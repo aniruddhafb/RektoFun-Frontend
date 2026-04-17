@@ -1,0 +1,144 @@
+export default function TermsPage() {
+    return (
+        <div className="min-h-screen bg-[#f5f5f5] font-sans">
+            {/* Navigation */}
+            <nav className="bg-[#f5f5f5]/80 backdrop-blur-md border-b border-gray-200">
+                <div className="max-w-7xl mx-auto px-6 lg:px-8">
+                    <div className="flex items-center justify-between h-20">
+                        <a href="/" className="flex items-center gap-2 cursor-pointer">
+                            <div className="w-8 h-8 bg-black rounded-full" />
+                            <span className="text-xl font-semibold tracking-tight">REKTO</span>
+                        </a>
+                        <a
+                            href="/"
+                            className="px-6 py-2.5 bg-black text-white text-sm font-medium rounded-full hover:bg-gray-800 transition-colors cursor-pointer"
+                        >
+                            Back to Home
+                        </a>
+                    </div>
+                </div>
+            </nav>
+
+            {/* Content */}
+            <main className="max-w-4xl mx-auto px-6 lg:px-8 py-12 md:py-16">
+                <h1 className="text-4xl md:text-5xl font-bold text-black mb-8">
+                    Terms of Service
+                </h1>
+
+                <div className="prose prose-lg max-w-none text-gray-700">
+                    <p className="text-lg mb-6">
+                        Last updated: April 2026
+                    </p>
+
+                    <section className="mb-8">
+                        <h2 className="text-2xl font-semibold text-black mb-4">
+                            1. Acceptance of Terms
+                        </h2>
+                        <p className="mb-4">
+                            By accessing and using RektoFun, you accept and agree to be bound by the terms
+                            and provision of this agreement. If you do not agree to abide by the above,
+                            please do not use this service.
+                        </p>
+                    </section>
+
+                    <section className="mb-8">
+                        <h2 className="text-2xl font-semibold text-black mb-4">
+                            2. Description of Service
+                        </h2>
+                        <p className="mb-4">
+                            RektoFun is a PvP battleground for price predictions and prediction markets.
+                            Users can participate in challenges, compete on leaderboards, and engage with
+                            other users in prediction-based competitions.
+                        </p>
+                    </section>
+
+                    <section className="mb-8">
+                        <h2 className="text-2xl font-semibold text-black mb-4">
+                            3. User Responsibilities
+                        </h2>
+                        <p className="mb-4">
+                            You are responsible for maintaining the confidentiality of your account
+                            information and for all activities that occur under your account. You agree
+                            to notify us immediately of any unauthorized use of your account.
+                        </p>
+                    </section>
+
+                    <section className="mb-8">
+                        <h2 className="text-2xl font-semibold text-black mb-4">
+                            4. Prohibited Activities
+                        </h2>
+                        <p className="mb-4">
+                            Users are prohibited from engaging in any activity that:
+                        </p>
+                        <ul className="list-disc pl-6 mb-4 space-y-2">
+                            <li>Violates any applicable laws or regulations</li>
+                            <li>Infringes on the rights of others</li>
+                            <li>Interferes with the operation of the service</li>
+                            <li>Attempts to gain unauthorized access to our systems</li>
+                            <li>Engages in fraudulent or manipulative behavior</li>
+                        </ul>
+                    </section>
+
+                    <section className="mb-8">
+                        <h2 className="text-2xl font-semibold text-black mb-4">
+                            5. Limitation of Liability
+                        </h2>
+                        <p className="mb-4">
+                            RektoFun shall not be liable for any indirect, incidental, special,
+                            consequential, or punitive damages resulting from your use of or inability
+                            to use the service.
+                        </p>
+                    </section>
+
+                    <section className="mb-8">
+                        <h2 className="text-2xl font-semibold text-black mb-4">
+                            6. Changes to Terms
+                        </h2>
+                        <p className="mb-4">
+                            We reserve the right to modify these terms at any time. We will notify users
+                            of any material changes by posting the new terms on this page.
+                        </p>
+                    </section>
+
+                    <section className="mb-8">
+                        <h2 className="text-2xl font-semibold text-black mb-4">
+                            7. Contact Information
+                        </h2>
+                        <p className="mb-4">
+                            If you have any questions about these Terms of Service, please contact us
+                            through our Discord community or email support.
+                        </p>
+                    </section>
+                </div>
+            </main>
+
+            {/* Footer */}
+            <footer className="py-6 px-6 lg:px-8 border-t border-gray-200 bg-[#f5f5f5]">
+                <div className="max-w-7xl mx-auto">
+                    <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+                        <p className="text-sm text-gray-600">
+                            ©2026 RektoFun
+                        </p>
+                        <div className="flex gap-6">
+                            <a href="#" className="text-gray-600 hover:text-black transition-colors cursor-pointer">
+                                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M24 4.557c-.883.392-1.832.656-2.828.775 1.017-.609 1.798-1.574 2.165-2.724-.951.564-2.005.974-3.127 1.195-.897-.957-2.178-1.555-3.594-1.555-3.179 0-5.515 2.966-4.797 6.045-4.091-.205-7.719-2.165-10.148-5.144-1.29 2.213-.669 5.108 1.523 6.574-.806-.026-1.566-.247-2.229-.616-.054 2.281 1.581 4.415 3.949 4.89-.693.188-1.452.232-2.224.084.626 1.956 2.444 3.379 4.6 3.419-2.07 1.623-4.678 2.348-7.29 2.04 2.179 1.397 4.768 2.212 7.548 2.212 9.142 0 14.307-7.721 13.995-14.646.962-.695 1.797-1.562 2.457-2.549z" />
+                                </svg>
+                            </a>
+                            <a href="#" className="text-gray-600 hover:text-black transition-colors cursor-pointer">
+                                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.835 2.809 1.305 3.495.998.108-.776.419-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
+                                </svg>
+                            </a>
+                            <a href="#" className="text-gray-600 hover:text-black transition-colors cursor-pointer">
+                                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z" />
+                                </svg>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </footer>
+        </div>
+    );
+}
