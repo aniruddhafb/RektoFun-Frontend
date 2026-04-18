@@ -1,3 +1,28 @@
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Terms of Service",
+  description: "Read RektoFun's Terms of Service. Learn about our user responsibilities, prohibited activities, and service limitations.",
+  keywords: ["terms of service", "RektoFun terms", "user agreement", "prediction markets terms", "trading platform rules", "service terms"],
+  robots: {
+    index: true,
+    follow: true,
+  },
+  openGraph: {
+    title: "Terms of Service | RektoFun",
+    description: "Read our Terms of Service and user agreement.",
+    url: "https://rekto.fun/terms",
+    images: [
+      {
+        url: "/logos/BG.png",
+        width: 1200,
+        height: 630,
+        alt: "RektoFun Terms of Service",
+      },
+    ],
+  },
+};
+
 export default function TermsPage() {
     return (
         <div className="min-h-screen bg-[#f5f5f5] font-sans">

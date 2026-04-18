@@ -1,3 +1,24 @@
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+    title: "About Us",
+    description: "Learn about RektoFun's mission to revolutionize prediction markets with PvP battles. Discover our vision for the future of competitive trading.",
+    keywords: ["about RektoFun", "prediction markets mission", "PvP trading platform", "trading community", "DeFi vision", "Web3 predictions"],
+    openGraph: {
+        title: "About RektoFun",
+        description: "Learn about our mission to revolutionize prediction markets with PvP battles.",
+        url: "https://rekto.fun/about",
+        images: [
+            {
+                url: "/logos/BG.png",
+                width: 1200,
+                height: 630,
+                alt: "About RektoFun",
+            },
+        ],
+    },
+};
+
 export default function AboutPage() {
     return (
         <div className="min-h-screen bg-[#f5f5f5] font-sans">
