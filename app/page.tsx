@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useState, useCallback } from "react";
 
 interface Bubble {
@@ -297,9 +298,9 @@ export default function Home() {
           </p>
 
           {/* CTA Button */}
-          <button className="px-10 py-4 bg-black text-white text-base font-semibold rounded-lg hover:bg-gray-800 transition-all shadow-lg cursor-pointer hover:scale-105 hover:shadow-glow pointer-events-auto">
+          <Link href="/challenges" className="px-10 py-4 bg-black text-white text-base font-semibold rounded-lg hover:bg-gray-800 transition-all shadow-lg cursor-pointer hover:scale-105 hover:shadow-glow pointer-events-auto">
             View Challenges ➝
-          </button>
+          </Link>
         </div>
 
         {/* Bottom decorative elements */}
