@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { Navbar, Footer } from "./components";
 
+import Providers from "./providers/PrivyProvider";
+
 export const metadata: Metadata = {
   title: "Landing Page",
   description: "Beautiful landing page",
@@ -22,9 +24,11 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-full flex flex-col">
-        <Navbar />
-        <main className="flex-1">{children}</main>
-        <Footer />
+        <Providers>
+          <Navbar />
+          <main className="flex-1">{children}</main>
+          <Footer />
+        </Providers>
       </body>
     </html>
   );
