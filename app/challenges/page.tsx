@@ -924,7 +924,8 @@ export default function ChallengesPage() {
                                     {/* Price labels */}
                                     <div className="flex justify-between text-sm text-gray-500 mb-2">
                                         <span>${challenge.startPrice.toLocaleString()}</span>
-                                        <span className="font-semibold text-gray-700">Target: ${challenge.targetPrice.toLocaleString()}</span>
+                                        <span className="font-semibold text-gray-700">${challenge.targetPrice.toLocaleString()}</span>
+                                        <span>${challenge.startPrice.toLocaleString()}</span>
                                     </div>
 
                                     {/* Progress bar container */}
@@ -973,9 +974,19 @@ export default function ChallengesPage() {
                                 </button>
 
                                 {/* Challenge Expiry */}
-                                <p className="text-center text-xs text-gray-600 mt-1.5">
-                                    Challenge expires in <span className="font-medium text-gray-900">{challenge.timeRemaining}</span>
-                                </p>
+                                <div className="flex items-center justify-center gap-1.5 text-xs text-gray-600 mt-1.5">
+                                    <span>Challenge expires in</span>
+                                    <span className="font-medium text-gray-900">{challenge.timeRemaining}</span>
+                                    <div className="group relative">
+                                        <svg className="w-3.5 h-3.5 text-gray-400 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10">
+                                            This challenge will expire in 59 mins, you won't be able to join after that.
+                                            <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
+                                        </div>
+                                    </div>
+                                </div>
 
                                 {/* Divider */}
                                 <div className="border-t border-gray-200 my-2"></div>
@@ -987,6 +998,15 @@ export default function ChallengesPage() {
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                                         </svg>
                                         <span className="text-sm">Created <span className="font-semibold text-gray-900">2h ago</span></span>
+                                        <div className="group relative">
+                                            <svg className="w-3.5 h-3.5 text-gray-400 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            </svg>
+                                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-44 p-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10">
+                                                This challenge was created 2 hours ago and will end on September 30, 2024 at 3:00 PM UTC if accepted.
+                                                <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
+                                            </div>
+                                        </div>
                                     </div>
                                     <div className="flex items-center gap-3">
                                         <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
