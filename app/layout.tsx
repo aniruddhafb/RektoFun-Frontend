@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { Navbar, Footer } from "./components";
 
+import Providers from "./providers/PrivyProvider";
+
 export const metadata: Metadata = {
   title: {
     default: "RektoFun - Win Or Get Rekt!!",
@@ -81,10 +83,12 @@ export default function RootLayout({
         <meta name="msapplication-TileColor" content="#f3e1d7" />
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
       </head>
-      <body className="min-h-full flex flex-col bg-[#f3e1d7]">
-        <Navbar />
-        <main className="flex-1">{children}</main>
-        <Footer />
+      <body className="min-h-full flex flex-col">
+        <Providers>
+          <Navbar />
+          <main className="flex-1">{children}</main>
+          <Footer />
+        </Providers>
       </body>
     </html>
   );
