@@ -298,7 +298,7 @@ export default function Home() {
 
           {/* CTA Button */}
           <button className="px-10 py-4 bg-black text-white text-base font-semibold rounded-lg hover:bg-gray-800 transition-all shadow-lg cursor-pointer hover:scale-105 hover:shadow-glow pointer-events-auto">
-            View Challenges ➝
+            Launching soon..
           </button>
         </div>
 
