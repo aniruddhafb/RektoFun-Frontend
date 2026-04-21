@@ -1,6 +1,8 @@
 'use client';
 
 import { PrivyProvider } from '@privy-io/react-auth';
+import { createSolanaRpc, createSolanaRpcSubscriptions } from '@solana/kit';
+import { toSolanaWalletConnectors } from "@privy-io/react-auth/solana";
 
 export default function Providers({ children }: { children: React.ReactNode }) {
   return (
@@ -8,7 +10,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
       appId={process.env.NEXT_PUBLIC_appId || ""}
       clientId={process.env.NEXT_PUBLIC_clientId || ""}
       config={{
-        // Configure login methods - social logins + wallet
+        appearance: { walletChainType: 'ethereum-and-solana' },
         loginMethods: ['google', 'twitter', 'wallet', 'email'],
 
         // Create embedded wallets for users who don't have a wallet
@@ -20,19 +22,15 @@ export default function Providers({ children }: { children: React.ReactNode }) {
             createOnLogin: 'users-without-wallets'
           }
         },
-
-        // Default chain — Solana devnet
-        supportedChains: {
-          id: 103, // Solana devnet chain ID in Privy
-          name: 'Solana Devnet',
-          network: 'solana-devnet',
-          nativeCurrency: { name: 'SOL', symbol: 'SOL', decimals: 9 },
-          rpcUrls: {
-            default: {
-              http: [process.env.NEXT_PUBLIC_SOLANA_RPC || 'https://api.devnet.solana.com'],
-            },
-          },
-        } as any,
+        // Configure Solana devnet as the default network
+        // solana: {
+        //   rpcs: {
+        //     'solana:devnet': {
+        //       rpc: createSolanaRpc('https://api.devnet.solana.com'),
+        //       rpcSubscriptions: createSolanaRpcSubscriptions('wss://api.devnet.solana.com'),
+        //     },
+        //   },
+        // },
       }}
     >
       {children}

@@ -7,9 +7,9 @@
  * Returns a wallet adapter compatible with getRektoProgram().
  */
 
-import { usePrivy, useWallets } from "@privy-io/react-auth";
+import { usePrivy } from "@privy-io/react-auth";
+import { useWallets } from "@privy-io/react-auth/solana";
 import { PublicKey, Transaction, Connection } from "@solana/web3.js";
-import { useMemo } from "react";
 import { getRektoProgram, RPC_ENDPOINT } from "./rektofun-program";
 import type { Program } from "@anchor-lang/core";
 
@@ -21,25 +21,35 @@ export interface SolanaWalletAdapter {
 
 export function useSolanaWallet() {
   const { authenticated, login } = usePrivy();
-  const { wallets } = useWallets();
+  const { wallets, ready } = useWallets();
 
-  // Pick the first Solana wallet (chain type = "solana")
-  const solanaWallet = wallets.find(
-    (w) => (w as any).chainType === "solana" || (w as any).type === "solana"
-  );
+  console.log({ solanaWallets: wallets, ready });
 
-  const adapter: SolanaWalletAdapter | null = useMemo(() => {
-    if (!solanaWallet?.address) return null;
+  // Pick the first available Solana wallet
+  const solanaWallet = wallets[0] ?? null;
+
+  console.log({ solanaWallet });
+
+  let adapter: SolanaWalletAdapter | null = null;
+
+  if (solanaWallet?.address) {
     const address = solanaWallet.address;
-    return {
+    adapter = {
       publicKey: new PublicKey(address),
       signTransaction: async (tx: Transaction) => {
         const connection = new Connection(RPC_ENDPOINT, "confirmed");
         const { blockhash } = await connection.getLatestBlockhash();
         tx.recentBlockhash = blockhash;
         tx.feePayer = new PublicKey(address);
-        const signed = await (solanaWallet as any).signTransaction(tx);
-        return signed as Transaction;
+
+        // Serialize the legacy transaction to bytes for the Privy Solana API
+        const serialized = tx.serialize({ requireAllSignatures: false });
+        const { signedTransaction } = await solanaWallet.signTransaction({
+          transaction: serialized,
+        });
+
+        // Deserialize the signed transaction bytes back to a Transaction object
+        return Transaction.from(signedTransaction);
       },
       signAllTransactions: async (txs: Transaction[]) => {
         const connection = new Connection(RPC_ENDPOINT, "confirmed");
@@ -48,22 +58,27 @@ export function useSolanaWallet() {
           txs.map(async (tx) => {
             tx.recentBlockhash = blockhash;
             tx.feePayer = new PublicKey(address);
-            const signed = await (solanaWallet as any).signTransaction(tx);
-            return signed as Transaction;
+
+            const serialized = tx.serialize({ requireAllSignatures: false });
+            const { signedTransaction } = await solanaWallet.signTransaction({
+              transaction: serialized,
+            });
+
+            return Transaction.from(signedTransaction);
           })
         );
       },
     };
-  }, [solanaWallet]);
+  }
 
-  const program: Program | null = useMemo(() => {
-    if (!adapter) return null;
+  let program: Program | null = null;
+  if (adapter) {
     try {
-      return getRektoProgram(adapter);
+      program = getRektoProgram(adapter);
     } catch {
-      return null;
+      program = null;
     }
-  }, [adapter]);
+  }
 
   /**
    * Send a pre-built transaction via the Solana wallet.
@@ -77,8 +92,13 @@ export function useSolanaWallet() {
     tx.recentBlockhash = blockhash;
     tx.feePayer = adapter.publicKey;
 
-    const signed = await (solanaWallet as any).signTransaction(tx);
-    const rawTx = (signed as any).serialize();
+    const serialized = tx.serialize({ requireAllSignatures: false });
+    const { signedTransaction } = await solanaWallet.signTransaction({
+      transaction: serialized,
+    });
+
+    const signed = Transaction.from(signedTransaction);
+    const rawTx = signed.serialize();
     const sig = await connection.sendRawTransaction(rawTx, {
       skipPreflight: false,
     });
