@@ -551,60 +551,6 @@ const topTraders = [
     },
 ];
 
-const topCreators = [
-    {
-        rank: 1,
-        username: "WhaleCreator",
-        avatar: "/scribbles/bags.png",
-        flag: "🇺🇸",
-        badge: "W",
-        wins: 245,
-        winsChange: "+32",
-        winsUp: true,
-        rekts: 12,
-        rektsChange: "-3",
-        rektsUp: false,
-        challenges: 890,
-        winRate: "95%",
-        earnings: "456.8 SOL",
-        isTop: true,
-    },
-    {
-        rank: 2,
-        username: "ChallengeKing",
-        avatar: "/scribbles/stars.png",
-        flag: "🇬🇧",
-        badge: null,
-        wins: 198,
-        winsChange: null,
-        winsUp: null,
-        rekts: 28,
-        rektsChange: "-5",
-        rektsUp: false,
-        challenges: 756,
-        winRate: "88%",
-        earnings: "389.2 SOL",
-        isTop: false,
-    },
-    {
-        rank: 3,
-        username: "PoolMaster",
-        avatar: "/scribbles/dollars.png",
-        flag: "🇨🇦",
-        badge: null,
-        wins: 176,
-        winsChange: "+18",
-        winsUp: true,
-        rekts: 34,
-        rektsChange: null,
-        rektsUp: null,
-        challenges: 678,
-        winRate: "84%",
-        earnings: "312.5 SOL",
-        isTop: false,
-    },
-];
-
 // Sparkle icon component
 const SparkleIcon = ({ className }: { className?: string }) => (
     <svg className={className} width="12" height="12" viewBox="0 0 12 12" fill="none">
