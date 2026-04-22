@@ -175,58 +175,378 @@ const topTraders = [
         earnings: "49.8 SOL",
         isTop: false,
     },
-];
-
-const topCreators = [
     {
-        rank: 1,
-        username: "WhaleCreator",
-        avatar: "/scribbles/bags.png",
+        rank: 11,
+        username: "AlphaWolf",
+        avatar: "/scribbles/shiba.png",
         flag: "🇺🇸",
-        badge: "W",
-        wins: 245,
-        winsChange: "+32",
-        winsUp: true,
-        rekts: 12,
-        rektsChange: "-3",
-        rektsUp: false,
-        challenges: 890,
-        winRate: "95%",
-        earnings: "456.8 SOL",
-        isTop: true,
-    },
-    {
-        rank: 2,
-        username: "ChallengeKing",
-        avatar: "/scribbles/stars.png",
-        flag: "🇬🇧",
         badge: null,
-        wins: 198,
-        winsChange: null,
-        winsUp: null,
-        rekts: 28,
-        rektsChange: "-5",
+        wins: 92,
+        winsChange: "+5",
+        winsUp: true,
+        rekts: 42,
+        rektsChange: "-2",
         rektsUp: false,
-        challenges: 756,
-        winRate: "88%",
-        earnings: "389.2 SOL",
+        challenges: 195,
+        winRate: "69%",
+        earnings: "45.2 SOL",
         isTop: false,
     },
     {
-        rank: 3,
-        username: "PoolMaster",
-        avatar: "/scribbles/dollars.png",
+        rank: 12,
+        username: "BullRunner",
+        avatar: "/scribbles/btc.png",
         flag: "🇨🇦",
         badge: null,
-        wins: 176,
-        winsChange: "+18",
+        wins: 88,
+        winsChange: null,
+        winsUp: null,
+        rekts: 38,
+        rektsChange: "-4",
+        rektsUp: false,
+        challenges: 188,
+        winRate: "70%",
+        earnings: "42.8 SOL",
+        isTop: false,
+    },
+    {
+        rank: 13,
+        username: "CryptoQueen",
+        avatar: "/scribbles/pepe.png",
+        flag: "🇬🇧",
+        badge: null,
+        wins: 85,
+        winsChange: "+7",
         winsUp: true,
-        rekts: 34,
+        rekts: 35,
         rektsChange: null,
         rektsUp: null,
-        challenges: 678,
-        winRate: "84%",
-        earnings: "312.5 SOL",
+        challenges: 175,
+        winRate: "71%",
+        earnings: "40.5 SOL",
+        isTop: false,
+    },
+    {
+        rank: 14,
+        username: "SolSurfer",
+        avatar: "/scribbles/sol.png",
+        flag: "🇰🇷",
+        badge: null,
+        wins: 82,
+        winsChange: null,
+        winsUp: null,
+        rekts: 40,
+        rektsChange: "-3",
+        rektsUp: false,
+        challenges: 168,
+        winRate: "67%",
+        earnings: "38.2 SOL",
+        isTop: false,
+    },
+    {
+        rank: 15,
+        username: "MoonShot",
+        avatar: "/scribbles/coins.png",
+        flag: "🇪🇺",
+        badge: null,
+        wins: 78,
+        winsChange: "+4",
+        winsUp: true,
+        rekts: 36,
+        rektsChange: "-2",
+        rektsUp: false,
+        challenges: 162,
+        winRate: "68%",
+        earnings: "36.1 SOL",
+        isTop: false,
+    },
+    {
+        rank: 16,
+        username: "DegenPrince",
+        avatar: "/scribbles/doge.png",
+        flag: "🇺🇸",
+        badge: null,
+        wins: 75,
+        winsChange: null,
+        winsUp: null,
+        rekts: 33,
+        rektsChange: "-5",
+        rektsUp: false,
+        challenges: 155,
+        winRate: "69%",
+        earnings: "34.5 SOL",
+        isTop: false,
+    },
+    {
+        rank: 17,
+        username: "WhaleWatcher",
+        avatar: "/scribbles/bags.png",
+        flag: "🇨🇦",
+        badge: null,
+        wins: 72,
+        winsChange: "+6",
+        winsUp: true,
+        rekts: 30,
+        rektsChange: null,
+        rektsUp: null,
+        challenges: 148,
+        winRate: "71%",
+        earnings: "32.8 SOL",
+        isTop: false,
+    },
+    {
+        rank: 18,
+        username: "TokenMaster",
+        avatar: "/scribbles/stars.png",
+        flag: "🇬🇧",
+        badge: null,
+        wins: 68,
+        winsChange: null,
+        winsUp: null,
+        rekts: 28,
+        rektsChange: "-3",
+        rektsUp: false,
+        challenges: 142,
+        winRate: "71%",
+        earnings: "30.4 SOL",
+        isTop: false,
+    },
+    {
+        rank: 19,
+        username: "YieldFarmer",
+        avatar: "/scribbles/dollars.png",
+        flag: "🇰🇷",
+        badge: null,
+        wins: 65,
+        winsChange: "+3",
+        winsUp: true,
+        rekts: 25,
+        rektsChange: "-2",
+        rektsUp: false,
+        challenges: 135,
+        winRate: "72%",
+        earnings: "28.9 SOL",
+        isTop: false,
+    },
+    {
+        rank: 20,
+        username: "BlockBuilder",
+        avatar: "/scribbles/btc.png",
+        flag: "🇪🇺",
+        badge: null,
+        wins: 62,
+        winsChange: null,
+        winsUp: null,
+        rekts: 22,
+        rektsChange: "-4",
+        rektsUp: false,
+        challenges: 128,
+        winRate: "74%",
+        earnings: "27.2 SOL",
+        isTop: false,
+    },
+    {
+        rank: 21,
+        username: "StakeKing",
+        avatar: "/scribbles/sol.png",
+        flag: "🇺🇸",
+        badge: null,
+        wins: 58,
+        winsChange: "+5",
+        winsUp: true,
+        rekts: 20,
+        rektsChange: null,
+        rektsUp: null,
+        challenges: 122,
+        winRate: "74%",
+        earnings: "25.6 SOL",
+        isTop: false,
+    },
+    {
+        rank: 22,
+        username: "ApeIn",
+        avatar: "/scribbles/pepe.png",
+        flag: "🇨🇦",
+        badge: null,
+        wins: 55,
+        winsChange: null,
+        winsUp: null,
+        rekts: 18,
+        rektsChange: "-3",
+        rektsUp: false,
+        challenges: 115,
+        winRate: "75%",
+        earnings: "24.1 SOL",
+        isTop: false,
+    },
+    {
+        rank: 23,
+        username: "HodlGang",
+        avatar: "/scribbles/shiba.png",
+        flag: "🇬🇧",
+        badge: null,
+        wins: 52,
+        winsChange: "+4",
+        winsUp: true,
+        rekts: 16,
+        rektsChange: "-2",
+        rektsUp: false,
+        challenges: 108,
+        winRate: "76%",
+        earnings: "22.8 SOL",
+        isTop: false,
+    },
+    {
+        rank: 24,
+        username: "PumpChaser",
+        avatar: "/scribbles/coins.png",
+        flag: "🇰🇷",
+        badge: null,
+        wins: 48,
+        winsChange: null,
+        winsUp: null,
+        rekts: 15,
+        rektsChange: "-1",
+        rektsUp: false,
+        challenges: 102,
+        winRate: "76%",
+        earnings: "21.5 SOL",
+        isTop: false,
+    },
+    {
+        rank: 25,
+        username: "DumpSurvivor",
+        avatar: "/scribbles/doge.png",
+        flag: "🇪🇺",
+        badge: null,
+        wins: 45,
+        winsChange: "+3",
+        winsUp: true,
+        rekts: 14,
+        rektsChange: null,
+        rektsUp: null,
+        challenges: 95,
+        winRate: "76%",
+        earnings: "20.2 SOL",
+        isTop: false,
+    },
+    {
+        rank: 26,
+        username: "FOMOTrader",
+        avatar: "/scribbles/btc.png",
+        flag: "🇺🇸",
+        badge: null,
+        wins: 42,
+        winsChange: null,
+        winsUp: null,
+        rekts: 12,
+        rektsChange: "-2",
+        rektsUp: false,
+        challenges: 88,
+        winRate: "78%",
+        earnings: "18.9 SOL",
+        isTop: false,
+    },
+    {
+        rank: 27,
+        username: "DiamondPaws",
+        avatar: "/scribbles/pepe.png",
+        flag: "🇨🇦",
+        badge: null,
+        wins: 38,
+        winsChange: "+2",
+        winsUp: true,
+        rekts: 10,
+        rektsChange: "-1",
+        rektsUp: false,
+        challenges: 82,
+        winRate: "79%",
+        earnings: "17.5 SOL",
+        isTop: false,
+    },
+    {
+        rank: 28,
+        username: "RugPullSafe",
+        avatar: "/scribbles/sol.png",
+        flag: "🇬🇧",
+        badge: null,
+        wins: 35,
+        winsChange: null,
+        winsUp: null,
+        rekts: 9,
+        rektsChange: null,
+        rektsUp: null,
+        challenges: 75,
+        winRate: "80%",
+        earnings: "16.2 SOL",
+        isTop: false,
+    },
+    {
+        rank: 29,
+        username: "GasOptimizer",
+        avatar: "/scribbles/stars.png",
+        flag: "🇰🇷",
+        badge: null,
+        wins: 32,
+        winsChange: "+4",
+        winsUp: true,
+        rekts: 8,
+        rektsChange: "-2",
+        rektsUp: false,
+        challenges: 70,
+        winRate: "80%",
+        earnings: "15.1 SOL",
+        isTop: false,
+    },
+    {
+        rank: 30,
+        username: "LiquidityKing",
+        avatar: "/scribbles/dollars.png",
+        flag: "🇪🇺",
+        badge: null,
+        wins: 28,
+        winsChange: null,
+        winsUp: null,
+        rekts: 7,
+        rektsChange: "-1",
+        rektsUp: false,
+        challenges: 65,
+        winRate: "80%",
+        earnings: "14.0 SOL",
+        isTop: false,
+    },
+    {
+        rank: 31,
+        username: "MEVHunter",
+        avatar: "/scribbles/bags.png",
+        flag: "🇺🇸",
+        badge: null,
+        wins: 25,
+        winsChange: "+3",
+        winsUp: true,
+        rekts: 6,
+        rektsChange: null,
+        rektsUp: null,
+        challenges: 58,
+        winRate: "81%",
+        earnings: "12.8 SOL",
+        isTop: false,
+    },
+    {
+        rank: 32,
+        username: "OracleReader",
+        avatar: "/scribbles/shiba.png",
+        flag: "🇨🇦",
+        badge: null,
+        wins: 22,
+        winsChange: null,
+        winsUp: null,
+        rekts: 5,
+        rektsChange: "-1",
+        rektsUp: false,
+        challenges: 52,
+        winRate: "81%",
+        earnings: "11.5 SOL",
         isTop: false,
     },
 ];
@@ -311,21 +631,19 @@ const ChevronIcon = ({ direction }: { direction: "up" | "down" }) => (
 );
 
 export default function LeaderboardPage() {
-    const [activeTab, setActiveTab] = useState<"traders" | "creators">("traders");
-    const [sortBy, setSortBy] = useState<"wins" | "rekts">("wins");
     const [searchQuery, setSearchQuery] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
-    const itemsPerPage = 5;
+    const itemsPerPage = 10;
 
-    const data = activeTab === "traders" ? topTraders : topCreators;
+    const data = topTraders;
     const filteredData = data.filter((user) =>
         user.username.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
-    // Reset to page 1 when tab or search changes
+    // Reset to page 1 when search changes
     useEffect(() => {
         setCurrentPage(1);
-    }, [activeTab, searchQuery]);
+    }, [searchQuery]);
 
     // Pagination logic
     const totalPages = Math.ceil(filteredData.length / itemsPerPage);
@@ -391,197 +709,146 @@ export default function LeaderboardPage() {
                     </div>
                 </div>
 
-                {/* Tabs and Controls */}
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-                    {/* Tabs */}
-                    <div className="inline-flex bg-white/40 rounded-lg p-1 border border-white/50">
-                        <button
-                            onClick={() => setActiveTab("traders")}
-                            className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${activeTab === "traders"
-                                ? "bg-white text-gray-900 shadow-sm"
-                                : "text-gray-600 hover:text-gray-900"
-                                }`}
-                        >
-                            Top Traders
-                        </button>
-                        <button
-                            onClick={() => setActiveTab("creators")}
-                            className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${activeTab === "creators"
-                                ? "bg-white text-gray-900 shadow-sm"
-                                : "text-gray-600 hover:text-gray-900"
-                                }`}
-                        >
-                            Top Creators
-                        </button>
-                    </div>
-
-                    {/* Controls */}
-                    <div className="flex items-center gap-2">
-                        {/* Sort buttons */}
-                        <div className="inline-flex bg-white/40 rounded-lg p-1 border border-white/50">
-                            <button
-                                onClick={() => setSortBy("wins")}
-                                className={`px-3 py-1.5 rounded-md text-sm font-medium flex items-center gap-1 transition-all ${sortBy === "wins"
-                                    ? "bg-white text-gray-900 shadow-sm"
-                                    : "text-gray-600 hover:text-gray-900"
-                                    }`}
-                            >
-                                Wins
-                                <ChevronIcon direction="up" />
-                            </button>
-                            <button
-                                onClick={() => setSortBy("rekts")}
-                                className={`px-3 py-1.5 rounded-md text-sm font-medium flex items-center gap-1 transition-all ${sortBy === "rekts"
-                                    ? "bg-white text-gray-900 shadow-sm"
-                                    : "text-gray-600 hover:text-gray-900"
-                                    }`}
-                            >
-                                Rekts
-                                <ChevronIcon direction="down" />
-                            </button>
+                {/* Search */}
+                <div className="mb-6">
+                    <div className="relative max-w-md">
+                        <div className="absolute left-4 top-1/2 -translate-y-1/2">
+                            <SearchIcon />
                         </div>
-
-                        {/* Search */}
-                        <div className="relative">
-                            <div className="absolute left-3 top-1/2 -translate-y-1/2">
-                                <SearchIcon />
-                            </div>
-                            <input
-                                type="text"
-                                placeholder="Search traders"
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                className="pl-9 pr-4 py-1.5 bg-white/60 border border-white/50 rounded-lg text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-500/30 w-40"
-                            />
-                        </div>
-
-                        {/* Filter button */}
-                        <button className="px-4 py-1.5 bg-white/60 border border-white/50 rounded-lg text-sm font-medium text-gray-700 hover:bg-white/80 transition-all">
-                            Filter
-                        </button>
+                        <input
+                            type="text"
+                            placeholder="Search traders"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="pl-11 pr-4 py-3 bg-white/60 border border-white/50 rounded-xl text-base text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-500/30 w-full"
+                        />
                     </div>
                 </div>
 
                 {/* Leaderboard Table */}
                 <div className="bg-white/40 backdrop-blur-sm rounded-2xl border border-white/50 overflow-hidden shadow-sm">
-                    {/* Table Header */}
-                    <div className="grid grid-cols-12 gap-4 px-6 py-4 border-b border-white/50 text-sm font-medium text-gray-600">
-                        <div className="col-span-1">Rank</div>
-                        <div className="col-span-3">Trader</div>
-                        <div className="col-span-2 flex items-center gap-1">
-                            Wins
-                            <ChevronIcon direction="up" />
-                        </div>
-                        <div className="col-span-1 flex items-center gap-1">
-                            Rekts
-                            <ChevronIcon direction="down" />
-                        </div>
-                        <div className="col-span-2 flex items-center gap-1">
-                            Challenges
-                            <ChevronIcon direction="up" />
-                        </div>
-                        <div className="col-span-1 flex items-center gap-1">
-                            Win Rate
-                            <ChevronIcon direction="up" />
-                        </div>
-                        <div className="col-span-2 flex items-center gap-1 justify-end">
-                            Earnings
-                            <ChevronIcon direction="up" />
-                        </div>
-                    </div>
-
-                    {/* Table Body */}
-                    <div className="divide-y divide-white/30">
-                        {paginatedData.map((user) => (
-                            <div
-                                key={user.rank}
-                                className="grid grid-cols-12 gap-4 px-6 py-4 items-center hover:bg-white/30 transition-colors"
-                            >
-                                {/* Rank */}
-                                <div className="col-span-1 flex items-center gap-2">
-                                    <span className="text-lg font-semibold text-gray-700 w-4">
-                                        {user.rank}
-                                    </span>
-                                    {user.rank === 1 ? (
-                                        <StarBadge />
-                                    ) : (
-                                        <DiamondIcon />
-                                    )}
-                                </div>
-
-                                {/* Trader */}
-                                <div className="col-span-3 flex items-center gap-3">
-                                    <div className="relative w-10 h-10 rounded-full overflow-hidden bg-gray-200 border-2 border-white shadow-sm">
-                                        <Image
-                                            src={user.avatar}
-                                            alt={user.username}
-                                            fill
-                                            className="object-cover"
-                                        />
-                                    </div>
-                                    <div className="flex items-center gap-1.5">
-                                        <span className="font-semibold text-gray-900">
-                                            {user.username}
-                                        </span>
-                                        <span className="text-base">{user.flag}</span>
-                                        {user.badge && (
-                                            <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-700 text-xs font-bold rounded">
-                                                {user.badge}
-                                            </span>
-                                        )}
-                                    </div>
-                                </div>
-
-                                {/* Wins */}
-                                <div className="col-span-2 flex items-center gap-2">
-                                    {user.winsUp !== null && (
-                                        <ArrowUpIcon />
-                                    )}
-                                    {user.winsUp === null && user.winsChange === null && (
-                                        <SparkleIcon className="text-amber-500" />
-                                    )}
-                                    <span className="font-semibold text-gray-900">{user.wins}</span>
-                                    {user.winsChange && (
-                                        <span
-                                            className={`text-sm ${user.winsUp ? "text-emerald-600" : "text-gray-500"
-                                                }`}
-                                        >
-                                            {user.winsChange}
-                                        </span>
-                                    )}
-                                </div>
-
-                                {/* Rekts */}
-                                <div className="col-span-1 flex items-center gap-1">
-                                    <span
-                                        className={`font-semibold ${user.rektsChange ? "text-red-600" : "text-gray-900"
-                                            }`}
-                                    >
-                                        {user.rekts}
-                                    </span>
-                                    {user.rektsChange && (
-                                        <span className="text-sm text-emerald-600">
-                                            {user.rektsChange}
-                                        </span>
-                                    )}
-                                </div>
-
-                                {/* Challenges */}
+                    <div className="overflow-x-auto">
+                        <div className="min-w-[800px]">
+                            {/* Table Header */}
+                            <div className="grid grid-cols-12 gap-4 px-6 py-4 border-b border-white/50 text-sm font-medium text-gray-600">
+                                <div className="col-span-1">Rank</div>
+                                <div className="col-span-3">Trader</div>
                                 <div className="col-span-2 flex items-center gap-1">
-                                    <span className="text-gray-900">{user.challenges}</span>
+                                    Wins
+                                    <ChevronIcon direction="up" />
                                 </div>
-
-                                {/* Win Rate */}
-                                <div className="col-span-1">
-                                    <span className="text-gray-900">{user.winRate}</span>
+                                <div className="col-span-1 flex items-center gap-1">
+                                    Rekts
+                                    <ChevronIcon direction="down" />
                                 </div>
-
-                                {/* Earnings */}
-                                <div className="col-span-2 text-right">
-                                    <span className="font-semibold text-gray-900">{user.earnings}</span>
+                                <div className="col-span-2 flex items-center gap-1">
+                                    Challenges
+                                    <ChevronIcon direction="up" />
+                                </div>
+                                <div className="col-span-1 flex items-center gap-1">
+                                    Win Rate
+                                    <ChevronIcon direction="up" />
+                                </div>
+                                <div className="col-span-2 flex items-center gap-1 justify-end">
+                                    Earnings
+                                    <ChevronIcon direction="up" />
                                 </div>
                             </div>
-                        ))}
+
+                            {/* Table Body */}
+                            <div className="divide-y divide-white/30">
+                                {paginatedData.map((user) => (
+                                    <div
+                                        key={user.rank}
+                                        className="grid grid-cols-12 gap-4 px-6 py-4 items-center hover:bg-white/30 transition-colors"
+                                    >
+                                        {/* Rank */}
+                                        <div className="col-span-1 flex items-center gap-2">
+                                            <span className="text-lg font-semibold text-gray-700 w-4">
+                                                {user.rank}
+                                            </span>
+                                            {user.rank === 1 ? (
+                                                <StarBadge />
+                                            ) : (
+                                                <DiamondIcon />
+                                            )}
+                                        </div>
+
+                                        {/* Trader */}
+                                        <div className="col-span-3 flex items-center gap-3">
+                                            <div className="relative w-10 h-10 rounded-full overflow-hidden bg-gray-200 border-2 border-white shadow-sm flex-shrink-0">
+                                                <Image
+                                                    src={user.avatar}
+                                                    alt={user.username}
+                                                    fill
+                                                    className="object-cover"
+                                                />
+                                            </div>
+                                            <div className="flex items-center gap-1.5 min-w-0">
+                                                <span className="font-semibold text-gray-900 truncate">
+                                                    {user.username}
+                                                </span>
+                                                <span className="text-base flex-shrink-0">{user.flag}</span>
+                                                {user.badge && (
+                                                    <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-700 text-xs font-bold rounded flex-shrink-0">
+                                                        {user.badge}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* Wins */}
+                                        <div className="col-span-2 flex items-center gap-2">
+                                            {user.winsUp !== null && (
+                                                <ArrowUpIcon />
+                                            )}
+                                            {user.winsUp === null && user.winsChange === null && (
+                                                <SparkleIcon className="text-amber-500" />
+                                            )}
+                                            <span className="font-semibold text-gray-900">{user.wins}</span>
+                                            {user.winsChange && (
+                                                <span
+                                                    className={`text-sm ${user.winsUp ? "text-emerald-600" : "text-gray-500"
+                                                        }`}
+                                                >
+                                                    {user.winsChange}
+                                                </span>
+                                            )}
+                                        </div>
+
+                                        {/* Rekts */}
+                                        <div className="col-span-1 flex items-center gap-1">
+                                            <span
+                                                className={`font-semibold ${user.rektsChange ? "text-red-600" : "text-gray-900"
+                                                    }`}
+                                            >
+                                                {user.rekts}
+                                            </span>
+                                            {user.rektsChange && (
+                                                <span className="text-sm text-emerald-600">
+                                                    {user.rektsChange}
+                                                </span>
+                                            )}
+                                        </div>
+
+                                        {/* Challenges */}
+                                        <div className="col-span-2 flex items-center gap-1">
+                                            <span className="text-gray-900">{user.challenges}</span>
+                                        </div>
+
+                                        {/* Win Rate */}
+                                        <div className="col-span-1">
+                                            <span className="text-gray-900">{user.winRate}</span>
+                                        </div>
+
+                                        {/* Earnings */}
+                                        <div className="col-span-2 text-right">
+                                            <span className="font-semibold text-gray-900">{user.earnings}</span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
                     </div>
 
                     {/* Pagination */}

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { Navbar, Footer } from "./components";
+import { Analytics } from "@vercel/analytics/next"
 
 import Providers from "./providers/PrivyProvider";
 
@@ -23,7 +24,7 @@ export const metadata: Metadata = {
     locale: "en_US",
     url: "https://rekto.fun",
     siteName: "RektoFun",
-    title: "RektoFun - PvP Prediction Markets",
+    title: "RektoFun - PvP battleground for price predictions",
     description: "The first PvP battleground for price predictions. Compete, battle, and win rewards.",
     images: [
       {
@@ -36,7 +37,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "RektoFun - PvP Prediction Markets",
+    title: "RektoFun - PvP battleground for price predictions",
     description: "The first PvP battleground for price predictions. Compete, battle, and win rewards.",
     images: ["/logos/BG.png"],
     creator: "@rekto_fun",
@@ -70,6 +71,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="h-full antialiased">
+      <Analytics />
       <head>
         <link rel="preconnect" href="https://fonts.cdnfonts.com" />
         <link

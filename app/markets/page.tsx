@@ -1,8 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import Image from "next/image";
-import { Search, SlidersHorizontal, ChevronDown, ArrowRight, Flame, Zap } from "lucide-react";
+import { Search, SlidersHorizontal, ChevronDown, ArrowRight, Flame, Zap, TrendingUp, Clock, DollarSign, Eye, Bookmark } from "lucide-react";
+
+// Challenge data type
+interface Challenge {
+    id: string;
+    title: string;
+}
 
 // Market data type
 interface Market {
@@ -18,6 +24,9 @@ interface Market {
     prizePool: string;
     endsIn: string;
     category: string;
+    challenges: Challenge[];
+    totalTraders: number;
+    totalVolume: string;
 }
 
 // Sample market data
@@ -35,6 +44,15 @@ const marketsData: Market[] = [
         prizePool: "$3,240",
         endsIn: "1 hr 27m",
         category: "BTC",
+        challenges: [
+            { id: "c1", title: "BTC to hit $66K by noon" },
+            { id: "c2", title: "BTC +5% in 30 mins" },
+            { id: "c3", title: "BTC above $65.5K" },
+            { id: "c4", title: "BTC volatility challenge" },
+            { id: "c5", title: "BTC hourly close green" },
+        ],
+        totalTraders: 342,
+        totalVolume: "$1.2M",
     },
     {
         id: "2",
@@ -49,6 +67,14 @@ const marketsData: Market[] = [
         prizePool: "$2,100",
         endsIn: "27m",
         category: "ETH",
+        challenges: [
+            { id: "c6", title: "ETH to $3,200" },
+            { id: "c7", title: "ETH -3% in 1 hour" },
+            { id: "c8", title: "ETH gas fee spike" },
+            { id: "c9", title: "ETH bullish breakout" },
+        ],
+        totalTraders: 256,
+        totalVolume: "$890K",
     },
     {
         id: "3",
@@ -63,6 +89,13 @@ const marketsData: Market[] = [
         prizePool: "$8,720",
         endsIn: "2h 09m",
         category: "SOL",
+        challenges: [
+            { id: "c10", title: "SOL to $165" },
+            { id: "c11", title: "SOL +10% today" },
+            { id: "c12", title: "SOL volume spike" },
+        ],
+        totalTraders: 189,
+        totalVolume: "$650K",
     },
     {
         id: "4",
@@ -77,6 +110,14 @@ const marketsData: Market[] = [
         prizePool: "$3,240",
         endsIn: "1 hr 27m",
         category: "SOL",
+        challenges: [
+            { id: "c13", title: "SOL support test" },
+            { id: "c14", title: "SOL breakout $162" },
+            { id: "c15", title: "SOL vs ETH performance" },
+            { id: "c16", title: "SOL daily high" },
+        ],
+        totalTraders: 145,
+        totalVolume: "$420K",
     },
     {
         id: "5",
@@ -91,6 +132,13 @@ const marketsData: Market[] = [
         prizePool: "$530",
         endsIn: "1 hr 27m",
         category: "PEPE",
+        challenges: [
+            { id: "c17", title: "PEPE to the moon" },
+            { id: "c18", title: "PEPE 2x in 24h" },
+            { id: "c19", title: "PEPE volume surge" },
+        ],
+        totalTraders: 98,
+        totalVolume: "$180K",
     },
     {
         id: "6",
@@ -105,15 +153,57 @@ const marketsData: Market[] = [
         prizePool: "$430",
         endsIn: "24m",
         category: "BONK",
+        challenges: [
+            { id: "c20", title: "BONK reversal play" },
+            { id: "c21", title: "BONK support hold" },
+            { id: "c22", title: "BONK vs DOGE" },
+            { id: "c23", title: "BONK meme momentum" },
+        ],
+        totalTraders: 76,
+        totalVolume: "$95K",
     },
 ];
 
-const filterTabs = ["All", "BTC", "ETH", "SOL", "PEPE", "BONK"];
+type SortOption = "Recently Added" | "Trending" | "Price Markets" | "Most Watchlisted";
+
+const sortOptions: { label: SortOption; icon: React.ReactNode }[] = [
+    { label: "Recently Added", icon: <Clock className="w-4 h-4" /> },
+    { label: "Trending", icon: <TrendingUp className="w-4 h-4" /> },
+    { label: "Price Markets", icon: <DollarSign className="w-4 h-4" /> },
+    { label: "Most Watchlisted", icon: <Eye className="w-4 h-4" /> },
+];
 
 export default function MarketsPage() {
     const [activeTab, setActiveTab] = useState("All");
     const [currentPage, setCurrentPage] = useState(1);
+    const [sortBy, setSortBy] = useState<SortOption>("Recently Added");
+    const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+    const [bookmarkedMarkets, setBookmarkedMarkets] = useState<Set<string>>(new Set());
+    const dropdownRef = useRef<HTMLDivElement>(null);
     const totalPages = 3;
+
+    const toggleBookmark = (marketId: string) => {
+        setBookmarkedMarkets(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(marketId)) {
+                newSet.delete(marketId);
+            } else {
+                newSet.add(marketId);
+            }
+            return newSet;
+        });
+    };
+
+    // Close dropdown when clicking outside
+    useEffect(() => {
+        function handleClickOutside(event: MouseEvent) {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+                setIsDropdownOpen(false);
+            }
+        }
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
 
     const filteredMarkets = activeTab === "All"
         ? marketsData
@@ -121,70 +211,72 @@ export default function MarketsPage() {
 
     return (
         <div className="min-h-screen bg-[#f3e1d7]">
-            <div className="max-w-7xl mx-auto px-6 lg:px-8 py-8">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
                 {/* Header Section */}
-                <div className="mb-8">
-                    <h1 className="text-4xl font-bold text-gray-900 mb-2">Challenge Markets</h1>
-                    <p className="text-gray-600 text-lg">Predict trends and earn big on top crypto markets</p>
+                <div className="mb-6 sm:mb-8">
+                    <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-2">Challenge Markets</h1>
+                    <p className="text-gray-600 text-base sm:text-lg">Predict trends and earn big on top challenge markets</p>
                 </div>
 
                 {/* Filter Tabs and Search */}
-                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
-                    {/* Filter Tabs */}
-                    <div className="flex items-center gap-1 bg-white/50 rounded-full p-1 w-fit">
-                        {filterTabs.map((tab) => (
-                            <button
-                                key={tab}
-                                onClick={() => setActiveTab(tab)}
-                                className={`px-5 py-2 rounded-full text-sm font-medium transition-all duration-200 ${activeTab === tab
-                                        ? "bg-white text-gray-900 shadow-sm"
-                                        : "text-gray-600 hover:text-gray-900"
-                                    }`}
-                            >
-                                {tab}
-                            </button>
-                        ))}
-                    </div>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
 
                     {/* Search and Sort */}
-                    <div className="flex items-center gap-3">
-                        <div className="relative">
+                    <div className="flex items-center gap-2 sm:gap-3">
+                        <div className="relative flex-1 sm:flex-none">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                             <input
                                 type="text"
                                 placeholder="Search"
-                                className="pl-10 pr-4 py-2.5 bg-white/50 rounded-full text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-200 w-48"
+                                className="pl-10 pr-4 py-2.5 bg-white/50 rounded-full text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-200 w-full sm:w-48 lg:w-88"
                             />
                         </div>
-                        <button className="flex items-center gap-2 px-4 py-2.5 bg-white/50 rounded-full text-sm text-gray-700 hover:bg-white/70 transition-colors">
-                            Latest
-                            <ChevronDown className="w-4 h-4" />
-                        </button>
-                        <button className="p-2.5 bg-white/50 rounded-full text-gray-700 hover:bg-white/70 transition-colors">
-                            <SlidersHorizontal className="w-4 h-4" />
-                        </button>
+
+                        {/* Sort Dropdown */}
+                        <div className="relative" ref={dropdownRef}>
+                            <button
+                                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                                className="cursor-pointer flex items-center gap-2 px-3 sm:px-4 py-2.5 bg-white/50 rounded-full text-sm text-gray-700 hover:bg-white/70 transition-colors whitespace-nowrap"
+                            >
+                                <span className="hidden sm:inline">{sortBy}</span>
+                                <span className="sm:hidden">{sortOptions.find(o => o.label === sortBy)?.icon}</span>
+                                <ChevronDown className={`w-4 h-4 transition-transform ${isDropdownOpen ? "rotate-180" : ""}`} />
+                            </button>
+
+                            {isDropdownOpen && (
+                                <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-100 py-2 z-10">
+                                    {sortOptions.map((option) => (
+                                        <button
+                                            key={option.label}
+                                            onClick={() => {
+                                                setSortBy(option.label);
+                                                setIsDropdownOpen(false);
+                                            }}
+                                            className={`w-full cursor-pointer flex items-center gap-3 px-4 py-2.5 text-sm text-left transition-colors ${sortBy === option.label
+                                                ? "text-black font-semibold"
+                                                : "text-gray-700 hover:bg-gray-50"
+                                                }`}
+                                        >
+                                            {option.icon}
+                                            {option.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
 
-                {/* Section Header */}
-                <div className="flex items-center gap-3 mb-6">
-                    <span className="text-gray-700 font-medium">All Challenge Markets</span>
-                    <span className="flex items-center gap-1 text-amber-600 font-semibold">
-                        <span className="w-2 h-2 bg-amber-500 rounded-full"></span>
-                        {marketsData.length}
-                    </span>
-                </div>
-
                 {/* Markets Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 mb-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5 mb-8">
                     {filteredMarkets.map((market) => (
                         <div
                             key={market.id}
-                            className="bg-white/40 backdrop-blur-sm rounded-2xl p-5 border border-white/50 hover:shadow-lg transition-shadow duration-300"
+                            className="bg-white/40 backdrop-blur-sm rounded-2xl p-4 sm:p-5 border border-white/50 hover:shadow-lg transition-shadow duration-300 flex flex-col"
                         >
                             {/* Card Header */}
-                            <div className="flex items-start gap-3 mb-4">
-                                <div className="w-12 h-12 rounded-full overflow-hidden bg-white/50 flex-shrink-0">
+                            <div className="flex items-start gap-3 mb-3 sm:mb-4">
+                                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full overflow-hidden bg-white/50 flex-shrink-0">
                                     <Image
                                         src={market.icon}
                                         alt={market.name}
@@ -194,47 +286,77 @@ export default function MarketsPage() {
                                     />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <h3 className="font-semibold text-gray-900 text-lg leading-tight mb-1">
+                                    <h3 className="font-semibold text-gray-900 text-base sm:text-lg leading-tight mb-1">
                                         {market.name}
                                     </h3>
-                                    <div className="flex items-center gap-3 text-sm text-gray-600">
-                                        <span>{market.available} Available</span>
-                                        <span className="flex items-center gap-1">
-                                            <ArrowRight className="w-3 h-3" />
-                                            <Flame className="w-3 h-3 text-orange-500" />
-                                            {market.participants}
-                                        </span>
+                                    <div className="flex items-center gap-2 sm:gap-3 text-xs sm:text-sm text-gray-600">
+                                        <span>{market.available} Challenges Available</span>
+                                    </div>
+                                </div>
+                                {/* Bookmark Button */}
+                                <button
+                                    onClick={() => toggleBookmark(market.id)}
+                                    className="p-2 rounded-full hover:bg-white/50 transition-colors flex-shrink-0"
+                                    aria-label={bookmarkedMarkets.has(market.id) ? "Remove bookmark" : "Add bookmark"}
+                                >
+                                    <Bookmark
+                                        className={`w-5 h-5 transition-colors ${bookmarkedMarkets.has(market.id)
+                                            ? "fill-[#5a7c6c] text-[#5a7c6c]"
+                                            : "text-gray-400 hover:text-gray-600"
+                                            }`}
+                                    />
+                                </button>
+                            </div>
+
+                            {/* Card Body - Scrollable Challenges */}
+                            <div className="flex-1 mb-4">
+                                {/* Scrollable Challenges Section */}
+                                <div className="max-h-32 overflow-y-auto scrollbar-hide mb-4">
+                                    <style jsx>{`
+                                        .scrollbar-hide::-webkit-scrollbar {
+                                            display: none;
+                                        }
+                                        .scrollbar-hide {
+                                            -ms-overflow-style: none;
+                                            scrollbar-width: none;
+                                        }
+                                    `}</style>
+                                    <div className="space-y-2">
+                                        {market.challenges.map((challenge) => (
+                                            <div
+                                                key={challenge.id}
+                                                className="flex items-center justify-between p-2.5 bg-white/30 rounded-lg"
+                                            >
+                                                <span className="text-sm text-gray-800 font-medium truncate pr-2">
+                                                    {challenge.title}
+                                                </span>
+                                                <button className="px-3 py-1.5 bg-[#5a7c6c] hover:bg-[#4a6b5c] text-white text-xs font-medium rounded-lg transition-colors whitespace-nowrap">
+                                                    Rekt him
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Stats Section */}
+                                <div className="flex items-center justify-between text-xs text-gray-600 border-t border-white/30 pt-3">
+                                    <div className="flex flex-col">
+                                        <span className="font-semibold text-gray-900">{market.available}</span>
+                                        <span>Challenges</span>
+                                    </div>
+                                    <div className="flex flex-col items-center">
+                                        <span className="font-semibold text-gray-900">{market.totalTraders}</span>
+                                        <span>Traders</span>
+                                    </div>
+                                    <div className="flex flex-col items-end">
+                                        <span className="font-semibold text-gray-900">{market.totalVolume}</span>
+                                        <span>Volume</span>
                                     </div>
                                 </div>
                             </div>
 
-                            {/* Best Bet Badge */}
-                            <div className="mb-3">
-                                <span className="inline-block px-3 py-1 bg-[#e8d5c4] text-gray-700 text-xs font-medium rounded-full">
-                                    Best Bet
-                                </span>
-                            </div>
-
-                            {/* Prediction */}
-                            <div className="mb-4">
-                                <p className="text-gray-800">
-                                    <span className="text-emerald-600 font-semibold">{market.bestBet.reward}</span>{" "}
-                                    <span className="font-medium">{market.bestBet.prediction}</span>
-                                </p>
-                            </div>
-
-                            {/* Prize Pool & Time */}
-                            <div className="bg-white/40 rounded-xl px-4 py-3 mb-4">
-                                <div className="flex items-center justify-between text-sm">
-                                    <span className="font-semibold text-gray-900">{market.prizePool}</span>
-                                    <span className="text-gray-500">Prize Pool</span>
-                                    <span className="text-gray-400">•</span>
-                                    <span className="text-gray-600">Ends in {market.endsIn}</span>
-                                </div>
-                            </div>
-
                             {/* View Button */}
-                            <button className="w-full py-3 bg-[#5a7c6c] hover:bg-[#4a6b5c] text-white font-medium rounded-xl transition-colors flex items-center justify-center gap-2 group">
+                            <button className="w-full py-2.5 sm:py-3 bg-[#5a7c6c] hover:bg-[#4a6b5c] text-white font-medium rounded-xl transition-colors flex items-center justify-center gap-2 group text-sm sm:text-base">
                                 View Challenges
                                 <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                             </button>
@@ -244,16 +366,6 @@ export default function MarketsPage() {
 
                 {/* Pagination */}
                 <div className="flex items-center justify-center gap-2">
-                    {/* Dots indicator */}
-                    <div className="flex items-center gap-1.5 mr-4">
-                        {[1, 2, 3, 4, 5, 6].map((dot) => (
-                            <div
-                                key={dot}
-                                className={`w-2 h-2 rounded-full transition-colors ${dot <= currentPage ? "bg-gray-400" : "bg-gray-300"
-                                    }`}
-                            />
-                        ))}
-                    </div>
 
                     {/* Page Numbers */}
                     <div className="flex items-center gap-1">
@@ -262,8 +374,8 @@ export default function MarketsPage() {
                                 key={page}
                                 onClick={() => setCurrentPage(page)}
                                 className={`w-10 h-10 rounded-lg text-sm font-medium transition-colors ${currentPage === page
-                                        ? "bg-[#d4c4b5] text-gray-800"
-                                        : "text-gray-600 hover:bg-white/30"
+                                    ? "bg-[#d4c4b5] text-gray-800"
+                                    : "text-gray-600 hover:bg-white/30"
                                     }`}
                             >
                                 {page}

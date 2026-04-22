@@ -13,10 +13,12 @@
   --font-sans: "Craftwork Grotesk", Arial, Helvetica, sans-serif;
 }
 
+html,
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: "Craftwork Grotesk", Arial, Helvetica, sans-serif;
+  overflow-x: hidden;
 }
 
 /* Button hover glow */
@@ -533,4 +535,14 @@ body {
     inset 3px 3px 6px rgba(255, 255, 255, 0.5),
     0 0 15px rgba(255, 255, 255, 0.6);
   border: 2px solid rgba(255, 255, 255, 0.8);
+}
+
+/* Hide scrollbar for filter tabs */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
 }

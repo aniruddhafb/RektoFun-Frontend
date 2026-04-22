@@ -1,0 +1,463 @@
+"use client";
+
+import { useState, useRef } from "react";
+import { usePrivy } from "@privy-io/react-auth";
+import Image from "next/image";
+
+export default function SettingsPage() {
+    const { user, authenticated, logout, linkWallet, linkTwitter, linkGoogle } = usePrivy();
+
+    // Profile state
+    const [username, setUsername] = useState(user?.email?.address?.split('@')[0] || "trader_123");
+    const [description, setDescription] = useState("Crypto enthusiast | DeFi degen | Prediction markets warrior 🚀");
+    const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
+    const [isEditingUsername, setIsEditingUsername] = useState(false);
+    const [isEditingDescription, setIsEditingDescription] = useState(false);
+    const [showExportModal, setShowExportModal] = useState(false);
+    const [copiedAddress, setCopiedAddress] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // Get wallet address
+    const walletAddress = user?.wallet?.address || null;
+    const displayAddress = walletAddress
+        ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`
+        : "Not connected";
+
+    // Get linked accounts
+    const linkedTwitter = user?.linkedAccounts?.find(acc => acc.type === "twitter_oauth");
+    const linkedGoogle = user?.linkedAccounts?.find(acc => acc.type === "google_oauth");
+    const linkedWallet = user?.linkedAccounts?.find(acc => acc.type === "wallet");
+
+    // Determine current login method
+    const getLoginMethod = () => {
+        if (linkedWallet) return "wallet";
+        if (linkedTwitter) return "twitter";
+        if (linkedGoogle) return "google";
+        return "email";
+    };
+    const currentLoginMethod = getLoginMethod();
+
+    // Handle photo upload
+    const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setProfilePhoto(reader.result as string);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    // Copy wallet address
+    const copyAddress = () => {
+        if (walletAddress) {
+            navigator.clipboard.writeText(walletAddress);
+            setCopiedAddress(true);
+            setTimeout(() => setCopiedAddress(false), 2000);
+        }
+    };
+
+    // Save profile changes
+    const saveProfile = () => {
+        // TODO: Implement API call to save profile
+        setIsEditingUsername(false);
+        setIsEditingDescription(false);
+    };
+
+    return (
+        <div className="min-h-screen bg-[#f3e1d7] py-8 px-4 sm:px-6 lg:px-8">
+            <div className="max-w-4xl mx-auto">
+                {/* Header */}
+                <div className="mb-8">
+                    <h1 className="text-3xl font-bold text-gray-900">Settings</h1>
+                    <p className="text-gray-600 mt-1">Manage your profile, wallet, and connected accounts</p>
+                </div>
+
+                {/* Profile Section */}
+                <section className="bg-white/60 backdrop-blur-sm rounded-2xl border border-gray-300/50 p-6 mb-6">
+                    <div className="flex items-center gap-2 mb-6">
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+                            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                            </svg>
+                        </div>
+                        <h2 className="text-xl font-semibold text-gray-900">Profile</h2>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row gap-6">
+                        {/* Profile Photo */}
+                        <div className="flex flex-col items-center">
+                            <div className="relative">
+                                <div className="w-24 h-24 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-3xl font-bold overflow-hidden border-4 border-white shadow-lg">
+                                    {profilePhoto ? (
+                                        <Image src={profilePhoto} alt="Profile" width={96} height={96} className="w-full h-full object-cover" />
+                                    ) : (
+                                        username.charAt(0).toUpperCase()
+                                    )}
+                                </div>
+                                <button
+                                    onClick={() => fileInputRef.current?.click()}
+                                    className="absolute -bottom-1 -right-1 w-8 h-8 bg-black text-white rounded-full flex items-center justify-center hover:bg-gray-800 transition-colors shadow-md cursor-pointer"
+                                >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    </svg>
+                                </button>
+                                <input
+                                    ref={fileInputRef}
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={handlePhotoUpload}
+                                    className="hidden"
+                                />
+                            </div>
+                            <p className="text-xs text-gray-500 mt-2">Click to change photo</p>
+                        </div>
+
+                        {/* Username & Description */}
+                        <div className="flex-1 space-y-4">
+                            {/* Username */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Username</label>
+                                <div className="flex gap-2">
+                                    {isEditingUsername ? (
+                                        <>
+                                            <input
+                                                type="text"
+                                                value={username}
+                                                onChange={(e) => setUsername(e.target.value)}
+                                                className="flex-1 px-4 py-2 bg-white/80 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-black/20 focus:border-transparent"
+                                                placeholder="Enter username"
+                                            />
+                                            <button
+                                                onClick={saveProfile}
+                                                className="px-4 py-2 bg-black text-white rounded-xl hover:bg-gray-800 transition-colors cursor-pointer"
+                                            >
+                                                Save
+                                            </button>
+                                        </>
+                                    ) : (
+                                        <div className="flex-1 flex items-center justify-between px-4 py-2 bg-white/50 border border-gray-300/50 rounded-xl">
+                                            <span className="text-gray-900 font-medium">@{username}</span>
+                                            <button
+                                                onClick={() => setIsEditingUsername(true)}
+                                                className="text-gray-500 hover:text-black transition-colors cursor-pointer"
+                                            >
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                                </svg>
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Description */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Bio</label>
+                                {isEditingDescription ? (
+                                    <div className="flex gap-2">
+                                        <textarea
+                                            value={description}
+                                            onChange={(e) => setDescription(e.target.value)}
+                                            rows={3}
+                                            className="flex-1 px-4 py-2 bg-white/80 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-black/20 focus:border-transparent resize-none"
+                                            placeholder="Tell us about yourself..."
+                                        />
+                                        <button
+                                            onClick={saveProfile}
+                                            className="px-4 py-2 bg-black text-white rounded-xl hover:bg-gray-800 transition-colors cursor-pointer self-start"
+                                        >
+                                            Save
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div
+                                        onClick={() => setIsEditingDescription(true)}
+                                        className="px-4 py-3 bg-white/50 border border-gray-300/50 rounded-xl cursor-pointer hover:bg-white/80 transition-colors group"
+                                    >
+                                        <p className="text-gray-700">{description}</p>
+                                        <div className="flex justify-end mt-1">
+                                            <span className="text-xs text-gray-400 group-hover:text-gray-600">Click to edit</span>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                {/* Wallet Section */}
+                <section className="bg-white/60 backdrop-blur-sm rounded-2xl border border-gray-300/50 p-6 mb-6">
+                    <div className="flex items-center gap-2 mb-6">
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-orange-500 to-yellow-500 flex items-center justify-center">
+                            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                            </svg>
+                        </div>
+                        <h2 className="text-xl font-semibold text-gray-900">Wallet</h2>
+                    </div>
+
+                    <div className="space-y-4">
+                        {/* Wallet Address Display */}
+                        <div className="bg-white/70 border border-gray-300 rounded-xl p-4">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Connected Wallet Address</label>
+                            <div className="flex items-center gap-3">
+                                <div className="flex-1 px-4 py-3 bg-white/80 rounded-xl border border-gray-300/50">
+                                    <code className="text-sm font-mono text-gray-800">{displayAddress}</code>
+                                </div>
+                                <button
+                                    onClick={copyAddress}
+                                    className="px-4 py-3 bg-black text-white rounded-xl hover:bg-gray-800 transition-colors cursor-pointer flex items-center gap-2"
+                                >
+                                    {copiedAddress ? (
+                                        <>
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                            </svg>
+                                            <span className="hidden sm:inline">Copied!</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                            </svg>
+                                            <span className="hidden sm:inline">Copy</span>
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Link Wallet Button */}
+                        {!linkedWallet && (
+                            <button
+                                onClick={() => linkWallet()}
+                                className="w-full py-3 px-4 bg-[#1e2939] text-white font-medium rounded-xl hover:bg-[#2d3748] transition-all cursor-pointer flex items-center justify-center gap-2"
+                            >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                                </svg>
+                                Link Crypto Wallet
+                            </button>
+                        )}
+
+                        {/* Export Privy Wallet */}
+                        {authenticated && (
+                            <button
+                                onClick={() => setShowExportModal(true)}
+                                className="w-full py-3 px-4 bg-white border-2 border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50 hover:border-gray-400 transition-all cursor-pointer flex items-center justify-center gap-2"
+                            >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                </svg>
+                                Export Privy Wallet
+                            </button>
+                        )}
+                    </div>
+                </section>
+
+                {/* Social Connections Section */}
+                <section className="bg-white/60 backdrop-blur-sm rounded-2xl border border-gray-300/50 p-6 mb-6">
+                    <div className="flex items-center gap-2 mb-6">
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
+                            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                            </svg>
+                        </div>
+                        <h2 className="text-xl font-semibold text-gray-900">Connected Accounts</h2>
+                    </div>
+
+                    <div className="space-y-3">
+                        {/* Twitter */}
+                        <div className={`flex items-center justify-between p-4 rounded-xl border-2 transition-all ${linkedTwitter
+                            ? "bg-blue-50/50 border-blue-300"
+                            : "bg-white/50 border-gray-300 hover:border-gray-400"
+                            }`}>
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-full bg-black flex items-center justify-center">
+                                    <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                                        <path d="M24 4.557c-.883.392-1.832.656-2.828.775 1.017-.609 1.798-1.574 2.165-2.724-.951.564-2.005.974-3.127 1.195-.897-.957-2.178-1.555-3.594-1.555-3.179 0-5.515 2.966-4.797 6.045-4.091-.205-7.719-2.165-10.148-5.144-1.29 2.213-.669 5.108 1.523 6.574-.806-.026-1.566-.247-2.229-.616-.054 2.281 1.581 4.415 3.949 4.89-.693.188-1.452.232-2.224.084.626 1.956 2.444 3.379 4.6 3.419-2.07 1.623-4.678 2.348-7.29 2.04 2.179 1.397 4.768 2.212 7.548 2.212 9.142 0 14.307-7.721 13.995-14.646.962-.695 1.797-1.562 2.457-2.549z" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <p className="font-medium text-gray-900">Twitter / X</p>
+                                    <p className="text-sm text-gray-500">
+                                        {linkedTwitter
+                                            ? `@${linkedTwitter.username || "connected"}`
+                                            : "Not connected"}
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                {currentLoginMethod === "twitter" && (
+                                    <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full">
+                                        Current Login
+                                    </span>
+                                )}
+                                {linkedTwitter ? (
+                                    <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center">
+                                        <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                        </svg>
+                                    </div>
+                                ) : (
+                                    <button
+                                        onClick={() => linkTwitter()}
+                                        className="px-4 py-2 bg-black text-white text-sm font-medium rounded-full hover:bg-gray-800 transition-colors cursor-pointer"
+                                    >
+                                        Connect
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Google */}
+                        <div className={`flex items-center justify-between p-4 rounded-xl border-2 transition-all ${linkedGoogle
+                            ? "bg-red-50/50 border-red-300"
+                            : "bg-white/50 border-gray-300 hover:border-gray-400"
+                            }`}>
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-full bg-white border border-gray-200 flex items-center justify-center">
+                                    <svg className="w-5 h-5" viewBox="0 0 24 24">
+                                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+                                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <p className="font-medium text-gray-900">Google</p>
+                                    <p className="text-sm text-gray-500">
+                                        {linkedGoogle
+                                            ? linkedGoogle.email
+                                            : "Not connected"}
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                {currentLoginMethod === "google" && (
+                                    <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full">
+                                        Current Login
+                                    </span>
+                                )}
+                                {linkedGoogle ? (
+                                    <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center">
+                                        <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                        </svg>
+                                    </div>
+                                ) : (
+                                    <button
+                                        onClick={() => linkGoogle()}
+                                        className="px-4 py-2 bg-black text-white text-sm font-medium rounded-full hover:bg-gray-800 transition-colors cursor-pointer"
+                                    >
+                                        Connect
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Wallet Login Indicator */}
+                        {currentLoginMethod === "wallet" && (
+                            <div className="flex items-center justify-between p-4 rounded-xl border-2 bg-orange-50/50 border-orange-300">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-500 to-yellow-500 flex items-center justify-center">
+                                        <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <p className="font-medium text-gray-900">Crypto Wallet</p>
+                                        <p className="text-sm text-gray-500">{displayAddress}</p>
+                                    </div>
+                                </div>
+                                <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full">
+                                    Current Login
+                                </span>
+                            </div>
+                        )}
+                    </div>
+                </section>
+
+                {/* Logout Section */}
+                <section className="bg-white/60 backdrop-blur-sm rounded-2xl border border-gray-300/50 p-6">
+                    <div className="flex items-center gap-2 mb-4">
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-red-500 to-pink-500 flex items-center justify-center">
+                            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                            </svg>
+                        </div>
+                        <h2 className="text-xl font-semibold text-gray-900">Account</h2>
+                    </div>
+
+                    <button
+                        onClick={() => logout()}
+                        className="w-full py-3 px-4 bg-red-50 border border-red-200 text-red-600 font-medium rounded-xl hover:bg-red-100 hover:border-red-300 transition-all cursor-pointer flex items-center justify-center gap-2"
+                    >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                        </svg>
+                        Log Out
+                    </button>
+                </section>
+            </div>
+
+            {/* Export Wallet Modal */}
+            {showExportModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+                    <div className="bg-[#f3e1d7] rounded-2xl border border-gray-300 p-6 max-w-md w-full shadow-2xl">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-xl font-bold text-gray-900">Export Wallet</h3>
+                            <button
+                                onClick={() => setShowExportModal(false)}
+                                className="p-1 hover:bg-gray-200 rounded-full transition-colors cursor-pointer"
+                            >
+                                <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-4">
+                            <div className="flex items-start gap-3">
+                                <svg className="w-5 h-5 text-yellow-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                </svg>
+                                <p className="text-sm text-yellow-800">
+                                    <strong>Security Warning:</strong> Exporting your private key gives full access to your wallet.
+                                    Never share it with anyone and store it securely.
+                                </p>
+                            </div>
+                        </div>
+
+                        <p className="text-gray-600 mb-4">
+                            This will export your Privy wallet's private key. Make sure you're in a secure environment.
+                        </p>
+
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setShowExportModal(false)}
+                                className="flex-1 py-3 px-4 bg-white border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50 transition-colors cursor-pointer"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={() => {
+                                    // TODO: Implement actual wallet export
+                                    alert("Wallet export functionality would be implemented here with Privy's export API");
+                                    setShowExportModal(false);
+                                }}
+                                className="flex-1 py-3 px-4 bg-black text-white font-medium rounded-xl hover:bg-gray-800 transition-colors cursor-pointer"
+                            >
+                                Export
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
