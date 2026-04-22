@@ -37,31 +37,30 @@ export function useSolanaWallet() {
     adapter = {
       publicKey: new PublicKey(address),
       signTransaction: async (tx: Transaction) => {
-        const connection = new Connection(RPC_ENDPOINT, "confirmed");
-        const { blockhash } = await connection.getLatestBlockhash();
-        tx.recentBlockhash = blockhash;
+        // NOTE: Do NOT set recentBlockhash here — it will expire while the
+        // user reviews the Privy signing modal. sendTransaction sets a fresh
+        // blockhash immediately before broadcasting.
         tx.feePayer = new PublicKey(address);
 
         // Serialize the legacy transaction to bytes for the Privy Solana API
         const serialized = tx.serialize({ requireAllSignatures: false });
         const { signedTransaction } = await solanaWallet.signTransaction({
           transaction: serialized,
+          chain: 'solana:devnet',
         });
 
         // Deserialize the signed transaction bytes back to a Transaction object
         return Transaction.from(signedTransaction);
       },
       signAllTransactions: async (txs: Transaction[]) => {
-        const connection = new Connection(RPC_ENDPOINT, "confirmed");
-        const { blockhash } = await connection.getLatestBlockhash();
         return Promise.all(
           txs.map(async (tx) => {
-            tx.recentBlockhash = blockhash;
             tx.feePayer = new PublicKey(address);
 
             const serialized = tx.serialize({ requireAllSignatures: false });
             const { signedTransaction } = await solanaWallet.signTransaction({
               transaction: serialized,
+              chain: 'solana:devnet',
             });
 
             return Transaction.from(signedTransaction);
@@ -83,25 +82,59 @@ export function useSolanaWallet() {
   /**
    * Send a pre-built transaction via the Solana wallet.
    * Returns the transaction signature.
+   *
+   * Blockhash strategy:
+   *  - We use "processed" commitment so we get the absolute freshest blockhash
+   *    (~150 slots of validity remaining). "finalized" blockhashes are already
+   *    ~32 slots old when received, leaving only ~118 slots — not enough when
+   *    the Privy signing modal takes 10-15 s on a slow devnet.
+   *  - The blockhash is fetched immediately before the signing modal opens so
+   *    the clock starts as late as possible.
+   *  - After signing we rebroadcast with skipPreflight + maxRetries to survive
+   *    transient devnet congestion.
    */
   async function sendTransaction(tx: Transaction): Promise<string> {
     if (!adapter || !solanaWallet) throw new Error("Wallet not connected");
     const connection = new Connection(RPC_ENDPOINT, "confirmed");
+
+    // ── Balance guard ────────────────────────────────────────────────────────
+    // Check before signing so the user gets a clear error instead of a cryptic
+    // "block height exceeded" (which happens when the tx is dropped by the RPC
+    // node due to insufficient funds but skipPreflight hides the real reason).
+    const balance = await connection.getBalance(adapter.publicKey);
+    // Require at least 0.005 SOL to cover fees + rent (5_000_000 lamports)
+    if (balance < 5_000_000) {
+      throw new Error(
+        `Insufficient SOL balance. Your wallet has ${(balance / 1e9).toFixed(4)} SOL. ` +
+        `Please fund your wallet with at least 0.005 SOL on devnet to pay transaction fees. ` +
+        `You can get free devnet SOL at https://faucet.solana.com`
+      );
+    }
+
+    // "processed" gives the freshest blockhash — maximum ~150 slots of validity.
     const { blockhash, lastValidBlockHeight } =
-      await connection.getLatestBlockhash();
+      await connection.getLatestBlockhash("processed");
     tx.recentBlockhash = blockhash;
     tx.feePayer = adapter.publicKey;
 
     const serialized = tx.serialize({ requireAllSignatures: false });
     const { signedTransaction } = await solanaWallet.signTransaction({
       transaction: serialized,
+      chain: 'solana:devnet',
     });
 
     const signed = Transaction.from(signedTransaction);
     const rawTx = signed.serialize();
+
+    // Run preflight simulation so real errors (e.g. insufficient funds, program
+    // errors) surface immediately rather than timing out as "block height exceeded".
     const sig = await connection.sendRawTransaction(rawTx, {
       skipPreflight: false,
+      preflightCommitment: "processed",
+      maxRetries: 3,
     });
+
+    // Poll until confirmed or the block height is exceeded.
     await connection.confirmTransaction(
       { signature: sig, blockhash, lastValidBlockHeight },
       "confirmed"

@@ -47,8 +47,13 @@ export function deriveChallengePDA(
   creator: PublicKey,
   challengeId: number
 ): [PublicKey, number] {
+  // writeBigUInt64LE is not available in the browser Buffer polyfill,
+  // so we manually write the u64 as two u32 little-endian words.
   const idBuf = Buffer.alloc(8);
-  idBuf.writeBigUInt64LE(BigInt(challengeId));
+  const lo = challengeId >>> 0;               // lower 32 bits
+  const hi = Math.floor(challengeId / 0x100000000) >>> 0; // upper 32 bits
+  idBuf.writeUInt32LE(lo, 0);
+  idBuf.writeUInt32LE(hi, 4);
   return PublicKey.findProgramAddressSync(
     [CHALLENGE_SEED, creator.toBuffer(), idBuf],
     PROGRAM_ID

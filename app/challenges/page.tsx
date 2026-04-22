@@ -28,7 +28,7 @@ export default function ChallengesPage() {
 
   const { authenticated, login, program, sendTransaction, publicKey } = useSolanaWallet();
 
-  const loadChallenges = useCallback(async () => {
+  const loadChallenges = async () => {
     if (!program) return;
     setIsLoading(true);
     try {
@@ -39,7 +39,7 @@ export default function ChallengesPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [program]);
+  }
 
   useEffect(() => {
     loadChallenges();

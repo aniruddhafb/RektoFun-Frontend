@@ -222,7 +222,22 @@ export function CreateChallengeModal({
 
           {txError && (
             <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700">
-              ⚠️ {txError}
+              ⚠️{" "}
+              {txError.includes("https://faucet.solana.com") ? (
+                <>
+                  {txError.split("https://faucet.solana.com")[0]}
+                  <a
+                    href="https://faucet.solana.com"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline font-semibold"
+                  >
+                    https://faucet.solana.com
+                  </a>
+                </>
+              ) : (
+                txError
+              )}
             </div>
           )}
           {txSig && (
