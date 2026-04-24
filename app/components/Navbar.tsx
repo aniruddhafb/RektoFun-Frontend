@@ -78,13 +78,28 @@ export default function Navbar() {
         { href: "/leaderboard", label: "Leaderboard" },
         { href: "/referral", label: "Referral" },
         { href: "/activity", label: "Activity" },
-        { href: "https://rektofun.gitbook.io/rektofun/", label: "Roadmap" },
+        { href: "https://rektofun.gitbook.io/rektofun/roadmap/whats-next", label: "Roadmap" },
     ];
 
     return (
         <>
+            {/* Development Mode Banner */}
+            <div className="fixed top-0 left-0 right-0 z-[60] bg-amber-100 border-b border-amber-300">
+                <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-center gap-2">
+                    <svg className="w-4 h-4 text-amber-700 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    <p className="text-sm text-amber-900 font-medium text-center hidden md:block">
+                        Development Mode — Dummy data is displayed on this website
+                    </p>
+                    <p className="text-sm text-amber-900 font-medium text-center md:hidden">
+                        Development Mode
+                    </p>
+                </div>
+            </div>
+
             {/* Main Navbar - Sticky at top */}
-            <nav className="fixed top-0 left-0 right-0 z-50 bg-[#f3e1d7]/80 backdrop-blur-md border-b border-white-100">
+            <nav className="fixed top-0 left-0 right-0 z-50 bg-[#f3e1d7]/80 backdrop-blur-md border-b border-white-100 pt-8">
                 <div className="max-w-7xl mx-auto px-6 lg:px-8">
                     <div className="flex items-center justify-between h-20">
                         {/* Logo - Smaller on mobile */}
@@ -140,7 +155,7 @@ export default function Navbar() {
                                 </svg>
                             </div>
                             <Link
-                                href="https://rektofun.gitbook.io/rektofun/"
+                                href="https://rektofun.gitbook.io/rektofun/introduction/how-it-works"
                                 target="_blank"
                                 className="text-sm font-medium text-gray-700 hover:text-black transition-colors whitespace-nowrap"
                             >
@@ -237,20 +252,6 @@ export default function Navbar() {
                                                             Refer & Earn
                                                         </Link>
 
-                                                        {/* Edit Profile */}
-                                                        {/* <button
-                                                            onClick={() => {
-                                                                setIsDropdownOpen(false);
-                                                                setIsProfileModalOpen(true);
-                                                            }}
-                                                            className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:text-black transition-colors cursor-pointer"
-                                                        >
-                                                            <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                                                            </svg>
-                                                            Edit Profile
-                                                        </button> */}
-
                                                         {/* Settings */}
                                                         <Link
                                                             href="/settings"
@@ -277,15 +278,15 @@ export default function Navbar() {
                                                             Terms
                                                         </Link>
 
-                                                        {/* About Us */}
+                                                        {/* Privacy */}
                                                         <Link
-                                                            href="/about"
+                                                            href="/privacy"
                                                             className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:text-black transition-colors cursor-pointer"
                                                         >
                                                             <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                                             </svg>
-                                                            About Us
+                                                            Privacy
                                                         </Link>
 
                                                         {/* Docs */}
@@ -331,7 +332,7 @@ export default function Navbar() {
                                                                 </a>
                                                                 {/* Discord */}
                                                                 <a
-                                                                    href="#"
+                                                                    href="https://discord.gg/Uk22qDtzcQ"
                                                                     target="_blank"
                                                                     className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 hover:bg-[#5865F2] hover:text-white transition-colors cursor-pointer"
                                                                     aria-label="Discord"
@@ -599,7 +600,7 @@ export default function Navbar() {
 
                     {/* Profile */}
                     <Link
-                        href="/profile"
+                        href="/profile/test"
                         className={`flex flex-col items-center justify-center gap-0.5 min-w-0 flex-1 ${isActive("/profile")
                             ? "text-black"
                             : "text-gray-500"

@@ -2,30 +2,9 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import Image from "next/image";
-import Link from "next/link";
-import { Search, ChevronDown } from "lucide-react";
+import { ChallengeCard } from "@/app/components/ChallengeCard";
+import { Challenge, DUMMY_CHALLENGES } from "@/app/components/challengesData";
 import ChallengeDetailModal from "@/app/components/ChallengeDetailModal";
-
-// Types
-interface Challenge {
-    id: string;
-    asset: string;
-    assetLogo: string;
-    title: string;
-    creator: {
-        name: string;
-        avatar: string;
-    };
-    betAmount: number;
-    prediction: string;
-    currentPrice: number;
-    priceChange: number;
-    targetPrice: number;
-    startPrice: number;
-    timeRemaining: string;
-    likes: number;
-    status: "active" | "expired" | "won" | "lost" | "created" | "accepted";
-}
 
 // Activity item interface
 interface ActivityItem {
@@ -66,106 +45,6 @@ const profileData = {
         winRatio: 78.5,
     },
 };
-
-// Dummy challenges data matching the challenges page format
-const userChallenges: Challenge[] = [
-    {
-        id: "1",
-        asset: "SOL",
-        assetLogo: "/scribbles/sol.png",
-        title: "SOL Above $160 in 1 Hour?",
-        creator: { name: "DegenLord", avatar: "/scribbles/pepe.png" },
-        betAmount: 100,
-        prediction: "SOL > $160",
-        currentPrice: 157.4,
-        priceChange: -1.8,
-        targetPrice: 160,
-        startPrice: 168,
-        timeRemaining: "59m 12s",
-        likes: 5,
-        status: "active",
-    },
-    {
-        id: "2",
-        asset: "BTC",
-        assetLogo: "/scribbles/btc.png",
-        title: "BTC Above $95K in 2 Hours?",
-        creator: { name: "DegenLord", avatar: "/scribbles/pepe.png" },
-        betAmount: 250,
-        prediction: "BTC > $95,000",
-        currentPrice: 94300,
-        priceChange: 2.3,
-        targetPrice: 95000,
-        startPrice: 92000,
-        timeRemaining: "1h 45m",
-        likes: 12,
-        status: "won",
-    },
-    {
-        id: "3",
-        asset: "ETH",
-        assetLogo: "/scribbles/coins.png",
-        title: "ETH Below $3,200 in 30 mins?",
-        creator: { name: "DegenLord", avatar: "/scribbles/pepe.png" },
-        betAmount: 500,
-        prediction: "ETH < $3,200",
-        currentPrice: 3250,
-        priceChange: -0.5,
-        targetPrice: 3200,
-        startPrice: 3300,
-        timeRemaining: "28m 45s",
-        likes: 8,
-        status: "lost",
-    },
-    {
-        id: "4",
-        asset: "DOGE",
-        assetLogo: "/scribbles/doge.png",
-        title: "DOGE Above $0.18 in 1 Hour?",
-        creator: { name: "DegenLord", avatar: "/scribbles/pepe.png" },
-        betAmount: 50,
-        prediction: "DOGE > $0.18",
-        currentPrice: 0.175,
-        priceChange: 3.2,
-        targetPrice: 0.18,
-        startPrice: 0.165,
-        timeRemaining: "52m 30s",
-        likes: 3,
-        status: "created",
-    },
-    {
-        id: "5",
-        asset: "PEPE",
-        assetLogo: "/scribbles/pepe.png",
-        title: "PEPE Above $0.000015 in 3 Hours?",
-        creator: { name: "DegenLord", avatar: "/scribbles/pepe.png" },
-        betAmount: 150,
-        prediction: "PEPE > $0.000015",
-        currentPrice: 0.0000142,
-        priceChange: -2.1,
-        targetPrice: 0.000015,
-        startPrice: 0.0000145,
-        timeRemaining: "2h 15m",
-        likes: 7,
-        status: "accepted",
-    },
-    {
-        id: "6",
-        asset: "SHIB",
-        assetLogo: "/scribbles/shiba.png",
-        title: "SHIB Above $0.000025 in 1 Hour?",
-        creator: { name: "DegenLord", avatar: "/scribbles/pepe.png" },
-        betAmount: 75,
-        prediction: "SHIB > $0.000025",
-        currentPrice: 0.0000245,
-        priceChange: 1.5,
-        targetPrice: 0.000025,
-        startPrice: 0.000024,
-        timeRemaining: "48m 20s",
-        likes: 4,
-        status: "expired",
-    },
-];
 
 // Activity data matching the activity page style
 const activityData: ActivityItem[] = [
@@ -245,21 +124,14 @@ const activityData: ActivityItem[] = [
     },
 ];
 
-// Filter options
-const filterOptions = ["All Challenges", "Created", "Ongoing", "Expired", "Accepted", "Won", "Rekt", "Latest"];
-
 // Tab types
 type TabType = "challenges" | "activity";
 
 // Static params since profile page uses demo data
 export default function ProfilePage() {
     const [activeTab, setActiveTab] = useState<TabType>("challenges");
-    const [activeFilter, setActiveFilter] = useState("All Challenges");
-    const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-    const [searchQuery, setSearchQuery] = useState("");
     const [selectedChallenge, setSelectedChallenge] = useState<Challenge | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const dropdownRef = useRef<HTMLDivElement>(null);
 
     // Handle challenge card click
     const handleChallengeClick = (challenge: Challenge) => {
@@ -273,45 +145,10 @@ export default function ProfilePage() {
         setTimeout(() => setSelectedChallenge(null), 300);
     };
 
-    // Close dropdown when clicking outside
-    useEffect(() => {
-        function handleClickOutside(event: MouseEvent) {
-            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-                setIsDropdownOpen(false);
-            }
-        }
-        document.addEventListener("mousedown", handleClickOutside);
-        return () => document.removeEventListener("mousedown", handleClickOutside);
-    }, []);
-
     const tabs: { id: TabType; label: string }[] = [
         { id: "challenges", label: "Challenges" },
         { id: "activity", label: "Activity" },
     ];
-
-    // Filter challenges based on selected filter and search query
-    const filteredChallenges = userChallenges.filter((challenge) => {
-        // Search filter
-        const matchesSearch = searchQuery === "" ||
-            challenge.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            challenge.asset.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            challenge.prediction.toLowerCase().includes(searchQuery.toLowerCase());
-
-        if (activeFilter === "All Challenges") return matchesSearch;
-        if (activeFilter === "Created") return matchesSearch && challenge.status === "created";
-        if (activeFilter === "Ongoing") return matchesSearch && challenge.status === "active";
-        if (activeFilter === "Expired") return matchesSearch && challenge.status === "expired";
-        if (activeFilter === "Accepted") return matchesSearch && challenge.status === "accepted";
-        if (activeFilter === "Won") return matchesSearch && challenge.status === "won";
-        if (activeFilter === "Rekt") return matchesSearch && challenge.status === "lost";
-        if (activeFilter === "Latest") return matchesSearch;
-        return matchesSearch;
-    });
-
-    // Sort by latest if that filter is selected
-    const displayedChallenges = activeFilter === "Latest"
-        ? [...filteredChallenges].reverse()
-        : filteredChallenges;
 
     // Get highlight color based on text
     const getHighlightColor = (text?: string) => {
@@ -460,236 +297,15 @@ export default function ProfilePage() {
                 {/* Challenges Tab Content */}
                 {activeTab === "challenges" && (
                     <>
-                        {/* Search and Filter Section */}
-                        <div className="mt-6 flex flex-wrap items-center gap-3">
-                            {/* Search Bar */}
-                            {/* <div className="relative flex-1 min-w-[200px] max-w-md">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                                <input
-                                    type="text"
-                                    placeholder="Search challenges..."
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="w-full pl-10 pr-4 py-2.5 bg-white/50 rounded-full text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-200"
-                                />
-                            </div> */}
-
-                            {/* Filter Dropdown */}
-                            {/* <div className="relative" ref={dropdownRef}>
-                                <button
-                                    onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                                    className="cursor-pointer flex items-center gap-2 px-4 py-2.5 bg-white/50 rounded-full text-sm text-gray-700 hover:bg-white/70 transition-colors"
-                                >
-                                    <span>{activeFilter}</span>
-                                    <ChevronDown className={`w-4 h-4 transition-transform ${isDropdownOpen ? "rotate-180" : ""}`} />
-                                </button>
-
-                                {isDropdownOpen && (
-                                    <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-100 py-2 z-10">
-                                        {filterOptions.map((filter) => (
-                                            <button
-                                                key={filter}
-                                                onClick={() => {
-                                                    setActiveFilter(filter);
-                                                    setIsDropdownOpen(false);
-                                                }}
-                                                className={`w-full cursor-pointer flex items-center gap-3 px-4 py-2.5 text-sm text-left transition-colors ${activeFilter === filter
-                                                    ? "text-black font-semibold"
-                                                    : "text-gray-700 hover:bg-gray-50"
-                                                    }`}
-                                            >
-                                                {filter}
-                                            </button>
-                                        ))}
-                                    </div>
-                                )}
-                            </div> */}
-                        </div>
-
                         {/* Challenges Grid */}
                         <div className="mt-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                            {displayedChallenges.map((challenge) => {
-                                // Calculate price position for the progress bar (0-100%)
-                                const priceRange = Math.abs(challenge.targetPrice - challenge.startPrice);
-
-                                // Calculate progress: 50% is target, <50% is below, >50% is above
-                                let priceProgress = 50;
-                                if (priceRange > 0) {
-                                    const targetDiff = challenge.targetPrice - challenge.startPrice;
-                                    const normalizedProgress = (challenge.currentPrice - challenge.startPrice) / targetDiff;
-                                    priceProgress = 50 + (normalizedProgress * 50);
-                                }
-                                const clampedProgress = Math.min(Math.max(priceProgress, 0), 100);
-
-                                return (
-                                    <div
-                                        key={challenge.id}
-                                        onClick={() => handleChallengeClick(challenge)}
-                                        className="bg-[#f8ede7] rounded-2xl p-4 shadow-sm border border-white/50 hover:shadow-lg transition-shadow block cursor-pointer"
-                                    >
-                                        {/* Header */}
-                                        <div className="flex items-start justify-between mb-3">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center overflow-hidden">
-                                                    <Image
-                                                        src={challenge.assetLogo}
-                                                        alt={challenge.asset}
-                                                        width={32}
-                                                        height={32}
-                                                        className="w-8 h-8 object-contain"
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <h3 className="font-semibold text-gray-900 text-base leading-tight">
-                                                        {challenge.title}
-                                                    </h3>
-                                                    <div className="flex items-center gap-2 mt-0.5">
-                                                        <div className="w-4 h-4 rounded-full bg-gray-200 overflow-hidden">
-                                                            <Image
-                                                                src={challenge.creator.avatar}
-                                                                alt={challenge.creator.name}
-                                                                width={16}
-                                                                height={16}
-                                                                className="w-full h-full object-cover"
-                                                            />
-                                                        </div>
-                                                        <span className="text-sm text-gray-600">{challenge.creator.name}</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        {/* Divider */}
-                                        <div className="border-t border-gray-200 my-3"></div>
-
-                                        {/* Bet Info */}
-                                        <div className="text-center mb-3">
-                                            <p className="text-xl font-bold text-gray-900">
-                                                <span className="text-emerald-600">${challenge.betAmount}</span>{" "}
-                                                <span className="text-gray-700">Bet on {challenge.prediction}</span>
-                                            </p>
-                                        </div>
-
-                                        {/* Price Progress Bar */}
-                                        <div className="mb-5">
-                                            {/* Price labels */}
-                                            <div className="flex justify-between text-sm text-gray-500 mb-2">
-                                                <span>${challenge.startPrice.toLocaleString()}</span>
-                                                <span className="font-semibold text-gray-700">${challenge.targetPrice.toLocaleString()}</span>
-                                                <span>${challenge.startPrice.toLocaleString()}</span>
-                                            </div>
-
-                                            {/* Progress bar container */}
-                                            <div className="relative h-6 bg-gray-200 rounded-full overflow-hidden">
-                                                {/* Left side - Red (below target) */}
-                                                <div
-                                                    className="absolute inset-y-0 left-0 bg-gradient-to-r from-red-500 to-red-400"
-                                                    style={{ width: '50%' }}
-                                                />
-                                                {/* Right side - Green (above target) */}
-                                                <div
-                                                    className="absolute inset-y-0 right-0 bg-gradient-to-r from-emerald-400 to-emerald-500"
-                                                    style={{ width: '50%' }}
-                                                />
-
-                                                {/* Center marker for target price */}
-                                                <div className="absolute inset-y-0 left-1/2 w-0.5 bg-white/50" />
-
-                                                {/* Current price indicator */}
-                                                <div
-                                                    className="absolute top-0 bottom-0 flex items-center justify-center"
-                                                    style={{ left: `${clampedProgress}%`, transform: 'translateX(-50%)' }}
-                                                >
-                                                    <div className="w-4 h-4 bg-white border-2 border-amber-600 rounded-full shadow-lg z-10" />
-                                                </div>
-                                            </div>
-
-                                            {/* Moving price tag */}
-                                            <div className="relative mt-2 h-7">
-                                                <div
-                                                    className="absolute -translate-x-1/2 bg-gradient-to-r from-amber-800 to-amber-700 text-white px-2 py-0.5 rounded-full text-xs font-medium shadow-md whitespace-nowrap"
-                                                    style={{ left: `${clampedProgress}%` }}
-                                                >
-                                                    ${challenge.currentPrice.toLocaleString()}{" "}
-                                                    <span className={challenge.priceChange >= 0 ? "text-emerald-200" : "text-red-200"}>
-                                                        {challenge.priceChange >= 0 ? "+" : ""}{challenge.priceChange}%
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        {/* CTA Button */}
-                                        <button className="w-full py-2.5 px-4 bg-[#246044] rounded-xl text-white font-bold text-base shadow-lg hover:bg-[#2b7351] hover:shadow-xl hover:scale-[1.02] transition-all flex items-center justify-center gap-2">
-                                            ACCEPT
-                                            <span className="text-xl">⚔️</span>
-                                        </button>
-                                        {/* <button disabled className="w-full py-2.5 px-4 bg-[#246044] rounded-xl text-white font-bold text-base shadow-lg hover:bg-[#2b7351] hover:shadow-xl hover:scale-[1.02] transition-all flex items-center justify-center gap-2">
-                                            Ongoing
-                                            <span className="text-xl">⚔️</span>
-                                        </button>
-                                        <button className="w-full py-2.5 px-4 bg-[#C65A5A] rounded-xl text-white font-bold text-base shadow-lg hover:bg-[#c85656] hover:shadow-xl hover:scale-[1.02] transition-all flex items-center justify-center gap-2">
-                                            Expired
-                                            <span className="text-xl">😓</span>
-                                        </button>
-                                        <button className="w-full py-2.5 px-4 bg-[#E6C15A] rounded-xl text-black font-bold text-base shadow-lg hover:bg-[#e7c25a] hover:shadow-xl hover:scale-[1.02] transition-all flex items-center justify-center gap-2">
-                                            Completed
-                                            <span className="text-xl">🎊</span>
-                                        </button> */}
-
-                                        {/* Challenge Expiry */}
-                                        <div className="flex items-center justify-center gap-1.5 text-xs text-gray-600 mt-1.5">
-                                            <span>Challenge expires in</span>
-                                            <span className="font-medium text-gray-900">{challenge.timeRemaining}</span>
-                                            <div className="group relative">
-                                                <svg className="w-3.5 h-3.5 text-gray-400 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                </svg>
-                                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10">
-                                                    This challenge will expire in {challenge.timeRemaining}, you won't be able to join after that.
-                                                    <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        {/* Divider */}
-                                        <div className="border-t border-gray-200 my-2"></div>
-
-                                        {/* Footer */}
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex items-center gap-2 text-gray-600">
-                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                </svg>
-                                                <span className="text-sm">Created <span className="font-semibold text-gray-900">2h ago</span></span>
-                                                <div className="group relative">
-                                                    <svg className="w-3.5 h-3.5 text-gray-400 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                    </svg>
-                                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-44 p-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10">
-                                                        This challenge was created 2 hours ago and will end on September 30, 2024 at 3:00 PM UTC if accepted.
-                                                        <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center gap-3">
-                                                <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                                                    <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-                                                    </svg>
-                                                </button>
-                                                {/* Eye Icon */}
-                                                <div className="flex items-center gap-1">
-                                                    <span className="font-semibold text-gray-900">{challenge.likes}</span>
-                                                    <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                                    </svg>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                );
-                            })}
+                            {DUMMY_CHALLENGES.map((challenge) => (
+                                <ChallengeCard
+                                    key={challenge.id}
+                                    challenge={challenge}
+                                    onClick={handleChallengeClick}
+                                />
+                            ))}
                         </div>
                     </>
                 )}

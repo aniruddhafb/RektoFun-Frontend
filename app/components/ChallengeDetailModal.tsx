@@ -74,37 +74,36 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
     const hasWon = challenge.status === "won";
     const hasLost = challenge.status === "lost";
 
-    const getStatusBadge = () => {
-        switch (challenge.status) {
-            case "active":
-                return { label: "LIVE", className: "bg-emerald-500 text-white", icon: <TrendingUp className="w-3 h-3" /> };
-            case "accepted":
-                return { label: "ACCEPTED", className: "bg-blue-500 text-white", icon: <CheckCircle className="w-3 h-3" /> };
-            case "created":
-                return { label: "PENDING", className: "bg-amber-500 text-white", icon: <Clock className="w-3 h-3" /> };
-            case "won":
-                return { label: "WON", className: "bg-gradient-to-r from-yellow-500 to-amber-500 text-white", icon: <Trophy className="w-3 h-3" /> };
-            case "lost":
-                return { label: "REKT", className: "bg-red-600 text-white", icon: <Skull className="w-3 h-3" /> };
-            case "expired":
-                return { label: "EXPIRED", className: "bg-gray-500 text-white", icon: <AlertCircle className="w-3 h-3" /> };
-            default:
-                return { label: "UNKNOWN", className: "bg-gray-400 text-white", icon: null };
-        }
+    // Calculate price bar position (0-100%)
+    const getPriceBarPosition = () => {
+        const range = challenge.targetPrice - challenge.startPrice;
+        if (range === 0) return 50;
+        const position = ((challenge.currentPrice - challenge.startPrice) / range) * 100;
+        return Math.max(0, Math.min(100, position));
     };
-
-    const statusBadge = getStatusBadge();
+    const priceBarPosition = getPriceBarPosition();
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200 overflow-hidden">
             <div
                 ref={modalRef}
-                className="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto bg-gradient-to-br from-[#f8ede7] via-[#f3e1d7] to-[#e8d5c4] rounded-3xl shadow-2xl border border-[#d4a574]/30 animate-in zoom-in-95 duration-300"
+                className="relative w-full max-w-4xl max-h-[90vh] overflow-auto bg-gradient-to-br from-[#f8ede7] via-[#f3e1d7] to-[#e8d5c4] rounded-3xl shadow-2xl border border-[#d4a574]/30 animate-in zoom-in-95 duration-300"
                 style={{
-                    scrollbarWidth: "thin",
-                    scrollbarColor: "#d4a574 transparent"
+                    scrollbarWidth: "none",
+                    msOverflowStyle: "none",
                 }}
             >
+                {/* Hide scrollbar CSS for WebKit browsers */}
+                <style>{`
+                    .no-scrollbar::-webkit-scrollbar {
+                        display: none;
+                    }
+                    .no-scrollbar {
+                        -ms-overflow-style: none;
+                        scrollbar-width: none;
+                    }
+                `}</style>
+
                 {/* Decorative Background Elements */}
                 <div className="absolute top-0 left-0 w-64 h-64 bg-gradient-to-br from-[#d4a574]/20 to-transparent rounded-full -translate-x-1/2 -translate-y-1/2 blur-3xl" />
                 <div className="absolute bottom-0 right-0 w-48 h-48 bg-gradient-to-tl from-[#246044]/20 to-transparent rounded-full translate-x-1/2 translate-y-1/2 blur-2xl" />
@@ -112,7 +111,7 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
                 {/* Close Button */}
                 <button
                     onClick={onClose}
-                    className="absolute top-4 right-4 z-10 w-10 h-10 rounded-full bg-white/80 backdrop-blur-sm flex items-center justify-center text-gray-600 hover:text-gray-900 hover:bg-white transition-all duration-200 shadow-lg hover:shadow-xl hover:scale-110 active:scale-95"
+                    className="absolute top-4 right-4 z-10 w-10 h-10 rounded-full bg-white/80 backdrop-blur-sm flex items-center justify-center text-gray-600 hover:text-gray-900 hover:bg-white transition-all duration-200 shadow-lg hover:shadow-xl hover:scale-110 active:scale-95 cursor-pointer"
                 >
                     <X className="w-5 h-5" />
                 </button>
@@ -134,11 +133,6 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
                                     />
                                 </div>
                             </div>
-                            {/* Status Badge */}
-                            <div className={`absolute -bottom-2 -right-2 flex items-center gap-1 px-2.5 py-1 rounded-full ${statusBadge.className} text-xs font-bold shadow-lg`}>
-                                {statusBadge.icon}
-                                <span>{statusBadge.label}</span>
-                            </div>
                         </div>
 
                         {/* Challenge Info */}
@@ -156,54 +150,111 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
                                 {challenge.title}
                             </h2>
 
-                            {/* Prediction */}
+                            {/* Created By */}
                             <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/60 backdrop-blur-sm rounded-xl border border-[#d4a574]/30">
-                                <span className="text-lg">🎯</span>
-                                <span className="font-semibold text-[#5c4a42]">{challenge.prediction}</span>
+                                <div className="w-6 h-6 rounded-full overflow-hidden border border-[#d4a574]">
+                                    <Image
+                                        src={challenge.creator.avatar}
+                                        alt={challenge.creator.name}
+                                        width={24}
+                                        height={24}
+                                        className="w-full h-full object-cover"
+                                    />
+                                </div>
+                                <span className="font-semibold text-[#5c4a42]">Created by {challenge.creator.name}</span>
                             </div>
                         </div>
                     </div>
 
                     {/* Bet Amount - Highlighted */}
-                    <div className="relative mb-8 p-6 bg-gradient-to-r from-[#246044] to-[#2d6f4a] rounded-2xl text-white shadow-xl overflow-hidden">
+                    <div className="relative mb-8 p-6 bg-gradient-to-r from-[#246044] to-[#2d6f4a] rounded-2xl text-white shadow-xl overflow-visible">
                         <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-white/10 to-transparent rounded-full translate-x-8 -translate-y-8" />
                         <div className="absolute bottom-0 left-0 w-24 h-24 bg-gradient-to-tr from-white/10 to-transparent rounded-full -translate-x-6 translate-y-6" />
-                        <div className="relative flex flex-col sm:flex-row items-center justify-between gap-4">
-                            <div>
-                                <p className="text-white/80 text-sm font-medium mb-1">Prize Pool</p>
-                                <p className="text-4xl font-black">
-                                    ${challenge.betAmount}
-                                    <span className="text-xl ml-1 text-white/70">SOL</span>
-                                </p>
-                            </div>
-                            <div className="flex items-center gap-3">
-                                <div className="text-right">
+
+                        {/* Prize Pool - Top */}
+                        <div className="text-center mb-6">
+                            <p className="text-white/80 text-sm font-medium mb-1">Prize Pool</p>
+                            <p className="text-4xl font-black">
+                                ${challenge.betAmount}
+                                <span className="text-xl ml-1 text-white/70">SOL</span>
+                            </p>
+                        </div>
+
+                        {/* Price Section */}
+                        <div className="flex items-center justify-between mb-3">
+                            {/* Start Price */}
+                            <div className="flex items-center gap-1.5">
+                                <div className="group relative">
+                                    <svg className="w-4 h-4 text-white/60 cursor-pointer" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    <div className="fixed p-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-[9999] whitespace-nowrap shadow-xl"
+                                        style={{ pointerEvents: "none" }}>
+                                        Price when challenger posted the challenge
+                                    </div>
+                                </div>
+                                <div>
                                     <p className="text-white/70 text-xs">Start</p>
                                     <p className="font-bold">${challenge.startPrice.toLocaleString()}</p>
                                 </div>
-                                <div className="w-12 h-0.5 bg-white/30 rounded" />
-                                <div className="text-right">
-                                    <p className="text-white/70 text-xs">Target</p>
+                            </div>
+
+                            {/* Target Price */}
+                            <div className="flex items-center gap-1.5">
+                                <div>
+                                    <p className="text-white/70 text-xs text-right">Target</p>
                                     <p className="font-bold text-amber-300">${challenge.targetPrice.toLocaleString()}</p>
                                 </div>
-                                <div className="w-12 h-0.5 bg-white/30 rounded" />
-                                <div className="text-right">
-                                    <p className="text-white/70 text-xs">Current</p>
-                                    <p className={`font-bold ${challenge.priceChange >= 0 ? "text-emerald-300" : "text-red-300"}`}>
-                                        ${challenge.currentPrice.toLocaleString()}
-                                    </p>
+                                <div className="group relative">
+                                    <svg className="w-4 h-4 text-white/60 cursor-pointer" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    <div className="fixed p-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-[9999] whitespace-nowrap shadow-xl"
+                                        style={{ pointerEvents: "none" }}>
+                                        Hit price set by challenger
+                                    </div>
                                 </div>
                             </div>
                         </div>
+
+                        {/* Price Progress Bar */}
+                        <div className="relative">
+                            {/* Track */}
+                            <div className="h-3 bg-white/20 rounded-full overflow-hidden">
+                                {/* Progress fill */}
+                                <div
+                                    className="h-full bg-gradient-to-r from-emerald-400 to-emerald-300 rounded-full transition-all duration-500"
+                                    style={{ width: `${priceBarPosition}%` }}
+                                />
+                            </div>
+
+                            {/* Current Price Marker */}
+                            <div
+                                className="absolute top-1/2 -translate-y-1/2 w-5 h-5 bg-white rounded-full shadow-lg border-2 border-emerald-400 flex items-center justify-center"
+                                style={{ left: `calc(${priceBarPosition}% - 10px)` }}
+                            >
+                                <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+                            </div>
+                        </div>
+
+                        {/* Current Price Label */}
+                        <div className="mt-3 text-center">
+                            <p className={`text-lg font-bold ${challenge.priceChange >= 0 ? "text-emerald-300" : "text-red-300"}`}>
+                                ${challenge.currentPrice.toLocaleString()}
+                                <span className="text-xs ml-2 text-white/60">
+                                    ({challenge.priceChange >= 0 ? "+" : ""}{challenge.priceChange}%)
+                                </span>
+                            </p>
+                        </div>
                     </div>
 
-                    {/* VS Section - Only show if accepted */}
+                    {/* VS Section */}
                     <div className="mb-8">
                         <h3 className="text-center text-sm font-bold text-[#8b7355] uppercase tracking-wider mb-4">
                             {isAccepted ? "Battle Matchup" : "Waiting for Challenger"}
                         </h3>
 
-                        <div className={`flex flex-col ${isAccepted ? "sm:flex-row" : "sm:flex-row sm:justify-center"} items-center gap-4`}>
+                        <div className={`flex flex-row items-center justify-center gap-4`}>
                             {/* Challenger Profile */}
                             <div className="relative group">
                                 <div className={`relative p-4 rounded-2xl transition-all duration-300 ${hasWon
@@ -269,7 +320,7 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
                                             <User className="w-8 h-8 text-white/50" />
                                         </div>
                                         <div className="mt-3 px-4 py-1.5 bg-[#8b7355]/20 rounded-full">
-                                            <p className="text-xs font-semibold text-[#8b7355]">Seeking Challenger</p>
+                                            <p className="text-xs font-semibold text-[#8b7355]">Seeking Opponent</p>
                                         </div>
                                     </>
                                 )}
@@ -345,7 +396,7 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
 
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                             {/* Created */}
-                            <div className="relative p-4 bg-white/60 backdrop-blur-sm rounded-xl border border-[#d4a574]/20">
+                            <div className="relative p-4 bg-white/60 backdrop-blur-sm rounded-xl border border-[#d4a574]/20 hover:border-[#d4a574]/40 hover:shadow-lg transition-all duration-200 cursor-pointer">
                                 <div className="flex items-center gap-3 mb-2">
                                     <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center">
                                         <Calendar className="w-4 h-4 text-emerald-600" />
@@ -356,7 +407,7 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
                             </div>
 
                             {/* Expires */}
-                            <div className="relative p-4 bg-white/60 backdrop-blur-sm rounded-xl border border-[#d4a574]/20">
+                            <div className="relative p-4 bg-white/60 backdrop-blur-sm rounded-xl border border-[#d4a574]/20 hover:border-[#d4a574]/40 hover:shadow-lg transition-all duration-200 cursor-pointer">
                                 <div className="flex items-center gap-3 mb-2">
                                     <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center">
                                         <Clock className="w-4 h-4 text-amber-600" />
@@ -367,7 +418,7 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
                             </div>
 
                             {/* Ends */}
-                            <div className="relative p-4 bg-white/60 backdrop-blur-sm rounded-xl border border-[#d4a574]/20">
+                            <div className="relative p-4 bg-white/60 backdrop-blur-sm rounded-xl border border-[#d4a574]/20 hover:border-[#d4a574]/40 hover:shadow-lg transition-all duration-200 cursor-pointer">
                                 <div className="flex items-center gap-3 mb-2">
                                     <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
                                         <AlertCircle className="w-4 h-4 text-blue-600" />
@@ -379,42 +430,13 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
                         </div>
                     </div>
 
-                    {/* Stats Row */}
-                    <div className="flex flex-wrap items-center justify-center gap-6 p-4 bg-[#2d1f1a]/5 rounded-xl">
-                        <div className="flex items-center gap-2">
-                            <span className="text-lg">
-                                {challenge.priceChange >= 0 ? <TrendingUp className="w-5 h-5 text-emerald-500" /> : <TrendingDown className="w-5 h-5 text-red-500" />}
-                            </span>
-                            <span className={`font-bold ${challenge.priceChange >= 0 ? "text-emerald-600" : "text-red-600"}`}>
-                                {challenge.priceChange >= 0 ? "+" : ""}{challenge.priceChange}%
-                            </span>
-                            <span className="text-sm text-[#8b7355]">price change</span>
-                        </div>
-
-                        <div className="w-px h-6 bg-[#d4a574]/30 hidden sm:block" />
-
-                        <div className="flex items-center gap-2">
-                            <span className="text-lg">👁️</span>
-                            <span className="font-bold text-[#2d1f1a]">{challenge.likes}</span>
-                            <span className="text-sm text-[#8b7355]">watching</span>
-                        </div>
-
-                        <div className="w-px h-6 bg-[#d4a574]/30 hidden sm:block" />
-
-                        <div className="flex items-center gap-2">
-                            <span className="text-lg">🎫</span>
-                            <span className="font-bold text-[#2d1f1a]">#{challenge.id}</span>
-                            <span className="text-sm text-[#8b7355]">challenge</span>
-                        </div>
-                    </div>
-
                     {/* Action Buttons */}
                     <div className="mt-8 flex flex-col sm:flex-row gap-3">
-                        <button className="flex-1 py-3.5 px-6 bg-[#246044] hover:bg-[#2d6f4a] rounded-xl text-white font-bold text-base shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center gap-2">
+                        <button className="flex-1 py-3.5 px-6 bg-[#246044] hover:bg-[#2d6f4a] rounded-xl text-white font-bold text-base shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer">
                             Accept Challenge
                             <span className="text-xl">⚔️</span>
                         </button>
-                        <button className="flex-1 py-3.5 px-6 bg-white/80 hover:bg-white rounded-xl text-[#2d1f1a] font-semibold text-base border border-[#d4a574]/30 hover:border-[#d4a574] transition-all duration-200 flex items-center justify-center gap-2">
+                        <button className="flex-1 py-3.5 px-6 bg-white/80 hover:bg-white rounded-xl text-[#2d1f1a] font-semibold text-base border border-[#d4a574]/30 hover:border-[#d4a574] transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer">
                             Share
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />

@@ -1,102 +1,55 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { useSolanaWallet } from "../lib/useSolanaWallet";
-import {
-  buildAcceptChallengeTx,
-  fetchAllChallenges,
-  lamportsToSol,
-  type OnChainChallenge,
-} from "../lib/rektofun-program";
+import { useState } from "react";
 import { ChallengeHeader } from "./sections/ChallengeHeader";
 import { ChallengeFiltersSection } from "./sections/ChallengeFiltersSection";
 import { FeedbackBanner } from "./sections/FeedbackBanner";
 import { ChallengeGrid } from "./sections/ChallengeGrid";
 import { RektLoadingOverlay } from "../components/RektLoadingOverlay";
 import { CreateChallengeModal } from "./sections/CreateChallengeModal";
+import { Challenge } from "../components/challengesData";
+import ChallengeDetailModal from "../components/ChallengeDetailModal";
 
 export default function ChallengesPage() {
   const [activeFilter, setActiveFilter] = useState("Expiring Soon");
   const [activeAsset, setActiveAsset] = useState("All Markets");
   const [searchQuery, setSearchQuery] = useState("");
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [challenges, setChallenges] = useState<OnChainChallenge[]>([]);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [selectedChallenge, setSelectedChallenge] = useState<Challenge | null>(null);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [rektTarget, setRektTarget] = useState<OnChainChallenge | null>(null);
+  const [rektTarget, setRektTarget] = useState<Challenge | null>(null);
   const [rektTxSig, setRektTxSig] = useState<string | null>(null);
   const [rektError, setRektError] = useState<string | null>(null);
   const [isRekting, setIsRekting] = useState(false);
 
-  const { authenticated, login, program, sendTransaction, publicKey } = useSolanaWallet();
+  // Handle challenge card click
+  const handleChallengeClick = (challenge: Challenge) => {
+    setSelectedChallenge(challenge);
+    setIsDetailModalOpen(true);
+  };
 
-  const loadChallenges = async () => {
-    if (!program) return;
-    setIsLoading(true);
-    try {
-      const data = await fetchAllChallenges(program);
-      setChallenges(data);
-    } catch (err) {
-      console.error("Failed to load challenges:", err);
-    } finally {
-      setIsLoading(false);
-    }
-  }
+  // Close detail modal handler
+  const closeDetailModal = () => {
+    setIsDetailModalOpen(false);
+    setTimeout(() => setSelectedChallenge(null), 300);
+  };
 
-  useEffect(() => {
-    loadChallenges();
-  }, []);
-
-  async function handleRekt(challenge: OnChainChallenge) {
-    if (!authenticated) { login(); return; }
-    if (!program || !publicKey) { setRektError("Wallet not ready"); return; }
-
+  async function handleRekt(challenge: Challenge) {
     setRektTarget(challenge);
     setRektError(null);
     setRektTxSig(null);
     setIsRekting(true);
 
-    try {
-      const tx = await buildAcceptChallengeTx(program, publicKey, challenge.publicKey, challenge.creator);
-      const sig = await sendTransaction(tx);
-      setRektTxSig(sig);
-      await loadChallenges();
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setRektError(msg);
-    } finally {
-      setIsRekting(false);
-    }
+    // Simulate transaction
+    await new Promise(resolve => setTimeout(resolve, 1500));
+
+    setRektTxSig("simulated_tx_signature_" + Date.now());
+    setIsRekting(false);
   }
 
-  const filtered = challenges.filter((c) => {
-    // Market filter
-    if (activeAsset === "Bitcoin Markets" && c.asset !== "BTC") return false;
-    if (activeAsset === "Ethereum Markets" && c.asset !== "ETH") return false;
-    if (activeAsset === "Altcoin Markets" && !["SOL", "DOGE", "PEPE", "SHIB"].includes(c.asset)) return false;
-
-    // Challenge type filters
-    if (activeFilter === "Expiring Soon") {
-      const diff = c.expiresAt - Math.floor(Date.now() / 1000);
-      return diff > 0 && diff < 3600;
-    }
-    if (activeFilter === "Ending Soon") {
-      const diff = c.expiresAt - Math.floor(Date.now() / 1000);
-      return diff > 0 && diff < 86400;
-    }
-    if (activeFilter === "My Bets" && publicKey)
-      return c.creator.equals(publicKey) || c.challenger.equals(publicKey);
-    if (activeFilter === "High Stakes") return lamportsToSol(c.betAmount) >= 1;
-    if (activeFilter === "My Watchlists" && publicKey)
-      return c.creator.equals(publicKey) || c.challenger.equals(publicKey);
-    return true;
-  });
-
   const handleOpenCreateModal = () => {
-    if (!authenticated) {
-      login();
-      return;
-    }
-    setIsModalOpen(true);
+    setIsCreateModalOpen(true);
   };
 
   return (
@@ -115,22 +68,28 @@ export default function ChallengesPage() {
       <FeedbackBanner
         rektTxSig={rektTxSig}
         rektError={rektError}
-        targetCreator={rektTarget?.creator ?? null}
+        targetCreator={rektTarget?.creator.name ?? null}
       />
 
       <ChallengeGrid
-        challenges={filtered}
         onRekt={handleRekt}
+        onClick={handleChallengeClick}
         isLoading={isLoading}
-        onOpenModal={() => setIsModalOpen(true)}
+        onOpenModal={() => setIsCreateModalOpen(true)}
       />
 
       <RektLoadingOverlay isLoading={isRekting} />
 
       <CreateChallengeModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onCreated={loadChallenges}
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onCreated={() => { }}
+      />
+
+      <ChallengeDetailModal
+        challenge={selectedChallenge}
+        isOpen={isDetailModalOpen}
+        onClose={closeDetailModal}
       />
     </div>
   );

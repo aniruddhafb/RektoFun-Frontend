@@ -144,11 +144,11 @@ export default function ReferralPage() {
                     <div className="flex items-start gap-3 mb-2">
                         <Sparkles className="w-8 h-8 text-amber-600 mt-1" />
                         <h1 className="text-3xl sm:text-4xl font-bold text-gray-900">
-                            Refer & Earn Rekto Points
+                            Refer & Earn REKT POINTS
                         </h1>
                     </div>
                     <p className="text-gray-600 text-lg mb-8 ml-11">
-                        Invite friends to Rekto.fun and earn Rekto Points by competing challenges.
+                        Invite friends to Rekto.fun and earn REKT POINTS by competing challenges.
                     </p>
 
                     <div className="flex flex-col xl:flex-row gap-6">
@@ -165,7 +165,7 @@ export default function ReferralPage() {
                                         <h3 className="font-semibold text-gray-900">Refer Friends</h3>
                                     </div>
                                     <p className="text-gray-600 text-sm leading-relaxed">
-                                        Get <span className="font-semibold text-gray-900">100 Rekto Points</span> for every
+                                        Get <span className="font-semibold text-gray-900">100 REKT POINTS</span> for every
                                         friend you invite when they sign
                                     </p>
                                 </div>
@@ -179,7 +179,7 @@ export default function ReferralPage() {
                                         <h3 className="font-semibold text-gray-900">Win Challenges</h3>
                                     </div>
                                     <p className="text-gray-600 text-sm leading-relaxed">
-                                        Earn <span className="font-semibold text-gray-900">20 Rekto Points</span> for every
+                                        Earn <span className="font-semibold text-gray-900">20 REKT POINTS</span> for every
                                         challenge you win.
                                     </p>
                                 </div>
@@ -194,7 +194,7 @@ export default function ReferralPage() {
                                     </div>
                                     <p className="text-gray-600 text-sm leading-relaxed">
                                         Even if you lose, you still receive{" "}
-                                        <span className="font-semibold text-gray-900">10 Rekto Points</span>.
+                                        <span className="font-semibold text-gray-900">10 REKT POINTS</span>.
                                     </p>
                                 </div>
                             </div>
@@ -223,7 +223,7 @@ export default function ReferralPage() {
                                                 <span className="font-semibold text-gray-900">Share Your Referral Code</span>
                                             </div>
                                             <p className="text-sm text-gray-600 mb-3">
-                                                Get <span className="font-semibold text-gray-900">100 Rekto Points</span> for each friend who signs up using your link!
+                                                Get <span className="font-semibold text-gray-900">100 REKT POINTS</span> for each friend who signs up using your link!
                                             </p>
                                             <button
                                                 onClick={handleShare}
@@ -240,7 +240,7 @@ export default function ReferralPage() {
                                                 <CheckCircle className="w-4 h-4 text-gray-600 mt-0.5 flex-shrink-0" />
                                                 <div>
                                                     <p className="text-sm font-medium text-gray-800">Referral link copied!</p>
-                                                    <p className="text-xs text-gray-600 mt-0.5">Share it with your friends and get Rekto Points!</p>
+                                                    <p className="text-xs text-gray-600 mt-0.5">Share it with your friends and get REKT POINTS!</p>
                                                 </div>
                                             </div>
                                         )}
@@ -254,7 +254,7 @@ export default function ReferralPage() {
                                                         <span className="font-semibold text-gray-900">Redeem Referral Code</span>
                                                     </div>
                                                     <p className="text-sm text-gray-600 mb-3">
-                                                        Get <span className="font-semibold text-gray-900">50 Rekto Points</span> for using a referral code!
+                                                        Get <span className="font-semibold text-gray-900">50 REKT POINTS</span> for using a referral code!
                                                     </p>
                                                     <div className="flex flex-col sm:flex-row gap-2">
                                                         <input
@@ -288,7 +288,7 @@ export default function ReferralPage() {
                                                         <div>
                                                             <p className="font-semibold text-gray-900">Code Redeemed!</p>
                                                             <p className="text-sm text-gray-600">
-                                                                You received <span className="font-semibold text-gray-900">50 Rekto Points</span>
+                                                                You received <span className="font-semibold text-gray-900">50 REKT POINTS</span>
                                                             </p>
                                                         </div>
                                                     </div>
@@ -316,7 +316,7 @@ export default function ReferralPage() {
                                         </div>
                                         <h3 className="text-xl font-semibold text-gray-900 mb-2">Login to Access Referral</h3>
                                         <p className="text-gray-600 mb-6 max-w-sm">
-                                            Sign in or create an account to access your referral link and start earning Rekto Points!
+                                            Sign in or create an account to access your referral link and start earning REKT POINTS!
                                         </p>
                                         <button
                                             onClick={login}
@@ -355,7 +355,7 @@ export default function ReferralPage() {
                                             <Coins className="w-5 h-5 text-gray-600" />
                                         </div>
                                         <div>
-                                            <p className="text-sm text-gray-500">Your Rekto Points</p>
+                                            <p className="text-sm text-gray-500">Your REKT POINTS</p>
                                             <p className="text-2xl font-bold text-gray-900">1,250</p>
                                         </div>
                                     </div>
@@ -465,7 +465,7 @@ export default function ReferralPage() {
                                         {/* Referrals */}
                                         <div className="col-span-2 text-gray-900 font-medium text-sm">{user.referrals}</div>
 
-                                        {/* Rekto Points */}
+                                        {/* REKT POINTS */}
                                         <div className="col-span-2 text-gray-900 font-medium text-sm">{user.points}</div>
 
                                         {/* Earnings */}
