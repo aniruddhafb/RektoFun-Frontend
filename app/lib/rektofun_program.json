@@ -1,0 +1,730 @@
+{
+  "address": "4t5KYdKFmPw49yo6Bm1TV2ZDEi6k3Ns4eJLeNhgbVSzJ",
+  "metadata": {
+    "name": "rektofun_program",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Created with Anchor"
+  },
+  "instructions": [
+    {
+      "name": "accept_challenge",
+      "docs": [
+        "Challenger accepts the challenge by matching the bet amount (REKT HIM)."
+      ],
+      "discriminator": [
+        195,
+        227,
+        139,
+        241,
+        55,
+        193,
+        153,
+        105
+      ],
+      "accounts": [
+        {
+          "name": "challenger",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "creator"
+        },
+        {
+          "name": "challenge",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  104,
+                  97,
+                  108,
+                  108,
+                  101,
+                  110,
+                  103,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "creator"
+              },
+              {
+                "kind": "account",
+                "path": "challenge.challenge_id",
+                "account": "ChallengeAccount"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "challenge"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "cancel_challenge",
+      "docs": [
+        "Creator cancels an unaccepted challenge and reclaims their bet."
+      ],
+      "discriminator": [
+        231,
+        253,
+        0,
+        151,
+        179,
+        94,
+        5,
+        152
+      ],
+      "accounts": [
+        {
+          "name": "creator",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "challenge",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  104,
+                  97,
+                  108,
+                  108,
+                  101,
+                  110,
+                  103,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "creator"
+              },
+              {
+                "kind": "account",
+                "path": "challenge.challenge_id",
+                "account": "ChallengeAccount"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "challenge"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "create_challenge",
+      "docs": [
+        "Creator posts a new challenge, locking their SOL bet into escrow."
+      ],
+      "discriminator": [
+        170,
+        244,
+        47,
+        1,
+        1,
+        15,
+        173,
+        239
+      ],
+      "accounts": [
+        {
+          "name": "creator",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "creator_counter",
+          "docs": [
+            "Per-creator counter — init on first challenge, increment thereafter"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  114,
+                  101,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  99,
+                  111,
+                  117,
+                  110,
+                  116,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "creator"
+              }
+            ]
+          }
+        },
+        {
+          "name": "challenge",
+          "docs": [
+            "The challenge account itself"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  104,
+                  97,
+                  108,
+                  108,
+                  101,
+                  110,
+                  103,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "creator"
+              },
+              {
+                "kind": "account",
+                "path": "creator_counter.count",
+                "account": "CreatorCounter"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "docs": [
+            "SOL vault that holds both bets — a plain system-owned PDA"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "challenge"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "params",
+          "type": {
+            "defined": {
+              "name": "CreateChallengeParams"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "settle_challenge",
+      "docs": [
+        "Admin/oracle settles the challenge after expiry, sending funds to winner."
+      ],
+      "discriminator": [
+        242,
+        58,
+        232,
+        150,
+        127,
+        199,
+        11,
+        204
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "docs": [
+            "The admin/oracle wallet that is authorised to settle challenges.",
+            "In production this should be a multisig or a Switchboard/Pyth oracle CPI."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "creator",
+          "writable": true
+        },
+        {
+          "name": "challenger",
+          "writable": true
+        },
+        {
+          "name": "treasury",
+          "writable": true
+        },
+        {
+          "name": "challenge",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  104,
+                  97,
+                  108,
+                  108,
+                  101,
+                  110,
+                  103,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "challenge.creator",
+                "account": "ChallengeAccount"
+              },
+              {
+                "kind": "account",
+                "path": "challenge.challenge_id",
+                "account": "ChallengeAccount"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "challenge"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "creator_wins",
+          "type": "bool"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "ChallengeAccount",
+      "discriminator": [
+        96,
+        128,
+        44,
+        165,
+        71,
+        172,
+        60,
+        12
+      ]
+    },
+    {
+      "name": "CreatorCounter",
+      "discriminator": [
+        62,
+        129,
+        78,
+        26,
+        23,
+        138,
+        248,
+        82
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "BetTooSmall",
+      "msg": "Bet amount is below the minimum allowed"
+    },
+    {
+      "code": 6001,
+      "name": "DurationTooShort",
+      "msg": "Challenge duration is too short (minimum 5 minutes)"
+    },
+    {
+      "code": 6002,
+      "name": "DurationTooLong",
+      "msg": "Challenge duration is too long (maximum 7 days)"
+    },
+    {
+      "code": 6003,
+      "name": "AlreadyAccepted",
+      "msg": "Challenge has already been accepted"
+    },
+    {
+      "code": 6004,
+      "name": "NotOpen",
+      "msg": "Challenge is not in Open status"
+    },
+    {
+      "code": 6005,
+      "name": "NotActive",
+      "msg": "Challenge is not in Active status"
+    },
+    {
+      "code": 6006,
+      "name": "NotExpired",
+      "msg": "Challenge has not yet expired"
+    },
+    {
+      "code": 6007,
+      "name": "ChallengeExpired",
+      "msg": "Challenge has already expired; cannot accept"
+    },
+    {
+      "code": 6008,
+      "name": "CannotAcceptOwnChallenge",
+      "msg": "Creator cannot accept their own challenge"
+    },
+    {
+      "code": 6009,
+      "name": "UnauthorizedCancel",
+      "msg": "Only the challenge creator can cancel"
+    },
+    {
+      "code": 6010,
+      "name": "UnauthorizedSettle",
+      "msg": "Only the admin/oracle can settle challenges"
+    },
+    {
+      "code": 6011,
+      "name": "Overflow",
+      "msg": "Arithmetic overflow"
+    },
+    {
+      "code": 6012,
+      "name": "AssetTooLong",
+      "msg": "Asset symbol too long (max 10 chars)"
+    },
+    {
+      "code": 6013,
+      "name": "InvalidResolvesAt",
+      "msg": "Resolve time must be after expiry time"
+    }
+  ],
+  "types": [
+    {
+      "name": "ChallengeAccount",
+      "docs": [
+        "The main challenge account stored on-chain.",
+        "Seeds: [b\"challenge\", creator.key(), challenge_id.to_le_bytes()]"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "creator",
+            "docs": [
+              "The wallet that created the challenge"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "challenger",
+            "docs": [
+              "The wallet that accepted the challenge (zero if not yet accepted)"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "challenge_id",
+            "docs": [
+              "Unique numeric ID for this challenge (per creator)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "asset",
+            "docs": [
+              "Asset symbol, e.g. \"BTC\", \"SOL\", \"ETH\""
+            ],
+            "type": "string"
+          },
+          {
+            "name": "bet_amount",
+            "docs": [
+              "Bet amount in lamports (both sides must match)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "target_price_usd_cents",
+            "docs": [
+              "Target price in USD cents (e.g. $66,500 → 6_650_000)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "direction",
+            "docs": [
+              "Direction of the creator's prediction"
+            ],
+            "type": {
+              "defined": {
+                "name": "PredictionDirection"
+              }
+            }
+          },
+          {
+            "name": "expires_at",
+            "docs": [
+              "Unix timestamp when the challenge expires (no more accepts after this)"
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "resolves_at",
+            "docs": [
+              "Unix timestamp when the price is evaluated (end of prediction window)"
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "status",
+            "docs": [
+              "Current status"
+            ],
+            "type": {
+              "defined": {
+                "name": "ChallengeStatus"
+              }
+            }
+          },
+          {
+            "name": "vault_bump",
+            "docs": [
+              "PDA bump for the vault"
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "bump",
+            "docs": [
+              "PDA bump for this account"
+            ],
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ChallengeStatus",
+      "docs": [
+        "On-chain status of a challenge"
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Open"
+          },
+          {
+            "name": "Active"
+          },
+          {
+            "name": "Settled"
+          },
+          {
+            "name": "Cancelled"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CreateChallengeParams",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "asset",
+            "docs": [
+              "Asset symbol, e.g. \"BTC\""
+            ],
+            "type": "string"
+          },
+          {
+            "name": "bet_amount",
+            "docs": [
+              "Bet amount in lamports"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "target_price_usd_cents",
+            "docs": [
+              "Target price in USD cents (e.g. $66,500 → 6_650_000)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "direction_above",
+            "docs": [
+              "true = creator predicts price will be ABOVE target; false = BELOW"
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "expires_at",
+            "docs": [
+              "Unix timestamp: last moment another user can accept this challenge"
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "resolves_at",
+            "docs": [
+              "Unix timestamp: when the price outcome is evaluated"
+            ],
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CreatorCounter",
+      "docs": [
+        "A per-creator counter so each creator can have multiple challenges.",
+        "Seeds: [b\"creator_counter\", creator.key()]"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "creator",
+            "type": "pubkey"
+          },
+          {
+            "name": "count",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PredictionDirection",
+      "docs": [
+        "Direction of the price prediction"
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Above"
+          },
+          {
+            "name": "Below"
+          }
+        ]
+      }
+    }
+  ]
+}
