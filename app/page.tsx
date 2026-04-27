@@ -1,4 +1,4 @@
-import { HeroSection, WaysToWinSection } from "@/components/homepage-components";
+import { HeroSection, WaysToWinSection } from "@/app/components/homepage-components";
 
 export default function Home() {
   return (

@@ -1,26 +1,26 @@
 // Challenge type definition (matching ChallengeDetailModal)
 export interface Challenge {
-  id: string;
-  asset: string;
-  assetLogo: string;
-  title: string;
-  creator: {
-    name: string;
-    avatar: string;
-  };
-  betAmount: number;
-  prediction: string;
-  currentPrice: number;
-  priceChange: number;
-  targetPrice: number;
-  startPrice: number;
-  timeRemaining: string;
-  likes: number;
-  status: "active" | "expired" | "won" | "lost" | "created" | "accepted";
-  accepter?: {
-    name: string;
-    avatar: string;
-  };
+    id: string;
+    asset: string;
+    assetLogo: string;
+    title: string;
+    creator: {
+        name: string;
+        avatar: string;
+    };
+    betAmount: number;
+    prediction: string;
+    currentPrice: number;
+    priceChange: number;
+    targetPrice: number;
+    startPrice: number;
+    timeRemaining: string;
+    likes: number;
+    status: "active" | "expired" | "won" | "lost" | "created" | "accepted";
+    accepter?: {
+        name: string;
+        avatar: string;
+    };
 }
 
 // Coin mappings

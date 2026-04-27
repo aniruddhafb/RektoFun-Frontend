@@ -4,5 +4,4 @@ export { NavbarDesktopSearch } from "./NavbarDesktopSearch";
 export { NavbarMobileBottomNav } from "./NavbarMobileBottomNav";
 export { NavbarNavLinks } from "./NavbarNavLinks";
 export { NavbarProfileDropdown } from "./NavbarProfileDropdown";
-export { NavbarProfileModal } from "./NavbarProfileModal";
-export { NAV_LINKS, PROFILE_SVGS } from "./navbarData";
+export { NAV_LINKS } from "./navbarData";

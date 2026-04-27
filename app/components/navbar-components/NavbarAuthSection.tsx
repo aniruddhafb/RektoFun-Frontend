@@ -13,7 +13,6 @@ type NavbarAuthSectionProps = {
     onMouseEnterDropdown: () => void;
     onMouseLeaveDropdown: () => void;
     onOpenDeposit: () => void;
-    onOpenProfileEditor: () => void;
     profileHref: string;
 };
 
@@ -28,13 +27,18 @@ export function NavbarAuthSection({
     onMouseEnterDropdown,
     onMouseLeaveDropdown,
     onOpenDeposit,
-    onOpenProfileEditor,
     profileHref,
 }: NavbarAuthSectionProps) {
     return (
         <div className="flex items-center gap-2 sm:gap-4">
             {authenticated ? (
                 <div className="flex items-center gap-3">
+                    {/* Portfolio Balance */}
+                    <div className="hidden sm:flex items-center gap-2 px-3 py-2 bg-white/30 border border-gray-300 hover:bg-white/50 rounded-full transition-colors cursor-pointer">
+                        {/* <span className="text-xs text-gray-600">Portfolio</span> */}
+                        <span className="text-sm font-semibold text-gray-900">$0.00</span>
+                    </div>
+
                     <button
                         type="button"
                         onClick={onOpenDeposit}
@@ -53,7 +57,6 @@ export function NavbarAuthSection({
                         onMouseLeave={onMouseLeaveDropdown}
                         onLogout={onLogout}
                         onOpenDeposit={onOpenDeposit}
-                        onOpenProfileEditor={onOpenProfileEditor}
                         profileHref={profileHref}
                     />
                 </div>

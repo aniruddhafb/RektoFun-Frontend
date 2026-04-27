@@ -10,19 +10,13 @@ import {
     NavbarDesktopSearch,
     NavbarMobileBottomNav,
     NavbarNavLinks,
-    NavbarProfileModal,
-    PROFILE_SVGS,
 } from "./navbar-components";
 
 export default function Navbar() {
     const [searchQuery, setSearchQuery] = useState("");
     const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-    const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
     const [username, setUsername] = useState("trader_123");
-    const [editUsername, setEditUsername] = useState("trader_123");
-    const [editInviteCode, setEditInviteCode] = useState("");
-    const [editProfileIndex, setEditProfileIndex] = useState(0);
     const pathname = usePathname();
 
     const { open: openPhantomModal } = useModal();
@@ -55,32 +49,12 @@ export default function Navbar() {
         }
     };
 
-    const randomizeProfile = () => {
-        const randomIndex = Math.floor(Math.random() * PROFILE_SVGS.length);
-        setEditProfileIndex(randomIndex);
-    };
-
     const isActive = (href: string) => {
         if (href === "/") {
             return pathname === href;
         }
 
         return pathname === href || pathname.startsWith(`${href}/`);
-    };
-
-    const openProfileEditor = () => {
-        setEditUsername(displayUsername);
-        setIsProfileModalOpen(true);
-    };
-
-    const handleSaveProfile = () => {
-        setUsername(editUsername.trim() || defaultUsername);
-        console.log("Saving profile:", {
-            username: editUsername,
-            profileIndex: editProfileIndex,
-            inviteCode: editInviteCode,
-        });
-        setIsProfileModalOpen(false);
     };
 
     return (
@@ -106,7 +80,6 @@ export default function Navbar() {
                             onMouseEnterDropdown={() => setIsDropdownOpen(true)}
                             onMouseLeaveDropdown={() => setIsDropdownOpen(false)}
                             onOpenDeposit={() => setIsDepositModalOpen(true)}
-                            onOpenProfileEditor={openProfileEditor}
                             profileHref={profileHref}
                         />
                     </div>
@@ -126,20 +99,6 @@ export default function Navbar() {
             <DepositModal
                 isOpen={isDepositModalOpen}
                 onClose={() => setIsDepositModalOpen(false)}
-            />
-
-            <NavbarProfileModal
-                defaultUsername={defaultUsername}
-                editInviteCode={editInviteCode}
-                editProfileIndex={editProfileIndex}
-                editUsername={editUsername}
-                isOpen={isProfileModalOpen}
-                onClose={() => setIsProfileModalOpen(false)}
-                onEditInviteCodeChange={setEditInviteCode}
-                onEditUsernameChange={setEditUsername}
-                onRandomizeProfile={randomizeProfile}
-                onSave={handleSaveProfile}
-                profileSvgs={PROFILE_SVGS}
             />
 
             <NavbarMobileBottomNav isActive={isActive} profileHref={profileHref} />

@@ -4,9 +4,9 @@ import Image from "next/image";
 import Link from "next/link";
 import { Search, ChevronDown, ChevronRight, Crown, Eye, EyeOff } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { CreateChallengeModal } from "../../challenges/sections/CreateChallengeModal";
-import { ChallengeCard } from "../../components/ChallengeCard";
-import { Challenge, DUMMY_CHALLENGES } from "../../components/challengesData";
+import { CreateChallengeModal } from "../../components/challenge-components/CreateChallengeModal";
+import { ChallengeCard } from "../../components/challenge-components/ChallengeCard";
+import { Challenge, DUMMY_CHALLENGES } from "../../components/challenge-components/challengesData";
 function TradingViewChart() {
     const containerRef = useRef<HTMLDivElement>(null);
 

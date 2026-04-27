@@ -3,7 +3,6 @@
 import { useState, useRef, useEffect } from "react";
 import Image from "next/image";
 import { Search, ChevronDown, ArrowRight, TrendingUp, Clock, DollarSign, Eye, Bookmark } from "lucide-react";
-import { CreateMarketModal } from "./sections/CreateMarketModal";
 
 // Challenge data type
 interface Challenge {
@@ -180,11 +179,7 @@ export default function MarketsPage() {
     const [sortBy, setSortBy] = useState<SortOption>("Recently Added");
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [bookmarkedMarkets, setBookmarkedMarkets] = useState<Set<string>>(new Set());
-    const [isModalOpen, setIsModalOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
-    const handleOpenCreateModal = () => {
-        setIsModalOpen(true);
-    };
 
     const toggleBookmark = (marketId: string) => {
         setBookmarkedMarkets(prev => {
@@ -222,15 +217,6 @@ export default function MarketsPage() {
                         <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-2">Challenge Markets</h1>
                         <p className="text-gray-600 text-base sm:text-lg">Predict trends and earn big on top challenge markets</p>
                     </div>
-                    <button
-                        onClick={handleOpenCreateModal}
-                        className="cursor-pointer inline-flex items-center justify-center px-6 py-3 bg-white/50 border border-gray-400 hover:bg-white/80 text-black text-sm font-medium rounded-full hover:bg-gray-800 transition-colors"
-                    >
-                        <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                        </svg>
-                        Create Market
-                    </button>
                 </div>
 
                 {/* Filter Tabs and Search */}
@@ -411,7 +397,6 @@ export default function MarketsPage() {
                     </div>
                 </div>
 
-                <CreateMarketModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
             </div>
         </div>
     );

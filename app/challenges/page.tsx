@@ -1,14 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { ChallengeHeader } from "./sections/ChallengeHeader";
-import { ChallengeFiltersSection } from "./sections/ChallengeFiltersSection";
-import { FeedbackBanner } from "./sections/FeedbackBanner";
-import { ChallengeGrid } from "./sections/ChallengeGrid";
+import { ChallengeHeader } from "../components/challenge-components/ChallengeHeader";
+import { ChallengeFiltersSection } from "../components/challenge-components/ChallengeFiltersSection";
+import { FeedbackBanner } from "../components/challenge-components/FeedbackBanner";
+import { ChallengeGrid } from "../components/challenge-components/ChallengeGrid";
 import { RektLoadingOverlay } from "../components/RektLoadingOverlay";
-import { CreateChallengeModal } from "./sections/CreateChallengeModal";
-import { Challenge } from "../components/challengesData";
-import ChallengeDetailModal from "../components/ChallengeDetailModal";
+import { CreateChallengeModal } from "../components/challenge-components/CreateChallengeModal";
+import { Challenge } from "../components/challenge-components/challengesData";
+import ChallengeDetailModal from "../components/challenge-components/ChallengeDetailModal";
 
 export default function ChallengesPage() {
   const [activeFilter, setActiveFilter] = useState("Expiring Soon");
