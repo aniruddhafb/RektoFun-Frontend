@@ -20,15 +20,15 @@ type MenuActionProps = {
     children: ReactNode;
     icon: ReactNode;
 } & (
-    | {
-          href: string;
-          onClick?: never;
-      }
-    | {
-          href?: never;
-          onClick: () => void;
-      }
-);
+        | {
+            href: string;
+            onClick?: never;
+        }
+        | {
+            href?: never;
+            onClick: () => void;
+        }
+    );
 
 function MenuAction(props: MenuActionProps) {
     const content = (
@@ -85,9 +85,9 @@ export function NavbarProfileDropdown({
                 <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-sm font-semibold">
                     {displayUsername.charAt(0).toUpperCase() || "U"}
                 </div>
-                <span className="hidden sm:block text-sm font-medium text-gray-700 max-w-[100px] truncate">
+                {/* <span className="hidden sm:block text-sm font-medium text-gray-700 max-w-[100px] truncate">
                     {displayUsername}
-                </span>
+                </span> */}
                 <svg
                     className="w-4 h-4 text-gray-500"
                     fill="none"

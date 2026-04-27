@@ -93,9 +93,6 @@ export function CreateChallengeModal({
         </div>
 
         <div className="px-6 py-4 space-y-4 overflow-y-auto">
-          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-            Wallet-backed challenge creation is currently disabled while a replacement for Privy is being integrated.
-          </div>
 
           <div className="space-y-2">
             <label className="text-sm font-medium text-gray-700">Market</label>
@@ -211,15 +208,10 @@ export function CreateChallengeModal({
           </div>
 
           <button
-            disabled
             className="w-full py-4 bg-gray-400 text-white rounded-full font-bold text-lg cursor-not-allowed"
           >
-            Wallet Integration Required
+            Create Challenge
           </button>
-
-          <p className="text-center text-sm text-gray-600">
-            Add a replacement wallet provider before enabling on-chain challenge creation again.
-          </p>
         </div>
       </div>
 
