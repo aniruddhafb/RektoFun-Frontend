@@ -17,6 +17,10 @@ export interface Challenge {
     timeRemaining: string;
     likes: number;
     status: "active" | "expired" | "won" | "lost" | "created" | "accepted";
+    mode: "pvp" | "multi";
+    challengerCount: number;
+    defenderCount: number;
+    totalPool: number;
     accepter?: {
         name: string;
         avatar: string;
@@ -53,6 +57,10 @@ export const DUMMY_CHALLENGES: Challenge[] = [
         timeRemaining: "59m 12s",
         likes: 5,
         status: "active",
+        mode: "pvp",
+        challengerCount: 3,
+        defenderCount: 2,
+        totalPool: 500,
         accepter: { name: "CryptoKing", avatar: "/scribbles/pepe.png" },
     },
     {
@@ -73,6 +81,10 @@ export const DUMMY_CHALLENGES: Challenge[] = [
         timeRemaining: "1h 45m",
         likes: 12,
         status: "active",
+        mode: "multi",
+        challengerCount: 5,
+        defenderCount: 4,
+        totalPool: 2250,
     },
     {
         id: "3",
@@ -92,6 +104,10 @@ export const DUMMY_CHALLENGES: Challenge[] = [
         timeRemaining: "28m 45s",
         likes: 8,
         status: "active",
+        mode: "pvp",
+        challengerCount: 2,
+        defenderCount: 3,
+        totalPool: 2500,
     },
     {
         id: "4",
@@ -111,6 +127,10 @@ export const DUMMY_CHALLENGES: Challenge[] = [
         timeRemaining: "52m 30s",
         likes: 3,
         status: "created",
+        mode: "multi",
+        challengerCount: 1,
+        defenderCount: 0,
+        totalPool: 50,
     },
     {
         id: "5",
@@ -130,6 +150,10 @@ export const DUMMY_CHALLENGES: Challenge[] = [
         timeRemaining: "2h 15m",
         likes: 7,
         status: "accepted",
+        mode: "pvp",
+        challengerCount: 4,
+        defenderCount: 2,
+        totalPool: 900,
         accepter: { name: "DegenLord", avatar: "/scribbles/pepe.png" },
     },
     {
@@ -150,6 +174,10 @@ export const DUMMY_CHALLENGES: Challenge[] = [
         timeRemaining: "48m 20s",
         likes: 4,
         status: "expired",
+        mode: "multi",
+        challengerCount: 2,
+        defenderCount: 1,
+        totalPool: 225,
         accepter: { name: "DegenLord", avatar: "/scribbles/pepe.png" },
     },
 ];

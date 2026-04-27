@@ -7,14 +7,12 @@ interface ChallengeCardProps {
     challenge: Challenge;
     onClick?: (challenge: Challenge) => void;
     onRekt?: (challenge: Challenge) => void;
-    variant?: "default" | "market";
 }
 
 export function ChallengeCard({
     challenge,
     onClick,
     onRekt,
-    variant = "default"
 }: ChallengeCardProps) {
     const handleClick = () => {
         if (onClick) {
@@ -23,18 +21,6 @@ export function ChallengeCard({
             onRekt(challenge);
         }
     };
-
-    // Calculate price position for the progress bar (0-100%)
-    const priceRange = Math.abs(challenge.targetPrice - challenge.startPrice);
-
-    // Calculate progress: 50% is target, <50% is below, >50% is above
-    let priceProgress = 50;
-    if (priceRange > 0) {
-        const targetDiff = challenge.targetPrice - challenge.startPrice;
-        const normalizedProgress = (challenge.currentPrice - challenge.startPrice) / targetDiff;
-        priceProgress = 50 + (normalizedProgress * 50);
-    }
-    const clampedProgress = Math.min(Math.max(priceProgress, 0), 100);
 
     const isAccepted = challenge.status === "accepted" || challenge.status === "active" || challenge.status === "won" || challenge.status === "lost";
     const hasWon = challenge.status === "won";
@@ -75,91 +61,128 @@ export function ChallengeCard({
                         </div>
                     </div>
                 </div>
-                {/* Watchlist Icon - only show in market variant */}
-                {variant === "market" && (
-                    <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                        <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
-                        </svg>
-                    </button>
-                )}
+                {/* Watchlist Button */}
+                <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                    <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                    </svg>
+                </button>
             </div>
 
             {/* Divider */}
             <div className="border-t border-gray-200 my-3"></div>
 
-            {/* Bet Info */}
-            <div className="text-center mb-3">
-                <p className="text-xl font-bold text-gray-900">
-                    <span className="text-emerald-600">${challenge.betAmount}</span>{" "}
-                    <span className="text-gray-700">Bet on {challenge.prediction}</span>
-                </p>
+            {/* Challenge Mode Info */}
+            <div className="group relative flex items-center justify-center gap-2 mb-4">
+                <svg className="w-4 h-4 text-black cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span className="text-xs font-medium text-black">
+                    {challenge.mode === "pvp" ? "PVP Mode" : "Multi Mode"}
+                </span>
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 text-center">
+                    {challenge.mode === "pvp"
+                        ? "The creator has set this challenge to PVP mode, meaning it's a 1v1 challenge only."
+                        : "The creator has set this challenge to multi mode, meaning multiple people can join."}
+                    <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
+                </div>
             </div>
 
-            {/* Price Progress Bar - only show in market variant */}
-            {variant === "market" && (
-                <div className="mb-5">
-                    {/* Price labels */}
-                    <div className="flex justify-between text-sm text-gray-500 mb-2">
-                        <span>${challenge.startPrice.toLocaleString()}</span>
-                        <span className="font-semibold text-gray-700">${challenge.targetPrice.toLocaleString()}</span>
-                        <span>${challenge.startPrice.toLocaleString()}</span>
-                    </div>
+            {/* VS Section */}
+            <div className="mb-5">
+                <div className="flex flex-row items-center justify-center gap-2 sm:gap-4">
+                    {/* Challenger Profile */}
+                    <div className="relative group flex flex-col items-center">
+                        <div className={`relative p-3 rounded-xl transition-all duration-300 ${hasWon
+                            ? "bg-gradient-to-br from-amber-100 to-yellow-50 border-2 border-amber-400"
+                            : hasLost
+                                ? "bg-gradient-to-br from-red-100 to-rose-50 border-2 border-red-300"
+                                : "bg-white/80 border-2 border-[#d4a574]/30"
+                            }`}>
+                            {/* Winner Crown */}
+                            {hasWon && (
+                                <div className="absolute -top-5 left-1/2 -translate-x-1/2 text-2xl animate-bounce">
+                                    👑
+                                </div>
+                            )}
 
-                    {/* Progress bar container */}
-                    <div className="relative h-6 bg-gray-200 rounded-full overflow-hidden">
-                        {/* Left side - Red (below target) */}
-                        <div
-                            className="absolute inset-y-0 left-0 bg-gradient-to-r from-red-500 to-red-400"
-                            style={{ width: '50%' }}
-                        />
-                        {/* Right side - Green (above target) */}
-                        <div
-                            className="absolute inset-y-0 right-0 bg-gradient-to-r from-emerald-400 to-emerald-500"
-                            style={{ width: '50%' }}
-                        />
+                            {/* Avatar */}
+                            <div className="relative">
+                                <div className={`w-14 h-14 rounded-full overflow-hidden border-2 ${hasWon ? "border-amber-400" : "border-[#d4a574]"
+                                    } shadow-md`}>
+                                    <Image
+                                        src={challenge.creator.avatar}
+                                        alt={challenge.creator.name}
+                                        width={56}
+                                        height={56}
+                                        className="w-full h-full object-cover"
+                                    />
+                                </div>
+                                {/* Count Badge */}
+                                {challenge.mode === "multi" && challenge.challengerCount > 1 && (
+                                    <div className="absolute -top-1 -right-1 w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center border-2 border-white">
+                                        <span className="text-[9px] font-bold text-white">+{challenge.challengerCount - 1}</span>
+                                    </div>
+                                )}
+                                {/* Label */}
+                                <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 px-1.5 py-0.5 bg-[#2d1f1a] text-white text-[9px] font-bold rounded-full">
+                                    {challenge.mode === "multi" ? "CHALLENGERS" : "CHALLENGER"}
+                                </div>
+                            </div>
 
-                        {/* Center marker for target price */}
-                        <div className="absolute inset-y-0 left-1/2 w-0.5 bg-white/50" />
-
-                        {/* Current price indicator */}
-                        <div
-                            className="absolute top-0 bottom-0 flex items-center justify-center"
-                            style={{ left: `${clampedProgress}%`, transform: 'translateX(-50%)' }}
-                        >
-                            <div className="w-4 h-4 bg-white border-2 border-amber-600 rounded-full shadow-lg z-10" />
+                            {/* Info */}
+                            <div className="mt-4 text-center">
+                                <p className="font-bold text-[#2d1f1a] text-xs">{challenge.creator.name}</p>
+                                <p className="text-[10px] text-[#8b7355] mt-0.5">
+                                    {hasWon ? "Won!" : hasLost ? "Lost" : "Created"}
+                                </p>
+                            </div>
                         </div>
                     </div>
 
-                    {/* Moving price tag */}
-                    <div className="relative mt-2 h-7">
-                        <div
-                            className="absolute -translate-x-1/2 bg-gradient-to-r from-amber-800 to-amber-700 text-white px-2 py-0.5 rounded-full text-xs font-medium shadow-md whitespace-nowrap"
-                            style={{ left: `${clampedProgress}%` }}
-                        >
-                            ${challenge.currentPrice.toLocaleString()}{" "}
-                            <span className={challenge.priceChange >= 0 ? "text-emerald-200" : "text-red-200"}>
-                                {challenge.priceChange >= 0 ? "+" : ""}{challenge.priceChange}%
-                            </span>
-                        </div>
+                    {/* VS Badge or Pending Badge */}
+                    <div className="flex flex-col items-center justify-center px-2">
+                        <>
+                            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#2d1f1a] to-[#4a3830] flex items-center justify-center shadow-lg">
+                                <span className="text-lg font-black text-[#f3e1d7]">VS</span>
+                            </div>
+                            {/* Pool Display */}
+                            <div className="mt-2 px-3 py-1.5 bg-emerald-50 rounded-lg text-center border border-emerald-200">
+                                <div className="flex items-center justify-center gap-1">
+                                    <span className="text-[9px] text-emerald-600 font-medium">Pool</span>
+                                    <div className="group relative">
+                                        <svg className="w-3 h-3 text-emerald-500 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 text-center">
+                                            the total money locked in the escrow contract
+                                            <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <p className="text-sm font-bold text-emerald-600">${challenge.totalPool}</p>
+                            </div>
+                            {hasWon || hasLost ? (
+                                <div className="mt-1 text-center">
+                                    <p className={`text-lg font-black ${hasWon ? "text-amber-500" : "text-red-500"}`}>
+                                        {hasWon ? "+" : "-"}${challenge.betAmount}
+                                    </p>
+                                </div>
+                            ) : null}
+                        </>
                     </div>
-                </div>
-            )}
 
-            {/* VS Section - Challenger vs Opponent UI - for default/profile variant */}
-            {variant !== "market" && (
-                <div className="mb-5">
-                    <div className="flex flex-row items-center justify-center gap-2 sm:gap-4">
-                        {/* Challenger Profile */}
+                    {/* Defender Profile */}
+                    {isAccepted && challenge.accepter ? (
                         <div className="relative group flex flex-col items-center">
-                            <div className={`relative p-3 rounded-xl transition-all duration-300 ${hasWon
+                            <div className={`relative p-3 rounded-xl transition-all duration-300 ${hasLost
                                 ? "bg-gradient-to-br from-amber-100 to-yellow-50 border-2 border-amber-400"
-                                : hasLost
+                                : hasWon
                                     ? "bg-gradient-to-br from-red-100 to-rose-50 border-2 border-red-300"
                                     : "bg-white/80 border-2 border-[#d4a574]/30"
                                 }`}>
                                 {/* Winner Crown */}
-                                {hasWon && (
+                                {hasLost && (
                                     <div className="absolute -top-5 left-1/2 -translate-x-1/2 text-2xl animate-bounce">
                                         👑
                                     </div>
@@ -167,133 +190,81 @@ export function ChallengeCard({
 
                                 {/* Avatar */}
                                 <div className="relative">
-                                    <div className={`w-14 h-14 rounded-full overflow-hidden border-2 ${hasWon ? "border-amber-400" : "border-[#d4a574]"
+                                    <div className={`w-14 h-14 rounded-full overflow-hidden border-2 ${hasLost ? "border-amber-400" : "border-[#d4a574]"
                                         } shadow-md`}>
                                         <Image
-                                            src={challenge.creator.avatar}
-                                            alt={challenge.creator.name}
+                                            src={challenge.accepter.avatar}
+                                            alt={challenge.accepter.name}
                                             width={56}
                                             height={56}
                                             className="w-full h-full object-cover"
                                         />
                                     </div>
+                                    {/* Count Badge */}
+                                    {challenge.mode === "multi" && challenge.defenderCount > 1 && (
+                                        <div className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center border-2 border-white">
+                                            <span className="text-[9px] font-bold text-white">+{challenge.defenderCount - 1}</span>
+                                        </div>
+                                    )}
                                     {/* Label */}
                                     <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 px-1.5 py-0.5 bg-[#2d1f1a] text-white text-[9px] font-bold rounded-full">
-                                        CHALLENGER
+                                        {challenge.mode === "multi" ? "DEFENDERS" : "DEFENDER"}
                                     </div>
                                 </div>
 
                                 {/* Info */}
                                 <div className="mt-4 text-center">
-                                    <p className="font-bold text-[#2d1f1a] text-xs">{challenge.creator.name}</p>
+                                    <p className="font-bold text-[#2d1f1a] text-xs">{challenge.accepter.name}</p>
                                     <p className="text-[10px] text-[#8b7355] mt-0.5">
-                                        {hasWon ? "Won!" : hasLost ? "Lost" : "Created"}
+                                        {hasLost ? "Won!" : hasWon ? "Lost" : "Defending"}
                                     </p>
                                 </div>
                             </div>
                         </div>
-
-                        {/* VS Badge or Pending Badge */}
-                        <div className="flex flex-col items-center justify-center px-2">
-                            {isAccepted ? (
-                                <>
-                                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#2d1f1a] to-[#4a3830] flex items-center justify-center shadow-lg">
-                                        <span className="text-lg font-black text-[#f3e1d7]">VS</span>
-                                    </div>
-                                    {hasWon || hasLost ? (
-                                        <div className="mt-1 text-center">
-                                            <p className={`text-lg font-black ${hasWon ? "text-amber-500" : "text-red-500"}`}>
-                                                {hasWon ? "+" : "-"}${challenge.betAmount}
-                                            </p>
-                                        </div>
-                                    ) : null}
-                                </>
-                            ) : (
-                                <>
-                                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-gray-300 to-gray-400 flex items-center justify-center shadow-md animate-pulse">
-                                        <span className="text-lg text-white/50">?</span>
-                                    </div>
-                                    <div className="mt-2 px-2 py-0.5 bg-[#8b7355]/20 rounded-full">
-                                        <p className="text-[10px] font-semibold text-[#8b7355]">Open</p>
-                                    </div>
-                                </>
-                            )}
+                    ) : (
+                        /* Placeholder for pending state */
+                        <div className="relative flex flex-col items-center">
+                            <div className="p-3 rounded-xl bg-white/40 border-2 border-dashed border-[#d4a574]/30">
+                                <div className="w-14 h-14 rounded-full bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center border-2 border-[#d4a574]/50">
+                                    <span className="text-xl">❓</span>
+                                </div>
+                                <div className="mt-3 text-center">
+                                    <p className="font-semibold text-[#8b7355] text-xs">No one yet</p>
+                                </div>
+                            </div>
                         </div>
-
-                        {/* Accepter Profile - Only show if accepted */}
-                        {isAccepted && challenge.accepter ? (
-                            <div className="relative group flex flex-col items-center">
-                                <div className={`relative p-3 rounded-xl transition-all duration-300 ${hasLost
-                                    ? "bg-gradient-to-br from-amber-100 to-yellow-50 border-2 border-amber-400"
-                                    : hasWon
-                                        ? "bg-gradient-to-br from-red-100 to-rose-50 border-2 border-red-300"
-                                        : "bg-white/80 border-2 border-[#d4a574]/30"
-                                    }`}>
-                                    {/* Winner Crown */}
-                                    {hasLost && (
-                                        <div className="absolute -top-5 left-1/2 -translate-x-1/2 text-2xl animate-bounce">
-                                            👑
-                                        </div>
-                                    )}
-
-                                    {/* Avatar */}
-                                    <div className="relative">
-                                        <div className={`w-14 h-14 rounded-full overflow-hidden border-2 ${hasLost ? "border-amber-400" : "border-[#d4a574]"
-                                            } shadow-md`}>
-                                            <Image
-                                                src={challenge.accepter.avatar}
-                                                alt={challenge.accepter.name}
-                                                width={56}
-                                                height={56}
-                                                className="w-full h-full object-cover"
-                                            />
-                                        </div>
-                                        {/* Label */}
-                                        <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 px-1.5 py-0.5 bg-[#2d1f1a] text-white text-[9px] font-bold rounded-full">
-                                            ACCEPTER
-                                        </div>
-                                    </div>
-
-                                    {/* Info */}
-                                    <div className="mt-4 text-center">
-                                        <p className="font-bold text-[#2d1f1a] text-xs">{challenge.accepter.name}</p>
-                                        <p className="text-[10px] text-[#8b7355] mt-0.5">
-                                            {hasLost ? "Won!" : hasWon ? "Lost" : "Accepted"}
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                        ) : (
-                            /* Placeholder for pending state */
-                            <div className="relative flex flex-col items-center">
-                                <div className="p-3 rounded-xl bg-white/40 border-2 border-dashed border-[#d4a574]/30">
-                                    <div className="w-14 h-14 rounded-full bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center border-2 border-[#d4a574]/50">
-                                        <span className="text-xl">❓</span>
-                                    </div>
-                                    <div className="mt-3 text-center">
-                                        <p className="font-semibold text-[#8b7355] text-xs">No one yet</p>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                    </div>
+                    )}
                 </div>
-            )}
+            </div>
 
             {/* CTA Button */}
-            <button
-                onClick={(e) => {
-                    e.stopPropagation();
-                    if (onRekt) onRekt(challenge);
-                }}
-                className={`w-full py-2.5 px-4 rounded-xl text-white font-bold text-base shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all flex items-center justify-center gap-2 ${variant === "market"
-                    ? "bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-300 text-gray-900 border-2 border-amber-400/50"
-                    : "bg-[#246044] hover:bg-[#2b7351]"
-                    }`}
-            >
-                {variant === "market" ? "REKT HIM" : "ACCEPT"}
-                <span className="text-xl">{variant === "market" ? "😈" : "⚔️"}</span>
-            </button>
+            <div className="flex gap-2">
+                {challenge.mode === "multi" ? (
+                    <>
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                if (onRekt) onRekt(challenge);
+                            }}
+                            className="flex-1 py-2.5 px-4 rounded-xl bg-[#246044] hover:bg-[#2b7351] text-white font-bold text-sm shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all flex items-center justify-center gap-2"
+                        >
+                            JOIN CHALLENGE
+                            <span className="text-lg">⚔️</span>
+                        </button>
+                    </>
+                ) : (
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            if (onRekt) onRekt(challenge);
+                        }}
+                        className="w-full py-2.5 px-4 rounded-xl bg-[#246044] hover:bg-[#2b7351] text-white font-bold text-base shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all flex items-center justify-center gap-2"
+                    >
+                        ACCEPT
+                        <span className="text-xl">⚔️</span>
+                    </button>
+                )}
+            </div>
 
             {/* Challenge Expiry */}
             <div className="flex items-center justify-center gap-1.5 text-xs text-gray-600 mt-1.5">
