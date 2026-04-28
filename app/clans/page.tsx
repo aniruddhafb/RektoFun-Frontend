@@ -222,7 +222,6 @@ const ClanCard = ({ clan }: { clan: Clan }) => {
                 <div className="flex gap-4">
                     {/* Logo with rank badge */}
                     <div className="relative flex-shrink-0">
-                        <RankBadge rank={clan.rank} />
                         <div className="w-20 h-20 rounded-xl overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200 border border-white/80 shadow-sm ml-2">
                             <Image
                                 src={clan.logo}
@@ -242,17 +241,6 @@ const ClanCard = ({ clan }: { clan: Clan }) => {
                                 {clan.verified && (
                                     <VerifiedIcon className="w-5 h-5 text-blue-500 flex-shrink-0" />
                                 )}
-                            </div>
-                            {/* Join status */}
-                            <div className="flex flex-col items-center gap-1 flex-shrink-0">
-                                {isInviteOnly ? (
-                                    <LockIcon className="w-6 h-6 text-orange-400" />
-                                ) : (
-                                    <ShieldIcon className="w-6 h-6 text-green-500" />
-                                )}
-                                <span className={`text-xs font-medium whitespace-nowrap ${isInviteOnly ? "text-orange-500" : "text-green-600"}`}>
-                                    {isInviteOnly ? "Invite Only" : "Open to Join"}
-                                </span>
                             </div>
                         </div>
 
@@ -278,8 +266,8 @@ const ClanCard = ({ clan }: { clan: Clan }) => {
                 {/* Type & Members row */}
                 <div className="flex items-center gap-3 mt-3">
                     <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold border ${isInviteOnly
-                            ? "bg-orange-50 text-orange-600 border-orange-200"
-                            : "bg-green-50 text-green-700 border-green-200"
+                        ? "bg-orange-50 text-orange-600 border-orange-200"
+                        : "bg-green-50 text-green-700 border-green-200"
                         }`}>
                         {isInviteOnly ? (
                             <LockIcon className="w-3 h-3" />
@@ -321,13 +309,6 @@ const ClanCard = ({ clan }: { clan: Clan }) => {
                     </div>
                     <span className="text-xs text-gray-400">Win Rate</span>
                 </div>
-                <div className="flex flex-col items-center gap-0.5 px-2">
-                    <div className="flex items-center gap-1">
-                        <StarIcon className="w-3.5 h-3.5 text-orange-500" />
-                        <span className="text-sm font-bold text-orange-500">{clan.rektPoints}</span>
-                    </div>
-                    <span className="text-xs text-gray-400">REKT Points</span>
-                </div>
             </div>
         </div>
     );
@@ -367,7 +348,7 @@ export default function ClansPage() {
                             <h1 className="text-3xl sm:text-4xl font-bold text-gray-900">Clans</h1>
                             <ShieldIcon className="w-7 h-7 text-orange-400" />
                         </div>
-                        <p className="text-gray-500 mt-1 text-base">Team up. Compete. Win together.</p>
+                        <p className="text-gray-500 mt-1 text-base">Team up and compete to win together</p>
                     </div>
 
                     <div className="flex items-center gap-3 flex-shrink-0">
@@ -424,20 +405,6 @@ export default function ClansPage() {
                         <ChevronDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                     </div>
 
-                    {/* Chain filter */}
-                    <div className="relative">
-                        <select
-                            value={filterChain}
-                            onChange={(e) => setFilterChain(e.target.value)}
-                            className="appearance-none pl-4 pr-9 py-2.5 bg-white/70 border border-gray-200 rounded-xl text-sm text-gray-800 font-medium focus:outline-none focus:ring-2 focus:ring-gray-300 shadow-sm cursor-pointer"
-                        >
-                            <option>All Chains</option>
-                            <option>Solana</option>
-                            <option>Ethereum</option>
-                        </select>
-                        <ChevronDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-                    </div>
-
                     {/* Sort */}
                     <div className="relative">
                         <select
@@ -475,10 +442,10 @@ export default function ClansPage() {
                         {rest.length > 0 && (
                             <div className="flex justify-center">
                                 <div className={`grid gap-4 w-full ${rest.length === 1
-                                        ? "max-w-sm"
-                                        : rest.length === 2
-                                            ? "grid-cols-1 md:grid-cols-2 max-w-2xl"
-                                            : "grid-cols-1 md:grid-cols-2 xl:grid-cols-3"
+                                    ? "max-w-sm"
+                                    : rest.length === 2
+                                        ? "grid-cols-1 md:grid-cols-2 max-w-2xl"
+                                        : "grid-cols-1 md:grid-cols-2 xl:grid-cols-3"
                                     }`}>
                                     {rest.map((clan) => (
                                         <ClanCard key={clan.rank} clan={clan} />
