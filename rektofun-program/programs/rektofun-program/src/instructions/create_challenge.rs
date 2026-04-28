@@ -55,6 +55,7 @@ pub struct CreateChallenge<'info> {
     /// SOL vault that holds both bets — a plain system-owned PDA.
     /// Must be `init` (not just `mut`) so Anchor creates the account and
     /// makes it rent-exempt before the system_program::transfer CPI runs.
+    /// CHECK: PDA seed-validated vault, manually created with init then funded via CPI
     #[account(
         init,
         payer = creator,
@@ -62,7 +63,7 @@ pub struct CreateChallenge<'info> {
         seeds = [VAULT_SEED, challenge.key().as_ref()],
         bump,
     )]
-    pub vault: SystemAccount<'info>,
+    pub vault: UncheckedAccount<'info>,
 
     pub system_program: Program<'info, System>,
 }
