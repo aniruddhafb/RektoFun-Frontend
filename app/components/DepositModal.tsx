@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useAccounts } from "@phantom/react-sdk";
-import QRCode from "qrcode";
+import { usePrivy } from "@privy-io/react-auth";
 
 interface DepositModalProps {
   isOpen: boolean;
@@ -10,11 +9,23 @@ interface DepositModalProps {
 }
 
 export function DepositModal({ isOpen, onClose }: DepositModalProps) {
-  const accounts = useAccounts();
+  const { user } = usePrivy();
   const [copied, setCopied] = useState(false);
-  const [qrCodeUrl, setQrCodeUrl] = useState<string>("");
 
-  const walletAddress = accounts?.[0]?.address || null;
+  const getWalletAddress = () => {
+    if (!user) return null;
+    return user.wallet?.address || null;
+  };
+
+  const walletAddress = getWalletAddress();
+
+  const qrPattern = [
+    true, false, true, false, true,
+    false, true, false, true, false,
+    true, false, true, false, true,
+    false, true, false, true, false,
+    true, false, true, false, true,
+  ];
 
   useEffect(() => {
     if (isOpen) document.body.style.overflow = "hidden";
@@ -31,29 +42,6 @@ export function DepositModal({ isOpen, onClose }: DepositModalProps) {
       return () => window.removeEventListener("keydown", handleEsc);
     }
   }, [isOpen, onClose]);
-
-  useEffect(() => {
-    const generateQR = async () => {
-      if (walletAddress) {
-        try {
-          const url = await QRCode.toDataURL(walletAddress, {
-            width: 256,
-            margin: 2,
-            color: {
-              dark: "#000000",
-              light: "#ffffff",
-            },
-          });
-          setQrCodeUrl(url);
-        } catch (err) {
-          console.error("Failed to generate QR code:", err);
-        }
-      } else {
-        setQrCodeUrl("");
-      }
-    };
-    generateQR();
-  }, [walletAddress]);
 
   if (!isOpen) return null;
 
@@ -115,23 +103,16 @@ export function DepositModal({ isOpen, onClose }: DepositModalProps) {
           <div className="bg-white/60 rounded-2xl p-4 mb-4">
             <p className="text-xs font-medium text-black mb-2">QR CODE</p>
             <div className="flex justify-center py-4">
-              {walletAddress ? (
-                qrCodeUrl ? (
-                  <img
-                    src={qrCodeUrl}
-                    alt="QR Code for wallet address"
-                    className="w-32 h-32 rounded-xl border-2 border-gray-200"
-                  />
-                ) : (
-                  <div className="w-32 h-32 rounded-xl border-2 border-gray-200 flex items-center justify-center bg-white">
-                    <div className="animate-pulse text-xs text-gray-400">Generating...</div>
-                  </div>
-                )
-              ) : (
-                <div className="w-32 h-32 rounded-xl border-2 border-gray-200 flex items-center justify-center bg-white">
-                  <div className="text-xs text-gray-400 text-center">No wallet connected</div>
+              <div className="w-32 h-32 bg-white rounded-xl flex items-center justify-center border-2 border-gray-200">
+                <div className="grid grid-cols-5 gap-1">
+                  {qrPattern.map((isDark, i) => (
+                    <div
+                      key={i}
+                      className={`w-4 h-4 rounded-sm ${isDark ? "bg-gray-900" : "bg-white"}`}
+                    />
+                  ))}
                 </div>
-              )}
+              </div>
             </div>
           </div>
 

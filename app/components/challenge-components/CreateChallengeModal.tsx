@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import { DatePickerModal } from "./DatePickerModal";
 import { DurationPickerModal } from "./DurationPickerModal";
-import { useSolana, useModal, useAccounts } from "@phantom/react-sdk";
+import { useSolanaWallet } from "@/app/lib/useSolanaWallet";
 import { Connection, PublicKey } from "@solana/web3.js";
 import {
     getRektoProgram,
@@ -70,12 +70,10 @@ export function CreateChallengeModal({
     const coinDropdownRef = useRef<HTMLDivElement>(null);
     const directionDropdownRef = useRef<HTMLDivElement>(null);
 
-    // Phantom SDK hooks
-    const { solana, isAvailable } = useSolana();
-    const { open: openPhantomModal } = useModal();
-    const accounts = useAccounts();
-    const walletAddress = accounts?.[0]?.address ?? null;
-    const isWalletConnected = Boolean(walletAddress);
+    // Privy wallet hook
+    const { authenticated, login, program, sendTransaction, publicKey } = useSolanaWallet();
+    const walletAddress = publicKey?.toBase58() ?? null;
+    const isWalletConnected = Boolean(authenticated && walletAddress);
 
     useEffect(() => {
         if (isOpen) document.body.style.overflow = "hidden";
@@ -137,14 +135,14 @@ export function CreateChallengeModal({
     };
 
     const handleCreateChallenge = async () => {
-        // If wallet not connected, open Phantom modal
-        if (!isWalletConnected || !walletAddress) {
-            openPhantomModal();
+        // If wallet not connected, open login
+        if (!authenticated) {
+            login();
             return;
         }
 
-        if (!isAvailable || !solana) {
-            setTxError("Solana wallet not available. Please connect your wallet.");
+        if (!program || !publicKey) {
+            setTxError("Solana wallet not ready. Please wait or reconnect.");
             return;
         }
 
@@ -171,23 +169,8 @@ export function CreateChallengeModal({
         setTxSignature(null);
 
         try {
-            const creatorPubkey = new PublicKey(walletAddress);
+            const creatorPubkey = publicKey;
             const connection = new Connection(RPC_ENDPOINT, "confirmed");
-
-            // Build a wallet adapter compatible with getRektoProgram
-            const walletAdapter = {
-                publicKey: creatorPubkey,
-                signTransaction: async (tx: any) => {
-                    const signed = await solana.signTransaction(tx);
-                    return signed as any;
-                },
-                signAllTransactions: async (txs: any[]) => {
-                    const signed = await solana.signAllTransactions(txs);
-                    return signed as any[];
-                },
-            };
-
-            const program = getRektoProgram(walletAdapter);
 
             // Calculate timestamps
             const nowSec = Math.floor(Date.now() / 1000);
@@ -207,19 +190,15 @@ export function CreateChallengeModal({
                 resolvesAt,
             });
 
-            // Set recent blockhash and fee payer
-            const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
-            tx.recentBlockhash = blockhash;
-            tx.feePayer = creatorPubkey;
-
             setTxStatus("signing");
 
-            // Sign and send via Phantom
-            const { signature } = await solana.signAndSendTransaction(tx as any);
+            // Send transaction via Privy wallet
+            const signature = await sendTransaction(tx);
             setTxSignature(signature);
             setTxStatus("confirming");
 
             // Wait for confirmation
+            const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
             await connection.confirmTransaction(
                 { signature, blockhash, lastValidBlockHeight },
                 "confirmed"
@@ -244,7 +223,7 @@ export function CreateChallengeModal({
                     tx_signature: signature,
                     challenge_pda: challengePDA.toBase58(),
                     challenge_id: challengeId,
-                    creator_wallet: walletAddress,
+                    creator_wallet: walletAddress || "",
                     market: selectedMarket.symbol,
                     asset: selectedCoin.symbol,
                     bet_amount_sol: betAmount,
@@ -274,7 +253,7 @@ export function CreateChallengeModal({
     const isLoading = txStatus === "building" || txStatus === "signing" || txStatus === "confirming";
 
     const getButtonLabel = () => {
-        if (!isWalletConnected) return "Connect Wallet to Create";
+        if (!authenticated) return "Connect Wallet to Create";
         switch (txStatus) {
             case "building": return "Building Transaction...";
             case "signing": return "Waiting for Signature...";
@@ -285,7 +264,7 @@ export function CreateChallengeModal({
     };
 
     const getButtonStyle = () => {
-        if (!isWalletConnected) return "w-full py-4 bg-orange-500 hover:bg-orange-600 text-white rounded-full font-bold text-lg transition-colors";
+        if (!authenticated) return "w-full py-4 bg-orange-500 hover:bg-orange-600 text-white rounded-full font-bold text-lg transition-colors";
         if (isLoading) return "w-full py-4 bg-gray-400 text-white rounded-full font-bold text-lg cursor-not-allowed";
         if (txStatus === "success") return "w-full py-4 bg-green-500 text-white rounded-full font-bold text-lg cursor-not-allowed";
         if (txStatus === "error") return "w-full py-4 bg-red-500 hover:bg-red-600 text-white rounded-full font-bold text-lg transition-colors";

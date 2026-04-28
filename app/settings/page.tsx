@@ -1,45 +1,45 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState, useRef } from "react";
+import { usePrivy } from "@privy-io/react-auth";
 import Image from "next/image";
-import { useAccounts, useModal } from "@phantom/react-sdk";
 
 const PROFILE_SVGS = Array.from({ length: 31 }, (_, i) => `/profiles/${i + 1}.svg`);
 
 export default function SettingsPage() {
-    const [username, setUsername] = useState("trader_123");
-    const [description, setDescription] = useState("Crypto enthusiast | DeFi degen | Prediction markets warrior");
+    const { user, authenticated, logout, login, linkWallet, linkTwitter, linkGoogle } = usePrivy();
+
+    // Profile state
+    const [username, setUsername] = useState(user?.email?.address?.split('@')[0] || "trader_123");
+    const [description, setDescription] = useState("Crypto enthusiast | DeFi degen | Prediction markets warrior 🚀");
     const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
     const [editProfileIndex, setEditProfileIndex] = useState(0);
+    const [isEditingProfile, setIsEditingProfile] = useState(false);
+    const [showExportModal, setShowExportModal] = useState(false);
     const [copiedAddress, setCopiedAddress] = useState(false);
-    const [email, setEmail] = useState("");
-    const [twitter, setTwitter] = useState("");
-    const [telegram, setTelegram] = useState("");
-    const [verificationCode, setVerificationCode] = useState("");
-    const [isEmailVerified, setIsEmailVerified] = useState(false);
-    const [verificationSent, setVerificationSent] = useState(false);
-    const [generatedCode, setGeneratedCode] = useState("");
-    const [codeExpiry, setCodeExpiry] = useState<number | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    const { open: openPhantomModal } = useModal();
-    const accounts = useAccounts();
+    // Get wallet address
+    const walletAddress = user?.wallet?.address || null;
+    const displayAddress = walletAddress
+        ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`
+        : "Not connected";
 
-    const connectedAccount = accounts?.[0];
-    const walletAddress = connectedAccount?.address;
-    const shortAddress = walletAddress
-        ? `${walletAddress.slice(0, 4)}...${walletAddress.slice(-4)}`
-        : null;
-    const displayAddress = shortAddress ?? "Wallet not connected";
+    // Get linked accounts
+    const linkedTwitter = user?.linkedAccounts?.find(acc => acc.type === "twitter_oauth");
+    const linkedGoogle = user?.linkedAccounts?.find(acc => acc.type === "google_oauth");
+    const linkedWallet = user?.linkedAccounts?.find(acc => acc.type === "wallet");
 
-    const copyAddress = async () => {
-        if (walletAddress) {
-            await navigator.clipboard.writeText(walletAddress);
-            setCopiedAddress(true);
-            setTimeout(() => setCopiedAddress(false), 2000);
-        }
+    // Determine current login method
+    const getLoginMethod = () => {
+        if (linkedWallet) return "wallet";
+        if (linkedTwitter) return "twitter";
+        if (linkedGoogle) return "google";
+        return "email";
     };
+    const currentLoginMethod = getLoginMethod();
 
+    // Handle photo upload
     const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
@@ -51,44 +51,63 @@ export default function SettingsPage() {
         }
     };
 
-    const saveProfile = () => {
-        console.log("Saving profile:", { username, description, profileIndex: editProfileIndex });
+    // Copy wallet address
+    const copyAddress = () => {
+        if (walletAddress) {
+            navigator.clipboard.writeText(walletAddress);
+            setCopiedAddress(true);
+            setTimeout(() => setCopiedAddress(false), 2000);
+        }
     };
 
+    // Save profile changes
+    const saveProfile = () => {
+        // TODO: Implement API call to save profile (username, description, profileIndex)
+        console.log("Saving profile:", { username, description, profileIndex: editProfileIndex });
+        setIsEditingProfile(false);
+    };
+
+    // Randomize profile function
     const randomizeProfile = () => {
         const randomIndex = Math.floor(Math.random() * 31);
         setEditProfileIndex(randomIndex);
     };
 
-    const sendVerificationCode = () => {
-        if (!email) return;
-        const code = Math.floor(100000 + Math.random() * 900000).toString();
-        setGeneratedCode(code);
-        setCodeExpiry(Date.now() + 10 * 60 * 1000); // 10 minutes expiry
-        setVerificationSent(true);
-        console.log(`Verification code sent to ${email}: ${code}`);
-        alert(`Verification code sent to ${email}: ${code}`);
-    };
-
-    const verifyEmail = () => {
-        if (verificationCode === generatedCode && codeExpiry && Date.now() < codeExpiry) {
-            setIsEmailVerified(true);
-            alert("Email verified successfully!");
-        } else if (codeExpiry && Date.now() >= codeExpiry) {
-            alert("Verification code expired. Please request a new one.");
-        } else {
-            alert("Invalid verification code. Please try again.");
-        }
-    };
+    // Show login prompt if not authenticated
+    if (!authenticated) {
+        return (
+            <div className="min-h-screen bg-[#f3e1d7] py-8 px-4 sm:px-6 lg:px-8 flex items-center justify-center">
+                <div className="max-w-md w-full bg-white/60 backdrop-blur-sm rounded-2xl border border-gray-300 p-8 text-center">
+                    <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-4">
+                        <svg className="w-8 h-8 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                        </svg>
+                    </div>
+                    <h2 className="text-2xl font-bold text-gray-900 mb-2">Login Required</h2>
+                    <p className="text-gray-600 mb-6">
+                        Please login to access the settings page and manage your profile.
+                    </p>
+                    <button
+                        onClick={login}
+                        className="w-full py-3 px-6 bg-black text-white font-medium rounded-xl hover:bg-gray-800 transition-colors cursor-pointer"
+                    >
+                        Login to Continue
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-[#f3e1d7] py-8 px-4 sm:px-6 lg:px-8">
             <div className="max-w-4xl mx-auto">
+                {/* Header */}
                 <div className="mb-8">
                     <h1 className="text-3xl font-bold text-gray-900">Settings</h1>
-                    <p className="text-gray-600 mt-1">Manage your local profile preferences and view your connected wallet.</p>
+                    <p className="text-gray-600 mt-1">Manage your profile, wallet, and connected accounts</p>
                 </div>
 
+                {/* Profile Section */}
                 <section className="bg-white/60 backdrop-blur-sm rounded-2xl border border-gray-300/50 p-6 mb-6">
                     <div className="flex items-center gap-2 mb-6">
                         <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
@@ -100,17 +119,16 @@ export default function SettingsPage() {
                     </div>
 
                     <div className="flex flex-col sm:flex-row gap-6">
+                        {/* Profile Photo Section */}
                         <div className="flex flex-col items-center">
                             <div className="relative">
                                 <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-white shadow-lg">
                                     {profilePhoto ? (
                                         <Image src={profilePhoto} alt="Profile" width={96} height={96} className="w-full h-full object-cover" />
                                     ) : (
-                                        <Image
+                                        <img
                                             src={PROFILE_SVGS[editProfileIndex]}
                                             alt="Profile"
-                                            width={96}
-                                            height={96}
                                             className="w-full h-full object-cover"
                                         />
                                     )}
@@ -135,7 +153,9 @@ export default function SettingsPage() {
                             <p className="text-xs text-gray-500 mt-2">Click to upload image</p>
                         </div>
 
+                        {/* Profile Editor */}
                         <div className="flex-1 space-y-4">
+                            {/* Profile Options */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">Or choose a character</label>
                                 <button
@@ -149,10 +169,9 @@ export default function SettingsPage() {
                                 </button>
                             </div>
 
+                            {/* Username Field */}
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Username <span className="text-red-500">*</span>
-                                </label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Username</label>
                                 <input
                                     type="text"
                                     value={username}
@@ -162,10 +181,9 @@ export default function SettingsPage() {
                                 />
                             </div>
 
+                            {/* Bio Field */}
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Bio <span className="text-red-500">*</span>
-                                </label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Bio</label>
                                 <textarea
                                     value={description}
                                     onChange={(e) => setDescription(e.target.value)}
@@ -175,117 +193,7 @@ export default function SettingsPage() {
                                 />
                             </div>
 
-                            {/* Twitter & Telegram in one row */}
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                {/* Twitter */}
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Twitter (optional)</label>
-                                    <div className="relative">
-                                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                            <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M23.953 4.57a10 10 0 01-2.825.775 4.958 4.958 0 002.163-2.723c-.951.555-2.005.959-3.127 1.184a4.92 4.92 0 00-8.384 4.482C7.69 8.095 4.067 6.13 1.64 3.162a4.822 4.822 0 00-.666 2.475c0 1.71.87 3.213 2.188 4.096a4.904 4.904 0 01-2.228-.616v.06a4.923 4.923 0 003.946 4.827 4.996 4.996 0 01-2.212.085 4.936 4.936 0 004.604 3.417 9.867 9.867 0 01-6.102 2.105c-.39 0-.779-.023-1.17-.067a13.995 13.995 0 007.557 2.209c9.053 0 13.998-7.496 13.998-13.985 0-.21 0-.42-.015-.63A9.935 9.935 0 0024 4.59z" />
-                                            </svg>
-                                        </div>
-                                        <input
-                                            type="text"
-                                            value={twitter}
-                                            onChange={(e) => setTwitter(e.target.value)}
-                                            className="w-full pl-12 pr-4 py-2 bg-white/80 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-black/20 focus:border-transparent"
-                                            placeholder="@username"
-                                        />
-                                    </div>
-                                </div>
-
-                                {/* Telegram */}
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Telegram (optional)</label>
-                                    <div className="relative">
-                                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                            <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-8-9 8 9 2zm0 0v-8" />
-                                            </svg>
-                                        </div>
-                                        <input
-                                            type="text"
-                                            value={telegram}
-                                            onChange={(e) => setTelegram(e.target.value)}
-                                            className="w-full pl-12 pr-4 py-2 bg-white/80 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-black/20 focus:border-transparent"
-                                            placeholder="@username"
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Email Verification */}
-                            {/* <div className="bg-blue-50/50 border border-blue-200 rounded-xl p-4 space-y-3">
-                                <div className="flex items-start gap-2 mb-2">
-                                    <svg className="w-5 h-5 text-blue-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    </svg>
-                                    <p className="text-sm text-blue-700">
-                                        Verify your email to get updates on your challenges, challenge invites, clan invites, etc.
-                                    </p>
-                                </div>
-                                <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                                    <div className="relative flex-1">
-                                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                            <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                                            </svg>
-                                        </div>
-                                        <input
-                                            type="email"
-                                            value={email}
-                                            onChange={(e) => setEmail(e.target.value)}
-                                            disabled={isEmailVerified}
-                                            className="w-full pl-12 pr-4 py-2 bg-white/80 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-black/20 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
-                                            placeholder="you@example.com"
-                                        />
-                                    </div>
-                                    {!isEmailVerified && (
-                                        <button
-                                            onClick={sendVerificationCode}
-                                            disabled={!email || verificationSent}
-                                            className="px-4 py-2 bg-black text-white rounded-xl hover:bg-gray-800 transition-colors cursor-pointer font-medium text-sm disabled:bg-gray-300 disabled:cursor-not-allowed whitespace-nowrap"
-                                        >
-                                            {verificationSent ? "Resend" : "Verify"}
-                                        </button>
-                                    )}
-                                    {isEmailVerified && (
-                                        <span className="flex items-center gap-1 text-green-600 font-medium text-sm">
-                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                            </svg>
-                                            Verified
-                                        </span>
-                                    )}
-                                </div>
-
-                                {!isEmailVerified && verificationSent && (
-                                    <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                                        <input
-                                            type="text"
-                                            value={verificationCode}
-                                            onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                                            className="flex-1 px-4 py-2 bg-white/80 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-black/20 focus:border-transparent font-mono tracking-widest text-center"
-                                            placeholder="Enter 6-digit code"
-                                            maxLength={6}
-                                        />
-                                        <button
-                                            onClick={verifyEmail}
-                                            disabled={verificationCode.length !== 6}
-                                            className="px-4 py-2 bg-black text-white rounded-xl hover:bg-gray-800 transition-colors cursor-pointer font-medium text-sm disabled:bg-gray-300 disabled:cursor-not-allowed"
-                                        >
-                                            Confirm
-                                        </button>
-                                    </div>
-                                )}
-
-                                {verificationSent && !isEmailVerified && (
-                                    <p className="text-xs text-gray-500">A 6-digit verification code has been sent to your email address.</p>
-                                )}
-                            </div> */}
-
+                            {/* Save Button */}
                             <button
                                 onClick={saveProfile}
                                 className="w-full px-4 py-2 bg-black text-white rounded-xl hover:bg-gray-800 transition-colors cursor-pointer font-medium"
@@ -311,65 +219,260 @@ export default function SettingsPage() {
                         {/* Wallet Address Display */}
                         <div className="bg-white/70 border border-gray-300 rounded-xl p-4">
                             <label className="block text-sm font-medium text-gray-700 mb-2">Connected Wallet Address</label>
-                            {walletAddress ? (
-                                <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                                    <div className="flex-1 px-4 py-3 bg-white/80 rounded-xl border border-gray-300/50 overflow-hidden">
-                                        <code className="text-sm font-mono text-gray-800 break-all">{walletAddress}</code>
-                                    </div>
-                                    <button
-                                        onClick={copyAddress}
-                                        className="px-4 py-3 bg-black text-white rounded-xl hover:bg-gray-800 transition-colors cursor-pointer flex items-center gap-2"
-                                    >
-                                        {copiedAddress ? (
-                                            <>
-                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                                </svg>
-                                                <span className="hidden sm:inline">Copied!</span>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                                                </svg>
-                                                <span className="hidden sm:inline">Copy</span>
-                                            </>
-                                        )}
-                                    </button>
+                            <div className="flex items-center gap-3">
+                                <div className="flex-1 px-4 py-3 bg-white/80 rounded-xl border border-gray-300/50">
+                                    <code className="text-sm font-mono text-gray-800">{displayAddress}</code>
                                 </div>
-                            ) : (
-                                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-                                    <div className="flex-1 px-4 py-3 bg-white/80 rounded-xl border border-gray-300/50 overflow-hidden">
-                                        <code className="text-sm font-mono text-gray-500 break-all">{displayAddress}</code>
-                                    </div>
-                                    <button
-                                        onClick={openPhantomModal}
-                                        className="px-4 py-3 bg-black text-white rounded-xl hover:bg-gray-800 transition-colors cursor-pointer flex items-center gap-2"
-                                    >
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
-                                        </svg>
-                                        <span>Connect Wallet</span>
-                                    </button>
-                                </div>
-                            )}
+                                <button
+                                    onClick={copyAddress}
+                                    className="px-4 py-3 bg-black text-white rounded-xl hover:bg-gray-800 transition-colors cursor-pointer flex items-center gap-2"
+                                >
+                                    {copiedAddress ? (
+                                        <>
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                            </svg>
+                                            <span className="hidden sm:inline">Copied!</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                            </svg>
+                                            <span className="hidden sm:inline">Copy</span>
+                                        </>
+                                    )}
+                                </button>
+                            </div>
                         </div>
 
-                        {/* Embedded Wallet Info */}
-                        <div className="bg-orange-50/70 border border-orange-200 rounded-xl p-4">
-                            <div className="flex items-start gap-3">
-                                <svg className="w-5 h-5 text-orange-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        {/* Link Wallet Button */}
+                        {!linkedWallet && (
+                            <button
+                                onClick={() => linkWallet()}
+                                className="w-full py-3 px-4 bg-[#1e2939] text-white font-medium rounded-xl hover:bg-[#2d3748] transition-all cursor-pointer flex items-center justify-center gap-2"
+                            >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                                 </svg>
-                                <p className="text-sm text-orange-700">
-                                    This is your embedded wallet address on rekto.fun!
-                                    To access it, simply log in to the <strong>Phantom app</strong> or <strong>browser extension</strong> using the same login method you used on our website.
+                                Link Crypto Wallet
+                            </button>
+                        )}
+
+                        {/* Export Privy Wallet */}
+                        {authenticated && (
+                            <button
+                                onClick={() => setShowExportModal(true)}
+                                className="w-full py-3 px-4 bg-white border-2 border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50 hover:border-gray-400 transition-all cursor-pointer flex items-center justify-center gap-2"
+                            >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                </svg>
+                                Export Privy Wallet
+                            </button>
+                        )}
+                    </div>
+                </section>
+
+                {/* Social Connections Section */}
+                <section className="bg-white/60 backdrop-blur-sm rounded-2xl border border-gray-300/50 p-6 mb-6">
+                    <div className="flex items-center gap-2 mb-6">
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
+                            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                            </svg>
+                        </div>
+                        <h2 className="text-xl font-semibold text-gray-900">Connected Accounts</h2>
+                    </div>
+
+                    <div className="space-y-3">
+                        {/* Twitter */}
+                        <div className={`flex items-center justify-between p-4 rounded-xl border-2 transition-all ${linkedTwitter
+                            ? "bg-blue-50/50 border-blue-300"
+                            : "bg-white/50 border-gray-300 hover:border-gray-400"
+                            }`}>
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-full bg-black flex items-center justify-center">
+                                    <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                                        <path d="M24 4.557c-.883.392-1.832.656-2.828.775 1.017-.609 1.798-1.574 2.165-2.724-.951.564-2.005.974-3.127 1.195-.897-.957-2.178-1.555-3.594-1.555-3.179 0-5.515 2.966-4.797 6.045-4.091-.205-7.719-2.165-10.148-5.144-1.29 2.213-.669 5.108 1.523 6.574-.806-.026-1.566-.247-2.229-.616-.054 2.281 1.581 4.415 3.949 4.89-.693.188-1.452.232-2.224.084.626 1.956 2.444 3.379 4.6 3.419-2.07 1.623-4.678 2.348-7.29 2.04 2.179 1.397 4.768 2.212 7.548 2.212 9.142 0 14.307-7.721 13.995-14.646.962-.695 1.797-1.562 2.457-2.549z" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <p className="font-medium text-gray-900">Twitter / X</p>
+                                    <p className="text-sm text-gray-500">
+                                        {linkedTwitter
+                                            ? `@${linkedTwitter.username || "connected"}`
+                                            : "Not connected"}
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                {currentLoginMethod === "twitter" && (
+                                    <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full">
+                                        Current Login
+                                    </span>
+                                )}
+                                {linkedTwitter ? (
+                                    <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center">
+                                        <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                        </svg>
+                                    </div>
+                                ) : (
+                                    <button
+                                        onClick={() => linkTwitter()}
+                                        className="px-4 py-2 bg-black text-white text-sm font-medium rounded-full hover:bg-gray-800 transition-colors cursor-pointer"
+                                    >
+                                        Connect
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Google */}
+                        <div className={`flex items-center justify-between p-4 rounded-xl border-2 transition-all ${linkedGoogle
+                            ? "bg-red-50/50 border-red-300"
+                            : "bg-white/50 border-gray-300 hover:border-gray-400"
+                            }`}>
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-full bg-white border border-gray-200 flex items-center justify-center">
+                                    <svg className="w-5 h-5" viewBox="0 0 24 24">
+                                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+                                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <p className="font-medium text-gray-900">Google</p>
+                                    <p className="text-sm text-gray-500">
+                                        {linkedGoogle
+                                            ? linkedGoogle.email
+                                            : "Not connected"}
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                {currentLoginMethod === "google" && (
+                                    <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full">
+                                        Current Login
+                                    </span>
+                                )}
+                                {linkedGoogle ? (
+                                    <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center">
+                                        <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                        </svg>
+                                    </div>
+                                ) : (
+                                    <button
+                                        onClick={() => linkGoogle()}
+                                        className="px-4 py-2 bg-black text-white text-sm font-medium rounded-full hover:bg-gray-800 transition-colors cursor-pointer"
+                                    >
+                                        Connect
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Wallet Login Indicator */}
+                        {currentLoginMethod === "wallet" && (
+                            <div className="flex items-center justify-between p-4 rounded-xl border-2 bg-orange-50/50 border-orange-300">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-500 to-yellow-500 flex items-center justify-center">
+                                        <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <p className="font-medium text-gray-900">Crypto Wallet</p>
+                                        <p className="text-sm text-gray-500">{displayAddress}</p>
+                                    </div>
+                                </div>
+                                <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full">
+                                    Current Login
+                                </span>
+                            </div>
+                        )}
+                    </div>
+                </section>
+
+                {/* Logout Section */}
+                <section className="bg-white/60 backdrop-blur-sm rounded-2xl border border-gray-300/50 p-6">
+                    <div className="flex items-center gap-2 mb-4">
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-red-500 to-pink-500 flex items-center justify-center">
+                            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                            </svg>
+                        </div>
+                        <h2 className="text-xl font-semibold text-gray-900">Account</h2>
+                    </div>
+
+                    <button
+                        onClick={() => logout()}
+                        className="w-full py-3 px-4 bg-red-50 border border-red-200 text-red-600 font-medium rounded-xl hover:bg-red-100 hover:border-red-300 transition-all cursor-pointer flex items-center justify-center gap-2"
+                    >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                        </svg>
+                        Log Out
+                    </button>
+                </section>
+            </div>
+
+            {/* Export Wallet Modal */}
+            {showExportModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+                    <div className="bg-[#f3e1d7] rounded-2xl border border-gray-300 p-6 max-w-md w-full shadow-2xl">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-xl font-bold text-gray-900">Export Wallet</h3>
+                            <button
+                                onClick={() => setShowExportModal(false)}
+                                className="p-1 hover:bg-gray-200 rounded-full transition-colors cursor-pointer"
+                            >
+                                <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-4">
+                            <div className="flex items-start gap-3">
+                                <svg className="w-5 h-5 text-yellow-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                </svg>
+                                <p className="text-sm text-yellow-800">
+                                    <strong>Security Warning:</strong> Exporting your private key gives full access to your wallet.
+                                    Never share it with anyone and store it securely.
                                 </p>
                             </div>
                         </div>
+
+                        <p className="text-gray-600 mb-4">
+                            This will export your Privy wallet's private key. Make sure you're in a secure environment.
+                        </p>
+
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setShowExportModal(false)}
+                                className="flex-1 py-3 px-4 bg-white border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50 transition-colors cursor-pointer"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={() => {
+                                    // TODO: Implement actual wallet export
+                                    alert("Wallet export functionality would be implemented here with Privy's export API");
+                                    setShowExportModal(false);
+                                }}
+                                className="flex-1 py-3 px-4 bg-black text-white font-medium rounded-xl hover:bg-gray-800 transition-colors cursor-pointer"
+                            >
+                                Export
+                            </button>
+                        </div>
                     </div>
-                </section>
-            </div>
+                </div>
+            )}
         </div>
     );
 }

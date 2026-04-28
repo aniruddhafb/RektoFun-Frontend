@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { Navbar, Footer } from "./components";
 import { Analytics } from "@vercel/analytics/next";
-import ConnectionProvider from "./providers/PhantomProvider";
+import Providers from "./providers/PrivyProvider";
 
 export const metadata: Metadata = {
   title: {
@@ -85,11 +85,11 @@ export default function RootLayout({
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
       </head>
       <body className="min-h-full flex flex-col">
-        <ConnectionProvider>
+        <Providers>
           <Navbar />
           <main className="flex-1">{children}</main>
           <Footer />
-        </ConnectionProvider>
+        </Providers>
       </body>
     </html>
   );
