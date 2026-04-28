@@ -9,6 +9,8 @@ export const NAV_LINKS = [
     { href: "/leaderboard", label: "Leaderboard" },
     { href: "/referral", label: "Referral" },
     { href: "/activity", label: "Activity" },
+    { href: "/clans", label: "Explore Clans" },
+    { href: "/clan", label: "Resolve Challenges" },
     {
         href: "https://rektofun.gitbook.io/rektofun/roadmap/whats-next",
         label: "Roadmap",
