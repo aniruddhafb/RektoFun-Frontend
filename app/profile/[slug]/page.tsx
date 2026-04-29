@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useParams } from "next/navigation";
 import { Challenge, DUMMY_CHALLENGES } from "@/app/components/challenge-components/challengesData";
 import ChallengeDetailModal from "@/app/components/challenge-components/ChallengeDetailModal";
 import {
@@ -9,6 +10,7 @@ import {
     ProfileChallenges,
     ProfileActivity,
 } from "@/app/components/profile-components";
+import { getUserByWallet, User } from "@/app/lib/users-service/users";
 
 // Activity item interface
 interface ActivityItem {
@@ -31,24 +33,8 @@ interface ActivityItem {
     timestamp: string;
 }
 
-// Dummy data for the profile
-const profileData = {
-    username: "DegenLord",
-    avatar: "/scribbles/pepe.png",
-    walletAddress: "0x7a89...3f4a",
-    bio: "King of the Degens, betting big and laughing at tears of REKTed noobs",
-    joinedDate: "Feb",
-    balance: {
-        sol: 7.02,
-        solUsd: 1160,
-    },
-    stats: {
-        wins: 528,
-        rekts: 145,
-        totalChallenges: 673,
-        winRatio: 78.5,
-    },
-};
+// Tab types
+type TabType = "challenges" | "activity";
 
 // Activity data matching the activity page style
 const activityData: ActivityItem[] = [
@@ -128,14 +114,37 @@ const activityData: ActivityItem[] = [
     },
 ];
 
-// Tab types
-type TabType = "challenges" | "activity";
-
-// Static params since profile page uses demo data
 export default function ProfilePage() {
+    const params = useParams();
+    const slug = params.slug as string;
     const [activeTab, setActiveTab] = useState<TabType>("challenges");
     const [selectedChallenge, setSelectedChallenge] = useState<Challenge | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [user, setUser] = useState<User | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+
+    // Fetch user data by wallet address (slug)
+    useEffect(() => {
+        async function fetchUser() {
+            try {
+                setLoading(true);
+                const userData = await getUserByWallet(slug);
+                console.log("Fetched user data:", userData);
+                setUser(userData);
+                setError(null);
+            } catch (err) {
+                setError(err instanceof Error ? err.message : "Failed to fetch user");
+                setUser(null);
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        if (slug) {
+            fetchUser();
+        }
+    }, [slug]);
 
     // Handle challenge card click
     const handleChallengeClick = (challenge: Challenge) => {
@@ -149,18 +158,58 @@ export default function ProfilePage() {
         setTimeout(() => setSelectedChallenge(null), 300);
     };
 
+    // Format wallet address for display (shorten it)
+    const formatWalletAddress = (address: string) => {
+        if (address.length > 10) {
+            return `${address.slice(0, 6)}...${address.slice(-4)}`;
+        }
+        return address;
+    };
+
+
+
+    if (loading) {
+        return (
+            <div className="min-h-screen bg-[#f3e1d7] flex items-center justify-center">
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#1a1a2e] mx-auto mb-4"></div>
+                    <p className="text-[#1a1a2e]">Loading profile...</p>
+                </div>
+            </div>
+        );
+    }
+
+    if (error || !user) {
+        return (
+            <div className="min-h-screen bg-[#f3e1d7] flex items-center justify-center">
+                <div className="text-center">
+                    <p className="text-red-500 mb-2">Failed to load profile</p>
+                    <p className="text-[#666] text-sm">{error || "User not found"}</p>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="min-h-screen bg-[#f3e1d7] pb-8">
             {/* Profile Header Section */}
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
                 <ProfileHeader
-                    username={profileData.username}
-                    avatar={profileData.avatar}
-                    walletAddress={profileData.walletAddress}
-                    bio={profileData.bio}
-                    joinedDate={profileData.joinedDate}
-                    balance={profileData.balance}
-                    stats={profileData.stats}
+                    username={user.username}
+                    avatar={user.profile_image || "/scribbles/pepe.png"}
+                    walletAddress={formatWalletAddress(user.wallet_address)}
+                    bio={user.description || "No bio yet"}
+                    joinedDate={user.created_at}
+                    balance={{
+                        sol: user.earnings || 0,
+                        solUsd: (user.earnings || 0) * 165, // Approximate SOL to USD
+                    }}
+                    stats={{
+                        wins: 0, // These would come from challenges data
+                        rekts: 0,
+                        totalChallenges: 0,
+                        winRatio: 0,
+                    }}
                 />
 
                 {/* Tab Navigation */}

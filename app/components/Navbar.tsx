@@ -5,6 +5,7 @@ import { usePrivy } from "@privy-io/react-auth";
 import { usePathname } from "next/navigation";
 import { DepositModal } from "./DepositModal";
 import * as components from "./navbar-components";
+import { createUser } from "@/app/lib/users-service/users";
 
 export default function Navbar() {
     const { login, authenticated, user, logout, ready } = usePrivy();
@@ -15,20 +16,29 @@ export default function Navbar() {
     const [editUsername, setEditUsername] = useState("");
     const [editProfileIndex, setEditProfileIndex] = useState(0);
     const [editInviteCode, setEditInviteCode] = useState("");
+    const [hasCalledCreateUser, setHasCalledCreateUser] = useState(false);
     const pathname = usePathname();
 
     const handleAuth = () => {
+        console.log('[Navbar] handleAuth called - login() invoked');
         login();
     };
 
     const handleLogout = () => {
+        console.log('[Navbar] handleLogout called - logout() invoked');
+        setHasCalledCreateUser(false);
         logout();
     };
 
     // Get wallet address from user object (handles both embedded and external wallets)
     const getWalletAddress = () => {
-        if (!user) return null;
-        return user.wallet?.address || null;
+        if (!user) {
+            console.log('[Navbar] getWalletAddress - user is null, returning null');
+            return null;
+        }
+        const address = user.wallet?.address || null;
+        console.log('[Navbar] getWalletAddress - address:', address ? `${address.slice(0, 6)}...` : 'null');
+        return address;
     };
 
     const walletAddress = getWalletAddress();
@@ -40,7 +50,6 @@ export default function Navbar() {
     const getUsername = () => {
         if (!user) return null;
         return (
-            user.email?.address?.split("@")[0] ||
             displayAddress ||
             "User"
         );
@@ -61,6 +70,48 @@ export default function Navbar() {
             setEditInviteCode("");
         }
     }, [isProfileModalOpen, username]);
+
+    // Call createUser when user authenticates (only once per session)
+    useEffect(() => {
+        const handleCreateUser = async () => {
+            if (!authenticated || !user || hasCalledCreateUser) {
+                console.log('[Navbar] createUser skipped:', {
+                    authenticated,
+                    hasUser: !!user,
+                    hasCalledCreateUser
+                });
+                return;
+            }
+
+            const walletAddress = user.wallet?.address;
+            if (!walletAddress) {
+                console.log('[Navbar] createUser skipped - no wallet address');
+                return;
+            }
+
+            console.log('[Navbar] Calling createUser for wallet:', walletAddress);
+
+            try {
+                const userData = await createUser({
+                    wallet_address: walletAddress,
+                    username: `user-${walletAddress}`,
+                    login_type: user.email ? 'email' : 'wallet',
+                });
+                console.log('[Navbar] createUser success:', userData);
+            } catch (error) {
+                // If user already exists (409), that's fine - backend returns existing user
+                if (error instanceof Error && error.message.includes('409')) {
+                    console.log('[Navbar] createUser - user already exists (expected)');
+                } else {
+                    console.error('[Navbar] createUser error:', error);
+                }
+            } finally {
+                setHasCalledCreateUser(true);
+            }
+        };
+
+        handleCreateUser();
+    }, [authenticated, user, hasCalledCreateUser, username]);
 
     // Helper function to check if link is active
     const isActive = (href: string) => {

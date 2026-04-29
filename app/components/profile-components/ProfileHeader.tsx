@@ -2,6 +2,7 @@
 
 import React from "react";
 import Image from "next/image";
+import dayjs from "dayjs";
 
 interface ProfileHeaderProps {
     username: string;
@@ -50,7 +51,7 @@ export function ProfileHeader({
                 {/* User Info */}
                 <div className="flex flex-col gap-2 justify-center">
                     <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
-                        {username}
+                        {username.slice(0, 10)}...{username.slice(-3)}
                     </h1>
 
                     {/* Wallet Address */}
@@ -72,7 +73,7 @@ export function ProfileHeader({
                     <p className="text-sm text-gray-600 max-w-md">
                         {bio}{" "}
                         <span className="inline-flex items-center gap-1">
-                            <span className="text-gray-500">Joined {joinedDate}</span>
+                            <span className="text-gray-500">Joined {dayjs(joinedDate).format('MMM D, YYYY')}</span>
                         </span>
                     </p>
 
