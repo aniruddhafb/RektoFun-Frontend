@@ -13,6 +13,15 @@ import { PublicKey, Transaction, Connection } from "@solana/web3.js";
 import { getRektoProgram, RPC_ENDPOINT } from "./rektofun-program";
 import type { Program } from "@anchor-lang/core";
 
+/**
+ * Validates if a string is a valid base58 Solana address.
+ */
+function isValidBase58Address(address: string): boolean {
+    if (!address || typeof address !== "string") return false;
+    // Base58 alphabet: 123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz
+    return /^[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]{32,44}$/.test(address);
+}
+
 export interface SolanaWalletAdapter {
     publicKey: PublicKey;
     signTransaction: (tx: Transaction) => Promise<Transaction>;
@@ -32,7 +41,7 @@ export function useSolanaWallet() {
 
     let adapter: SolanaWalletAdapter | null = null;
 
-    if (solanaWallet?.address) {
+    if (solanaWallet?.address && isValidBase58Address(solanaWallet.address)) {
         const address = solanaWallet.address;
         adapter = {
             publicKey: new PublicKey(address),

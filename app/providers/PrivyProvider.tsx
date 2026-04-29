@@ -2,7 +2,6 @@
 
 import { PrivyProvider } from '@privy-io/react-auth';
 import { createSolanaRpc, createSolanaRpcSubscriptions } from '@solana/kit';
-import { toSolanaWalletConnectors } from "@privy-io/react-auth/solana";
 
 export default function Providers({ children }: { children: React.ReactNode }) {
     return (
