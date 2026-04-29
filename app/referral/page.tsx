@@ -126,13 +126,12 @@ export default function ReferralPage() {
                 <div className="max-w-7xl mx-auto">
                     {/* Header */}
                     <div className="flex items-start gap-3 mb-2">
-                        <Sparkles className="w-8 h-8 text-amber-600 mt-1" />
                         <h1 className="text-3xl sm:text-4xl font-bold text-gray-900">
-                            Refer & Earn REKT POINTS
+                            Refer & Earn
                         </h1>
                     </div>
-                    <p className="text-gray-600 text-lg mb-8 ml-11">
-                        Invite friends to Rekto.fun and earn REKT POINTS by competing challenges.
+                    <p className="text-gray-600 text-lg mb-8">
+                        Invite friends to RektoFun and earn REKT Points!!
                     </p>
 
                     <div className="flex flex-col xl:flex-row gap-6">

@@ -167,14 +167,11 @@ export default function ActivityPage() {
             {/* Header Section */}
             <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-6">
                 <div className="flex items-center gap-3 mb-2">
-                    <div className="w-10 h-10 rounded-xl bg-[#2d1f1a] flex items-center justify-center text-xl shadow-lg">
-                        📊
-                    </div>
                     <h1 className="text-3xl sm:text-4xl font-bold text-[#2d1f1a]">
                         Activity
                     </h1>
                 </div>
-                <p className="text-[#5c4a42] text-sm sm:text-base ml-13">
+                <p className="text-[#5c4a42] text-sm sm:text-base">
                     View the latest challenges and bets made across Rekto.fun.
                 </p>
             </div>

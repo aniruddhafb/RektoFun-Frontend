@@ -4,11 +4,13 @@ import { useState, useEffect } from "react";
 import { usePrivy } from "@privy-io/react-auth";
 import { usePathname } from "next/navigation";
 import { DepositModal } from "./DepositModal";
+import { useWalletData } from "@/app/lib/useWalletData";
 import * as components from "./navbar-components";
 import { createUser } from "@/app/lib/users-service/users";
 
 export default function Navbar() {
     const { login, authenticated, user, logout, ready } = usePrivy();
+    const { solanaWallet, walletAddress, usdcBalance } = useWalletData();
     const [searchQuery, setSearchQuery] = useState("");
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
@@ -30,18 +32,6 @@ export default function Navbar() {
         logout();
     };
 
-    // Get wallet address from user object (handles both embedded and external wallets)
-    const getWalletAddress = () => {
-        if (!user) {
-            console.log('[Navbar] getWalletAddress - user is null, returning null');
-            return null;
-        }
-        const address = user.wallet?.address || null;
-        console.log('[Navbar] getWalletAddress - address:', address ? `${address.slice(0, 6)}...` : 'null');
-        return address;
-    };
-
-    const walletAddress = getWalletAddress();
     const displayAddress = walletAddress
         ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`
         : null;
@@ -170,6 +160,7 @@ export default function Navbar() {
                             authenticated={authenticated}
                             displayAddress={displayAddress || ""}
                             displayUsername={username || ""}
+                            usdcBalance={usdcBalance}
                             isDropdownOpen={isDropdownOpen}
                             onAuth={handleAuth}
                             onCloseDropdown={() => setIsDropdownOpen(false)}

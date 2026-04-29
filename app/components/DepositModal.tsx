@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { usePrivy } from "@privy-io/react-auth";
+import { useWalletData } from "@/app/lib/useWalletData";
 
 interface DepositModalProps {
   isOpen: boolean;
@@ -9,15 +9,8 @@ interface DepositModalProps {
 }
 
 export function DepositModal({ isOpen, onClose }: DepositModalProps) {
-  const { user } = usePrivy();
+  const { walletAddress, usdcBalance } = useWalletData();
   const [copied, setCopied] = useState(false);
-
-  const getWalletAddress = () => {
-    if (!user) return null;
-    return user.wallet?.address || null;
-  };
-
-  const walletAddress = getWalletAddress();
 
   const qrPattern = [
     true, false, true, false, true,
@@ -81,7 +74,7 @@ export function DepositModal({ isOpen, onClose }: DepositModalProps) {
             <p className="text-xs font-medium text-black mb-2">YOUR WALLET ADDRESS</p>
             <div className="flex items-center gap-2">
               <p className="text-sm font-mono text-gray-800 truncate flex-1">
-                {walletAddress || "No wallet connected"}
+                {walletAddress ? `${walletAddress}` : "No wallet connected"}
               </p>
               <button
                 onClick={handleCopy}
@@ -101,6 +94,17 @@ export function DepositModal({ isOpen, onClose }: DepositModalProps) {
           </div>
 
           <div className="bg-white/60 rounded-2xl p-4 mb-4">
+            <p className="text-xs font-medium text-black mb-2">YOUR CURRENT USDC BALANCE</p>
+            <p className="text-lg font-semibold text-gray-900">
+              {usdcBalance !== null ? `$${usdcBalance.toFixed(2)}` : "$0.00"}
+            </p>
+          </div>
+
+          <div className="bg-white/60 rounded-2xl p-4 mb-4">
+            <p className="text-xs font-medium text-black mb-2">To deposit funds on devnet visit <a href="https://faucet.circle.com/" target="_blank" rel="noopener noreferrer" className="text-blue-500 underline">faucet.circle.com</a> and copy paste the above address</p>
+          </div>
+
+          {/* <div className="bg-white/60 rounded-2xl p-4 mb-4">
             <p className="text-xs font-medium text-black mb-2">QR CODE</p>
             <div className="flex justify-center py-4">
               <div className="w-32 h-32 bg-white rounded-xl flex items-center justify-center border-2 border-gray-200">
@@ -114,7 +118,7 @@ export function DepositModal({ isOpen, onClose }: DepositModalProps) {
                 </div>
               </div>
             </div>
-          </div>
+          </div> */}
 
           <p className="text-xs font-semibold text-black text-center">
             Only send USDC tokens on solana chain to this address. Other tokens may be lost permanently.
