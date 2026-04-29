@@ -19,7 +19,7 @@ const topTraders = [
         rektsUp: false,
         challenges: 325,
         winRate: "79%",
-        earnings: "128.4 SOL",
+        earnings: "128.4",
         isTop: true,
     },
     {
@@ -36,7 +36,7 @@ const topTraders = [
         rektsUp: false,
         challenges: 302,
         winRate: "81%",
-        earnings: "116.2 SOL",
+        earnings: "116.2",
         isTop: false,
     },
     {
@@ -53,7 +53,7 @@ const topTraders = [
         rektsUp: false,
         challenges: 315,
         winRate: "82%",
-        earnings: "105.6 SOL",
+        earnings: "105.6",
         isTop: false,
     },
     {
@@ -70,7 +70,7 @@ const topTraders = [
         rektsUp: null,
         challenges: 275,
         winRate: "76%",
-        earnings: "94.3 SOL",
+        earnings: "94.3",
         isTop: false,
     },
     {
@@ -87,7 +87,7 @@ const topTraders = [
         rektsUp: false,
         challenges: 265,
         winRate: "77%",
-        earnings: "83.1 SOL",
+        earnings: "83.1",
         isTop: false,
     },
     {
@@ -104,7 +104,7 @@ const topTraders = [
         rektsUp: false,
         challenges: 262,
         winRate: "75%",
-        earnings: "72.5 SOL",
+        earnings: "72.5",
         isTop: false,
     },
     {
@@ -121,7 +121,7 @@ const topTraders = [
         rektsUp: false,
         challenges: 245,
         winRate: "74%",
-        earnings: "68.3 SOL",
+        earnings: "68.3",
         isTop: false,
     },
     {
@@ -138,7 +138,7 @@ const topTraders = [
         rektsUp: false,
         challenges: 238,
         winRate: "73%",
-        earnings: "61.7 SOL",
+        earnings: "61.7",
         isTop: false,
     },
     {
@@ -155,7 +155,7 @@ const topTraders = [
         rektsUp: null,
         challenges: 220,
         winRate: "72%",
-        earnings: "55.4 SOL",
+        earnings: "55.4",
         isTop: false,
     },
     {
@@ -172,7 +172,7 @@ const topTraders = [
         rektsUp: false,
         challenges: 205,
         winRate: "71%",
-        earnings: "49.8 SOL",
+        earnings: "49.8",
         isTop: false,
     },
     {
@@ -189,7 +189,7 @@ const topTraders = [
         rektsUp: false,
         challenges: 195,
         winRate: "69%",
-        earnings: "45.2 SOL",
+        earnings: "45.2",
         isTop: false,
     },
     {
@@ -206,7 +206,7 @@ const topTraders = [
         rektsUp: false,
         challenges: 188,
         winRate: "70%",
-        earnings: "42.8 SOL",
+        earnings: "42.8",
         isTop: false,
     },
     {
@@ -223,7 +223,7 @@ const topTraders = [
         rektsUp: null,
         challenges: 175,
         winRate: "71%",
-        earnings: "40.5 SOL",
+        earnings: "40.5",
         isTop: false,
     },
     {
@@ -240,7 +240,7 @@ const topTraders = [
         rektsUp: false,
         challenges: 168,
         winRate: "67%",
-        earnings: "38.2 SOL",
+        earnings: "38.2",
         isTop: false,
     },
     {
@@ -257,7 +257,7 @@ const topTraders = [
         rektsUp: false,
         challenges: 162,
         winRate: "68%",
-        earnings: "36.1 SOL",
+        earnings: "36.1",
         isTop: false,
     },
     {
@@ -274,7 +274,7 @@ const topTraders = [
         rektsUp: false,
         challenges: 155,
         winRate: "69%",
-        earnings: "34.5 SOL",
+        earnings: "34.5",
         isTop: false,
     },
     {
@@ -291,7 +291,7 @@ const topTraders = [
         rektsUp: null,
         challenges: 148,
         winRate: "71%",
-        earnings: "32.8 SOL",
+        earnings: "32.8",
         isTop: false,
     },
     {
@@ -308,7 +308,7 @@ const topTraders = [
         rektsUp: false,
         challenges: 142,
         winRate: "71%",
-        earnings: "30.4 SOL",
+        earnings: "30.4",
         isTop: false,
     },
     {
@@ -325,7 +325,7 @@ const topTraders = [
         rektsUp: false,
         challenges: 135,
         winRate: "72%",
-        earnings: "28.9 SOL",
+        earnings: "28.9",
         isTop: false,
     },
     {
@@ -342,7 +342,7 @@ const topTraders = [
         rektsUp: false,
         challenges: 128,
         winRate: "74%",
-        earnings: "27.2 SOL",
+        earnings: "27.2",
         isTop: false,
     },
     {
@@ -359,7 +359,7 @@ const topTraders = [
         rektsUp: null,
         challenges: 122,
         winRate: "74%",
-        earnings: "25.6 SOL",
+        earnings: "25.6",
         isTop: false,
     },
     {
@@ -376,7 +376,7 @@ const topTraders = [
         rektsUp: false,
         challenges: 115,
         winRate: "75%",
-        earnings: "24.1 SOL",
+        earnings: "24.1",
         isTop: false,
     },
     {
@@ -393,7 +393,7 @@ const topTraders = [
         rektsUp: false,
         challenges: 108,
         winRate: "76%",
-        earnings: "22.8 SOL",
+        earnings: "22.8",
         isTop: false,
     },
     {
@@ -410,7 +410,7 @@ const topTraders = [
         rektsUp: false,
         challenges: 102,
         winRate: "76%",
-        earnings: "21.5 SOL",
+        earnings: "21.5",
         isTop: false,
     },
     {
@@ -427,7 +427,7 @@ const topTraders = [
         rektsUp: null,
         challenges: 95,
         winRate: "76%",
-        earnings: "20.2 SOL",
+        earnings: "20.2",
         isTop: false,
     },
     {
@@ -444,7 +444,7 @@ const topTraders = [
         rektsUp: false,
         challenges: 88,
         winRate: "78%",
-        earnings: "18.9 SOL",
+        earnings: "18.9",
         isTop: false,
     },
     {
@@ -461,7 +461,7 @@ const topTraders = [
         rektsUp: false,
         challenges: 82,
         winRate: "79%",
-        earnings: "17.5 SOL",
+        earnings: "17.5",
         isTop: false,
     },
     {
@@ -478,7 +478,7 @@ const topTraders = [
         rektsUp: null,
         challenges: 75,
         winRate: "80%",
-        earnings: "16.2 SOL",
+        earnings: "16.2",
         isTop: false,
     },
     {
@@ -495,7 +495,7 @@ const topTraders = [
         rektsUp: false,
         challenges: 70,
         winRate: "80%",
-        earnings: "15.1 SOL",
+        earnings: "15.1",
         isTop: false,
     },
     {
@@ -512,7 +512,7 @@ const topTraders = [
         rektsUp: false,
         challenges: 65,
         winRate: "80%",
-        earnings: "14.0 SOL",
+        earnings: "14.0",
         isTop: false,
     },
     {
@@ -529,7 +529,7 @@ const topTraders = [
         rektsUp: null,
         challenges: 58,
         winRate: "81%",
-        earnings: "12.8 SOL",
+        earnings: "12.8",
         isTop: false,
     },
     {
@@ -546,7 +546,7 @@ const topTraders = [
         rektsUp: false,
         challenges: 52,
         winRate: "81%",
-        earnings: "11.5 SOL",
+        earnings: "11.5",
         isTop: false,
     },
 ];
@@ -746,7 +746,7 @@ export default function LeaderboardPage() {
                                     <ChevronIcon direction="up" />
                                 </div>
                                 <div className="col-span-1 flex items-center gap-1">
-                                    Win Rate
+                                    Win%
                                     <ChevronIcon direction="up" />
                                 </div>
                                 <div className="col-span-2 flex items-center gap-1 justify-end">
@@ -788,12 +788,6 @@ export default function LeaderboardPage() {
                                                 <span className="font-semibold text-gray-900 truncate">
                                                     {user.username}
                                                 </span>
-                                                <span className="text-base flex-shrink-0">{user.flag}</span>
-                                                {user.badge && (
-                                                    <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-700 text-xs font-bold rounded flex-shrink-0">
-                                                        {user.badge}
-                                                    </span>
-                                                )}
                                             </div>
                                         </div>
 
@@ -843,7 +837,7 @@ export default function LeaderboardPage() {
 
                                         {/* Earnings */}
                                         <div className="col-span-2 text-right">
-                                            <span className="font-semibold text-gray-900">{user.earnings}</span>
+                                            <span className="font-semibold text-gray-900">${user.earnings}</span>
                                         </div>
                                     </div>
                                 ))}

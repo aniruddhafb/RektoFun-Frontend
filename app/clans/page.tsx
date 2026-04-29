@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import { Search, ChevronDown, Clock, Shield, Lock, Users, Trophy } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Clan {
@@ -355,6 +356,50 @@ export default function ClansPage() {
     const [filterChain, setFilterChain] = useState("All Chains");
     const [sortBy, setSortBy] = useState("Top");
 
+    // Dropdown state
+    const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
+    const [isTimeDropdownOpen, setIsTimeDropdownOpen] = useState(false);
+    const [isSortDropdownOpen, setIsSortDropdownOpen] = useState(false);
+    const filterDropdownRef = useRef<HTMLDivElement>(null);
+    const timeDropdownRef = useRef<HTMLDivElement>(null);
+    const sortDropdownRef = useRef<HTMLDivElement>(null);
+
+    // Filter options for dropdowns
+    const typeOptions = [
+        { label: "All Clans", icon: <Users className="w-4 h-4" /> },
+        { label: "Public", icon: <Shield className="w-4 h-4" /> },
+        { label: "Invite Only", icon: <Lock className="w-4 h-4" /> },
+    ];
+
+    const timeOptions = [
+        { label: "All Time", icon: <Clock className="w-4 h-4" /> },
+        { label: "This Week", icon: <Clock className="w-4 h-4" /> },
+        { label: "This Month", icon: <Clock className="w-4 h-4" /> },
+    ];
+
+    const sortOptions = [
+        { label: "Top", icon: <Trophy className="w-4 h-4" /> },
+        { label: "Newest", icon: <Clock className="w-4 h-4" /> },
+        { label: "Members", icon: <Users className="w-4 h-4" /> },
+    ];
+
+    // Close dropdowns when clicking outside
+    useEffect(() => {
+        function handleClickOutside(event: MouseEvent) {
+            if (filterDropdownRef.current && !filterDropdownRef.current.contains(event.target as Node)) {
+                setIsFilterDropdownOpen(false);
+            }
+            if (timeDropdownRef.current && !timeDropdownRef.current.contains(event.target as Node)) {
+                setIsTimeDropdownOpen(false);
+            }
+            if (sortDropdownRef.current && !sortDropdownRef.current.contains(event.target as Node)) {
+                setIsSortDropdownOpen(false);
+            }
+        }
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+
     const filtered = clansData.filter((c) => {
         const matchSearch = c.name.toLowerCase().includes(search.toLowerCase());
         const matchType =
@@ -378,18 +423,17 @@ export default function ClansPage() {
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6">
                     <div>
                         <div className="flex items-center gap-2">
-                            <h1 className="text-3xl sm:text-4xl font-bold text-gray-900">Clans</h1>
-                            <ShieldIcon className="w-7 h-7 text-orange-400" />
+                            <h1 className="text-3xl sm:text-4xl font-bold text-gray-900">Explore Clans</h1>
                         </div>
                         <p className="text-gray-500 mt-1 text-base">Team up and compete to win together</p>
                     </div>
 
                     <div className="flex items-center gap-3 flex-shrink-0">
-                        <button className="flex items-center gap-2 px-4 py-2.5 bg-white/70 hover:bg-white/90 border border-gray-200 rounded-xl text-sm font-semibold text-gray-800 transition-all shadow-sm">
+                        {/* <button className="flex items-center gap-2 px-4 py-2.5 bg-white/70 hover:bg-white/90 border border-gray-200 rounded-xl text-sm font-semibold text-gray-800 transition-all shadow-sm">
                             <MyClansIcon className="w-4 h-4" />
                             My Clans
-                        </button>
-                        <button className="flex items-center gap-2 px-4 py-2.5 bg-gray-900 hover:bg-gray-800 text-white rounded-xl text-sm font-semibold transition-all shadow-sm">
+                        </button> */}
+                        <button className="cursor-pointer flex items-center gap-2 px-4 py-2.5 bg-gray-900 hover:bg-gray-800 text-white rounded-xl text-sm font-semibold transition-all shadow-sm">
                             <PlusIcon className="w-4 h-4" />
                             Create Clan
                         </button>
@@ -397,59 +441,92 @@ export default function ClansPage() {
                 </div>
 
                 {/* ── Filters ── */}
-                <div className="flex flex-wrap gap-3 mb-6">
-                    {/* Search */}
-                    <div className="relative flex-1 min-w-[200px]">
-                        <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                        <input
-                            type="text"
-                            placeholder="Search clans..."
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            className="w-full pl-9 pr-4 py-2.5 bg-white/70 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300 shadow-sm"
-                        />
-                    </div>
+                <div className="max-w-7xl mx-auto pb-8">
+                    <div className="flex flex-col lg:flex-row gap-4 items-stretch lg:items-center">
+                        {/* Search Input */}
+                        <div className="relative w-full lg:flex-1 lg:max-w-md">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                            <input
+                                type="text"
+                                placeholder="Search clans..."
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                className="w-full pl-10 pr-4 py-2.5 bg-white/50 rounded-full text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-200"
+                            />
+                        </div>
 
-                    {/* Type filter */}
-                    <div className="relative">
-                        <select
-                            value={filterType}
-                            onChange={(e) => setFilterType(e.target.value)}
-                            className="appearance-none pl-4 pr-9 py-2.5 bg-white/70 border border-gray-200 rounded-xl text-sm text-gray-800 font-medium focus:outline-none focus:ring-2 focus:ring-gray-300 shadow-sm cursor-pointer"
-                        >
-                            <option>All Clans</option>
-                            <option>Public</option>
-                            <option>Invite Only</option>
-                        </select>
-                        <ChevronDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-                    </div>
+                        {/* Dropdowns - Side by side on all screen sizes */}
+                        <div className="flex flex-row gap-3 items-center">
+                            {/* Type Dropdown */}
+                            <div className="relative" ref={filterDropdownRef}>
+                                <button
+                                    onClick={() => setIsFilterDropdownOpen(!isFilterDropdownOpen)}
+                                    className="cursor-pointer flex items-center gap-2 px-3 py-2 bg-white/50 rounded-full text-sm text-gray-700 hover:bg-white/70 transition-colors justify-between flex-1"
+                                >
+                                    <div className="flex items-center gap-2">
+                                        <span>{typeOptions.find((o) => o.label === filterType)?.icon}</span>
+                                        <span>{filterType}</span>
+                                    </div>
+                                    <ChevronDown className={`w-4 h-4 transition-transform ${isFilterDropdownOpen ? "rotate-180" : ""}`} />
+                                </button>
 
-                    {/* Time filter */}
-                    <div className="relative">
-                        <select
-                            value={filterTime}
-                            onChange={(e) => setFilterTime(e.target.value)}
-                            className="appearance-none pl-4 pr-9 py-2.5 bg-white/70 border border-gray-200 rounded-xl text-sm text-gray-800 font-medium focus:outline-none focus:ring-2 focus:ring-gray-300 shadow-sm cursor-pointer"
-                        >
-                            <option>All Time</option>
-                            <option>This Week</option>
-                            <option>This Month</option>
-                        </select>
-                        <ChevronDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-                    </div>
+                                {isFilterDropdownOpen && (
+                                    <div className="absolute left-0 sm:right-0 top-full mt-2 w-full sm:w-56 bg-white rounded-xl shadow-lg border border-gray-100 py-2 z-10">
+                                        {typeOptions.map((option) => (
+                                            <button
+                                                key={option.label}
+                                                onClick={() => {
+                                                    setFilterType(option.label);
+                                                    setIsFilterDropdownOpen(false);
+                                                }}
+                                                className={`w-full cursor-pointer flex items-center gap-3 px-4 py-2.5 text-sm text-left transition-colors ${filterType === option.label
+                                                    ? "text-black font-semibold"
+                                                    : "text-gray-700 hover:bg-gray-50"
+                                                    }`}
+                                            >
+                                                {option.icon}
+                                                {option.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
 
-                    {/* Sort */}
-                    <div className="relative">
-                        <select
-                            value={sortBy}
-                            onChange={(e) => setSortBy(e.target.value)}
-                            className="appearance-none pl-4 pr-9 py-2.5 bg-white/70 border border-gray-200 rounded-xl text-sm text-gray-800 font-medium focus:outline-none focus:ring-2 focus:ring-gray-300 shadow-sm cursor-pointer"
-                        >
-                            <option value="Top">Sort: Top</option>
-                            <option value="Newest">Sort: Newest</option>
-                            <option value="Members">Sort: Members</option>
-                        </select>
-                        <ChevronDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                            {/* Sort Dropdown */}
+                            <div className="relative" ref={sortDropdownRef}>
+                                <button
+                                    onClick={() => setIsSortDropdownOpen(!isSortDropdownOpen)}
+                                    className="cursor-pointer flex items-center gap-2 px-3 py-2 bg-white/50 rounded-full text-sm text-gray-700 hover:bg-white/70 transition-colors justify-between flex-1"
+                                >
+                                    <div className="flex items-center gap-2">
+                                        <span>{sortOptions.find((o) => o.label === sortBy)?.icon}</span>
+                                        <span>Sort: {sortBy}</span>
+                                    </div>
+                                    <ChevronDown className={`w-4 h-4 transition-transform ${isSortDropdownOpen ? "rotate-180" : ""}`} />
+                                </button>
+
+                                {isSortDropdownOpen && (
+                                    <div className="absolute left-0 sm:right-0 top-full mt-2 w-full sm:w-56 bg-white rounded-xl shadow-lg border border-gray-100 py-2 z-10">
+                                        {sortOptions.map((option) => (
+                                            <button
+                                                key={option.label}
+                                                onClick={() => {
+                                                    setSortBy(option.label);
+                                                    setIsSortDropdownOpen(false);
+                                                }}
+                                                className={`w-full cursor-pointer flex items-center gap-3 px-4 py-2.5 text-sm text-left transition-colors ${sortBy === option.label
+                                                    ? "text-black font-semibold"
+                                                    : "text-gray-700 hover:bg-gray-50"
+                                                    }`}
+                                            >
+                                                {option.icon}
+                                                {option.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -488,24 +565,6 @@ export default function ClansPage() {
                         )}
                     </div>
                 )}
-
-                {/* ── Bottom Banner ── */}
-                <div className="mt-8 bg-white/60 backdrop-blur-sm rounded-2xl border border-white/70 shadow-sm px-5 py-4 flex flex-col sm:flex-row items-center justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
-                            <TrophyIcon className="w-5 h-5 text-amber-600" />
-                        </div>
-                        <p className="text-sm text-gray-700 font-medium">
-                            Join a clan and compete in clan battles to earn rewards and climb the rankings!
-                        </p>
-                    </div>
-                    <button className="flex items-center gap-1.5 px-4 py-2 bg-white hover:bg-gray-50 border border-gray-200 rounded-xl text-sm font-semibold text-gray-800 transition-all shadow-sm flex-shrink-0 whitespace-nowrap">
-                        How Clans Work
-                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <path d="M7 17L17 7M17 7H7M17 7v10" />
-                        </svg>
-                    </button>
-                </div>
 
             </div>
         </div>

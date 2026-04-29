@@ -56,7 +56,7 @@ const clanData = {
     members: 37,
     maxMembers: 50,
     totalWins: 128,
-    totalRekts: 3460,
+    totalRekts: 78,
     winRate: 78,
     rektPoints: "12.4K",
     verified: true,
@@ -563,15 +563,9 @@ export default function ClanDetailPage() {
 
                         {/* Join / Manage */}
                         <div className="flex-shrink-0 flex flex-col items-stretch sm:items-end gap-3 sm:min-w-[160px]">
-                            <div className="bg-green-50 border border-green-200 rounded-xl p-3 flex items-start gap-2">
-                                <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
-                                    <ShieldIcon className="w-4 h-4 text-green-600" />
-                                </div>
-                                <div>
-                                    <p className="text-sm font-bold text-gray-900">Open to Join</p>
-                                    <p className="text-xs text-gray-500">Anyone can join and compete</p>
-                                </div>
-                            </div>
+                            <button className="w-full px-5 py-2.5 bg-gray-900 hover:bg-gray-800 text-white rounded-xl text-sm font-bold transition-all shadow-sm">
+                                Leave Clan
+                            </button>
                             <button className="w-full px-5 py-2.5 bg-gray-900 hover:bg-gray-800 text-white rounded-xl text-sm font-bold transition-all shadow-sm">
                                 Manage Clan
                             </button>

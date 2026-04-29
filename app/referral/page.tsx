@@ -32,7 +32,7 @@ const leaderboardData = [
         joined: "Jun 2023",
         referrals: "8.9k",
         points: 840,
-        earnings: "128.4 SOL",
+        earnings: "128.4",
     },
     {
         rank: 2,
@@ -42,7 +42,7 @@ const leaderboardData = [
         joined: "Jan 2024",
         referrals: "7.6k",
         points: 675,
-        earnings: "116.2 SOL",
+        earnings: "116.2",
     },
     {
         rank: 3,
@@ -52,7 +52,7 @@ const leaderboardData = [
         joined: "Mar 2023",
         referrals: "6.2k",
         points: 590,
-        earnings: "98.7 SOL",
+        earnings: "98.7",
     },
     {
         rank: 4,
@@ -62,7 +62,7 @@ const leaderboardData = [
         joined: "Aug 2023",
         referrals: "5.1k",
         points: 445,
-        earnings: "76.3 SOL",
+        earnings: "76.3",
     },
     {
         rank: 5,
@@ -72,7 +72,7 @@ const leaderboardData = [
         joined: "Dec 2023",
         referrals: "4.3k",
         points: 380,
-        earnings: "62.1 SOL",
+        earnings: "62.1",
     },
 ];
 
@@ -453,7 +453,7 @@ export default function ReferralPage() {
                                         <div className="col-span-2 text-gray-900 font-medium text-sm">{user.points}</div>
 
                                         {/* Earnings */}
-                                        <div className="col-span-2 text-gray-900 font-medium text-sm">{user.earnings}</div>
+                                        <div className="col-span-2 text-gray-900 font-medium text-sm">${user.earnings}</div>
                                     </div>
                                 ))}
                             </div>
