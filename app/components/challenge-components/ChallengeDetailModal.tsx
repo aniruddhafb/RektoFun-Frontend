@@ -3,38 +3,7 @@
 import React, { useEffect, useRef } from "react";
 import Image from "next/image";
 import { X, Clock, Trophy, Skull, TrendingUp, TrendingDown, User, Calendar, AlertCircle, CheckCircle } from "lucide-react";
-
-interface Challenge {
-    id: string;
-    asset: string;
-    assetLogo: string;
-    title: string;
-    mode: "pvp" | "multi";
-    creator: {
-        name: string;
-        avatar: string;
-    };
-    betAmount: number;
-    prediction: string;
-    currentPrice: number;
-    priceChange: number;
-    targetPrice: number;
-    startPrice: number;
-    timeRemaining: string;
-    likes: number;
-    status: "active" | "expired" | "won" | "lost" | "created" | "accepted";
-    accepter?: {
-        name: string;
-        avatar: string;
-    };
-    challengerCount?: number;
-    defenderCount?: number;
-    challengerPlayers?: { name: string; avatar: string }[];
-    defenderPlayers?: { name: string; avatar: string }[];
-    createdAt?: string;
-    expiresAt?: string;
-    endsAt?: string;
-}
+import { Challenge } from "./challengesData";
 
 interface ChallengeDetailModalProps {
     challenge: Challenge | null;

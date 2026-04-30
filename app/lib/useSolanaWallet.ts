@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { usePrivy } from "@privy-io/react-auth";
 import { useWallets } from "@privy-io/react-auth/solana";
 import { PublicKey, Transaction, Connection } from "@solana/web3.js";
@@ -37,11 +37,15 @@ export function useSolanaWallet() {
 
     console.log({ solanaWallet });
 
-    let adapter: SolanaWalletAdapter | null = null;
+    // Use useMemo to create a stable adapter reference based on the wallet address.
+    // This prevents the useEffect from re-running on every render.
+    const adapter: SolanaWalletAdapter | null = useMemo(() => {
+        if (!solanaWallet?.address || !isValidBase58Address(solanaWallet.address)) {
+            return null;
+        }
 
-    if (solanaWallet?.address && isValidBase58Address(solanaWallet.address)) {
         const address = solanaWallet.address;
-        adapter = {
+        return {
             publicKey: new PublicKey(address),
             signTransaction: async (tx: Transaction) => {
                 // NOTE: Do NOT set recentBlockhash here — it will expire while the
@@ -75,30 +79,42 @@ export function useSolanaWallet() {
                 );
             },
         };
-    }
+    }, [solanaWallet?.address]);
 
-    let program: Program | null = null;
-    if (adapter) {
+    // Derive a stable publicKey string for dependency tracking
+    const publicKeyBase58 = adapter?.publicKey?.toBase58() ?? null;
+
+    const program: Program | null = useMemo(() => {
+        if (!adapter) return null;
         try {
-            program = getRektoProgram(adapter);
+            return getRektoProgram(adapter);
         } catch {
-            program = null;
+            return null;
         }
-    }
+    }, [adapter]);
 
-    // Fetch USDC balance
+    // Fetch USDC balance with debouncing to avoid rate limit (429) errors.
+    // The effect depends on publicKeyBase58 (a stable string), not the adapter object.
     useEffect(() => {
-        const fetchUsdcBalance = async () => {
-            if (!adapter) {
-                setUsdcBalance(null);
-                return;
-            }
+        if (!publicKeyBase58) {
+            setUsdcBalance(null);
+            return;
+        }
 
+        // Track if this fetch has been superseded by a newer trigger
+        let isStale = false;
+        let timeoutId: ReturnType<typeof setTimeout>;
+
+        const fetchUsdcBalance = async () => {
             try {
                 const connection = new Connection(RPC_ENDPOINT, "confirmed");
-                const tokenAccounts = await connection.getParsedTokenAccountsByOwner(adapter.publicKey, {
-                    mint: USDC_MINT,
-                });
+                const tokenAccounts = await connection.getParsedTokenAccountsByOwner(
+                    new PublicKey(publicKeyBase58),
+                    { mint: USDC_MINT }
+                );
+
+                // Ignore response if a newer fetch has started
+                if (isStale) return;
 
                 if (tokenAccounts.value.length > 0) {
                     const balance = tokenAccounts.value[0].account.data.parsed.info.tokenAmount.uiAmount;
@@ -107,13 +123,23 @@ export function useSolanaWallet() {
                     setUsdcBalance(0);
                 }
             } catch (error) {
+                // Ignore errors from superseded requests
+                if (isStale) return;
                 console.error('[useSolanaWallet] Failed to fetch USDC balance:', error);
-                setUsdcBalance(null);
             }
         };
 
-        fetchUsdcBalance();
-    }, [adapter]);
+        // Debounce: wait 500ms before fetching to avoid rapid re-renders hitting rate limit
+        timeoutId = setTimeout(() => {
+            isStale = false;
+            fetchUsdcBalance();
+        }, 500);
+
+        return () => {
+            isStale = true;
+            clearTimeout(timeoutId);
+        };
+    }, [publicKeyBase58]);
 
     /**
      * Send a pre-built transaction via the Solana wallet.

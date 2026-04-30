@@ -68,13 +68,12 @@ export default function ChallengesPage() {
       <FeedbackBanner
         rektTxSig={rektTxSig}
         rektError={rektError}
-        targetCreator={rektTarget?.creator.name ?? null}
+        targetCreator={rektTarget?.creator_wallet ? `${rektTarget.creator_wallet.slice(0, 6)}...` : null}
       />
 
       <ChallengeGrid
         onRekt={handleRekt}
         onClick={handleChallengeClick}
-        isLoading={isLoading}
         onOpenModal={() => setIsCreateModalOpen(true)}
       />
 

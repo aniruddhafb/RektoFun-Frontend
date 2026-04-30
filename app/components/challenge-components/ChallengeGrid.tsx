@@ -1,19 +1,43 @@
+'use client';
+
+import { useState, useEffect } from 'react';
 import { ChallengeCard } from "./ChallengeCard";
-import { Challenge, DUMMY_CHALLENGES } from "./challengesData";
+import { Challenge, mapApiChallenge } from "./challengesData";
+import { getChallenges } from "../../lib/challenges-service/challenges";
 
 interface ChallengeGridProps {
     onRekt: (challenge: Challenge) => void;
     onClick: (challenge: Challenge) => void;
-    isLoading: boolean;
     onOpenModal: () => void;
+    isLoading?: boolean;
 }
 
 export function ChallengeGrid({
     onRekt,
     onClick,
-    isLoading,
     onOpenModal,
 }: ChallengeGridProps) {
+    const [challenges, setChallenges] = useState<Challenge[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        async function fetchChallenges() {
+            try {
+                const response = await getChallenges();
+                // Map API response to unified Challenge type
+                const mappedChallenges = response.challenges.map(mapApiChallenge);
+                setChallenges(mappedChallenges);
+            } catch (error) {
+                console.error('Failed to fetch challenges:', error);
+                setChallenges([]);
+            } finally {
+                setIsLoading(false);
+            }
+        }
+
+        fetchChallenges();
+    }, []);
+
     if (isLoading) {
         return (
             <div className="max-w-7xl mx-auto px-6 lg:px-8 pb-16">
@@ -22,9 +46,7 @@ export function ChallengeGrid({
         );
     }
 
-    const displayedChallenges = DUMMY_CHALLENGES;
-
-    if (displayedChallenges.length === 0) {
+    if (challenges.length === 0) {
         return (
             <div className="max-w-7xl mx-auto px-6 lg:px-8 pb-16">
                 <div className="text-center py-16">
@@ -43,7 +65,7 @@ export function ChallengeGrid({
     return (
         <div className="max-w-7xl mx-auto px-6 lg:px-8 pb-16">
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                {displayedChallenges.map((challenge) => (
+                {challenges.map((challenge) => (
                     <ChallengeCard
                         key={challenge.id}
                         challenge={challenge}

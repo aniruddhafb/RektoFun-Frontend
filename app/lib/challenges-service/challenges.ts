@@ -16,8 +16,9 @@ export interface ChallengesResponse {
 }
 
 export interface GetChallengesParams {
-  status?: 'open' | 'accepted' | 'closed';
-  asset?: string;
+  status?: 'open' | 'locked' | 'resolved' | 'cancelled';
+  category?: string;
+  ticker?: string;
   creator_wallet?: string;
   limit?: number;
   offset?: number;
@@ -46,8 +47,11 @@ export async function getChallenges(params: GetChallengesParams = {}): Promise<C
   if (params.status) {
     searchParams.set('status', params.status);
   }
-  if (params.asset) {
-    searchParams.set('asset', params.asset);
+  if (params.category) {
+    searchParams.set('category', params.category);
+  }
+  if (params.ticker) {
+    searchParams.set('ticker', params.ticker);
   }
   if (params.creator_wallet) {
     searchParams.set('creator_wallet', params.creator_wallet);

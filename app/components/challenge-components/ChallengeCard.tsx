@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { Challenge } from "./challengesData";
+import { Challenge, coins } from "./challengesData";
 
 interface ChallengeCardProps {
     challenge: Challenge;
@@ -22,9 +22,14 @@ export function ChallengeCard({
         }
     };
 
-    const isAccepted = challenge.status === "accepted" || challenge.status === "active" || challenge.status === "won" || challenge.status === "lost";
-    const hasWon = challenge.status === "won";
-    const hasLost = challenge.status === "lost";
+    const isAccepted = challenge.status === "accepted" || challenge.status === "closed";
+    const hasWon = challenge.status === "closed" && (challenge as any).result?.winner === challenge.creator_wallet;
+    const hasLost = challenge.status === "closed" && (challenge as any).result?.winner !== challenge.creator_wallet;
+    
+    const assetInfo = coins[challenge.asset];
+    const timeRemaining = challenge.expires_at
+        ? `${Math.floor((challenge.expires_at - Date.now()) / 60000)}m`
+        : "N/A";
 
     return (
         <div
