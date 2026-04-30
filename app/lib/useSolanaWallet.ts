@@ -29,6 +29,7 @@ export function useSolanaWallet() {
     const { authenticated, login } = usePrivy();
     const { wallets, ready } = useWallets();
     const [usdcBalance, setUsdcBalance] = useState<number | null>(null);
+    const [solBalance, setSolBalance] = useState<number | null>(null);
 
     console.log({ solanaWallets: wallets, ready });
 
@@ -98,6 +99,7 @@ export function useSolanaWallet() {
     useEffect(() => {
         if (!publicKeyBase58) {
             setUsdcBalance(null);
+            setSolBalance(null);
             return;
         }
 
@@ -105,9 +107,11 @@ export function useSolanaWallet() {
         let isStale = false;
         let timeoutId: ReturnType<typeof setTimeout>;
 
-        const fetchUsdcBalance = async () => {
+        const fetchBalances = async () => {
             try {
                 const connection = new Connection(RPC_ENDPOINT, "confirmed");
+                
+                // Fetch USDC balance
                 const tokenAccounts = await connection.getParsedTokenAccountsByOwner(
                     new PublicKey(publicKeyBase58),
                     { mint: USDC_MINT }
@@ -117,22 +121,28 @@ export function useSolanaWallet() {
                 if (isStale) return;
 
                 if (tokenAccounts.value.length > 0) {
-                    const balance = tokenAccounts.value[0].account.data.parsed.info.tokenAmount.uiAmount;
-                    setUsdcBalance(balance);
+                    const usdcBal = tokenAccounts.value[0].account.data.parsed.info.tokenAmount.uiAmount;
+                    setUsdcBalance(usdcBal);
                 } else {
                     setUsdcBalance(0);
+                }
+
+                // Fetch SOL balance
+                const solBal = await connection.getBalance(new PublicKey(publicKeyBase58));
+                if (!isStale) {
+                    setSolBalance(solBal / 1e9); // Convert lamports to SOL
                 }
             } catch (error) {
                 // Ignore errors from superseded requests
                 if (isStale) return;
-                console.error('[useSolanaWallet] Failed to fetch USDC balance:', error);
+                console.error('[useSolanaWallet] Failed to fetch balances:', error);
             }
         };
 
         // Debounce: wait 500ms before fetching to avoid rapid re-renders hitting rate limit
         timeoutId = setTimeout(() => {
             isStale = false;
-            fetchUsdcBalance();
+            fetchBalances();
         }, 500);
 
         return () => {
@@ -213,5 +223,6 @@ export function useSolanaWallet() {
         sendTransaction,
         publicKey: adapter?.publicKey ?? null,
         usdcBalance,
+        solBalance,
     };
 }

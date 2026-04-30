@@ -36,7 +36,9 @@ export async function createUser(params: CreateUserParams): Promise<User> {
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to create user: ${response.statusText}`);
+    const error = new Error(`Failed to create user: ${response.statusText}`);
+    (error as any).status = response.status;
+    throw error;
   }
 
   return response.json();
@@ -84,6 +86,63 @@ export async function updateUser(id: string, params: Partial<CreateUserParams>):
 
   if (!response.ok) {
     throw new Error(`Failed to update user: ${response.statusText}`);
+  }
+
+  return response.json();
+}
+
+export async function acceptReferral(newUserWallet: string, referrerCode: string): Promise<{ newUser: User; referrer: User }> {
+  console.log('[acceptReferral] Attempting to accept referral with wallet:', newUserWallet, 'and code:', referrerCode);
+  const response = await fetch(`${API_BASE_URL}/users/accept-referral`, {
+    method: 'POST',
+    headers: {
+      'accept': 'application/json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ new_user_wallet: newUserWallet, referrer_code: referrerCode }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to accept referral: ${response.statusText}`);
+  }
+
+  return response.json();
+}
+
+export interface LeaderboardUser {
+  id: string;
+  wallet_address: string;
+  username: string | null;
+  profile_image: string | null;
+  referrals: string[];
+  created_at: string | null;
+  earnings: number | null;
+}
+
+export interface LeaderboardResponse {
+  users: LeaderboardUser[];
+  count: number;
+}
+
+export async function getLeaderboard(
+  limit: number = 10,
+  offset: number = 0,
+  search?: string
+): Promise<LeaderboardResponse> {
+  let url = `${API_BASE_URL}/users/leaderboard?limit=${limit}&offset=${offset}`;
+  if (search) {
+    url += `&search=${encodeURIComponent(search)}`;
+  }
+
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'accept': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch leaderboard: ${response.statusText}`);
   }
 
   return response.json();

@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { usePrivy } from "@privy-io/react-auth";
 import Image from "next/image";
 import { useSolanaWallet } from "@/app/lib/useSolanaWallet";
+import { getUserByWallet, updateUser } from "@/app/lib/users-service/users";
 
 
 const PROFILE_SVGS = Array.from({ length: 31 }, (_, i) => `/profiles/${i + 1}.svg`);
@@ -12,17 +13,49 @@ export default function SettingsPage() {
     const { user, authenticated, logout, login, linkWallet, linkTwitter, linkGoogle } = usePrivy();
 
     // Profile state
-    const [username, setUsername] = useState(user?.email?.address?.split('@')[0] || "trader_123");
-    const [description, setDescription] = useState("Crypto enthusiast | DeFi degen | Prediction markets warrior 🚀");
+    const [username, setUsername] = useState("");
+    const [description, setDescription] = useState("");
     const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
     const [editProfileIndex, setEditProfileIndex] = useState(0);
     const [isEditingProfile, setIsEditingProfile] = useState(false);
     const [showExportModal, setShowExportModal] = useState(false);
     const [copiedAddress, setCopiedAddress] = useState(false);
+    const [showSuccessMessage, setShowSuccessMessage] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const [isLoadingProfile, setIsLoadingProfile] = useState(true);
+    const [isSavingProfile, setIsSavingProfile] = useState(false);
 
     const { publicKey } = useSolanaWallet();
     const walletAddress = publicKey?.toBase58() ?? null;
+
+    // Fetch user data on mount
+    useEffect(() => {
+        const fetchUserData = async () => {
+            if (!authenticated || !publicKey) {
+                setIsLoadingProfile(false);
+                return;
+            }
+
+            try {
+                const walletAddress = publicKey.toBase58();
+                const userData = await getUserByWallet(walletAddress);
+                setUsername(userData.username || "");
+                setDescription(userData.description || "");
+                if (userData.profile_image) {
+                    const profileMatch = userData.profile_image.match(/profiles\/(\d+)\.svg/);
+                    if (profileMatch) {
+                        setEditProfileIndex(parseInt(profileMatch[1]) - 1);
+                    }
+                }
+            } catch (error) {
+                console.log('[Settings] Could not fetch user data:', error);
+            } finally {
+                setIsLoadingProfile(false);
+            }
+        };
+
+        fetchUserData();
+    }, [authenticated, publicKey]);
 
     // Get wallet address
     // const walletAddress = user?.wallet?.address || null;
@@ -66,10 +99,29 @@ export default function SettingsPage() {
     };
 
     // Save profile changes
-    const saveProfile = () => {
-        // TODO: Implement API call to save profile (username, description, profileIndex)
-        console.log("Saving profile:", { username, description, profileIndex: editProfileIndex });
-        setIsEditingProfile(false);
+    const saveProfile = async () => {
+        if (!publicKey) return;
+
+        setIsSavingProfile(true);
+        try {
+            const walletAddress = publicKey.toBase58();
+            const existingUser = await getUserByWallet(walletAddress);
+            const profileIndex = editProfileIndex + 1;
+
+            await updateUser(existingUser.id, {
+                username: username,
+                description: description,
+                profile_image: `https://earningrecords.com/assets/profiles/${profileIndex}.svg`,
+            });
+            console.log('[Settings] Profile saved successfully');
+            setIsEditingProfile(false);
+            setShowSuccessMessage(true);
+            setTimeout(() => setShowSuccessMessage(false), 3000);
+        } catch (error) {
+            console.error('[Settings] Failed to save profile:', error);
+        } finally {
+            setIsSavingProfile(false);
+        }
     };
 
     // Randomize profile function
@@ -138,7 +190,7 @@ export default function SettingsPage() {
                                         />
                                     )}
                                 </div>
-                                <button
+                                {/* <button
                                     onClick={() => fileInputRef.current?.click()}
                                     className="absolute -bottom-1 -right-1 w-8 h-8 bg-black text-white rounded-full flex items-center justify-center hover:bg-gray-800 transition-colors shadow-md cursor-pointer"
                                 >
@@ -153,9 +205,9 @@ export default function SettingsPage() {
                                     accept="image/*"
                                     onChange={handlePhotoUpload}
                                     className="hidden"
-                                />
+                                /> */}
                             </div>
-                            <p className="text-xs text-gray-500 mt-2">Click to upload image</p>
+                            {/* <p className="text-xs text-gray-500 mt-2">Click to upload image</p> */}
                         </div>
 
                         {/* Profile Editor */}
@@ -178,6 +230,7 @@ export default function SettingsPage() {
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Username</label>
                                 <input
+                                    maxLength={18}
                                     type="text"
                                     value={username}
                                     onChange={(e) => setUsername(e.target.value)}
@@ -190,6 +243,7 @@ export default function SettingsPage() {
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Bio</label>
                                 <textarea
+                                    maxLength={100}
                                     value={description}
                                     onChange={(e) => setDescription(e.target.value)}
                                     rows={2}
@@ -201,10 +255,31 @@ export default function SettingsPage() {
                             {/* Save Button */}
                             <button
                                 onClick={saveProfile}
-                                className="w-full px-4 py-2 bg-black text-white rounded-xl hover:bg-gray-800 transition-colors cursor-pointer font-medium"
+                                disabled={isSavingProfile}
+                                className="w-full px-4 py-2 bg-black text-white rounded-xl hover:bg-gray-800 transition-colors cursor-pointer font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                                Save Changes
+                                {isSavingProfile ? (
+                                    <span className="flex items-center justify-center gap-2">
+                                        <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                        </svg>
+                                        Saving...
+                                    </span>
+                                ) : (
+                                    "Save Changes"
+                                )}
                             </button>
+
+                            {/* Success Message */}
+                            {showSuccessMessage && (
+                                <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-xl text-green-700 text-sm font-medium">
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                    </svg>
+                                    Changes saved successfully!
+                                </div>
+                            )}
                         </div>
                     </div>
                 </section>

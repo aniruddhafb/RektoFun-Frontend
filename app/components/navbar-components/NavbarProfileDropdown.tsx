@@ -2,10 +2,13 @@
 
 import Link from "next/link";
 import { ReactNode } from "react";
+import favicon from "../../../public/logos/1.png";
+import Image from "next/image";
 
 type NavbarProfileDropdownProps = {
     displayAddress: string;
     displayUsername: string;
+    displayProfileImage: string | null;
     usdcBalance: number | null;
     isOpen: boolean;
     onClose: () => void;
@@ -63,6 +66,7 @@ function MenuAction(props: MenuActionProps) {
 export function NavbarProfileDropdown({
     displayAddress,
     displayUsername,
+    displayProfileImage,
     usdcBalance,
     isOpen,
     onClose,
@@ -81,16 +85,31 @@ export function NavbarProfileDropdown({
             onMouseEnter={onMouseEnter}
             onMouseLeave={onMouseLeave}
         >
+            {/* profile display btn  */}
             <button
                 type="button"
-                className="flex items-center gap-2 p-1 pr-3 rounded-full bg-white/50 border border-gray-300 hover:bg-white/80 transition-all cursor-pointer"
+                className="flex items-center gap-2 p-1 pr-3 rounded-full bg-white/50 border border-gray-400 hover:bg-white/80 transition-all cursor-pointer"
             >
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-sm font-semibold">
-                    {displayUsername.charAt(0).toUpperCase() || "U"}
-                </div>
-                {/* <span className="hidden sm:block text-sm font-medium text-gray-700 max-w-[100px] truncate">
+                {displayProfileImage ? (
+                    <Image
+                        height={32}
+                        width={32}
+                        src={displayProfileImage}
+                        alt="Profile"
+                        className="rounded-full object-cover flex-shrink-0"
+                    />
+                ) : (
+                    <Image
+                        height={32}
+                        width={32}
+                        src={favicon}
+                        alt="Profile"
+                        className="rounded-full object-cover flex-shrink-0"
+                    />
+                )}
+                <span className="hidden sm:block text-sm font-medium text-gray-700 max-w-[100px] m-1">
                     {displayUsername}
-                </span> */}
+                </span>
                 <svg
                     className="w-4 h-4 text-gray-500"
                     fill="none"
@@ -114,11 +133,25 @@ export function NavbarProfileDropdown({
                                 href={profileHref}
                                 className="flex items-center gap-3"
                             >
-                                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-lg font-semibold flex-shrink-0">
-                                    {displayUsername.charAt(0).toUpperCase() || "U"}
-                                </div>
+                                {displayProfileImage ? (
+                                    <Image
+                                        height={58}
+                                        width={58}
+                                        src={displayProfileImage}
+                                        alt="Profile"
+                                        className="rounded-full object-cover flex-shrink-0 mb-2"
+                                    />
+                                ) : (
+                                    <Image
+                                        height={58}
+                                        width={58}
+                                        src={favicon}
+                                        alt="Profile"
+                                        className=" rounded-full object-cover"
+                                    />
+                                )}
                                 <div className="min-w-0">
-                                    <p className="font-semibold text-gray-900 truncate">
+                                    <p className="font-semibold text-gray-900">
                                         {displayUsername}
                                     </p>
                                     <p className="text-xs text-gray-500 font-mono truncate">
