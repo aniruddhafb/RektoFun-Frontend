@@ -1,17 +1,14 @@
 "use client";
 
-/**
- * useSolanaWallet
- *
- * Bridges Privy's embedded/external Solana wallet to the Anchor program client.
- * Returns a wallet adapter compatible with getRektoProgram().
- */
-
+import { useState, useEffect } from "react";
 import { usePrivy } from "@privy-io/react-auth";
 import { useWallets } from "@privy-io/react-auth/solana";
 import { PublicKey, Transaction, Connection } from "@solana/web3.js";
 import { getRektoProgram, RPC_ENDPOINT } from "./rektofun-program";
 import type { Program } from "@anchor-lang/core";
+
+// USDC mint address on Solana devnet
+const USDC_MINT = new PublicKey("4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU");
 
 /**
  * Validates if a string is a valid base58 Solana address.
@@ -31,12 +28,12 @@ export interface SolanaWalletAdapter {
 export function useSolanaWallet() {
     const { authenticated, login } = usePrivy();
     const { wallets, ready } = useWallets();
+    const [usdcBalance, setUsdcBalance] = useState<number | null>(null);
 
     console.log({ solanaWallets: wallets, ready });
 
     // Pick the first available Solana wallet
     const solanaWallet = wallets[0] ?? null;
-    
 
     console.log({ solanaWallet });
 
@@ -88,6 +85,35 @@ export function useSolanaWallet() {
             program = null;
         }
     }
+
+    // Fetch USDC balance
+    useEffect(() => {
+        const fetchUsdcBalance = async () => {
+            if (!adapter) {
+                setUsdcBalance(null);
+                return;
+            }
+
+            try {
+                const connection = new Connection(RPC_ENDPOINT, "confirmed");
+                const tokenAccounts = await connection.getParsedTokenAccountsByOwner(adapter.publicKey, {
+                    mint: USDC_MINT,
+                });
+
+                if (tokenAccounts.value.length > 0) {
+                    const balance = tokenAccounts.value[0].account.data.parsed.info.tokenAmount.uiAmount;
+                    setUsdcBalance(balance);
+                } else {
+                    setUsdcBalance(0);
+                }
+            } catch (error) {
+                console.error('[useSolanaWallet] Failed to fetch USDC balance:', error);
+                setUsdcBalance(null);
+            }
+        };
+
+        fetchUsdcBalance();
+    }, [adapter]);
 
     /**
      * Send a pre-built transaction via the Solana wallet.
@@ -160,5 +186,6 @@ export function useSolanaWallet() {
         program,
         sendTransaction,
         publicKey: adapter?.publicKey ?? null,
+        usdcBalance,
     };
 }

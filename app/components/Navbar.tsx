@@ -4,13 +4,14 @@ import { useState, useEffect } from "react";
 import { usePrivy } from "@privy-io/react-auth";
 import { usePathname } from "next/navigation";
 import { DepositModal } from "./DepositModal";
-import { useWalletData } from "@/app/lib/useWalletData";
+import { useSolanaWallet } from "@/app/lib/useSolanaWallet";
 import * as components from "./navbar-components";
 import { createUser } from "@/app/lib/users-service/users";
 
 export default function Navbar() {
     const { login, authenticated, user, logout, ready } = usePrivy();
-    const { solanaWallet, walletAddress, usdcBalance } = useWalletData();
+    const { solanaWallet, publicKey, usdcBalance } = useSolanaWallet();
+    const walletAddress = publicKey?.toBase58() ?? null;
     const [searchQuery, setSearchQuery] = useState("");
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
@@ -38,7 +39,7 @@ export default function Navbar() {
 
     // Get username from user object
     const getUsername = () => {
-        if (!user) return null;
+        if (!publicKey) return null;
         return (
             displayAddress ||
             "User"
@@ -64,16 +65,16 @@ export default function Navbar() {
     // Call createUser when user authenticates (only once per session)
     useEffect(() => {
         const handleCreateUser = async () => {
-            if (!authenticated || !user || hasCalledCreateUser) {
+            if (!authenticated || !publicKey || hasCalledCreateUser) {
                 console.log('[Navbar] createUser skipped:', {
                     authenticated,
-                    hasUser: !!user,
+                    hasUser: !!publicKey,
                     hasCalledCreateUser
                 });
                 return;
             }
 
-            const walletAddress = user.wallet?.address;
+            const walletAddress = publicKey?.toBase58();
             if (!walletAddress) {
                 console.log('[Navbar] createUser skipped - no wallet address');
                 return;
@@ -85,7 +86,7 @@ export default function Navbar() {
                 const userData = await createUser({
                     wallet_address: walletAddress,
                     username: `user-${walletAddress}`,
-                    login_type: user.email ? 'email' : 'wallet',
+                    login_type: user?.email ? 'email' : 'wallet',
                 });
                 console.log('[Navbar] createUser success:', userData);
             } catch (error) {

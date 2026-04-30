@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useWalletData } from "@/app/lib/useWalletData";
+import { useSolanaWallet } from "@/app/lib/useSolanaWallet";
 
 interface DepositModalProps {
   isOpen: boolean;
@@ -9,7 +9,8 @@ interface DepositModalProps {
 }
 
 export function DepositModal({ isOpen, onClose }: DepositModalProps) {
-  const { walletAddress, usdcBalance } = useWalletData();
+  const { publicKey, usdcBalance } = useSolanaWallet();
+  const walletAddress = publicKey?.toBase58() ?? null;
   const [copied, setCopied] = useState(false);
 
   const qrPattern = [

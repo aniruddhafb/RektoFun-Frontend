@@ -5,7 +5,7 @@ import Image from "next/image";
 import { MessageCircle, Send, Loader2 } from "lucide-react";
 import { ClanData } from "./types";
 import { ClanMessage, getClanMessages, createClanMessage } from "@/app/lib/clan-service/clanMessages";
-import { useWalletData } from "@/app/lib/useWalletData";
+import { useSolanaWallet } from "@/app/lib/useSolanaWallet";
 import { getUserByWallet } from "@/app/lib/users-service/users";
 
 interface ChatSectionProps {
@@ -21,7 +21,8 @@ const ChatSection = ({ clanData }: ChatSectionProps) => {
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     // Wallet data hook - provides walletAddress
-    const { walletAddress } = useWalletData();
+    const { publicKey } = useSolanaWallet();
+    const walletAddress = publicKey?.toBase58() ?? null;
 
     // Current user state - will be populated from backend
     const [currentUser, setCurrentUser] = useState<{
