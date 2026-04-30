@@ -4,13 +4,13 @@ import { useState, useEffect } from "react";
 import { usePrivy } from "@privy-io/react-auth";
 import { usePathname } from "next/navigation";
 import { DepositModal } from "./DepositModal";
+import { useWalletData } from "@/app/lib/useWalletData";
 import * as components from "./navbar-components";
 import { createUser } from "@/app/lib/users-service/users";
-import { useSolanaWallet } from "../lib/useSolanaWallet";
 
 export default function Navbar() {
-    const { login, authenticated, logout, ready } = usePrivy();
-    const {publicKey} = useSolanaWallet();
+    const { login, authenticated, user, logout, ready } = usePrivy();
+    const { solanaWallet, walletAddress, usdcBalance } = useWalletData();
     const [searchQuery, setSearchQuery] = useState("");
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
@@ -32,25 +32,13 @@ export default function Navbar() {
         logout();
     };
 
-    // Get wallet address from user object (handles both embedded and external wallets)
-    const getWalletAddress = () => {
-        if (!publicKey) {
-            console.log('[Navbar] getWalletAddress - user is null, returning null');
-            return null;
-        }
-        const address = publicKey?.toBase58();
-        console.log('[Navbar] getWalletAddress - address:', address ? `${address.slice(0, 6)}...` : 'null');
-        return address;
-    };
-
-    const walletAddress = getWalletAddress();
     const displayAddress = walletAddress
         ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`
         : null;
 
     // Get username from user object
     const getUsername = () => {
-        if (!publicKey) return null;
+        if (!user) return null;
         return (
             displayAddress ||
             "User"
@@ -76,16 +64,16 @@ export default function Navbar() {
     // Call createUser when user authenticates (only once per session)
     useEffect(() => {
         const handleCreateUser = async () => {
-            if (!authenticated || !publicKey || hasCalledCreateUser) {
+            if (!authenticated || !user || hasCalledCreateUser) {
                 console.log('[Navbar] createUser skipped:', {
                     authenticated,
-                    hasUser: !!publicKey,
+                    hasUser: !!user,
                     hasCalledCreateUser
                 });
                 return;
             }
 
-            const walletAddress = publicKey.toBase58();
+            const walletAddress = user.wallet?.address;
             if (!walletAddress) {
                 console.log('[Navbar] createUser skipped - no wallet address');
                 return;
@@ -97,7 +85,7 @@ export default function Navbar() {
                 const userData = await createUser({
                     wallet_address: walletAddress,
                     username: `user-${walletAddress}`,
-                    login_type: 'wallet',
+                    login_type: user.email ? 'email' : 'wallet',
                 });
                 console.log('[Navbar] createUser success:', userData);
             } catch (error) {
@@ -113,7 +101,7 @@ export default function Navbar() {
         };
 
         handleCreateUser();
-    }, [authenticated, publicKey, hasCalledCreateUser, username]);
+    }, [authenticated, user, hasCalledCreateUser, username]);
 
     // Helper function to check if link is active
     const isActive = (href: string) => {
@@ -172,6 +160,7 @@ export default function Navbar() {
                             authenticated={authenticated}
                             displayAddress={displayAddress || ""}
                             displayUsername={username || ""}
+                            usdcBalance={usdcBalance}
                             isDropdownOpen={isDropdownOpen}
                             onAuth={handleAuth}
                             onCloseDropdown={() => setIsDropdownOpen(false)}

@@ -6,6 +6,7 @@ import { ReactNode } from "react";
 type NavbarProfileDropdownProps = {
     displayAddress: string;
     displayUsername: string;
+    usdcBalance: number | null;
     isOpen: boolean;
     onClose: () => void;
     onMouseEnter: () => void;
@@ -62,6 +63,7 @@ function MenuAction(props: MenuActionProps) {
 export function NavbarProfileDropdown({
     displayAddress,
     displayUsername,
+    usdcBalance,
     isOpen,
     onClose,
     onMouseEnter,
@@ -70,6 +72,9 @@ export function NavbarProfileDropdown({
     onOpenDeposit,
     profileHref,
 }: NavbarProfileDropdownProps) {
+    const balanceDisplay = usdcBalance !== null
+        ? `$${usdcBalance.toFixed(2)}`
+        : '...';
     return (
         <div
             className="relative"
@@ -127,9 +132,9 @@ export function NavbarProfileDropdown({
 
                             {/* User Balance Display */}
                             <div className="px-4 py-3 mx-2 mb-1 rounded-xl bg-gradient-to-r from-gray-50 to-gray-100 border border-gray-200">
-                                <p className="text-xs text-gray-500 mb-1.5">Your Balance</p>
+                                <p className="text-xs text-gray-500 mb-1.5">Your USDC Balance</p>
                                 <div className="flex items-center gap-2">
-                                    <span className="text-base font-semibold text-gray-900">$0.00</span>
+                                    <span className="text-base font-semibold text-gray-900">{balanceDisplay}</span>
                                 </div>
                             </div>
 

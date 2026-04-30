@@ -6,6 +6,7 @@ type NavbarAuthSectionProps = {
     authenticated: boolean;
     displayAddress: string;
     displayUsername: string;
+    usdcBalance: number | null;
     isDropdownOpen: boolean;
     onAuth: () => void;
     onCloseDropdown: () => void;
@@ -20,6 +21,7 @@ export function NavbarAuthSection({
     authenticated,
     displayAddress,
     displayUsername,
+    usdcBalance,
     isDropdownOpen,
     onAuth,
     onCloseDropdown,
@@ -29,11 +31,15 @@ export function NavbarAuthSection({
     onOpenDeposit,
     profileHref,
 }: NavbarAuthSectionProps) {
+    const balanceDisplay = usdcBalance !== null
+        ? `$${usdcBalance.toFixed(2)}`
+        : '...';
+
     return (
         <div className="flex items-center gap-2 sm:gap-4">
             {authenticated ? (
                 <div className="flex items-center gap-3">
-                    {/* deposit section  */}
+                    {/* deposit section with SOL balance */}
                     <button
                         type="button"
                         onClick={onOpenDeposit}
@@ -42,12 +48,13 @@ export function NavbarAuthSection({
                         <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                         </svg>
-                        <span className="text-sm font-semibold text-gray-900">$0.00</span>
+                        <span className="text-sm font-semibold text-gray-900">{balanceDisplay}</span>
                     </button>
 
                     <NavbarProfileDropdown
                         displayAddress={displayAddress}
                         displayUsername={displayUsername}
+                        usdcBalance={usdcBalance}
                         isOpen={isDropdownOpen}
                         onClose={onCloseDropdown}
                         onMouseEnter={onMouseEnterDropdown}
