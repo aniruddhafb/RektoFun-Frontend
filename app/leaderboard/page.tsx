@@ -788,6 +788,7 @@ export default function LeaderboardPage() {
                                                     alt={user.username}
                                                     fill
                                                     className="object-cover"
+                                                    sizes="40px"
                                                 />
                                             </div>
                                             <div className="flex items-center gap-1.5 min-w-0">

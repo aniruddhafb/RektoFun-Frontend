@@ -15,13 +15,24 @@ export interface WalletData {
     usdcBalance: number | null;
 }
 
+/**
+ * Validates if a string is a valid base58 Solana address.
+ */
+function isValidBase58Address(address: string): boolean {
+    if (!address || typeof address !== "string") return false;
+    // Base58 alphabet: 123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz
+    return /^[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]{32,44}$/.test(address);
+}
+
 export function useWalletData() {
     const { user } = usePrivy();
     const { solanaWallet } = useSolanaWallet();
     const [usdcBalance, setUsdcBalance] = useState<number | null>(null);
 
     // Get wallet address from solanaWallet first, fallback to user.wallet
-    const walletAddress = solanaWallet?.address || user?.wallet?.address || null;
+    // Only use addresses that pass base58 validation
+    const rawAddress = solanaWallet?.address || user?.wallet?.address || null;
+    const walletAddress = rawAddress && isValidBase58Address(rawAddress) ? rawAddress : null;
 
     // Fetch USDC balance
     useEffect(() => {

@@ -301,6 +301,7 @@ export default function MarketPage({ params }: { params: { slug: string } }) {
                                 alt="Bitcoin"
                                 fill
                                 className="object-contain"
+                                sizes="64px"
                             />
                         </div>
                         <div>
@@ -434,6 +435,7 @@ export default function MarketPage({ params }: { params: { slug: string } }) {
                                                                     alt={user.username}
                                                                     fill
                                                                     className="object-cover"
+                                                                    sizes="40px"
                                                                 />
                                                             </div>
                                                             <div className="flex items-center gap-1 min-w-0">
