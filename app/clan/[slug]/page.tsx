@@ -2,14 +2,20 @@
 
 import { useState, useEffect } from "react";
 import * as ClanComponents from "@/app/components/clan-slug-components";
+import { useSolanaWallet } from "@/app/lib/useSolanaWallet";
 import type { Tab } from "@/app/components/clan-slug-components";
 import type { ClanData } from "@/app/components/clan-slug-components/types";
 import { getClanDataBySlug } from "@/app/lib/clan-service/clans";
+import { getClanMembers } from "@/app/lib/clan-service/clanMembers";
+import { getUserByWallet } from "@/app/lib/users-service/users";
 import { LoadingPage } from "@/app/components/LoadingPage";
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function ClanDetailPage({ params }: { params: Promise<{ slug: string }> }) {
+    const { publicKey: userWallet } = useSolanaWallet();
     const [slug, setSlug] = useState<string>("");
+    const [isMember, setIsMember] = useState(false);
+    const [membersRefreshKey, setMembersRefreshKey] = useState(0);
     const [activeTab, setActiveTab] = useState<Tab>("Overview");
     const [clanData, setClanData] = useState<ClanData | null>(null);
     const [loading, setLoading] = useState(true);
@@ -24,6 +30,10 @@ export default function ClanDetailPage({ params }: { params: Promise<{ slug: str
                 members: newMemberCount,
             };
         });
+        
+        // Trigger refresh for ClanMembers component
+        setMembersRefreshKey(prev => prev + 1);
+
         // Refresh clan data from server after a short delay
         setTimeout(() => {
             if (slug) {
@@ -64,6 +74,34 @@ export default function ClanDetailPage({ params }: { params: Promise<{ slug: str
                 const clan = await getClanDataBySlug(slug);
                 console.log("Fetched clan data:", clan);
                 setClanData(clan);
+
+                // Check if user is a member
+                if (userWallet) {
+                    const walletAddress = userWallet.toBase58();
+                    try {
+                        // First, get the user ID associated with this wallet
+                        const user = await getUserByWallet(walletAddress);
+                        const userId = user.id;
+
+                        const membersResponse = await getClanMembers(slug);
+
+                        // Check if the user's ID is in the clan members list
+                        // We check both the internal userId and the wallet address
+                        const memberExists = membersResponse.members.some((m: any) =>
+                            m.id === userId ||
+                            m.id === walletAddress ||
+                            m.name === userId ||
+                            m.name === walletAddress
+                        );
+                        console.log("Membership check:", { userId, walletAddress, memberExists });
+                        setIsMember(memberExists);
+                    } catch (err) {
+                        console.error("Failed to check membership:", err);
+                        setIsMember(false);
+                    }
+                } else {
+                    setIsMember(false);
+                }
             } catch (err) {
                 console.error("Failed to fetch clan:", err);
                 setError(err instanceof Error ? err.message : "Failed to fetch clan");
@@ -73,7 +111,7 @@ export default function ClanDetailPage({ params }: { params: Promise<{ slug: str
         }
 
         fetchClan();
-    }, [slug]);
+    }, [slug, userWallet]);
 
     const tabs: Tab[] = ["Overview", "Chat"];
 
@@ -86,13 +124,19 @@ export default function ClanDetailPage({ params }: { params: Promise<{ slug: str
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
 
                         {/* ── Clan Header ── */}
-                        <ClanComponents.ClanHeader clanData={clanData} onClanMembershipChange={handleClanMembershipChange} onClanDataUpdate={handleClanDataUpdate} />
+                        <ClanComponents.ClanHeader
+                            clanData={clanData}
+                            onClanMembershipChange={handleClanMembershipChange}
+                            onClanDataUpdate={handleClanDataUpdate}
+                            onMembershipStatusChange={setIsMember}
+                        />
 
                         {/* ── Tabs ── */}
                         <ClanComponents.ClanTabs
                             activeTab={activeTab}
                             onTabChange={setActiveTab}
                             tabs={tabs}
+                            isMember={isMember}
                         />
 
                         {/* ── Overview Tab ── */}
@@ -108,6 +152,7 @@ export default function ClanDetailPage({ params }: { params: Promise<{ slug: str
                                     <ClanComponents.ClanMembers
                                         clanId={clanData.slug}
                                         maxMembers={clanData.maxMembers}
+                                        refreshKey={membersRefreshKey}
                                     />
                                 </div>
                             </div>
@@ -115,7 +160,16 @@ export default function ClanDetailPage({ params }: { params: Promise<{ slug: str
 
                         {/* ── Chat Tab ── */}
                         {activeTab === "Chat" && (
-                            <ClanComponents.ChatSection clanData={clanData} />
+                            isMember ? (
+                                <ClanComponents.ChatSection clanData={clanData} />
+                            ) : (
+                                <div className="bg-white/60 backdrop-blur-sm rounded-2xl border border-white/70 shadow-sm p-10 flex flex-col items-center justify-center text-center">
+                                    <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                                        <span className="text-2xl">🔒</span>
+                                    </div>
+                                    <p className="text-gray-600 font-medium">Only clan members can have conversation with each other</p>
+                                </div>
+                            )
                         )}
 
                     </div>

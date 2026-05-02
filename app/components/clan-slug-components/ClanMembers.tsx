@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { ClanMember } from "@/app/lib/clan-service/clanMembers";
 import { getClanMembers } from "@/app/lib/clan-service/clanMembers";
 import RoleBadge from "./RoleBadge";
@@ -10,9 +11,10 @@ import { SearchIcon } from "./icons";
 interface ClanMembersProps {
     clanId: string;
     maxMembers: number;
+    refreshKey?: number;
 }
 
-const ClanMembers = ({ clanId, maxMembers }: ClanMembersProps) => {
+const ClanMembers = ({ clanId, maxMembers, refreshKey }: ClanMembersProps) => {
     const [members, setMembers] = useState<ClanMember[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -25,6 +27,7 @@ const ClanMembers = ({ clanId, maxMembers }: ClanMembersProps) => {
                 setLoading(true);
                 setError(null);
                 const response = await getClanMembers(clanId);
+                console.log("Fetched members:", response);
                 setMembers(response.members);
             } catch (err) {
                 setError(err instanceof Error ? err.message : "Failed to fetch members");
@@ -36,7 +39,7 @@ const ClanMembers = ({ clanId, maxMembers }: ClanMembersProps) => {
         if (clanId) {
             fetchMembers();
         }
-    }, [clanId]);
+    }, [clanId, refreshKey]);
 
     const filteredMembers = members.filter((m) => {
         const matchSearch = m.name.toLowerCase().includes(memberSearch.toLowerCase());
@@ -94,9 +97,10 @@ const ClanMembers = ({ clanId, maxMembers }: ClanMembersProps) => {
                         <p className="text-gray-500 text-sm text-center py-4">No members found</p>
                     ) : (
                         filteredMembers.map((member) => (
-                            <div
+                            <Link
                                 key={member.id}
-                                className="flex items-center gap-3 py-2 border-b border-gray-100/80 last:border-0"
+                                href={`/profile/${member.wallet_address}`}
+                                className="flex items-center gap-3 py-2 border-b border-gray-100/80 last:border-0 hover:bg-gray-50/50 transition-colors duration-200 rounded-lg"
                             >
                                 <div className="w-9 h-9 rounded-full overflow-hidden bg-gray-200 flex-shrink-0 border border-white shadow-sm">
                                     <Image
@@ -117,7 +121,7 @@ const ClanMembers = ({ clanId, maxMembers }: ClanMembersProps) => {
                                     <span className="text-sm font-bold text-gray-900">{member.rektPoints}</span>
                                     <span className="text-[10px] text-gray-400">REKT Points</span>
                                 </div>
-                            </div>
+                            </Link>
                         ))
                     )}
                 </div>

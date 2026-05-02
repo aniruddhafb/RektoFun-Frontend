@@ -9,6 +9,7 @@ export interface ClanMessage {
     id: string;
     clan_id: string;
     sender_id: string;
+    sender_walletAddress: string | null;
     message: string;
     created_at: string;
     sender_username: string | null;

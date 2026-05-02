@@ -216,6 +216,7 @@ export async function transformClanToClanData(clan: Clan, index: number = 0): Pr
     // Fetch leader profile data
     let leaderName = clan.clan_leader;
     let leaderAvatar = "/scribbles/btc.png"; // Default avatar
+    let leaderWallet = ""; // Initialize as empty
 
     try {
         const leaderResponse = await fetch(`${API_BASE_URL}/users/${encodeURIComponent(clan.clan_leader)}`, {
@@ -229,6 +230,7 @@ export async function transformClanToClanData(clan: Clan, index: number = 0): Pr
             const leaderData = await leaderResponse.json();
             leaderName = leaderData.username || clan.clan_leader;
             leaderAvatar = leaderData.profile_image || "/scribbles/btc.png";
+            leaderWallet = leaderData.wallet_address || leaderData.wallet || "";
         }
     } catch (error) {
         console.error("Failed to fetch leader profile:", error);
@@ -241,6 +243,7 @@ export async function transformClanToClanData(clan: Clan, index: number = 0): Pr
         tagline: clan.clan_description || "Elite trading clan",
         description: clan.clan_description || "Join us to trade and win together!",
         leader: leaderName,
+        leaderWallet: leaderWallet,
         leaderAvatar: leaderAvatar,
         logo: clan.clan_image || "/scribbles/coins.png", // Default logo
         type: clan.clan_status === "public" ? "Public" : "Invite Only",

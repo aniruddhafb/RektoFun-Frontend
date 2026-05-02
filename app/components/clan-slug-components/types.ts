@@ -52,6 +52,7 @@ export interface ClanData {
     tagline: string;
     description: string;
     leader: string;
+    leaderWallet: string;
     leaderAvatar: string;
     logo: string;
     type: "Public" | "Invite Only";
@@ -73,6 +74,7 @@ export const clanData: ClanData = {
     tagline: "Trade smart. Win together.",
     description: "Always stay one step ahead of the market.",
     leader: "LionKing",
+    leaderWallet: "fake-wallet-address-123",
     leaderAvatar: "/profiles/1.svg",
     logo: "/scribbles/coins.png",
     type: "Public",

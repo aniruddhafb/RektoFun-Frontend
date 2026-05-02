@@ -28,9 +28,10 @@ interface ClanHeaderProps {
     clanData: ClanData;
     onClanMembershipChange?: (newMemberCount: number) => void;
     onClanDataUpdate?: () => void;
+    onMembershipStatusChange?: (isMember: boolean) => void;
 }
 
-const ClanHeader = ({ clanData, onClanMembershipChange, onClanDataUpdate }: ClanHeaderProps) => {
+const ClanHeader = ({ clanData, onClanMembershipChange, onClanDataUpdate, onMembershipStatusChange }: ClanHeaderProps) => {
     const { publicKey } = useSolanaWallet();
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -200,6 +201,7 @@ const ClanHeader = ({ clanData, onClanMembershipChange, onClanDataUpdate }: Clan
                 setIsMember(true);
                 // Notify parent component about membership change
                 onClanMembershipChange?.(clanData.members + 1);
+                onMembershipStatusChange?.(true);
             }
         } catch (err) {
             setError(err instanceof Error ? err.message : "Failed to join clan");
@@ -230,6 +232,7 @@ const ClanHeader = ({ clanData, onClanMembershipChange, onClanDataUpdate }: Clan
                 setIsMember(false);
                 // Notify parent component about membership change
                 onClanMembershipChange?.(clanData.members - 1);
+                onMembershipStatusChange?.(false);
             }
         } catch (err) {
             setError(err instanceof Error ? err.message : "Failed to leave clan");
@@ -251,7 +254,20 @@ const ClanHeader = ({ clanData, onClanMembershipChange, onClanDataUpdate }: Clan
                     <span className="hidden sm:inline">Back to Clans</span>
                 </Link>
                 <button
-                    className="group flex items-center gap-2 px-4 py-2.5 bg-white/70 hover:bg-white/90 border border-gray-200/60 hover:border-gray-300/80 rounded-xl text-sm font-semibold text-gray-700 transition-all duration-300 shadow-sm hover:shadow-md"
+                    onClick={() => {
+                        const shareUrl = window.location.href;
+                        if (navigator.share) {
+                            navigator.share({
+                                title: `Join ${clanData.name}`,
+                                text: `Check out ${clanData.name} on RektoFun!`,
+                                url: shareUrl,
+                            }).catch(() => console.log('Error sharing'));
+                        } else {
+                            navigator.clipboard.writeText(shareUrl);
+                            alert('Clan link copied to clipboard!');
+                        }
+                    }}
+                    className="cursor-pointer group flex items-center gap-2 px-4 py-2.5 bg-white/70 hover:bg-white/90 border border-gray-200/60 hover:border-gray-300/80 rounded-xl text-sm font-semibold text-gray-700 transition-all duration-300 shadow-sm hover:shadow-md"
                     aria-label="Share Clan"
                 >
                     <ShareIcon className="w-4 h-4 group-hover:scale-110 transition-transform duration-300" />
@@ -308,7 +324,11 @@ const ClanHeader = ({ clanData, onClanMembershipChange, onClanDataUpdate }: Clan
 
                         {/* Leader & Members */}
                         <div className="flex flex-wrap items-center justify-center xl:justify-start gap-4 mt-4">
-                            <div className="flex items-center gap-2.5 px-3 py-1.5 bg-orange-50/60 rounded-xl border border-orange-100/60 backdrop-blur-sm">
+                            {/* leader option  */}
+                            <Link
+                                href={`/profile/${clanData.leaderWallet}`}
+                                className="flex items-center gap-2.5 px-3 py-1.5 bg-orange-50/60 rounded-xl border border-orange-100/60 backdrop-blur-sm hover:bg-orange-100/80 transition-colors duration-300"
+                            >
                                 <div className="w-6 h-6 rounded-full overflow-hidden bg-gray-200 flex-shrink-0 ring-2 ring-orange-200/50">
                                     <Image
                                         src={clanData.leaderAvatar}
@@ -320,8 +340,8 @@ const ClanHeader = ({ clanData, onClanMembershipChange, onClanDataUpdate }: Clan
                                 </div>
                                 <span className="text-sm font-bold text-orange-600">{clanData.leader}</span>
                                 <span className="text-xs text-gray-400 font-medium">Leader</span>
-                            </div>
-
+                            </Link>
+                            {/* member option  */}
                             <div className="flex items-center gap-2 text-sm text-gray-600">
                                 <div className="flex -space-x-2">
                                 </div>

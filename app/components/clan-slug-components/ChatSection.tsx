@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { MessageCircle, Send, Loader2 } from "lucide-react";
 import { ClanData } from "./types";
 import { ClanMessage, getClanMessages, createClanMessage } from "@/app/lib/clan-service/clanMessages";
@@ -222,7 +223,10 @@ const ChatSection = ({ clanData }: ChatSectionProps) => {
                                             key={msg.id}
                                             className={`flex gap-2 ${isOwnMessage ? "flex-row-reverse" : ""}`}
                                         >
-                                            <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-200 flex-shrink-0">
+                                            <Link
+                                                href={`/profile/${msg.sender_walletAddress}`}
+                                                className="w-8 h-8 rounded-full overflow-hidden bg-gray-200 flex-shrink-0 hover:ring-2 ring-gray-300 transition-all"
+                                            >
                                                 <Image
                                                     src={msg.sender_avatar || "/profiles/1.svg"}
                                                     alt={msg.sender_username || "User"}
@@ -230,12 +234,15 @@ const ChatSection = ({ clanData }: ChatSectionProps) => {
                                                     height={32}
                                                     className="w-full h-full object-cover"
                                                 />
-                                            </div>
+                                            </Link>
                                             <div className={`max-w-[75%] ${isOwnMessage ? "items-end" : ""}`}>
                                                 <div className="flex items-center gap-2 mb-0.5">
-                                                    <span className={`text-xs font-medium ${isOwnMessage ? "text-gray-500" : "text-gray-700"}`}>
+                                                    <Link
+                                                        href={`/profile/${msg.sender_walletAddress}`}
+                                                        className={`text-xs font-medium hover:underline ${isOwnMessage ? "text-gray-500" : "text-gray-700"}`}
+                                                    >
                                                         {msg.sender_username || "Anonymous"}
-                                                    </span>
+                                                    </Link>
                                                     <span className="text-xs text-gray-400">{formatTime(msg.created_at)}</span>
                                                 </div>
                                                 <div

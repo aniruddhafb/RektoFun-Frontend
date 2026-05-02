@@ -57,26 +57,26 @@ export default function Navbar() {
     const username = getUsername();
 
     // Fetch user profile data when authenticated
+    const fetchUserProfileData = async () => {
+        if (!authenticated || !publicKey) {
+            setUserProfileData(null);
+            return;
+        }
+
+        try {
+            const walletAddress = publicKey.toBase58();
+            const userData = await getUserByWallet(walletAddress);
+            setUserProfileData({
+                username: userData.username,
+                profileImage: userData.profile_image,
+            });
+        } catch (error) {
+            console.log('[Navbar] Could not fetch user profile data:', error);
+            setUserProfileData(null);
+        }
+    };
+
     useEffect(() => {
-        const fetchUserProfileData = async () => {
-            if (!authenticated || !publicKey) {
-                setUserProfileData(null);
-                return;
-            }
-
-            try {
-                const walletAddress = publicKey.toBase58();
-                const userData = await getUserByWallet(walletAddress);
-                setUserProfileData({
-                    username: userData.username,
-                    profileImage: userData.profile_image,
-                });
-            } catch (error) {
-                console.log('[Navbar] Could not fetch user profile data:', error);
-                setUserProfileData(null);
-            }
-        };
-
         fetchUserProfileData();
     }, [authenticated, publicKey]);
 
@@ -119,6 +119,7 @@ export default function Navbar() {
             console.error('[Navbar] Failed to update profile:', error);
         }
 
+        await fetchUserProfileData();
         setIsProfileModalOpen(false);
     };
 
@@ -188,6 +189,7 @@ export default function Navbar() {
                 console.error('[Navbar] createUser error:', error);
             } finally {
                 setHasCalledCreateUser(true);
+                await fetchUserProfileData();
             }
         };
 

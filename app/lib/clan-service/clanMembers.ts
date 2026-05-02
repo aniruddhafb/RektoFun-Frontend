@@ -7,6 +7,7 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 export interface ClanMember {
     id: string;
+    wallet_address: string;
     name: string;
     avatar: string;
     role: "Leader" | "Member";
@@ -20,6 +21,7 @@ export interface ClanMembersResponse {
 
 interface BackendClanMember {
     id: string;
+    wallet_address: string | null;
     username: string | null;
     profile_image: string | null;
     earnings: number | null;
@@ -53,6 +55,7 @@ export async function getClanMembers(clanId: string): Promise<ClanMembersRespons
         // Transform backend response to frontend format
         const members: ClanMember[] = data.members.map((member) => ({
             id: member.id,
+            wallet_address: member.wallet_address || "",
             name: member.username || "Unknown",
             avatar: member.profile_image || "/profiles/1.svg",
             role: member.role,
