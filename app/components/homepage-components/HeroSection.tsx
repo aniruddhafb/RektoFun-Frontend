@@ -105,7 +105,7 @@ export function HeroSection() {
                 </h1>
 
                 <p className="text-lg lg:text-xl text-gray-800 mb-10 max-w-xl mx-auto">
-                    The first PvP battleground for price predictions
+                    The first PvP battleground for predictions
                     <br />
                     Prediction Markets 2.0 {"\u{1FA84}"}
                 </p>
