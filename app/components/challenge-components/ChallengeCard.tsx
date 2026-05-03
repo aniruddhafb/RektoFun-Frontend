@@ -1,19 +1,77 @@
 "use client";
 
+import React from "react";
 import Image from "next/image";
-import { Challenge, coins } from "./challengesData";
+import { ChallengeListItem, joinChallenge } from "@/app/lib/challenges-service/challenges";
 
 interface ChallengeCardProps {
-    challenge: Challenge;
-    onClick?: (challenge: Challenge) => void;
-    onRekt?: (challenge: Challenge) => void;
+    challenge: ChallengeListItem;
+    onClick?: (challenge: ChallengeListItem) => void;
+    onRekt?: (challenge: ChallengeListItem) => void;
+    ownerAddress?: string;
+}
+
+// Helper types for metadata structure
+interface UIMetadata {
+    title?: string;
+    subtitle?: string;
+}
+
+interface AssetMetadata {
+    symbol?: string;
+    name?: string;
+    icon?: string;
+}
+
+interface BetMetadata {
+    amount?: number;
+    currency?: string;
+    display?: string;
+}
+
+interface ModeMetadata {
+    type?: "pvp" | "multi";
+    display?: string;
+}
+
+interface LabelsMetadata {
+    creator?: string;
+    opponent?: string;
+    yes?: string;
+    no?: string;
+}
+
+interface PoolMetadata {
+    currency?: string;
+    display?: string;
+}
+
+// Helper types for resolution_details
+interface ResolutionDetails {
+    source?: string;
+    metric?: string;
+    condition?: {
+        operator?: string;
+        value?: number;
+    };
+    target?: {
+        type?: string;
+        identifier?: string;
+    };
+    resolution?: {
+        mode?: string;
+        resolve_at?: string;
+    };
 }
 
 export function ChallengeCard({
     challenge,
     onClick,
     onRekt,
+    ownerAddress
 }: ChallengeCardProps) {
+    const [isLoading, setIsLoading] = React.useState(false);
+
     const handleClick = () => {
         if (onClick) {
             onClick(challenge);
@@ -22,14 +80,84 @@ export function ChallengeCard({
         }
     };
 
-    const isAccepted = challenge.status === "accepted" || challenge.status === "closed";
-    const hasWon = challenge.status === "closed" && (challenge as any).result?.winner === challenge.creator_wallet;
-    const hasLost = challenge.status === "closed" && (challenge as any).result?.winner !== challenge.creator_wallet;
+    const handleJoinChallenge = async (e: React.MouseEvent) => {
+        e.stopPropagation();
+        try {
+            setIsLoading(true);
+            await joinChallenge({
+                challenge_id: challenge.id,
+                user_id: ownerAddress || "unknown",
+                side: "opponent",
+                bet_amount: challenge.initial_bet,
+            });
+            if (onRekt) onRekt(challenge);
+        } catch (error) {
+            console.error("Failed to join challenge:", error);
+            alert("Failed to join challenge. Please try again.");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    // ChallengeListItem doesn't have metadata or resolution_details in the same way as Challenge
+    // We use the flattened properties provided by ChallengeListItem
+    const uiMeta: UIMetadata = {};
+    const assetMeta: AssetMetadata = {
+        name: challenge.market.name,
+        icon: challenge.market.icon,
+    };
+    const betMeta: BetMetadata = {
+        amount: challenge.initial_bet,
+        currency: "SOL", // Defaulting to SOL as per original code
+    };
+    const modeMeta: ModeMetadata = {
+        type: challenge.mode === "pool" ? "multi" : "pvp",
+        display: challenge.mode === "pool" ? "Pool Mode" : "PVP Mode",
+    };
+    const labelsMeta: LabelsMetadata = {
+        creator: challenge.creator.username,
+    };
+    const poolMeta: PoolMetadata = {
+        display: `$${challenge.total_pool} SOL`,
+    };
+
+    // Resolution details are not present in ChallengeListItem, using empty object
+    const resolutionDetails: ResolutionDetails = {};
+
+    // Determine mode: pvp or multi (mapped from pvp/pool)
+    const challengeMode: "pvp" | "multi" = modeMeta.type || "pvp";
+
+    // Helper values derived from metadata
+    const isAccepted = challenge.status === "locked" || challenge.status === "resolved";
     
-    const assetInfo = coins[challenge.asset];
-    const timeRemaining = challenge.expires_at
-        ? `${Math.floor((challenge.expires_at - Date.now()) / 60000)}m`
+    // ChallengeListItem doesn't have created_by, but we can check result if available
+    // Since we don't have created_by in ChallengeListItem, we might need to adjust this logic
+    // For now, let's assume we can't determine win/loss without the creator's ID
+    const hasWon = challenge.status === "resolved" && challenge.result && (challenge.result as Record<string, unknown>).winner === "current_user_id"; // Placeholder
+    const hasLost = challenge.status === "resolved" && challenge.result && (challenge.result as Record<string, unknown>).winner !== "current_user_id"; // Placeholder
+
+    // Get asset info
+    const assetSymbol = assetMeta.symbol || challenge.market.name || "BTC";
+    const assetIcon = assetMeta.icon || "/scribbles/btc.png";
+    const assetName = assetMeta.name || assetSymbol;
+
+    // Get title
+    const title = uiMeta.title || challenge.title || `Bet on ${assetSymbol}`;
+
+    // Get bet amount
+    const betAmount = betMeta.amount || 0;
+    const betCurrency = betMeta.currency || "SOL";
+
+    // Get pool display
+    const poolDisplay = poolMeta.display || "$0 SOL";
+
+    // Calculate time remaining from expire_time
+    const timeRemaining = challenge.expire_time
+        ? `${Math.floor((new Date(challenge.expire_time).getTime() - Date.now()) / 60000)}m`
         : "N/A";
+
+    // Get resolution condition value for display
+    const conditionValue = resolutionDetails.condition?.value;
 
     return (
         <div
@@ -41,8 +169,8 @@ export function ChallengeCard({
                 <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center overflow-hidden">
                         <Image
-                            src={challenge.assetLogo}
-                            alt={challenge.asset}
+                            src={assetIcon}
+                            alt={assetName}
                             width={32}
                             height={32}
                             className="w-8 h-8 object-contain"
@@ -50,19 +178,19 @@ export function ChallengeCard({
                     </div>
                     <div>
                         <h3 className="font-semibold text-gray-900 text-base leading-tight">
-                            {challenge.title}
+                            {title}
                         </h3>
                         <div className="flex items-center gap-2 mt-0.5">
                             <div className="w-4 h-4 rounded-full bg-gray-200 overflow-hidden">
                                 <Image
-                                    src={challenge.creator.avatar}
-                                    alt={challenge.creator.name}
+                                    src={assetIcon}
+                                    alt={assetName}
                                     width={16}
                                     height={16}
                                     className="w-full h-full object-cover"
                                 />
                             </div>
-                            <span className="text-sm text-gray-600">{challenge.creator.name}</span>
+                            <span className="text-sm text-gray-600">{labelsMeta.creator || "Creator"}</span>
                         </div>
                     </div>
                 </div>
@@ -80,15 +208,15 @@ export function ChallengeCard({
             {/* Challenge Mode Info */}
             <div className="group relative flex items-center justify-center gap-2 mb-4">
                 <h2 className="text-sm font-medium text-black">
-                    {challenge.mode === "pvp" ? "PVP Mode" : "Multi Mode"}
+                    {modeMeta.display || (challengeMode === "pvp" ? "PVP Mode" : "Multi Mode")}
                 </h2>
                 <svg className="w-4 h-4 text-black cursor-help ml-[-4px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 text-center">
-                    {challenge.mode === "pvp"
+                    {challengeMode === "pvp"
                         ? "The creator has set this challenge to PVP mode, meaning it's a 1v1 challenge only."
-                        : "The creator has set this challenge to multi mode, meaning multiple people can join."}
+                        : "The creator has set this challenge to pool mode, meaning multiple people can join."}
                     <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
                 </div>
             </div>
@@ -115,27 +243,21 @@ export function ChallengeCard({
                             <div className={`w-14 h-14 rounded-full overflow-hidden border-2 ${hasWon ? "border-amber-400" : "border-[#d4a574]"
                                 } shadow-md`}>
                                 <Image
-                                    src={challenge.creator.avatar}
-                                    alt={challenge.creator.name}
+                                    src={assetIcon}
+                                    alt={assetName}
                                     width={56}
                                     height={56}
                                     className="w-full h-full object-cover"
                                 />
                             </div>
-                            {/* Count Badge */}
-                            {challenge.mode === "multi" && challenge.challengerCount > 1 && (
-                                <div className="absolute top-1 right-1 w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center border-2 border-white">
-                                    <span className="text-[9px] font-bold text-white">+{challenge.challengerCount - 1}</span>
-                                </div>
-                            )}
                             {/* Label */}
                             <div className="mt-1 px-1.5 py-0.5 bg-[#2d1f1a] text-white text-[9px] font-bold rounded-full">
-                                {challenge.mode === "multi" ? "CHALLENGERS" : "CHALLENGER"}
+                                {challengeMode === "multi" ? "CHALLENGERS" : "CHALLENGER"}
                             </div>
 
                             {/* Info */}
                             <div className="mt-2 text-center">
-                                <p className="font-bold text-[#2d1f1a] text-xs">{challenge.creator.name}</p>
+                                <p className="font-bold text-[#2d1f1a] text-xs">{assetSymbol}</p>
                                 <p className="text-[10px] text-[#8b7355] mt-0.5">
                                     {hasWon ? "Won!" : hasLost ? "Lost" : "Created"}
                                 </p>
@@ -163,12 +285,12 @@ export function ChallengeCard({
                                         </div>
                                     </div>
                                 </div>
-                                <p className="text-sm font-bold text-emerald-600">${challenge.totalPool}</p>
+                                <p className="text-sm font-bold text-emerald-600">{poolDisplay}</p>
                             </div>
                             {hasWon || hasLost ? (
                                 <div className="mt-1 text-center">
                                     <p className={`text-lg font-black ${hasWon ? "text-amber-500" : "text-red-500"}`}>
-                                        {hasWon ? "+" : "-"}${challenge.betAmount}
+                                        {hasWon ? "+" : "-"}{betAmount} {betCurrency}
                                     </p>
                                 </div>
                             ) : null}
@@ -176,7 +298,7 @@ export function ChallengeCard({
                     </div>
 
                     {/* Defender Profile */}
-                    {isAccepted && challenge.accepter ? (
+                    {isAccepted && challenge.opponent_info ? (
                         <div className="relative group flex flex-col items-center">
                             <div className={`w-[120px] h-[140px] flex flex-col items-center justify-center p-3 rounded-xl transition-all duration-300 ${hasLost
                                 ? "bg-gradient-to-br from-amber-100 to-yellow-50 border-2 border-amber-400"
@@ -195,27 +317,27 @@ export function ChallengeCard({
                                 <div className={`w-14 h-14 rounded-full overflow-hidden border-2 ${hasLost ? "border-amber-400" : "border-[#d4a574]"
                                     } shadow-md`}>
                                     <Image
-                                        src={challenge.accepter.avatar}
-                                        alt={challenge.accepter.name}
+                                        src={challenge.opponent_info.profile_image}
+                                        alt={challenge.opponent_info.username}
                                         width={56}
                                         height={56}
                                         className="w-full h-full object-cover"
                                     />
                                 </div>
                                 {/* Count Badge */}
-                                {challenge.mode === "multi" && challenge.defenderCount > 1 && (
+                                {challenge.mode === "multi" && (challenge.total_opponents ?? 0) > 1 && (
                                     <div className="absolute top-1 right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center border-2 border-white">
-                                        <span className="text-[9px] font-bold text-white">+{challenge.defenderCount - 1}</span>
+                                        <span className="text-[9px] font-bold text-white">+{ (challenge.total_opponents ?? 0) - 1}</span>
                                     </div>
                                 )}
                                 {/* Label */}
                                 <div className="mt-1 px-1.5 py-0.5 bg-[#2d1f1a] text-white text-[9px] font-bold rounded-full">
-                                    {challenge.mode === "multi" ? "DEFENDERS" : "DEFENDER"}
+                                    {challenge.mode === "pool" ? "POOL" : "DEFENDER"}
                                 </div>
 
                                 {/* Info */}
                                 <div className="mt-2 text-center">
-                                    <p className="font-bold text-[#2d1f1a] text-xs">{challenge.accepter.name}</p>
+                                    <p className="font-bold text-[#2d1f1a] text-xs">{challenge.opponent_info.username}</p>
                                     <p className="text-[10px] text-[#8b7355] mt-0.5">
                                         {hasLost ? "Won!" : hasWon ? "Lost" : "Defending"}
                                     </p>
@@ -241,29 +363,25 @@ export function ChallengeCard({
 
             {/* CTA Button */}
             <div className="flex gap-2">
-                {challenge.mode === "multi" ? (
+                {challenge.mode === "pool" ? (
                     <>
                         <button
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                if (onRekt) onRekt(challenge);
-                            }}
-                            className="flex-1 py-2.5 px-4 rounded-xl bg-[#246044] hover:bg-[#2b7351] text-white font-bold text-sm shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all flex items-center justify-center gap-2"
+                            disabled={isLoading}
+                            onClick={handleJoinChallenge}
+                            className="flex-1 py-2.5 px-4 rounded-xl bg-[#246044] hover:bg-[#2b7351] text-white font-bold text-sm shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
                         >
-                            JOIN CHALLENGE
-                            <span className="text-lg">⚔️</span>
+                            {isLoading ? "JOINING..." : "JOIN CHALLENGE"}
+                            {!isLoading && <span className="text-lg">⚔️</span>}
                         </button>
                     </>
                 ) : (
                     <button
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            if (onRekt) onRekt(challenge);
-                        }}
-                        className="w-full py-2.5 px-4 rounded-xl bg-[#246044] hover:bg-[#2b7351] text-white font-bold text-base shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all flex items-center justify-center gap-2"
+                        disabled={isLoading}
+                        onClick={handleJoinChallenge}
+                        className="w-full py-2.5 px-4 rounded-xl bg-[#246044] hover:bg-[#2b7351] text-white font-bold text-base shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
                     >
-                        ACCEPT
-                        <span className="text-xl">⚔️</span>
+                        {isLoading ? "JOINING..." : "ACCEPT CHALLENGE"}
+                        {!isLoading && <span className="text-xl">⚔️</span>}
                     </button>
                 )}
             </div>
@@ -271,13 +389,13 @@ export function ChallengeCard({
             {/* Challenge Expiry */}
             <div className="flex items-center justify-center gap-1.5 text-xs text-gray-600 mt-1.5">
                 <span>Challenge expires in</span>
-                <span className="font-medium text-gray-900">{challenge.timeRemaining}</span>
+                <span className="font-medium text-gray-900">{timeRemaining}</span>
                 <div className="group relative">
                     <svg className="w-3.5 h-3.5 text-gray-400 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                     <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10">
-                        This challenge will expire in {challenge.timeRemaining}, you won't be able to join after that.
+                        This challenge will expire in {timeRemaining}, you won't be able to join after that.
                         <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
                     </div>
                 </div>
@@ -311,7 +429,7 @@ export function ChallengeCard({
                     </button>
                     {/* Eye Icon */}
                     <div className="flex items-center gap-1">
-                        <span className="font-semibold text-gray-900">{challenge.likes}</span>
+                        <span className="font-semibold text-gray-900">0</span>
                         <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />

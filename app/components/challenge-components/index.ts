@@ -7,5 +7,3 @@ export { CreateChallengeModal } from "./CreateChallengeModal";
 export { DatePickerModal } from "./DatePickerModal";
 export { DurationPickerModal } from "./DurationPickerModal";
 export { FeedbackBanner } from "./FeedbackBanner";
-export { DUMMY_CHALLENGES, coins } from "./challengesData";
-export type { Challenge } from "./challengesData";

@@ -7,7 +7,7 @@ import { FeedbackBanner } from "../components/challenge-components/FeedbackBanne
 import { ChallengeGrid } from "../components/challenge-components/ChallengeGrid";
 import { RektLoadingOverlay } from "../components/RektLoadingOverlay";
 import { CreateChallengeModal } from "../components/challenge-components/CreateChallengeModal";
-import { Challenge } from "../components/challenge-components/challengesData";
+import { ChallengeListItem} from "../lib/challenges-service/challenges";
 import ChallengeDetailModal from "../components/challenge-components/ChallengeDetailModal";
 
 export default function ChallengesPage() {
@@ -15,16 +15,16 @@ export default function ChallengesPage() {
   const [activeAsset, setActiveAsset] = useState("All Markets");
   const [searchQuery, setSearchQuery] = useState("");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [selectedChallenge, setSelectedChallenge] = useState<Challenge | null>(null);
+  const [selectedChallenge, setSelectedChallenge] = useState<ChallengeListItem | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [rektTarget, setRektTarget] = useState<Challenge | null>(null);
+  const [rektTarget, setRektTarget] = useState<ChallengeListItem | null>(null);
   const [rektTxSig, setRektTxSig] = useState<string | null>(null);
   const [rektError, setRektError] = useState<string | null>(null);
   const [isRekting, setIsRekting] = useState(false);
 
   // Handle challenge card click
-  const handleChallengeClick = (challenge: Challenge) => {
+  const handleChallengeClick = (challenge: ChallengeListItem) => {
     setSelectedChallenge(challenge);
     setIsDetailModalOpen(true);
   };
@@ -35,7 +35,7 @@ export default function ChallengesPage() {
     setTimeout(() => setSelectedChallenge(null), 300);
   };
 
-  async function handleRekt(challenge: Challenge) {
+  async function handleRekt(challenge: ChallengeListItem) {
     setRektTarget(challenge);
     setRektError(null);
     setRektTxSig(null);
@@ -68,7 +68,7 @@ export default function ChallengesPage() {
       <FeedbackBanner
         rektTxSig={rektTxSig}
         rektError={rektError}
-        targetCreator={rektTarget?.creator_wallet ? `${rektTarget.creator_wallet.slice(0, 6)}...` : null}
+        targetCreator={rektTarget?.creator.wallet_address ? `${rektTarget.creator.wallet_address.slice(0, 6)}...` : null}
       />
 
       <ChallengeGrid

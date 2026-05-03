@@ -2,12 +2,14 @@
 
 import { useState, useEffect } from 'react';
 import { ChallengeCard } from "./ChallengeCard";
-import { Challenge, mapApiChallenge } from "./challengesData";
 import { getChallenges } from "../../lib/challenges-service/challenges";
+import { useSolanaWallet } from '@/app/lib/useSolanaWallet';
+import { ChallengeListItem } from '../../lib/challenges-service/challenges';
+
 
 interface ChallengeGridProps {
-    onRekt: (challenge: Challenge) => void;
-    onClick: (challenge: Challenge) => void;
+    onRekt: (challenge: ChallengeListItem) => void;
+    onClick: (challenge: ChallengeListItem) => void;
     onOpenModal: () => void;
     isLoading?: boolean;
 }
@@ -17,16 +19,19 @@ export function ChallengeGrid({
     onClick,
     onOpenModal,
 }: ChallengeGridProps) {
-    const [challenges, setChallenges] = useState<Challenge[]>([]);
+    const [challenges, setChallenges] = useState<ChallengeListItem[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+
+    const  {publicKey} = useSolanaWallet();
+
+    let ownerAddress = publicKey?.toString() || '';
 
     useEffect(() => {
         async function fetchChallenges() {
             try {
                 const response = await getChallenges();
-                // Map API response to unified Challenge type
-                const mappedChallenges = response.challenges.map(mapApiChallenge);
-                setChallenges(mappedChallenges);
+                // Map API response to unified ChallengeListItem type
+                setChallenges(response.challenges);
             } catch (error) {
                 console.error('Failed to fetch challenges:', error);
                 setChallenges([]);
@@ -71,6 +76,7 @@ export function ChallengeGrid({
                         challenge={challenge}
                         onRekt={onRekt}
                         onClick={onClick}
+                        ownerAddress={ownerAddress}
                     />
                 ))}
             </div>
