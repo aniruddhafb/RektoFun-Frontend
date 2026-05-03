@@ -6,9 +6,29 @@ import { ShieldIcon } from "./Icons";
 
 interface ClanGridProps {
     clans: Clan[];
+    loading?: boolean;
+    error?: string | null;
 }
 
-export function ClanGrid({ clans }: ClanGridProps) {
+export function ClanGrid({ clans, loading, error }: ClanGridProps) {
+    if (loading) {
+        return (
+            <div className="flex flex-col items-center justify-center py-20 text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mb-4" />
+                <p className="text-gray-600">Loading clans...</p>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="flex flex-col items-center justify-center py-20 text-center">
+                <ShieldIcon className="w-16 h-16 text-red-400 mb-4" />
+                <h3 className="text-xl font-semibold text-red-600 mb-2">Failed to load clans</h3>
+            </div>
+        );
+    }
+
     if (clans.length === 0) {
         return (
             <div className="flex flex-col items-center justify-center py-20 text-center">

@@ -360,7 +360,11 @@ export default function MarketsPage() {
                                     </div>
                                     <div className="flex flex-col items-end">
                                         <span className="font-semibold text-gray-900">{market.totalVolume}</span>
-                                        <span>Volume</span>
+                                        <span>24H Volume</span>
+                                    </div>
+                                    <div className="flex flex-col items-end">
+                                        <span className="font-semibold text-gray-900">{market.totalVolume}</span>
+                                        <span>7D Volume</span>
                                     </div>
                                 </div>
                             </div>

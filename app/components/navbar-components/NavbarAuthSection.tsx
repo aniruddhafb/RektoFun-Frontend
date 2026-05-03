@@ -6,6 +6,7 @@ type NavbarAuthSectionProps = {
     authenticated: boolean;
     displayAddress: string;
     displayUsername: string;
+    displayProfileImage: string | null;
     usdcBalance: number | null;
     isDropdownOpen: boolean;
     onAuth: () => void;
@@ -21,6 +22,7 @@ export function NavbarAuthSection({
     authenticated,
     displayAddress,
     displayUsername,
+    displayProfileImage,
     usdcBalance,
     isDropdownOpen,
     onAuth,
@@ -33,7 +35,7 @@ export function NavbarAuthSection({
 }: NavbarAuthSectionProps) {
     const balanceDisplay = usdcBalance !== null
         ? `$${usdcBalance.toFixed(2)}`
-        : '...';
+        : '$0.00';
 
     return (
         <div className="flex items-center gap-2 sm:gap-4">
@@ -54,6 +56,7 @@ export function NavbarAuthSection({
                     <NavbarProfileDropdown
                         displayAddress={displayAddress}
                         displayUsername={displayUsername}
+                        displayProfileImage={displayProfileImage}
                         usdcBalance={usdcBalance}
                         isOpen={isDropdownOpen}
                         onClose={onCloseDropdown}

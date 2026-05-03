@@ -1,11 +1,33 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { PlusIcon, MyClansIcon } from "./Icons";
 import { CreateClanModal } from "./CreateClanModal";
+import { useSolanaWallet } from "@/app/lib/useSolanaWallet";
+import { getUserIdByWallet } from "@/app/lib/clan-service/clans";
 
 export function ClanHeader() {
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+    const { publicKey } = useSolanaWallet();
+    const [userId, setUserId] = useState<string | undefined>(undefined);
+
+    // Fetch user ID when wallet is connected
+    useEffect(() => {
+        const fetchUserId = async () => {
+            if (publicKey) {
+                try {
+                    const id = await getUserIdByWallet(publicKey.toBase58());
+                    setUserId(id);
+                } catch (error) {
+                    console.error("Failed to fetch user ID:", error);
+                    setUserId(undefined);
+                }
+            } else {
+                setUserId(undefined);
+            }
+        };
+        fetchUserId();
+    }, [publicKey]);
 
     return (
         <>
@@ -35,6 +57,10 @@ export function ClanHeader() {
             <CreateClanModal
                 isOpen={isCreateModalOpen}
                 onClose={() => setIsCreateModalOpen(false)}
+                userId={userId}
+                onClanCreated={() => {
+                    console.log("Clan created successfully, refreshing...");
+                }}
             />
         </>
     );

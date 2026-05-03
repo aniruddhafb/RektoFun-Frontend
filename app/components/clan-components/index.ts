@@ -7,3 +7,4 @@ export { ClanFilters } from "./ClanFilters";
 export { ClanGrid } from "./ClanGrid";
 export { ClanHeader } from "./ClanHeader";
 export { CreateClanModal } from "./CreateClanModal";
+export { countriesList, type Country } from "./CountriesList";

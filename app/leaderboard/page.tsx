@@ -671,7 +671,7 @@ export default function LeaderboardPage() {
 
 
                 {/* Stats Cards */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
                     {/* Challenges Created */}
                     <div className="bg-white/60 backdrop-blur-sm rounded-xl px-5 py-4 flex items-center justify-between border border-white/50 shadow-sm">
                         <div className="flex items-center gap-3">
@@ -686,13 +686,13 @@ export default function LeaderboardPage() {
                         </svg>
                     </div>
 
-                    {/* Challenges Accepted */}
+                    {/* Total Traders */}
                     <div className="bg-white/60 backdrop-blur-sm rounded-xl px-5 py-4 flex items-center justify-between border border-white/50 shadow-sm">
                         <div className="flex items-center gap-3">
                             <HandshakeIcon />
                             <div>
-                                <div className="text-xl font-bold text-gray-900">173.2K</div>
-                                <div className="text-sm text-gray-600">Challenges Accepted</div>
+                                <div className="text-xl font-bold text-gray-900">12K</div>
+                                <div className="text-sm text-gray-600">Total Traders</div>
                             </div>
                         </div>
                         <svg width="20" height="20" viewBox="0 0 20 20" fill="none" className="text-gray-400">
@@ -707,6 +707,20 @@ export default function LeaderboardPage() {
                             <div>
                                 <div className="text-xl font-bold text-gray-900">$284.9K</div>
                                 <div className="text-sm text-gray-600">Total Earned</div>
+                            </div>
+                        </div>
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" className="text-gray-400">
+                            <path d="M8 6L12 10L8 14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                    </div>
+
+                    {/* Total Volume */}
+                    <div className="bg-white/60 backdrop-blur-sm rounded-xl px-5 py-4 flex items-center justify-between border border-white/50 shadow-sm">
+                        <div className="flex items-center gap-3">
+                            <CoinsIcon />
+                            <div>
+                                <div className="text-xl font-bold text-gray-900">$12M</div>
+                                <div className="text-sm text-gray-600">Total Volume</div>
                             </div>
                         </div>
                         <svg width="20" height="20" viewBox="0 0 20 20" fill="none" className="text-gray-400">

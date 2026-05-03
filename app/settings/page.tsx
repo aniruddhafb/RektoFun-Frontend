@@ -1,8 +1,11 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { usePrivy } from "@privy-io/react-auth";
 import Image from "next/image";
+import { useSolanaWallet } from "@/app/lib/useSolanaWallet";
+import { getUserByWallet, updateUser } from "@/app/lib/users-service/users";
+
 
 const PROFILE_SVGS = Array.from({ length: 31 }, (_, i) => `/profiles/${i + 1}.svg`);
 
@@ -10,17 +13,53 @@ export default function SettingsPage() {
     const { user, authenticated, logout, login, linkWallet, linkTwitter, linkGoogle } = usePrivy();
 
     // Profile state
-    const [username, setUsername] = useState(user?.email?.address?.split('@')[0] || "trader_123");
-    const [description, setDescription] = useState("Crypto enthusiast | DeFi degen | Prediction markets warrior 🚀");
+    const [username, setUsername] = useState("");
+    const [description, setDescription] = useState("");
     const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
     const [editProfileIndex, setEditProfileIndex] = useState(0);
     const [isEditingProfile, setIsEditingProfile] = useState(false);
     const [showExportModal, setShowExportModal] = useState(false);
     const [copiedAddress, setCopiedAddress] = useState(false);
+    const [showSuccessMessage, setShowSuccessMessage] = useState(false);
+    const [saveError, setSaveError] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const [isLoadingProfile, setIsLoadingProfile] = useState(true);
+    const [isSavingProfile, setIsSavingProfile] = useState(false);
+
+    const { publicKey } = useSolanaWallet();
+    const walletAddress = publicKey?.toBase58() ?? null;
+
+    // Fetch user data on mount
+    useEffect(() => {
+        const fetchUserData = async () => {
+            if (!authenticated || !publicKey) {
+                setIsLoadingProfile(false);
+                return;
+            }
+
+            try {
+                const walletAddress = publicKey.toBase58();
+                const userData = await getUserByWallet(walletAddress);
+                setUsername(userData.username || "");
+                setDescription(userData.description || "");
+                if (userData.profile_image) {
+                    const profileMatch = userData.profile_image.match(/profiles\/(\d+)\.svg/);
+                    if (profileMatch) {
+                        setEditProfileIndex(parseInt(profileMatch[1]) - 1);
+                    }
+                }
+            } catch (error) {
+                console.log('[Settings] Could not fetch user data:', error);
+            } finally {
+                setIsLoadingProfile(false);
+            }
+        };
+
+        fetchUserData();
+    }, [authenticated, publicKey]);
 
     // Get wallet address
-    const walletAddress = user?.wallet?.address || null;
+    // const walletAddress = user?.wallet?.address || null;
     const displayAddress = walletAddress
         ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`
         : "Not connected";
@@ -61,10 +100,32 @@ export default function SettingsPage() {
     };
 
     // Save profile changes
-    const saveProfile = () => {
-        // TODO: Implement API call to save profile (username, description, profileIndex)
-        console.log("Saving profile:", { username, description, profileIndex: editProfileIndex });
-        setIsEditingProfile(false);
+    const saveProfile = async () => {
+        if (!publicKey) return;
+
+        setSaveError(null);
+        setIsSavingProfile(true);
+        try {
+            const walletAddress = publicKey.toBase58();
+            const existingUser = await getUserByWallet(walletAddress);
+            const profileIndex = editProfileIndex + 1;
+
+            await updateUser(existingUser.id, {
+                username: username,
+                description: description,
+                profile_image: `https://earningrecords.com/assets/profiles/${profileIndex}.svg`,
+            });
+            console.log('[Settings] Profile saved successfully');
+            setIsEditingProfile(false);
+            setShowSuccessMessage(true);
+            setTimeout(() => setShowSuccessMessage(false), 3000);
+        } catch (error) {
+            console.error('[Settings] Failed to save profile:', error);
+            const errorMessage = 'Failed to save profile, username already exists!!';
+            setSaveError(errorMessage);
+        } finally {
+            setIsSavingProfile(false);
+        }
     };
 
     // Randomize profile function
@@ -133,7 +194,7 @@ export default function SettingsPage() {
                                         />
                                     )}
                                 </div>
-                                <button
+                                {/* <button
                                     onClick={() => fileInputRef.current?.click()}
                                     className="absolute -bottom-1 -right-1 w-8 h-8 bg-black text-white rounded-full flex items-center justify-center hover:bg-gray-800 transition-colors shadow-md cursor-pointer"
                                 >
@@ -148,9 +209,9 @@ export default function SettingsPage() {
                                     accept="image/*"
                                     onChange={handlePhotoUpload}
                                     className="hidden"
-                                />
+                                /> */}
                             </div>
-                            <p className="text-xs text-gray-500 mt-2">Click to upload image</p>
+                            {/* <p className="text-xs text-gray-500 mt-2">Click to upload image</p> */}
                         </div>
 
                         {/* Profile Editor */}
@@ -171,20 +232,33 @@ export default function SettingsPage() {
 
                             {/* Username Field */}
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Username</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Username*</label>
                                 <input
+                                    maxLength={18}
                                     type="text"
                                     value={username}
-                                    onChange={(e) => setUsername(e.target.value)}
-                                    className="w-full px-4 py-2 bg-white/80 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-black/20 focus:border-transparent"
+                                    onChange={(e) => {
+                                        setUsername(e.target.value);
+                                        if (saveError) setSaveError(null);
+                                    }}
+                                    className={`w-full px-4 py-2 bg-white/80 border rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-black/20 focus:border-transparent ${saveError ? 'border-red-300' : 'border-gray-300'}`}
                                     placeholder="Enter username"
                                 />
+                                {saveError && (
+                                    <div className="flex items-center gap-2 mt-2 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm font-medium">
+                                        <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        {saveError}
+                                    </div>
+                                )}
                             </div>
 
                             {/* Bio Field */}
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Bio</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Bio*</label>
                                 <textarea
+                                    maxLength={100}
                                     value={description}
                                     onChange={(e) => setDescription(e.target.value)}
                                     rows={2}
@@ -196,81 +270,32 @@ export default function SettingsPage() {
                             {/* Save Button */}
                             <button
                                 onClick={saveProfile}
-                                className="w-full px-4 py-2 bg-black text-white rounded-xl hover:bg-gray-800 transition-colors cursor-pointer font-medium"
+                                disabled={isSavingProfile}
+                                className="w-full px-4 py-2 bg-black text-white rounded-xl hover:bg-gray-800 transition-colors cursor-pointer font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                                Save Changes
+                                {isSavingProfile ? (
+                                    <span className="flex items-center justify-center gap-2">
+                                        <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                        </svg>
+                                        Saving...
+                                    </span>
+                                ) : (
+                                    "Save Changes"
+                                )}
                             </button>
-                        </div>
-                    </div>
-                </section>
 
-                {/* Wallet Section */}
-                <section className="bg-white/60 backdrop-blur-sm rounded-2xl border border-gray-300/50 p-6 mb-6">
-                    <div className="flex items-center gap-2 mb-6">
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-orange-500 to-yellow-500 flex items-center justify-center">
-                            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
-                            </svg>
-                        </div>
-                        <h2 className="text-xl font-semibold text-gray-900">Wallet</h2>
-                    </div>
-
-                    <div className="space-y-4">
-                        {/* Wallet Address Display */}
-                        <div className="bg-white/70 border border-gray-300 rounded-xl p-4">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Connected Wallet Address</label>
-                            <div className="flex items-center gap-3">
-                                <div className="flex-1 px-4 py-3 bg-white/80 rounded-xl border border-gray-300/50">
-                                    <code className="text-sm font-mono text-gray-800">{displayAddress}</code>
+                            {/* Success Message */}
+                            {showSuccessMessage && (
+                                <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-xl text-green-700 text-sm font-medium">
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                    </svg>
+                                    Changes saved successfully!
                                 </div>
-                                <button
-                                    onClick={copyAddress}
-                                    className="px-4 py-3 bg-black text-white rounded-xl hover:bg-gray-800 transition-colors cursor-pointer flex items-center gap-2"
-                                >
-                                    {copiedAddress ? (
-                                        <>
-                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                            </svg>
-                                            <span className="hidden sm:inline">Copied!</span>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                                            </svg>
-                                            <span className="hidden sm:inline">Copy</span>
-                                        </>
-                                    )}
-                                </button>
-                            </div>
+                            )}
                         </div>
-
-                        {/* Link Wallet Button */}
-                        {!linkedWallet && (
-                            <button
-                                onClick={() => linkWallet()}
-                                className="w-full py-3 px-4 bg-[#1e2939] text-white font-medium rounded-xl hover:bg-[#2d3748] transition-all cursor-pointer flex items-center justify-center gap-2"
-                            >
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                                </svg>
-                                Link Crypto Wallet
-                            </button>
-                        )}
-
-                        {/* Export Privy Wallet */}
-                        {authenticated && (
-                            <button
-                                onClick={() => setShowExportModal(true)}
-                                className="w-full py-3 px-4 bg-white border-2 border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50 hover:border-gray-400 transition-all cursor-pointer flex items-center justify-center gap-2"
-                            >
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                                </svg>
-                                Export Privy Wallet
-                            </button>
-                        )}
                     </div>
                 </section>
 

@@ -2,11 +2,11 @@
 
 import { useState, useEffect } from "react";
 import { usePrivy } from "@privy-io/react-auth";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { DepositModal } from "./DepositModal";
 import { useSolanaWallet } from "@/app/lib/useSolanaWallet";
 import * as components from "./navbar-components";
-import { createUser } from "@/app/lib/users-service/users";
+import { createUser, updateUser, getUserByWallet, acceptReferral } from "@/app/lib/users-service/users";
 
 export default function Navbar() {
     const { login, authenticated, user, logout, ready } = usePrivy();
@@ -16,11 +16,18 @@ export default function Navbar() {
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
     const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+    const [isNewUser, setIsNewUser] = useState(false);
     const [editUsername, setEditUsername] = useState("");
+    const [editBio, setEditBio] = useState("");
     const [editProfileIndex, setEditProfileIndex] = useState(0);
     const [editInviteCode, setEditInviteCode] = useState("");
     const [hasCalledCreateUser, setHasCalledCreateUser] = useState(false);
+    const [userProfileData, setUserProfileData] = useState<{ username: string; profileImage: string } | null>(null);
     const pathname = usePathname();
+
+    // Get invite code from URL
+    const searchParams = useSearchParams();
+    const inviteCodeFromUrl = searchParams?.get("ref") || "";
 
     const handleAuth = () => {
         console.log('[Navbar] handleAuth called - login() invoked');
@@ -41,6 +48,7 @@ export default function Navbar() {
     const getUsername = () => {
         if (!publicKey) return null;
         return (
+            userProfileData?.username ||
             displayAddress ||
             "User"
         );
@@ -48,25 +56,101 @@ export default function Navbar() {
 
     const username = getUsername();
 
+    // Fetch user profile data when authenticated
+    const fetchUserProfileData = async () => {
+        if (!authenticated || !publicKey) {
+            setUserProfileData(null);
+            return;
+        }
+
+        try {
+            const walletAddress = publicKey.toBase58();
+            const userData = await getUserByWallet(walletAddress);
+            setUserProfileData({
+                username: userData.username,
+                profileImage: userData.profile_image,
+            });
+        } catch (error) {
+            console.log('[Navbar] Could not fetch user profile data:', error);
+            setUserProfileData(null);
+        }
+    };
+
+    useEffect(() => {
+        fetchUserProfileData();
+    }, [authenticated, publicKey]);
+
     // Randomize profile function
     const randomizeProfile = () => {
         const randomIndex = Math.floor(Math.random() * 31);
         setEditProfileIndex(randomIndex);
     };
 
-    // Initialize edit values when modal opens
-    useEffect(() => {
-        if (isProfileModalOpen) {
-            setEditUsername(username || "");
-            setEditInviteCode("");
+    // Handle profile form submission
+    const handleProfileSubmit = async () => {
+        if (!publicKey) return;
+
+        const walletAddress = publicKey.toBase58();
+        const profileIndex = editProfileIndex + 1;
+        const referralCode = editInviteCode || inviteCodeFromUrl;
+
+        try {
+            // First get the user to get their ID
+            const existingUser = await getUserByWallet(walletAddress);
+
+            // Update profile data
+            await updateUser(existingUser.id, {
+                username: editUsername,
+                description: editBio,
+                profile_image: `https://earningrecords.com/assets/profiles/${profileIndex}.svg`,
+            });
+            console.log('[Navbar] Profile updated successfully');
+
+            // Handle referral if there's an invite code
+            if (referralCode) {
+                try {
+                    await acceptReferral(walletAddress, referralCode);
+                    console.log('[Navbar] Referral accepted successfully');
+                } catch (referralError) {
+                    console.error('[Navbar] Failed to accept referral:', referralError);
+                }
+            }
+        } catch (error) {
+            console.error('[Navbar] Failed to update profile:', error);
         }
-    }, [isProfileModalOpen, username]);
+
+        await fetchUserProfileData();
+        setIsProfileModalOpen(false);
+    };
+
+    // Initialize edit values when modal opens - fetch current user data
+    useEffect(() => {
+        const fetchUserData = async () => {
+            if (isProfileModalOpen && publicKey) {
+                const walletAddress = publicKey.toBase58();
+                try {
+                    const existingUser = await getUserByWallet(walletAddress);
+                    setEditUsername(existingUser.username || username || "");
+                    setEditBio(existingUser.description || "");
+                    setEditProfileIndex(existingUser.profile_image ? parseInt(existingUser.profile_image.match(/profiles\/(\d+)\.svg/)?.[1] || '1') - 1 : 0);
+                } catch (error) {
+                    console.log('[Navbar] Could not fetch existing user data:', error);
+                    setEditUsername(username || "");
+                }
+                // Pre-fill invite code from URL if available
+                setEditInviteCode(inviteCodeFromUrl || "");
+            }
+        };
+        fetchUserData();
+    }, [isProfileModalOpen, username, inviteCodeFromUrl, publicKey]);
 
     // Call createUser when user authenticates (only once per session)
     useEffect(() => {
         const handleCreateUser = async () => {
-            if (!authenticated || !publicKey || hasCalledCreateUser) {
+            // Wait forPrivy to be ready, user to be authenticated, and wallet to be connected
+            if (!ready || !authenticated || !publicKey || hasCalledCreateUser) {
                 console.log('[Navbar] createUser skipped:', {
+                    ready,
                     authenticated,
                     hasUser: !!publicKey,
                     hasCalledCreateUser
@@ -85,24 +169,32 @@ export default function Navbar() {
             try {
                 const userData = await createUser({
                     wallet_address: walletAddress,
-                    username: `user-${walletAddress}`,
+                    username: `user-${walletAddress.slice(0, 8)}`,
                     login_type: user?.email ? 'email' : 'wallet',
                 });
                 console.log('[Navbar] createUser success:', userData);
-            } catch (error) {
-                // If user already exists (409), that's fine - backend returns existing user
-                if (error instanceof Error && error.message.includes('409')) {
-                    console.log('[Navbar] createUser - user already exists (expected)');
+
+                // Check if this was a new user creation or existing user returned
+                // New users have default username format "user-XXXXXXXX"
+                const isNewUserCreated = userData.username === `user-${walletAddress.slice(0, 8)}`;
+
+                if (isNewUserCreated) {
+                    // New user - show profile modal immediately
+                    setIsNewUser(true);
+                    setIsProfileModalOpen(true);
                 } else {
-                    console.error('[Navbar] createUser error:', error);
+                    console.log('[Navbar] Returning user detected, profile modal not shown');
                 }
+            } catch (error) {
+                console.error('[Navbar] createUser error:', error);
             } finally {
                 setHasCalledCreateUser(true);
+                await fetchUserProfileData();
             }
         };
 
         handleCreateUser();
-    }, [authenticated, user, hasCalledCreateUser, username]);
+    }, [ready, authenticated, user, hasCalledCreateUser, publicKey]);
 
     // Helper function to check if link is active
     const isActive = (href: string) => {
@@ -144,7 +236,7 @@ export default function Navbar() {
             </div>
 
             {/* Main Navbar - Sticky at top */}
-            <nav className="fixed top-0 left-0 right-0 z-50 bg-[#f3e1d7]/80 backdrop-blur-md border-b border-white-100 pt-8">
+            <nav className="fixed top-0 left-0 right-0 z-50 bg-[#f3e1d7] border-b border-white-100 pt-8">
                 <div className="max-w-7xl mx-auto px-6 lg:px-8">
                     <div className="flex items-center justify-between h-20">
                         {/* Brand / Logo */}
@@ -161,6 +253,7 @@ export default function Navbar() {
                             authenticated={authenticated}
                             displayAddress={displayAddress || ""}
                             displayUsername={username || ""}
+                            displayProfileImage={userProfileData?.profileImage || null}
                             usdcBalance={usdcBalance}
                             isDropdownOpen={isDropdownOpen}
                             onAuth={handleAuth}
@@ -189,7 +282,7 @@ export default function Navbar() {
                 />
             )}
 
-            {/* Profile Edit Modal */}
+            {/* Profile Create Modal */}
             {isProfileModalOpen && (
                 <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
                     <div
@@ -199,14 +292,19 @@ export default function Navbar() {
                     <div className="relative z-10 w-full max-w-md bg-[#f3e1d7] rounded-3xl shadow-2xl overflow-hidden">
                         <div className="p-6">
                             <div className="flex items-center justify-between mb-6">
-                                <h2 className="text-xl font-bold text-gray-900">
-                                    Edit Profile
-                                </h2>
+                                <div>
+                                    <h2 className="text-xl font-bold text-gray-900">
+                                        Create Profile*
+                                    </h2>
+                                    <p className="text-sm text-gray-600">
+                                        Get started by creating a profile
+                                    </p>
+                                </div>
                                 <button
                                     onClick={() =>
                                         setIsProfileModalOpen(false)
                                     }
-                                    className="w-8 h-8 flex items-center justify-center rounded-full bg-white/50 hover:bg-white/80 transition-colors"
+                                    className="cursor-pointer w-8 h-8 flex items-center justify-center rounded-full bg-white/50 hover:bg-white/80 transition-colors"
                                 >
                                     <svg
                                         className="w-5 h-5 text-gray-600"
@@ -227,44 +325,12 @@ export default function Navbar() {
                             <div className="space-y-4">
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Username
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={editUsername}
-                                        onChange={(e) =>
-                                            setEditUsername(e.target.value)
-                                        }
-                                        className="w-full px-4 py-2 bg-white/80 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:border-transparent"
-                                        placeholder="Enter username"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Invite Code
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={editInviteCode}
-                                        onChange={(e) =>
-                                            setEditInviteCode(e.target.value)
-                                        }
-                                        className="w-full px-4 py-2 bg-white/80 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:border-transparent uppercase"
-                                        placeholder="Enter invite code"
-                                        maxLength={10}
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
                                         Profile Character
                                     </label>
                                     <div className="flex items-center gap-4">
                                         <div className="w-20 h-20 rounded-full overflow-hidden border-4 border-white shadow-lg">
                                             <img
-                                                src={`/profiles/${editProfileIndex + 1
-                                                    }.svg`}
+                                                src={`https://earningrecords.com/assets/profiles/${editProfileIndex + 1}.svg`}
                                                 alt="Profile"
                                                 className="w-full h-full object-cover"
                                             />
@@ -277,14 +343,59 @@ export default function Navbar() {
                                         </button>
                                     </div>
                                 </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Username*
+                                    </label>
+                                    <input
+                                        maxLength={18}
+                                        type="text"
+                                        value={editUsername}
+                                        onChange={(e) =>
+                                            setEditUsername(e.target.value)
+                                        }
+                                        className="w-full px-4 py-2 bg-white/80 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:border-transparent required"
+                                        placeholder="Enter username"
+                                    />
+                                    <p className="mt-1 text-xs text-gray-500">Create a unique username</p>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Bio*
+                                    </label>
+                                    <textarea
+                                        maxLength={100}
+                                        required
+                                        value={editBio}
+                                        onChange={(e) =>
+                                            setEditBio(e.target.value)
+                                        }
+                                        className="w-full px-4 py-2 bg-white/80 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:border-transparent required"
+                                        placeholder="Write a short bio"
+                                    />
+                                </div>
 
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Invite Code (Optional)
+                                    </label>
+                                    <input
+                                        maxLength={10}
+                                        type="text"
+                                        value={editInviteCode}
+                                        onChange={(e) =>
+                                            setEditInviteCode(e.target.value)
+                                        }
+                                        className="w-full px-4 py-2 bg-white/80 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:border-transparent"
+                                        placeholder="Enter invite code"
+                                    />
+                                </div>
                                 <button
-                                    onClick={() => {
-                                        setIsProfileModalOpen(false);
-                                    }}
-                                    className="w-full py-3 bg-gray-900 hover:bg-gray-800 text-white font-medium rounded-xl transition-colors"
+                                    onClick={handleProfileSubmit}
+                                    disabled={!editUsername.trim() || !editBio.trim()}
+                                    className="cursor-pointer w-full py-3 bg-gray-900 hover:bg-gray-800 text-white font-medium rounded-xl transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
                                 >
-                                    Save Changes
+                                    Continue
                                 </button>
                             </div>
                         </div>

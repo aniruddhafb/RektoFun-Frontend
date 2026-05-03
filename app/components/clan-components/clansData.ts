@@ -2,6 +2,7 @@ import { Clan } from "./ClanTypes";
 
 export const clansData: Clan[] = [
     {
+        id: "clan-001",
         rank: 1,
         name: "Alpha Syndicate",
         description: "Trade smart. Win together. Always stay one step ahead of the market.",
@@ -19,6 +20,7 @@ export const clansData: Clan[] = [
         chain: "Solana",
     },
     {
+        id: "clan-002",
         rank: 2,
         name: "Rekt Hunters",
         description: "Hunt the markets. Rekt the rest.",
@@ -36,6 +38,7 @@ export const clansData: Clan[] = [
         chain: "Solana",
     },
     {
+        id: "clan-003",
         rank: 3,
         name: "Market Mavericks",
         description: "Different mindset. Better results.",
@@ -53,6 +56,7 @@ export const clansData: Clan[] = [
         chain: "Ethereum",
     },
     {
+        id: "clan-004",
         rank: 4,
         name: "Liquidity Legends",
         description: "Liquidity is power.",
@@ -70,6 +74,7 @@ export const clansData: Clan[] = [
         chain: "Solana",
     },
     {
+        id: "clan-005",
         rank: 5,
         name: "Green Candles",
         description: "We don't guess, we predict.",

@@ -1,5 +1,6 @@
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface Clan {
+    id: string;
     rank: number;
     name: string;
     description: string;

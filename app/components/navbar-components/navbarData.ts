@@ -13,8 +13,8 @@ export const NAV_LINKS = [
 ];
 
 export const MORE_LINKS = [
-    { href: "/resolve", label: "Resolve Challenges" },
-    { href: "/resolve/nft", label: "Rekto Masters NFT" },
+    // { href: "/resolve", label: "Resolve Challenges" },
+    // { href: "/resolve/nft", label: "Rekto Masters NFT" },
     {
         href: "https://rektofun.gitbook.io/rektofun/roadmap/whats-next",
         label: "Our Roadmap",

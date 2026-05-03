@@ -52,9 +52,10 @@ export interface ClanData {
     tagline: string;
     description: string;
     leader: string;
+    leaderWallet: string;
     leaderAvatar: string;
     logo: string;
-    type: "Public" | "Private";
+    type: "Public" | "Invite Only";
     members: number;
     maxMembers: number;
     totalWins: number;
@@ -63,6 +64,7 @@ export interface ClanData {
     rektPoints: string;
     verified: boolean;
     isOpenToJoin: boolean;
+    country?: string;
 }
 
 // ─── Mock Data ───────────────────────────────────────────────────────────────
@@ -72,6 +74,7 @@ export const clanData: ClanData = {
     tagline: "Trade smart. Win together.",
     description: "Always stay one step ahead of the market.",
     leader: "LionKing",
+    leaderWallet: "fake-wallet-address-123",
     leaderAvatar: "/profiles/1.svg",
     logo: "/scribbles/coins.png",
     type: "Public",

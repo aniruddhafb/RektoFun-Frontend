@@ -11,7 +11,11 @@ interface ClanTabsProps {
     tabs: Tab[];
 }
 
-const ClanTabs = ({ activeTab, onTabChange, tabs }: ClanTabsProps) => {
+interface ClanTabsPropsExtended extends ClanTabsProps {
+    isMember: boolean;
+}
+
+const ClanTabs = ({ activeTab, onTabChange, tabs, isMember }: ClanTabsPropsExtended) => {
     return (
         <div className="flex items-center gap-1 mb-5 border-b border-gray-200/60 overflow-x-auto scrollbar-hide">
             {tabs.map((tab) => (
@@ -25,9 +29,11 @@ const ClanTabs = ({ activeTab, onTabChange, tabs }: ClanTabsProps) => {
                         }`}
                 >
                     {tab === "Settings" && <SettingsIcon className="w-3.5 h-3.5" />}
-                    {tab === "Chat" && <MessageCircle className="w-3.5 h-3.5" />}
-                    {tab}
                     {tab === "Chat" && (
+                        isMember ? <MessageCircle className="w-3.5 h-3.5" /> : <span className="text-gray-400">🔒</span>
+                    )}
+                    {tab}
+                    {tab === "Chat" && isMember && (
                         <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
                     )}
                 </button>

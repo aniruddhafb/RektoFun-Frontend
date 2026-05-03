@@ -1,11 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Clan } from "./ClanTypes";
-import { clansData } from "./clansData";
 import { ClanHeader } from "./ClanHeader";
 import { ClanFilters } from "./ClanFilters";
 import { ClanGrid } from "./ClanGrid";
+import { getClans } from "@/app/lib/clan-service/clans";
+
+const CLANS_PER_PAGE = 10;
 
 export default function ClansPage() {
     const [search, setSearch] = useState("");
@@ -13,7 +15,34 @@ export default function ClansPage() {
     const [filterChain, setFilterChain] = useState("All Chains");
     const [sortBy, setSortBy] = useState("Top");
 
-    const filtered = clansData.filter((c) => {
+    const [clans, setClans] = useState<Clan[]>([]);
+    const [totalClans, setTotalClans] = useState(0);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        const fetchClans = async () => {
+            setLoading(true);
+            setError(null);
+            try {
+                const offset = (currentPage - 1) * CLANS_PER_PAGE;
+                const result = await getClans(CLANS_PER_PAGE, offset);
+                setClans(result.clans);
+                setTotalClans(result.total);
+            } catch (err) {
+                setError(err instanceof Error ? err.message : "Failed to fetch clans");
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchClans();
+    }, [currentPage]);
+
+    const totalPages = Math.ceil(totalClans / CLANS_PER_PAGE);
+
+    const filtered = clans.filter((c) => {
         const matchSearch = c.name.toLowerCase().includes(search.toLowerCase());
         const matchType =
             filterType === "All Clans" ||
@@ -36,7 +65,30 @@ export default function ClansPage() {
                     sortBy={sortBy}
                     onSortByChange={setSortBy}
                 />
-                <ClanGrid clans={filtered} />
+                <ClanGrid clans={filtered} loading={loading} error={error} />
+
+                {/* Pagination Controls */}
+                {!loading && !error && totalPages > 1 && (
+                    <div className="flex justify-center items-center gap-4 mt-8">
+                        <button
+                            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                            disabled={currentPage === 1}
+                            className="px-4 py-2 bg-gray-900 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-800 transition-colors"
+                        >
+                            Previous
+                        </button>
+                        <span className="text-gray-700 font-medium">
+                            Page {currentPage} of {totalPages}
+                        </span>
+                        <button
+                            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                            disabled={currentPage === totalPages}
+                            className="px-4 py-2 bg-gray-900 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-800 transition-colors"
+                        >
+                            Next
+                        </button>
+                    </div>
+                )}
             </div>
         </div>
     );
