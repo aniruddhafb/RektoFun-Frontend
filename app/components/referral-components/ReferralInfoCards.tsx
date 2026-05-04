@@ -14,7 +14,7 @@ export function ReferralInfoCards() {
                     <h3 className="font-semibold text-gray-900">Refer Friends</h3>
                 </div>
                 <p className="text-gray-600 text-sm leading-relaxed">
-                    Get <span className="font-semibold text-gray-900">100 REKT POINTS</span> for every
+                    Get <span className="font-semibold text-gray-900">100 REKTO points</span> for every
                     friend you invite when they sign
                 </p>
             </div>
@@ -28,7 +28,7 @@ export function ReferralInfoCards() {
                     <h3 className="font-semibold text-gray-900">Win Challenges</h3>
                 </div>
                 <p className="text-gray-600 text-sm leading-relaxed">
-                    Earn <span className="font-semibold text-gray-900">20 REKT POINTS</span> for every
+                    Earn <span className="font-semibold text-gray-900">20 REKTO points</span> for every
                     challenge you win.
                 </p>
             </div>
@@ -43,7 +43,7 @@ export function ReferralInfoCards() {
                 </div>
                 <p className="text-gray-600 text-sm leading-relaxed">
                     Even if you lose, you still receive{" "}
-                    <span className="font-semibold text-gray-900">10 REKT POINTS</span>.
+                    <span className="font-semibold text-gray-900">10 REKTO points</span>.
                 </p>
             </div>
         </div>

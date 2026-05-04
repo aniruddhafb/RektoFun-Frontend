@@ -34,7 +34,7 @@ export function UserReferralStats({ referralsCount, referralPoints }: UserReferr
                             <Coins className="w-5 h-5 text-gray-600" />
                         </div>
                         <div>
-                            <p className="text-sm text-gray-500">Your REKT POINTS</p>
+                            <p className="text-sm text-gray-500">Your REKTO points</p>
                             <p className="text-2xl font-bold text-gray-900">{referralPoints.toLocaleString()}</p>
                         </div>
                     </div>

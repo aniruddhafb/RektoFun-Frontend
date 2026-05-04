@@ -102,7 +102,9 @@ export function DepositModal({ isOpen, onClose }: DepositModalProps) {
           </div>
 
           <div className="bg-white/60 rounded-2xl p-4 mb-4">
-            <p className="text-xs font-medium text-black mb-2">To deposit funds on devnet visit <a href="https://faucet.circle.com/" target="_blank" rel="noopener noreferrer" className="text-blue-500 underline">faucet.circle.com</a> and copy paste the above address</p>
+            <p className="text-xs font-medium text-black mb-2">As we are live on devnet to deposit funds on devnet visit <a href="https://faucet.solana.com/" target="_blank" rel="noopener noreferrer" className="text-blue-500 underline">faucet.solana.com</a> For $SOL and
+              <a href="https://faucet.circle.com/" target="_blank" rel="noopener noreferrer" className="text-blue-500 underline"> faucet.circle.com</a> For $USDC
+            </p>
           </div>
 
           {/* <div className="bg-white/60 rounded-2xl p-4 mb-4">

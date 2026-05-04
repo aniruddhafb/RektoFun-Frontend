@@ -97,7 +97,7 @@ export function ReferralLinkSection({
                     <span className="font-semibold text-gray-900">Share Your Referral Code</span>
                 </div>
                 <p className="text-sm text-gray-600 mb-3">
-                    Get <span className="font-semibold text-gray-900">100 REKT POINTS</span> for each friend who signs up using your link!
+                    Get <span className="font-semibold text-gray-900">100 REKTO points</span> for each friend who signs up using your link!
                 </p>
                 <button
                     onClick={handleShare}
@@ -114,7 +114,7 @@ export function ReferralLinkSection({
                     <CheckCircle className="w-4 h-4 text-gray-600 mt-0.5 flex-shrink-0" />
                     <div>
                         <p className="text-sm font-medium text-gray-800">Referral link copied!</p>
-                        <p className="text-xs text-gray-600 mt-0.5">Share it with your friends and get REKT POINTS!</p>
+                        <p className="text-xs text-gray-600 mt-0.5">Share it with your friends and get REKTO points!</p>
                     </div>
                 </div>
             )}
@@ -145,7 +145,7 @@ export function ReferralLinkSection({
                             <span className="font-semibold text-gray-900">Redeem Referral Code</span>
                         </div>
                         {/* <p className="text-sm text-gray-600 mb-3">
-                            Get <span className="font-semibold text-gray-900">50 REKT POINTS</span> for using a referral code!
+                            Get <span className="font-semibold text-gray-900">50 REKTO points</span> for using a referral code!
                         </p> */}
                         <div className="flex flex-col sm:flex-row gap-2">
                             <input

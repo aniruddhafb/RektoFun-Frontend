@@ -6,7 +6,7 @@ import Link from "next/link";
 export function NavbarBrand() {
     return (
         <div className="flex items-center gap-2 relative">
-            <div className="absolute -top-3 -left-[-128px] hidden md:block">
+            {/* <div className="absolute -top-3 -left-[-128px] hidden md:block">
                 <div className="relative w-10 h-10">
                     <svg viewBox="0 0 80 80" className="w-full h-full rotate-12">
                         <polygon
@@ -18,7 +18,7 @@ export function NavbarBrand() {
                         Beta
                     </span>
                 </div>
-            </div>
+            </div> */}
 
             <Link href="/" className="hover:opacity-80 transition-opacity">
                 <Image

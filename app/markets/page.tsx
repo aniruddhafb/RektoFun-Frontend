@@ -214,7 +214,7 @@ export default function MarketsPage() {
                 {/* Header Section */}
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6 sm:mb-8">
                     <div>
-                        <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-2">Challenge Markets</h1>
+                        <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-2">Markets Challenges</h1>
                         <p className="text-gray-600 text-base sm:text-lg">Predict trends and earn big on top challenge markets</p>
                     </div>
                 </div>

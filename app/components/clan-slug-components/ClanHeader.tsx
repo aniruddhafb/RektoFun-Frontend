@@ -388,14 +388,14 @@ const ClanHeader = ({ clanData, onClanMembershipChange, onClanDataUpdate, onMemb
                                 </div>
                             </div>
 
-                            {/* REKT Points */}
+                            {/* REKTO points */}
                             <div className="group flex items-center gap-3 px-4 py-2.5 rounded-xl bg-gradient-to-br from-orange-50/80 to-amber-50/80 hover:from-orange-100/80 hover:to-amber-100/80 border border-orange-100/60 hover:border-orange-200/80 transition-all duration-300 shadow-sm hover:shadow-md">
                                 <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-orange-100/80 group-hover:scale-110 transition-transform duration-300">
                                     <StarIcon className="w-5 h-5 text-orange-600" />
                                 </div>
                                 <div className="flex flex-col">
                                     <span className="text-xl font-black text-orange-600 leading-none">{clanData.rektPoints}</span>
-                                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wide leading-tight mt-0.5">REKT Points</span>
+                                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wide leading-tight mt-0.5">REKTO points</span>
                                 </div>
                             </div>
                         </div>

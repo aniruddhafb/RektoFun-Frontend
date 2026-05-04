@@ -162,7 +162,7 @@ export function ChallengeCard({
     return (
         <div
             onClick={handleClick}
-            className="bg-[#f8ede7] rounded-2xl p-4 shadow-sm border border-white/50 hover:shadow-lg transition-shadow block cursor-pointer"
+            className="bg-[#f8ede7] rounded-2xl p-4 shadow-sm border border-gray-300 hover:shadow-lg transition-shadow block cursor-pointer"
         >
             {/* Header */}
             <div className="flex items-start justify-between mb-3">

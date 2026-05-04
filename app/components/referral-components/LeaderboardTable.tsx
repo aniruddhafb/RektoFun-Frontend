@@ -82,7 +82,7 @@ function LeaderboardRow({ entry }: LeaderboardRowProps) {
             {/* Referrals */}
             <div className="col-span-2 text-gray-900 font-medium text-sm">{referralCount}</div>
 
-            {/* REKT POINTS */}
+            {/* REKTO points */}
             <div className="col-span-2 text-gray-900 font-medium text-sm">{points}</div>
 
             {/* Earnings */}

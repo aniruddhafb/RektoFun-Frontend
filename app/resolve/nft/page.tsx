@@ -234,9 +234,9 @@ export default function NFTPage() {
         },
         {
             number: "02",
-            title: "Weekly REKT Points Allocation",
+            title: "Weekly REKTO points Allocation",
             description:
-                "Holders will receive weekly distributions of REKT points, giving them a consistent edge in the ecosystem.",
+                "Holders will receive weekly distributions of REKTO points, giving them a consistent edge in the ecosystem.",
             icon: <StarIcon className="w-full h-full" />,
             iconBg: "#ede9fe",
             iconColor: "#7c3aed",

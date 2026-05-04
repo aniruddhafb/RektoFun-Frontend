@@ -14,7 +14,7 @@ export function LoginPrompt() {
                 </div>
                 <h3 className="text-xl font-semibold text-gray-900 mb-2">Login to Access Referral</h3>
                 <p className="text-gray-600 mb-6 max-w-sm">
-                    Sign in or create an account to access your referral link and start earning REKT POINTS!
+                    Sign in or create an account to access your referral link and start earning REKTO points!
                 </p>
                 <button
                     onClick={login}

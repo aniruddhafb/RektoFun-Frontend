@@ -163,7 +163,7 @@ export const earningCards: EarningCardItem[] = [
         bullets: [
             { icon: "\u{1F3AF}", text: "Win challenges with accurate predictions" },
             { icon: "\u{1F4B0}", text: "Win rewards based on your performance" },
-            { icon: "\u2B50", text: "Participate and win REKT points" },
+            { icon: "\u2B50", text: "Participate and win REKTO points" },
         ],
     },
     {
@@ -218,7 +218,7 @@ export const earningCards: EarningCardItem[] = [
         bullets: [
             {
                 icon: "\u{1F381}",
-                text: "Win REKT points for every successful referral",
+                text: "Win REKTO points for every successful referral",
             },
             { icon: "%", text: "Unlock future incentives from referral activity" },
             {

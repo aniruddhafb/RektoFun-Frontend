@@ -86,7 +86,7 @@ export function HeroSection() {
             </div>
 
             <div className="relative z-10 text-center px-6 max-w-3xl mx-auto pointer-events-none">
-                <div className="absolute -top-12 right-[5%] md:right-[2%]">
+                {/* <div className="absolute -top-12 right-[5%] md:right-[2%]">
                     <div className="relative w-16 h-16 md:w-20 md:h-20">
                         <svg viewBox="0 0 80 80" className="w-full h-full rotate-12">
                             <polygon
@@ -98,16 +98,16 @@ export function HeroSection() {
                             Beta
                         </span>
                     </div>
-                </div>
+                </div> */}
 
                 <h1 className="text-6xl lg:text-8xl font-bold tracking-tight text-black mb-6">
                     REKTO.FUN
                 </h1>
 
                 <p className="text-lg lg:text-xl text-gray-800 mb-10 max-w-xl mx-auto">
-                    The first PvP battleground for predictions
+                    The First PvP Battleground For Predictions
                     <br />
-                    Prediction Markets 2.0 {"\u{1FA84}"}
+                    Crypto & Sports {"\u{1FA84}"}
                 </p>
 
                 <Link

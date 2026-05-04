@@ -7,7 +7,7 @@ export function ReferralHeader() {
                 </h1>
             </div>
             <p className="text-gray-600 text-lg mb-8">
-                Invite friends to RektoFun and earn REKT Points!!
+                Invite friends to RektoFun and earn REKTO points!!
             </p>
         </>
     );

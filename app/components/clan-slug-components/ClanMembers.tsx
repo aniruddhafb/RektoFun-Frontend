@@ -119,7 +119,7 @@ const ClanMembers = ({ clanId, maxMembers, refreshKey }: ClanMembersProps) => {
                                 </div>
                                 <div className="flex flex-col items-end gap-1 flex-shrink-0">
                                     <span className="text-sm font-bold text-gray-900">{member.rektPoints}</span>
-                                    <span className="text-[10px] text-gray-400">REKT Points</span>
+                                    <span className="text-[10px] text-gray-400">REKTO points</span>
                                 </div>
                             </Link>
                         ))

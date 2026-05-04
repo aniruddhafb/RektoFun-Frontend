@@ -4,15 +4,15 @@ export const PROFILE_SVGS = Array.from(
 );
 
 export const NAV_LINKS = [
-    { href: "/challenges", label: "Challenges" },
+    { href: "/challenges", label: "Live Challenges" },
     { href: "/markets", label: "Challenge Markets" },
     { href: "/clans", label: "Explore Clans" },
-    { href: "/leaderboard", label: "Leaderboard" },
-    { href: "/referral", label: "Referral" },
-    { href: "/activity", label: "Activity" },
+    { href: "/activity", label: "Live Activity" },
 ];
 
 export const MORE_LINKS = [
+    { href: "/leaderboard", label: "Leaderboard" },
+    { href: "/referral", label: "Refer & Earn" },
     // { href: "/resolve", label: "Resolve Challenges" },
     // { href: "/resolve/nft", label: "Rekto Masters NFT" },
     {

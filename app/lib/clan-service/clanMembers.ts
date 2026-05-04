@@ -73,7 +73,7 @@ export async function getClanMembers(clanId: string): Promise<ClanMembersRespons
 }
 
 /**
- * Format earnings into REKT points display format
+ * Format earnings into REKTO points display format
  */
 function formatRektPoints(earnings: number): string {
     if (earnings >= 1000000) {
