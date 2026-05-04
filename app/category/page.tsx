@@ -277,7 +277,7 @@ export default function CategoryPage() {
                         {/* CTA */}
                         <div className="px-5 pb-5">
                             <Link
-                                href="/markets?category=crypto"
+                                href="/markets?category=crypto&id=80d3e1b7-4c64-4c45-9507-372b726ff061"
                                 className="group/btn flex items-center justify-between w-full px-5 py-4 rounded-2xl text-white font-bold text-sm sm:text-base transition-all duration-300 hover:opacity-95 hover:scale-[1.02] active:scale-[0.98]"
                                 style={{
                                     background: "linear-gradient(135deg, #f97316 0%, #ea580c 100%)",

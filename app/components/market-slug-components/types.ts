@@ -1,4 +1,4 @@
-import { Challenge } from "../challenge-components/challengesData";
+
 
 // Top trader data structure
 export interface TopTrader {
@@ -20,7 +20,7 @@ export interface TopTrader {
 }
 
 // Placeholder challenges for market page
-export const PLACEHOLDER_CHALLENGES: Challenge[] = [
+export const PLACEHOLDER_CHALLENGES: any[] = [
     {
         id: "placeholder-1",
         status: "open",

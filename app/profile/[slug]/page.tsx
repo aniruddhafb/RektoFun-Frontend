@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
-import { Challenge } from "@/app/components/challenge-components/challengesData";
 import ChallengeDetailModal from "@/app/components/challenge-components/ChallengeDetailModal";
 import {
     ProfileHeader,
@@ -13,6 +12,7 @@ import {
 import { LoadingPage } from "@/app/components/LoadingPage";
 import { getUserByWallet, User } from "@/app/lib/users-service/users";
 import { useSolanaWallet } from "@/app/lib/useSolanaWallet";
+import { ChallengeListItem } from "@/app/lib/challenges-service/challenges";
 
 // Activity item interface
 interface ActivityItem {
@@ -121,7 +121,7 @@ export default function ProfilePage() {
     const slug = params.slug as string;
     const { solBalance, usdcBalance } = useSolanaWallet();
     const [activeTab, setActiveTab] = useState<TabType>("challenges");
-    const [selectedChallenge, setSelectedChallenge] = useState<Challenge | null>(null);
+    const [selectedChallenge, setSelectedChallenge] = useState<ChallengeListItem | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
@@ -150,7 +150,7 @@ export default function ProfilePage() {
     }, [slug]);
 
     // Handle challenge card click
-    const handleChallengeClick = (challenge: Challenge) => {
+    const handleChallengeClick = (challenge: ChallengeListItem) => {
         setSelectedChallenge(challenge);
         setIsModalOpen(true);
     };
@@ -233,9 +233,9 @@ export default function ProfilePage() {
                         <ProfileTabs activeTab={activeTab} onTabChange={setActiveTab} />
 
                         {/* Challenges Tab Content */}
-                        {activeTab === "challenges" && (
+                        {/* {activeTab === "challenges" && (
                             <ProfileChallenges onChallengeClick={handleChallengeClick} />
-                        )}
+                        )} */}
 
                         {/* Activity Tab Content */}
                         {activeTab === "activity" && (

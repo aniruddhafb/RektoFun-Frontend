@@ -5,21 +5,16 @@ import Image from "next/image";
 import { DatePickerModal } from "./DatePickerModal";
 import { DurationPickerModal } from "./DurationPickerModal";
 import { useSolanaWallet } from "@/app/lib/useSolanaWallet";
-import { Connection, PublicKey } from "@solana/web3.js";
+import { Connection } from "@solana/web3.js";
 import {
-    getRektoProgram,
     buildCreateChallengeTx,
     deriveChallengePDA,
     deriveCreatorCounter,
     RPC_ENDPOINT,
 } from "@/app/lib/rektofun-program";
 import { createChallenge } from "@/app/lib/challenges-service/challenges";
-
-interface Coin {
-    symbol: string;
-    name: string;
-    logo: string;
-}
+import { getMarkets, Market } from "@/app/lib/markets-service/market";
+import { useUserStore } from "@/app/store/useUserStore";
 
 interface CreateChallengeModalProps {
     isOpen: boolean;
@@ -27,19 +22,7 @@ interface CreateChallengeModalProps {
     onCreated: () => void;
 }
 
-const coins: Coin[] = [
-    { symbol: "BTC", name: "Bitcoin", logo: "/scribbles/btc.png" },
-    { symbol: "ETH", name: "Ethereum", logo: "/scribbles/coins.png" },
-    { symbol: "SOL", name: "Solana", logo: "/scribbles/sol.png" },
-    { symbol: "PEPE", name: "Pepe", logo: "/scribbles/pepe.png" },
-    { symbol: "BONK", name: "Bonk", logo: "/scribbles/doge.png" },
-];
 
-const markets = [
-    { symbol: "SOL-PERP", name: "Solana Perpetual" },
-    { symbol: "BTC-PERP", name: "Bitcoin Perpetual" },
-    { symbol: "ETH-PERP", name: "Ethereum Perpetual" },
-];
 
 type TxStatus = "idle" | "building" | "signing" | "confirming" | "success" | "error";
 
@@ -48,9 +31,13 @@ export function CreateChallengeModal({
     onClose,
     onCreated,
 }: CreateChallengeModalProps) {
-    const [selectedMarket, setSelectedMarket] = useState(markets[0]);
+    const [markets, setMarkets] = useState<Market[]>([]);
+    const [selectedMarket, setSelectedMarket] = useState<Market | null>(null);
+    const [marketsLoading, setMarketsLoading] = useState(true);
     const [isMarketDropdownOpen, setIsMarketDropdownOpen] = useState(false);
-    const [selectedCoin, setSelectedCoin] = useState<Coin>(coins[0]);
+    const [childMarkets, setChildMarkets] = useState<Market[]>([]);
+    const [childMarketsLoading, setChildMarketsLoading] = useState(false);
+    const [selectedChildMarket, setChildMarket] = useState<Market | null>(null);
     const [isCoinDropdownOpen, setIsCoinDropdownOpen] = useState(false);
     const [betAmount, setBetAmount] = useState(0.1);
     const [predictionDirection, setPredictionDirection] = useState("Above");
@@ -61,6 +48,8 @@ export function CreateChallengeModal({
     const [duration, setDuration] = useState({ hours: 4, minutes: 0 });
     const [isDurationPickerOpen, setIsDurationPickerOpen] = useState(false);
     const [challengeMode, setChallengeMode] = useState<"pvp" | "multi">("pvp");
+
+    const { user } = useUserStore();
 
     // Transaction state
     const [txStatus, setTxStatus] = useState<TxStatus>("idle");
@@ -73,8 +62,6 @@ export function CreateChallengeModal({
 
     // Privy wallet hook
     const { authenticated, login, program, sendTransaction, publicKey } = useSolanaWallet();
-    const walletAddress = publicKey?.toBase58() ?? null;
-    const isWalletConnected = Boolean(authenticated && walletAddress);
 
     useEffect(() => {
         if (isOpen) document.body.style.overflow = "hidden";
@@ -92,6 +79,54 @@ export function CreateChallengeModal({
             setTxSignature(null);
         }
     }, [isOpen]);
+
+    useEffect(() => {
+        const fetchMarkets = async () => {
+            try {
+                setMarketsLoading(true);
+                const response = await getMarkets({ parent_id: null });
+                const fetchedMarkets = response.markets;
+
+                setMarkets(fetchedMarkets);
+
+            } catch (error) {
+                console.error("Error fetching markets:", error);
+            } finally {
+                setMarketsLoading(false);
+            }
+        };
+
+        if (isOpen) {
+            fetchMarkets();
+        }
+    }, [isOpen]);
+
+    useEffect(() => {
+        const fetchChildMarkets = async () => {
+            if (!isOpen || !selectedMarket?.id) {
+                setChildMarkets([]);
+                setChildMarket(null);
+                return;
+            }
+
+            try {
+                setChildMarketsLoading(true);
+                const response = await getMarkets({ parent_id: selectedMarket.id });
+                const fetchedMarkets = response.markets;
+
+                setChildMarkets(fetchedMarkets);
+                setChildMarket(fetchedMarkets[0] ?? null);
+            } catch (error) {
+                console.error("Error fetching child markets:", error);
+                setChildMarkets([]);
+                setChildMarket(null);
+            } finally {
+                setChildMarketsLoading(false);
+            }
+        };
+
+        fetchChildMarkets();
+    }, [isOpen, selectedMarket]);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -183,7 +218,7 @@ export function CreateChallengeModal({
 
             // Build the transaction
             const tx = await buildCreateChallengeTx(program, creatorPubkey, {
-                asset: selectedCoin.symbol,
+                asset: selectedChildMarket?.symbol || "",
                 betAmountSol: betAmount,
                 targetPriceUsdCents,
                 directionAbove: predictionDirection === "Above",
@@ -221,13 +256,15 @@ export function CreateChallengeModal({
             // Post to backend API
             try {
                 await createChallenge({
-                    title: `${selectedCoin.symbol} ${predictionDirection} $${predictionPrice}`,
-                    description: `Bet ${betAmount} SOL that ${selectedCoin.symbol} will be ${predictionDirection.toLowerCase()} $${predictionPrice} by ${selectedDate.toISOString()}`,
-                    category: selectedMarket.symbol,
-                    subcategory: selectedCoin.symbol,
+                    title: `${selectedChildMarket?.symbol} ${predictionDirection} $${predictionPrice}`,
+                    description: `Bet ${betAmount} SOL that ${selectedChildMarket?.symbol} will be ${predictionDirection.toLowerCase()} $${predictionPrice} by ${selectedDate.toISOString()}`,
+                    category: selectedChildMarket?.id || "",
                     event_type: "binary",
-                    ticker: selectedCoin.symbol,
-                    created_by: walletAddress || "",
+                    ticker: selectedChildMarket?.symbol || "",
+                    created_by: user?.id || "",
+                    mode: challengeMode,
+                    initial_bet: betAmount,
+                    bet_unit: 1,
                     resolution_source: "price_feed",
                     expire_time: new Date(expiresAt * 1000).toISOString(),
                     resolve_time: new Date(resolvesAt * 1000).toISOString(),
@@ -294,19 +331,25 @@ export function CreateChallengeModal({
                         <label className="text-sm font-medium text-gray-700">Select Challenge Market</label>
                         <div className="relative" ref={marketDropdownRef}>
                             <button onClick={() => { closeAllDropdowns(); setIsMarketDropdownOpen(!isMarketDropdownOpen); }} className="w-full flex items-center justify-between px-4 py-3 bg-[#faf0eb] border border-[#e8d5c8] rounded-xl hover:border-[#d4b8a8] transition-colors">
-                                <span className="font-semibold text-gray-900">{selectedMarket.symbol}</span>
+                                <span className="font-semibold text-gray-900">{selectedMarket?.name || "Select Market"}</span>
                                 <svg className={`w-5 h-5 text-gray-500 transition-transform ${isMarketDropdownOpen ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                                 </svg>
                             </button>
                             {isMarketDropdownOpen && (
                                 <div className="absolute top-full left-0 right-0 mt-1 bg-[#faf0eb] border border-[#e8d5c8] rounded-xl shadow-lg z-10 overflow-hidden">
-                                    {markets.map((m) => (
-                                        <button key={m.symbol} onClick={() => { setSelectedMarket(m); setIsMarketDropdownOpen(false); }} className="w-full px-4 py-3 text-left hover:bg-[#f3e1d7] transition-colors">
-                                            <span className="font-medium text-gray-900">{m.symbol}</span>
-                                            <span className="text-gray-500 text-sm ml-2">{m.name}</span>
-                                        </button>
-                                    ))}
+                                    {marketsLoading ? (
+                                        <div className="px-4 py-3 text-sm text-gray-500">Loading markets...</div>
+                                    ) : markets.length > 0 ? (
+                                        markets.map((m) => (
+                                            <button key={m.id} onClick={() => { setSelectedMarket(m); setIsMarketDropdownOpen(false); }} className="w-full px-4 py-3 text-left hover:bg-[#f3e1d7] transition-colors">
+                                                <span className="font-medium text-gray-900">{m.symbol || m.name}</span>
+                                                <span className="text-gray-500 text-sm ml-2">{m.name}</span>
+                                            </button>
+                                        ))
+                                    ) : (
+                                        <div className="px-4 py-3 text-sm text-gray-500">No markets available</div>
+                                    )}
                                 </div>
                             )}
                         </div>
@@ -318,9 +361,15 @@ export function CreateChallengeModal({
                             <button onClick={() => { closeAllDropdowns(); setIsCoinDropdownOpen(!isCoinDropdownOpen); }} className="w-full flex items-center justify-between px-4 py-3 bg-[#faf0eb] border border-[#e8d5c8] rounded-xl hover:border-[#d4b8a8] transition-colors">
                                 <div className="flex items-center gap-3">
                                     <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center overflow-hidden">
-                                        <Image src={selectedCoin.logo} alt={selectedCoin.symbol} width={24} height={24} className="w-6 h-6 object-contain" />
+                                        {selectedChildMarket?.image ? (
+                                            <Image src={selectedChildMarket.image} alt={selectedChildMarket.symbol || selectedChildMarket.name} width={24} height={24} className="w-6 h-6 object-contain" />
+                                        ) : (
+                                            <span className="text-xs font-bold text-white">
+                                                {selectedChildMarket?.symbol?.slice(0, 2) || "?"}
+                                            </span>
+                                        )}
                                     </div>
-                                    <span className="font-semibold text-gray-900">{selectedCoin.symbol}</span>
+                                    <span className="font-semibold text-gray-900">{selectedChildMarket?.symbol || "Select Token"}</span>
                                 </div>
                                 <svg className={`w-5 h-5 text-gray-500 transition-transform ${isCoinDropdownOpen ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -328,14 +377,26 @@ export function CreateChallengeModal({
                             </button>
                             {isCoinDropdownOpen && (
                                 <div className="absolute top-full left-0 right-0 mt-1 bg-[#faf0eb] border border-[#e8d5c8] rounded-xl shadow-lg z-10 overflow-hidden">
-                                    {coins.map((coin) => (
-                                        <button key={coin.symbol} onClick={() => { setSelectedCoin(coin); setIsCoinDropdownOpen(false); }} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#f3e1d7] transition-colors">
-                                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center overflow-hidden">
-                                                <Image src={coin.logo} alt={coin.symbol} width={24} height={24} className="w-6 h-6 object-contain" />
-                                            </div>
-                                            <span className="font-medium text-gray-900">{coin.symbol}</span>
-                                        </button>
-                                    ))}
+                                    {childMarketsLoading ? (
+                                        <div className="px-4 py-3 text-sm text-gray-500">Loading tokens...</div>
+                                    ) : childMarkets.length > 0 ? (
+                                        childMarkets.map((childMarket) => (
+                                            <button key={childMarket.id} onClick={() => { setChildMarket(childMarket); setIsCoinDropdownOpen(false); }} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#f3e1d7] transition-colors">
+                                                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center overflow-hidden">
+                                                    {childMarket.image ? (
+                                                        <Image src={childMarket.image} alt={childMarket.symbol || childMarket.name} width={24} height={24} className="w-6 h-6 object-contain" />
+                                                    ) : (
+                                                        <span className="text-xs font-bold text-white">
+                                                            {childMarket.symbol?.slice(0, 2) || "?"}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <span className="font-medium text-gray-900">{childMarket.symbol}</span>
+                                            </button>
+                                        ))
+                                    ) : (
+                                        <div className="px-4 py-3 text-sm text-gray-500">No tokens available</div>
+                                    )}
                                 </div>
                             )}
                         </div>
@@ -354,7 +415,7 @@ export function CreateChallengeModal({
                         <div className="flex gap-2">
                             <div className="relative flex-1" ref={directionDropdownRef}>
                                 <button onClick={() => { closeAllDropdowns(); setIsDirectionDropdownOpen(!isDirectionDropdownOpen); }} className="w-full flex items-center justify-between px-4 py-3 bg-[#faf0eb] border border-[#e8d5c8] rounded-xl hover:border-[#d4b8a8] transition-colors">
-                                    <span className="font-semibold text-gray-900">{selectedCoin.name} {predictionDirection}</span>
+                                    <span className="font-semibold text-gray-900">{selectedChildMarket?.name} {predictionDirection}</span>
                                     <svg className={`w-5 h-5 text-gray-500 transition-transform ${isDirectionDropdownOpen ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                                     </svg>
@@ -363,7 +424,7 @@ export function CreateChallengeModal({
                                     <div className="absolute top-full left-0 right-0 mt-1 bg-[#faf0eb] border border-[#e8d5c8] rounded-xl shadow-lg z-10 overflow-hidden">
                                         {["Above", "Below"].map((dir) => (
                                             <button key={dir} onClick={() => { setPredictionDirection(dir); setIsDirectionDropdownOpen(false); }} className="w-full px-4 py-3 text-left hover:bg-[#f3e1d7] transition-colors font-medium text-gray-900">
-                                                {selectedCoin.name} {dir}
+                                                {selectedChildMarket?.name} {dir}
                                             </button>
                                         ))}
                                     </div>
@@ -425,8 +486,8 @@ export function CreateChallengeModal({
                             <button
                                 onClick={() => setChallengeMode("pvp")}
                                 className={`flex-1 py-2 px-4 rounded-lg text-sm font-semibold transition-colors ${challengeMode === "pvp"
-                                        ? "bg-gray-900 text-white"
-                                        : "bg-transparent text-gray-600 hover:bg-[#f3e1d7]"
+                                    ? "bg-gray-900 text-white"
+                                    : "bg-transparent text-gray-600 hover:bg-[#f3e1d7]"
                                     }`}
                             >
                                 PVP
@@ -434,8 +495,8 @@ export function CreateChallengeModal({
                             <button
                                 onClick={() => setChallengeMode("multi")}
                                 className={`flex-1 py-2 px-4 rounded-lg text-sm font-semibold transition-colors ${challengeMode === "multi"
-                                        ? "bg-gray-900 text-white"
-                                        : "bg-transparent text-gray-600 hover:bg-[#f3e1d7]"
+                                    ? "bg-gray-900 text-white"
+                                    : "bg-transparent text-gray-600 hover:bg-[#f3e1d7]"
                                     }`}
                             >
                                 Multi
@@ -450,7 +511,7 @@ export function CreateChallengeModal({
 
                     <div className="text-center py-2">
                         <p className="text-gray-700">
-                            You win <span className="font-bold text-gray-900">{(betAmount * 2 * 0.975).toFixed(4)} USDC</span> if {selectedCoin.symbol} closes {predictionDirection.toLowerCase()} ${Number(predictionPrice).toLocaleString()} in {formatDuration(duration)}
+                            You win <span className="font-bold text-gray-900">{(betAmount * 2 * 0.975).toFixed(4)} USDC</span> if {selectedChildMarket?.symbol} closes {predictionDirection.toLowerCase()} ${Number(predictionPrice).toLocaleString()} in {formatDuration(duration)}
                         </p>
                         <p className="text-xs text-gray-500 mt-1">2.5% platform fee applies</p>
                     </div>

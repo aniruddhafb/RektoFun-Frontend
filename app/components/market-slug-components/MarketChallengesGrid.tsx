@@ -1,10 +1,10 @@
 "use client";
 
 import { ChallengeCard } from "../challenge-components/ChallengeCard";
-import { Challenge } from "../challenge-components/challengesData";
+import { ChallengeListItem } from "@/app/lib/challenges-service/challenges";
 
 interface MarketChallengesGridProps {
-    challenges: Challenge[];
+    challenges: ChallengeListItem[];
 }
 
 export function MarketChallengesGrid({ challenges }: MarketChallengesGridProps) {

@@ -1,14 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { usePrivy } from "@privy-io/react-auth";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { DepositModal } from "./DepositModal";
 import { useSolanaWallet } from "@/app/lib/useSolanaWallet";
 import * as components from "./navbar-components";
 import { createUser, updateUser, getUserByWallet, acceptReferral } from "@/app/lib/users-service/users";
+import { useUserStore } from "@/app/store/useUserStore";
 
 export default function Navbar() {
+    const { setUser, updateUser: updateStoreUser, clearUser } = useUserStore();
     const { login, authenticated, user, logout, ready } = usePrivy();
     const { solanaWallet, publicKey, usdcBalance } = useSolanaWallet();
     const walletAddress = publicKey?.toBase58() ?? null;
@@ -23,11 +25,17 @@ export default function Navbar() {
     const [editInviteCode, setEditInviteCode] = useState("");
     const [hasCalledCreateUser, setHasCalledCreateUser] = useState(false);
     const [userProfileData, setUserProfileData] = useState<{ username: string; profileImage: string } | null>(null);
+    const [inviteCodeFromUrl, setInviteCodeFromUrl] = useState("");
     const pathname = usePathname();
 
-    // Get invite code from URL
-    const searchParams = useSearchParams();
-    const inviteCodeFromUrl = searchParams?.get("ref") || "";
+    useEffect(() => {
+        if (typeof window === "undefined") {
+            return;
+        }
+
+        const params = new URLSearchParams(window.location.search);
+        setInviteCodeFromUrl(params.get("ref") || "");
+    }, []);
 
     const handleAuth = () => {
         console.log('[Navbar] handleAuth called - login() invoked');
@@ -37,6 +45,7 @@ export default function Navbar() {
     const handleLogout = () => {
         console.log('[Navbar] handleLogout called - logout() invoked');
         setHasCalledCreateUser(false);
+        clearUser();
         logout();
     };
 
@@ -66,6 +75,7 @@ export default function Navbar() {
         try {
             const walletAddress = publicKey.toBase58();
             const userData = await getUserByWallet(walletAddress);
+            setUser(userData);
             setUserProfileData({
                 username: userData.username,
                 profileImage: userData.profile_image,
@@ -99,11 +109,13 @@ export default function Navbar() {
             const existingUser = await getUserByWallet(walletAddress);
 
             // Update profile data
-            await updateUser(existingUser.id, {
+            const updatedData = {
                 username: editUsername,
                 description: editBio,
                 profile_image: `https://earningrecords.com/assets/profiles/${profileIndex}.svg`,
-            });
+            };
+            await updateUser(existingUser.id, updatedData);
+            updateStoreUser(updatedData);
             console.log('[Navbar] Profile updated successfully');
 
             // Handle referral if there's an invite code

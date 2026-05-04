@@ -1,11 +1,11 @@
 "use client";
 
 import React from "react";
-import { Challenge } from "@/app/components/challenge-components/challengesData";
+// import { Challenge } from "@/app/components/challenge-components/challengesData";
 import { ChallengeCard } from "@/app/components/challenge-components/ChallengeCard";
 
 // Static placeholder data
-const PLACEHOLDER_CHALLENGES: Challenge[] = [
+const PLACEHOLDER_CHALLENGES: any[] = [
     {
         id: "placeholder-1",
         status: "open",
@@ -67,7 +67,7 @@ const PLACEHOLDER_CHALLENGES: Challenge[] = [
 ];
 
 interface ProfileChallengesProps {
-    onChallengeClick: (challenge: Challenge) => void;
+    onChallengeClick: (challenge: any) => void;
 }
 
 export function ProfileChallenges({ onChallengeClick }: ProfileChallengesProps) {
