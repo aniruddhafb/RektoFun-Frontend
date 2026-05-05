@@ -55,11 +55,11 @@ export interface ChallengeListItem {
     profile_image: string;
     wallet_address: string;
   };
-  opponent_info: {
+  opponent_info?: {
     username: string;
     profile_image: string;
     wallet_address: string;
-  };
+  } | null;
 }
 
 export interface ChallengesResponse {
@@ -141,6 +141,7 @@ export interface CreateChallengeParams {
   created_by: string;
   mode: string;
   initial_bet: number;
+  target_price?: number;
   min_accept_bet?: number;
   max_accept_bet?: number;
   min_bet?: number;

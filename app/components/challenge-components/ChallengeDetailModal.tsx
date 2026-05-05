@@ -17,6 +17,7 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
     const modalRef = useRef<HTMLDivElement>(null);
     const router = useRouter();
     const [currentTime, setCurrentTime] = React.useState(() => Date.now());
+    const [shareFeedback, setShareFeedback] = React.useState<string | null>(null);
 
     const formatEndsByCountdown = (timestamp: number | null, nowMs: number): string => {
         if (!timestamp) return "unknown";
@@ -29,6 +30,38 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
         const minutes = totalMinutes % 60;
 
         if (days > 0) return `${days}d ${hours}h`;
+        if (hours > 0) return `${hours}h ${minutes}m`;
+        return `${minutes}m`;
+    };
+
+    const formatCreatedTimeAgo = (timestamp: number | null, nowMs: number): string => {
+        if (!timestamp) return "recently";
+
+        const diff = nowMs - timestamp;
+        if (diff < 0) return "just now";
+
+        const minutes = Math.floor(diff / 60000);
+        const hours = Math.floor(diff / 3600000);
+        const days = Math.floor(diff / 86400000);
+
+        if (days > 0) return `${days} day${days === 1 ? "" : "s"} ago`;
+        if (hours > 0) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+        if (minutes > 0) return `${minutes} minute${minutes === 1 ? "" : "s"} ago`;
+
+        return "just now";
+    };
+
+    const formatExpiryCountdown = (timestamp: number | null, nowMs: number): string => {
+        if (!timestamp) return "N/A";
+        const diffMs = timestamp - nowMs;
+        if (diffMs <= 0) return "0m";
+
+        const totalMinutes = Math.floor(diffMs / 60000);
+        const days = Math.floor(totalMinutes / (24 * 60));
+        const hours = Math.floor((totalMinutes % (24 * 60)) / 60);
+        const minutes = totalMinutes % 60;
+
+        if (days > 0) return `${days}d ${hours}h ${minutes}m`;
         if (hours > 0) return `${hours}h ${minutes}m`;
         return `${minutes}m`;
     };
@@ -132,17 +165,30 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
     const assetLogo = challenge.market?.icon || "/scribbles/btc.png";
     const creatorName = challenge.creator?.username || "Creator";
     const creatorAvatar = challenge.creator?.profile_image || assetLogo;
-    const accepterName = challenge.opponent_info?.username || "Opponent";
-    const accepterAvatar = challenge.opponent_info?.profile_image || assetLogo;
+    const hasOpponentInfo = Boolean(challenge.opponent_info?.username || challenge.opponent_info?.wallet_address);
+    const opponentDisplayName = challenge.opponent_info?.username || "Opponent";
+    const opponentAvatar = challenge.opponent_info?.profile_image || assetLogo;
+    const isPoolMode = challenge.mode === "pool";
     const betAmount = challenge.initial_bet ?? 0;
-    const timeRemaining = challenge.expire_time ? new Date(challenge.expire_time).toLocaleString() : "N/A";
-    const createdAt = challenge.created_at ? new Date(challenge.created_at).toLocaleString() : undefined;
-    const expiresAt = challenge.expire_time ? new Date(challenge.expire_time).toLocaleString() : undefined;
-    const endsAt = challenge.resolve_time ? new Date(challenge.resolve_time).toLocaleString() : undefined;
+    const createdTimestamp = challenge.created_at ? new Date(challenge.created_at).getTime() : null;
+    const expiryTimestamp = challenge.expire_time ? new Date(challenge.expire_time).getTime() : null;
     const resolveTimestamp = challenge.resolve_time ? new Date(challenge.resolve_time).getTime() : null;
     const endsByCountdown = formatEndsByCountdown(resolveTimestamp, currentTime);
     const exactCountdownDetails = formatExactCountdownDetails(resolveTimestamp, currentTime);
+    const createdTimeText = formatCreatedTimeAgo(createdTimestamp, currentTime);
+    const expiresInText = formatExpiryCountdown(expiryTimestamp, currentTime);
+    const endsInText = formatEndsByCountdown(resolveTimestamp, currentTime);
+    const resolveDayDateText = resolveTimestamp
+        ? new Date(resolveTimestamp).toLocaleDateString("en-GB", {
+            weekday: "long",
+            day: "numeric",
+            month: "long",
+        })
+        : "Unknown date";
     const creatorWalletAddress = challenge.creator?.wallet_address || "";
+    const creatorWalletShort = creatorWalletAddress
+        ? `${creatorWalletAddress.slice(0, 6)}...${creatorWalletAddress.slice(-4)}`
+        : "Unknown wallet";
     const startPrice = betAmount;
     const targetPrice = challenge.total_pool ?? betAmount;
     const currentPrice = challenge.total_pool ?? 0;
@@ -156,6 +202,36 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
         return Math.max(0, Math.min(100, position));
     };
     const priceBarPosition = getPriceBarPosition();
+
+    const handleShareChallenge = async () => {
+        if (!challenge) return;
+
+        const shareUrl = `${window.location.origin}/challenges?challengeId=${encodeURIComponent(challenge.id)}`;
+        const shareText = `Check out this challenge: ${challenge.title}`;
+
+        try {
+            if (navigator.share) {
+                await navigator.share({
+                    title: challenge.title,
+                    text: shareText,
+                    url: shareUrl,
+                });
+                setShareFeedback("Shared");
+            } else {
+                await navigator.clipboard.writeText(shareUrl);
+                setShareFeedback("Link copied");
+            }
+        } catch {
+            try {
+                await navigator.clipboard.writeText(shareUrl);
+                setShareFeedback("Link copied");
+            } catch {
+                setShareFeedback("Share failed");
+            }
+        }
+
+        window.setTimeout(() => setShareFeedback(null), 1800);
+    };
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200 overflow-hidden">
@@ -193,7 +269,7 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
                 {/* Main Content */}
                 <div className="relative p-6 sm:p-8">
                     {/* Header Section */}
-                    <div className="flex flex-col sm:flex-row gap-6 mb-8">
+                    <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 mb-6 sm:mb-8">
                         {/* Asset Image */}
                         <div className="relative flex-shrink-0 mx-auto sm:mx-0">
                             <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl bg-gradient-to-br from-[#2d1f1a] to-[#4a3830] p-1 shadow-xl">
@@ -210,7 +286,7 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
                         </div>
 
                         {/* Challenge Info */}
-                        <div className="flex-1 text-center sm:text-left">
+                        <div className="flex-1 text-center sm:text-left min-w-0">
                             {/* Market Tag */}
                             {/* <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-white/70 backdrop-blur-sm rounded-full mb-3 border border-[#d4a574]/40 shadow-sm">
                                 <div className="w-5 h-5 rounded-full bg-gradient-to-br from-amber-300 to-orange-500 flex items-center justify-center shadow-sm">
@@ -228,13 +304,11 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
                             </div> */}
 
                             {/* Title */}
-                            <h2 className="mt-2 flex text-[#2d1f1a] leading-tight mb-3">
-                                <span className="block text-2xl sm:text-3xl font-bold tracking-tight">
-                                    {challenge.title} In
-                                </span>
-                                <span className="block text-2xl sm:text-3xl font-bold tracking-tight">
-                                    <span className="ml-2 inline-flex items-center gap-1.5 align-middle">
-                                        <span className="text-2xl sm:text-3xl font-bold text-emerald-900">{endsByCountdown}</span>
+                            <h2 className="mt-2 text-[#2d1f1a] leading-tight mb-3">
+                                <span className="block sm:hidden text-[22px] font-bold tracking-tight break-words">
+                                    {challenge.title} In Next{" "}
+                                    <span className="inline-flex items-center gap-1.5 align-middle">
+                                        <span className="font-bold text-emerald-900 whitespace-nowrap">{endsByCountdown}</span>
                                         <span className="group relative inline-flex items-center">
                                             <svg className="w-4 h-4 text-emerald-700 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -242,7 +316,24 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
                                             <span className="absolute left-1/2 top-full z-10 mt-2 w-60 -translate-x-1/2 rounded-lg bg-gray-900 p-2 text-[11px] font-medium text-white opacity-0 invisible transition-all duration-200 group-hover:opacity-100 group-hover:visible normal-case leading-relaxed shadow-lg">
                                                 <span className="block">Exact countdown: {exactCountdownDetails.exactCountdown}</span>
                                                 <span className="block">Time left: {exactCountdownDetails.timeLeftText}</span>
-                                                <span className="block">Ends on: {exactCountdownDetails.dayLabel}</span>
+                                                <span className="block">Resolves on: {exactCountdownDetails.dayLabel}</span>
+                                                <span className="absolute left-1/2 top-0 -translate-x-1/2 -translate-y-full border-4 border-transparent border-b-gray-900"></span>
+                                            </span>
+                                        </span>
+                                    </span>
+                                </span>
+                                <span className="hidden sm:flex sm:items-center sm:gap-2 sm:text-3xl sm:font-bold sm:tracking-tight sm:whitespace-nowrap">
+                                    <span>{challenge.title} In Next</span>
+                                    <span className="inline-flex items-center gap-1.5 align-middle">
+                                        <span className="font-bold text-emerald-900 whitespace-nowrap">{endsByCountdown}</span>
+                                        <span className="group relative inline-flex items-center">
+                                            <svg className="w-4 h-4 text-emerald-700 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            </svg>
+                                            <span className="absolute left-1/2 top-full z-10 mt-2 w-60 -translate-x-1/2 rounded-lg bg-gray-900 p-2 text-[11px] font-medium text-white opacity-0 invisible transition-all duration-200 group-hover:opacity-100 group-hover:visible normal-case leading-relaxed shadow-lg">
+                                                <span className="block">Exact countdown: {exactCountdownDetails.exactCountdown}</span>
+                                                <span className="block">Time left: {exactCountdownDetails.timeLeftText}</span>
+                                                <span className="block">Resolves on: {exactCountdownDetails.dayLabel}</span>
                                                 <span className="absolute left-1/2 top-0 -translate-x-1/2 -translate-y-full border-4 border-transparent border-b-gray-900"></span>
                                             </span>
                                         </span>
@@ -268,8 +359,9 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
                                         className="w-full h-full object-cover"
                                     />
                                 </div>
-                                <span className="text-[13px] leading-none text-[#756d66]">
-                                    Created by {creatorName}
+                                <span className="flex flex-col leading-none text-left">
+                                    <span className="text-[13px] text-[#756d66]">Created by {creatorName}</span>
+                                    <span className="mt-1 text-[11px] text-[#9a9189]">{creatorWalletShort}</span>
                                 </span>
                             </button>
                         </div>
@@ -362,10 +454,10 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
                             {isAccepted ? "Battle Matchup" : "Waiting for Challenger"}
                         </h3>
 
-                        <div className={`flex flex-row items-center justify-center gap-4`}>
+                        <div className="flex flex-row items-center justify-center gap-2 sm:gap-4">
                             {/* Challenger Profile */}
-                            <div className="relative group">
-                                <div className={`relative p-4 rounded-2xl transition-all duration-300 ${hasWon
+                            <div className="relative group flex flex-col items-center">
+                                <div className={`w-[120px] h-[140px] flex flex-col items-center justify-center p-3 rounded-xl transition-all duration-300 ${hasWon
                                     ? "bg-gradient-to-br from-amber-100 to-yellow-50 border-2 border-amber-400 shadow-lg shadow-amber-200"
                                     : hasLost
                                         ? "bg-gradient-to-br from-red-100 to-rose-50 border-2 border-red-300"
@@ -380,26 +472,26 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
 
                                     {/* Avatar */}
                                     <div className="relative">
-                                        <div className={`w-20 h-20 rounded-full overflow-hidden border-3 ${hasWon ? "border-amber-400" : "border-[#d4a574]"
-                                            } shadow-lg`}>
+                                        <div className={`w-14 h-14 rounded-full overflow-hidden border-2 ${hasWon ? "border-amber-400" : "border-[#d4a574]"
+                                            } shadow-md`}>
                                             <Image
                                                 src={creatorAvatar}
                                                 alt={creatorName}
-                                                width={80}
-                                                height={80}
+                                                width={56}
+                                                height={56}
                                                 className="w-full h-full object-cover"
                                             />
                                         </div>
                                         {/* Label */}
-                                        <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 px-2 py-0.5 bg-[#2d1f1a] text-white text-[10px] font-bold rounded-full">
+                                        <div className="mt-1 px-1.5 py-0.5 bg-[#2d1f1a] text-white text-[9px] font-bold rounded-full">
                                             CHALLENGER
                                         </div>
                                     </div>
 
                                     {/* Info */}
-                                    <div className="mt-6 text-center">
-                                        <p className="font-bold text-[#2d1f1a] text-sm">{creatorName}</p>
-                                        <p className="text-xs text-[#8b7355] mt-1">
+                                    <div className="mt-2 text-center">
+                                        <p className="font-bold text-[#2d1f1a] text-xs">{creatorName}</p>
+                                        <p className="text-[10px] text-[#8b7355] mt-0.5">
                                             {hasWon ? "Won the bet!" : hasLost ? "Lost the bet" : "Created challenge"}
                                         </p>
                                     </div>
@@ -407,15 +499,15 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
                             </div>
 
                             {/* VS Badge or Pending Badge */}
-                            <div className="flex flex-col items-center justify-center">
+                            <div className="flex flex-col items-center justify-center px-2">
                                 {isAccepted ? (
                                     <>
-                                        <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#2d1f1a] to-[#4a3830] flex items-center justify-center shadow-xl">
-                                            <span className="text-2xl font-black text-[#f3e1d7]">VS</span>
+                                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#2d1f1a] to-[#4a3830] flex items-center justify-center shadow-lg">
+                                            <span className="text-lg font-black text-[#f3e1d7]">VS</span>
                                         </div>
                                         {hasWon || hasLost ? (
-                                            <div className="mt-2 text-center">
-                                                <p className={`text-2xl font-black ${hasWon ? "text-amber-500" : "text-red-500"}`}>
+                                            <div className="mt-1 text-center">
+                                                <p className={`text-lg font-black ${hasWon ? "text-amber-500" : "text-red-500"}`}>
                                                     {hasWon ? "+" : "-"}${betAmount}
                                                 </p>
                                                 <p className="text-[10px] text-[#8b7355]">SOL</p>
@@ -424,20 +516,20 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
                                     </>
                                 ) : (
                                     <>
-                                        <div className="w-16 h-16 rounded-full bg-gradient-to-br from-gray-300 to-gray-400 flex items-center justify-center shadow-lg animate-pulse">
-                                            <User className="w-8 h-8 text-white/50" />
+                                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-gray-300 to-gray-400 flex items-center justify-center shadow-lg animate-pulse">
+                                            <User className="w-6 h-6 text-white/50" />
                                         </div>
-                                        <div className="mt-3 px-4 py-1.5 bg-[#8b7355]/20 rounded-full">
+                                        <div className="mt-2 px-2.5 py-1 bg-[#8b7355]/20 rounded-full">
                                             <p className="text-xs font-semibold text-[#8b7355]">Seeking Opponent</p>
                                         </div>
                                     </>
                                 )}
                             </div>
 
-                            {/* Accepter Profile - Only show if accepted */}
-                            {isAccepted && challenge.opponent_info && (
-                                <div className="relative group">
-                                    <div className={`relative p-4 rounded-2xl transition-all duration-300 ${hasLost
+                            {/* Opponent Profile */}
+                            {hasOpponentInfo ? (
+                                <div className="relative group flex flex-col items-center">
+                                    <div className={`w-[120px] h-[140px] flex flex-col items-center justify-center p-3 rounded-xl transition-all duration-300 ${hasLost
                                         ? "bg-gradient-to-br from-amber-100 to-yellow-50 border-2 border-amber-400 shadow-lg shadow-amber-200"
                                         : hasWon
                                             ? "bg-gradient-to-br from-red-100 to-rose-50 border-2 border-red-300"
@@ -452,43 +544,44 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
 
                                         {/* Avatar */}
                                         <div className="relative">
-                                            <div className={`w-20 h-20 rounded-full overflow-hidden border-3 ${hasLost ? "border-amber-400" : "border-[#d4a574]"
-                                                } shadow-lg`}>
+                                            <div className={`w-14 h-14 rounded-full overflow-hidden border-2 ${hasLost ? "border-amber-400" : "border-[#d4a574]"
+                                                } shadow-md`}>
                                                 <Image
-                                                    src={accepterAvatar}
-                                                    alt={accepterName}
-                                                    width={80}
-                                                    height={80}
+                                                    src={opponentAvatar}
+                                                    alt={opponentDisplayName}
+                                                    width={56}
+                                                    height={56}
                                                     className="w-full h-full object-cover"
                                                 />
                                             </div>
                                             {/* Label */}
-                                            <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 px-2 py-0.5 bg-[#2d1f1a] text-white text-[10px] font-bold rounded-full">
-                                                ACCEPTER
+                                            <div className="mt-1 px-1.5 py-0.5 bg-[#2d1f1a] text-white text-[9px] font-bold rounded-full">
+                                                {isPoolMode ? "POOL" : "OPPONENT"}
                                             </div>
                                         </div>
 
                                         {/* Info */}
-                                        <div className="mt-6 text-center">
-                                            <p className="font-bold text-[#2d1f1a] text-sm">{accepterName}</p>
-                                            <p className="text-xs text-[#8b7355] mt-1">
-                                                {hasLost ? "Won the bet!" : hasWon ? "Lost the bet" : "Accepted challenge"}
+                                        <div className="mt-2 text-center">
+                                            <p className="font-bold text-[#2d1f1a] text-xs">{opponentDisplayName}</p>
+                                            <p className="text-[10px] text-[#8b7355] mt-0.5">
+                                                {hasLost ? "Won the bet!" : hasWon ? "Lost the bet" : "Defending challenge"}
                                             </p>
                                         </div>
                                     </div>
                                 </div>
-                            )}
+                            ) : (
 
-                            {/* Placeholder for pending state */}
-                            {!isAccepted && (
                                 <div className="relative">
-                                    <div className="p-4 rounded-2xl bg-white/40 border-2 border-dashed border-[#d4a574]/30">
-                                        <div className="w-20 h-20 rounded-full bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center border-3 border-[#d4a574]/50">
-                                            <span className="text-3xl">❓</span>
+                                    <div className="w-[120px] h-[140px] flex flex-col items-center justify-center p-3 rounded-xl bg-white/40 border-2 border-dashed border-[#d4a574]/30">
+                                        <div className="w-14 h-14 rounded-full bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center border-2 border-[#d4a574]/50">
+                                            <span className="text-xl">❓</span>
                                         </div>
-                                        <div className="mt-6 text-center">
-                                            <p className="font-semibold text-[#8b7355] text-sm">No one yet</p>
-                                            <p className="text-xs text-[#a08070] mt-1">Be the first to accept!</p>
+                                        <div className="mt-1 px-1.5 py-0.5 bg-[#2d1f1a] text-white text-[9px] font-bold rounded-full">
+                                            OPPONENT
+                                        </div>
+                                        <div className="mt-2 text-center">
+                                            <p className="font-semibold text-[#8b7355] text-xs">No one yet</p>
+                                            <p className="text-[10px] text-[#a08070] mt-0.5">Be the first to accept!</p>
                                         </div>
                                     </div>
                                 </div>
@@ -502,38 +595,59 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
                             Challenge Timeline
                         </h3>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 overflow-visible">
+                            {/* Mode */}
+                            <div className="relative p-4 bg-white/60 backdrop-blur-sm rounded-xl border border-[#d4a574]/20 hover:border-[#d4a574]/40 hover:shadow-lg transition-all duration-200 cursor-pointer overflow-visible">
+                                <div className="flex items-center gap-3 mb-2">
+                                    <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center">
+                                        <Calendar className="w-4 h-4 text-emerald-600" />
+                                    </div>
+                                    <span className="text-xs font-semibold text-[#8b7355] uppercase">Mode</span>
+                                </div>
+                                <p className="font-bold text-[#2d1f1a]">{challenge.mode === "pool" ? "Multi Mode" : "PvP Mode"}</p>
+                            </div>
+
                             {/* Created */}
-                            <div className="relative p-4 bg-white/60 backdrop-blur-sm rounded-xl border border-[#d4a574]/20 hover:border-[#d4a574]/40 hover:shadow-lg transition-all duration-200 cursor-pointer">
+                            <div className="relative p-4 bg-white/60 backdrop-blur-sm rounded-xl border border-[#d4a574]/20 hover:border-[#d4a574]/40 hover:shadow-lg transition-all duration-200 cursor-pointer overflow-visible">
                                 <div className="flex items-center gap-3 mb-2">
                                     <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center">
                                         <Calendar className="w-4 h-4 text-emerald-600" />
                                     </div>
                                     <span className="text-xs font-semibold text-[#8b7355] uppercase">Created</span>
                                 </div>
-                                <p className="font-bold text-[#2d1f1a]">{createdAt || "2 hours ago"}</p>
+                                <p className="font-bold text-[#2d1f1a]">{createdTimeText}</p>
                             </div>
 
                             {/* Expires */}
-                            <div className="relative p-4 bg-white/60 backdrop-blur-sm rounded-xl border border-[#d4a574]/20 hover:border-[#d4a574]/40 hover:shadow-lg transition-all duration-200 cursor-pointer">
+                            <div className="relative z-20 hover:z-50 p-4 bg-white/60 backdrop-blur-sm rounded-xl border border-[#d4a574]/20 hover:border-[#d4a574]/40 hover:shadow-lg transition-all duration-200 cursor-pointer overflow-visible">
                                 <div className="flex items-center gap-3 mb-2">
                                     <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center">
                                         <Clock className="w-4 h-4 text-amber-600" />
                                     </div>
-                                    <span className="text-xs font-semibold text-[#8b7355] uppercase">Expires</span>
+                                    <span className="text-xs font-semibold text-[#8b7355] uppercase">Expires In</span>
+                                    <div className="group relative z-[60]">
+                                        <svg className="w-3.5 h-3.5 text-amber-600 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 p-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-[9999] text-center">
+                                            This challenge will expire in {expiresInText}. After that, no one can join.
+                                            <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
+                                        </div>
+                                    </div>
                                 </div>
-                                <p className="font-bold text-[#2d1f1a]">{expiresAt || timeRemaining}</p>
+                                <p className="font-bold text-[#2d1f1a]">{expiresInText}</p>
                             </div>
 
-                            {/* Ends */}
-                            <div className="relative p-4 bg-white/60 backdrop-blur-sm rounded-xl border border-[#d4a574]/20 hover:border-[#d4a574]/40 hover:shadow-lg transition-all duration-200 cursor-pointer">
+                            {/* Resolves */}
+                            <div className="relative z-10 p-4 bg-white/60 backdrop-blur-sm rounded-xl border border-[#d4a574]/20 hover:border-[#d4a574]/40 hover:shadow-lg transition-all duration-200 cursor-pointer overflow-visible">
                                 <div className="flex items-center gap-3 mb-2">
                                     <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
                                         <AlertCircle className="w-4 h-4 text-blue-600" />
                                     </div>
-                                    <span className="text-xs font-semibold text-[#8b7355] uppercase">Ends</span>
+                                    <span className="text-xs font-semibold text-[#8b7355] uppercase">Resolves In</span>
                                 </div>
-                                <p className="font-bold text-[#2d1f1a]">{endsAt || timeRemaining}</p>
+                                <p className="font-bold text-[#2d1f1a]">{endsInText}</p>
+                                <p className="text-xs text-[#8b7355] mt-1">({resolveDayDateText})</p>
                             </div>
                         </div>
                     </div>
@@ -544,8 +658,12 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
                             Accept Challenge
                             <span className="text-xl">⚔️</span>
                         </button>
-                        <button className="flex-1 py-3.5 px-6 bg-white/80 hover:bg-white rounded-xl text-[#2d1f1a] font-semibold text-base border border-[#d4a574]/30 hover:border-[#d4a574] transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer">
-                            Share
+                        <button
+                            type="button"
+                            onClick={handleShareChallenge}
+                            className="flex-1 py-3.5 px-6 bg-white/80 hover:bg-white rounded-xl text-[#2d1f1a] font-semibold text-base border border-[#d4a574]/30 hover:border-[#d4a574] transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer"
+                        >
+                            {shareFeedback ?? "Share"}
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
                             </svg>

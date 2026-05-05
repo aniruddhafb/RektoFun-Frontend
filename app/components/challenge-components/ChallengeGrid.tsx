@@ -10,6 +10,7 @@ interface ChallengeGridProps {
     onRekt: (challenge: ChallengeListItem) => void;
     onClick: (challenge: ChallengeListItem) => void;
     onOpenModal: () => void;
+    onChallengesLoaded?: (challenges: ChallengeListItem[]) => void;
     isLoading?: boolean;
 }
 
@@ -17,6 +18,7 @@ export function ChallengeGrid({
     onRekt,
     onClick,
     onOpenModal,
+    onChallengesLoaded,
 }: ChallengeGridProps) {
     const [challenges, setChallenges] = useState<ChallengeListItem[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -29,17 +31,20 @@ export function ChallengeGrid({
             try {
                 const response = await getChallenges();
                 // Map API response to unified ChallengeListItem type
+                console.log({ response });
                 setChallenges(response.challenges);
+                onChallengesLoaded?.(response.challenges);
             } catch (error) {
                 console.error('Failed to fetch challenges:', error);
                 setChallenges([]);
+                onChallengesLoaded?.([]);
             } finally {
                 setIsLoading(false);
             }
         }
 
         fetchChallenges();
-    }, []);
+    }, [onChallengesLoaded]);
 
     if (isLoading) {
         return (

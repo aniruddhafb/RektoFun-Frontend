@@ -282,17 +282,17 @@ export function ChallengeCard({
             const onchainMeta =
                 (challengeDetails.metadata as Record<string, unknown> | undefined)
                     ?.onchain as
-                    | {
-                          challenge_pda?: string;
-                          creator_wallet?: string;
-                      }
-                    | undefined;
+                | {
+                    challenge_pda?: string;
+                    creator_wallet?: string;
+                }
+                | undefined;
 
             const challengePdaStr = onchainMeta?.challenge_pda;
             const creatorWalletStr =
                 onchainMeta?.creator_wallet ?? challenge.creator.wallet_address;
 
-            console.log({onchainMeta});
+            console.log({ onchainMeta });
 
             if (!challengePdaStr) {
                 throw new Error(
@@ -415,6 +415,10 @@ export function ChallengeCard({
     const creatorName = labelsMeta.creator || challenge.creator.username || "Creator";
     const creatorDisplayName = truncateProfileName(creatorName, 6);
     const creatorProfileImage = challenge.creator.profile_image || assetIcon;
+    const opponentInfo = challenge.opponent_info ?? null;
+    const hasOpponentInfo = Boolean(opponentInfo?.username || opponentInfo?.wallet_address);
+    const opponentProfileImage = opponentInfo?.profile_image || assetIcon;
+    const opponentDisplayName = opponentInfo?.username || "Opponent";
 
     // Get title
     const title = uiMeta.title || challenge.title || `Bet on ${assetSymbol}`;
@@ -504,7 +508,7 @@ export function ChallengeCard({
                                         <span className="absolute left-1/2 top-full z-10 mt-2 w-60 -translate-x-1/2 rounded-lg bg-gray-900 p-2 text-[11px] font-medium text-white opacity-0 invisible transition-all duration-200 group-hover:opacity-100 group-hover:visible normal-case leading-relaxed shadow-lg">
                                             <span className="block">Exact countdown: {exactCountdownDetails.exactCountdown}</span>
                                             <span className="block">Time left: {exactCountdownDetails.timeLeftText}</span>
-                                            <span className="block">Ends on: {exactCountdownDetails.dayLabel}</span>
+                                            <span className="block">Resolves on: {exactCountdownDetails.dayLabel}</span>
                                             <span className="absolute left-1/2 top-0 -translate-x-1/2 -translate-y-full border-4 border-transparent border-b-gray-900"></span>
                                         </span>
                                     </span>
@@ -617,7 +621,7 @@ export function ChallengeCard({
                     </div>
 
                     {/* opponent Profile */}
-                    {isAccepted && challenge.opponent_info ? (
+                    {hasOpponentInfo ? (
                         <div className="relative group flex flex-col items-center">
                             <div className={`w-[120px] h-[140px] flex flex-col items-center justify-center p-3 rounded-xl transition-all duration-300 ${hasLost
                                 ? "bg-gradient-to-br from-amber-100 to-yellow-50 border-2 border-amber-400"
@@ -636,15 +640,15 @@ export function ChallengeCard({
                                 <div className={`w-14 h-14 rounded-full overflow-hidden border-2 ${hasLost ? "border-amber-400" : "border-[#d4a574]"
                                     } shadow-md`}>
                                     <Image
-                                        src={challenge.opponent_info.profile_image}
-                                        alt={challenge.opponent_info.username}
+                                        src={opponentProfileImage}
+                                        alt={opponentDisplayName}
                                         width={56}
                                         height={56}
                                         className="w-full h-full object-cover"
                                     />
                                 </div>
                                 {/* Count Badge */}
-                                {challenge.mode === "multi" && (challenge.total_opponents ?? 0) > 1 && (
+                                {challenge.mode === "pool" && (challenge.total_opponents ?? 0) > 1 && (
                                     <div className="absolute top-1 right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center border-2 border-white">
                                         <span className="text-[9px] font-bold text-white">+{(challenge.total_opponents ?? 0) - 1}</span>
                                     </div>
@@ -656,7 +660,7 @@ export function ChallengeCard({
 
                                 {/* Info */}
                                 <div className="mt-2 text-center">
-                                    <p className="font-bold text-[#2d1f1a] text-xs">{challenge.opponent_info.username}</p>
+                                    <p className="font-bold text-[#2d1f1a] text-xs">{opponentDisplayName}</p>
                                     <p className="text-[10px] text-[#8b7355] mt-0.5">
                                         {hasLost ? "Won!" : hasWon ? "Lost" : "Defending"}
                                     </p>

@@ -287,6 +287,7 @@ export function CreateChallengeModal({
                     created_by: user?.id || "",
                     mode: challengeMode,
                     initial_bet: betAmount,
+                    target_price: isSportsSelected ? undefined : Number(predictionPrice),
                     bet_unit: 1,
                     resolution_source: isSportsSelected ? "manual" : "price_feed",
                     expire_time: new Date(expiresAt * 1000).toISOString(),
