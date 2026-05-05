@@ -272,7 +272,9 @@ export function CreateChallengeModal({
 
             const [challengePDA] = deriveChallengePDA(creatorPubkey, challengeId);
 
-            // Post to backend API
+            // Post to backend API — persist on-chain identifiers in metadata so
+            // future joiners can look the challenge up by PDA in O(1) instead of
+            // scanning every on-chain account.
             try {
                 await createChallenge({
                     title: isSportsSelected ? challengeStatement : `${selectedChildMarket?.symbol} ${predictionDirection} $${predictionPrice}`,
@@ -289,6 +291,16 @@ export function CreateChallengeModal({
                     resolution_source: isSportsSelected ? "manual" : "price_feed",
                     expire_time: new Date(expiresAt * 1000).toISOString(),
                     resolve_time: new Date(resolvesAt * 1000).toISOString(),
+                    metadata: {
+                        onchain: {
+                            challenge_pda: challengePDA.toBase58(),
+                            challenge_id: challengeId,
+                            creator_wallet: creatorPubkey.toBase58(),
+                            program_id: "4t5KYdKFmPw49yo6Bm1TV2ZDEi6k3Ns4eJLeNhgbVSzJ",
+                            cluster: "devnet",
+                            tx_signature: signature,
+                        },
+                    },
                 });
             } catch (apiErr) {
                 // Backend error is non-fatal — the on-chain tx succeeded
