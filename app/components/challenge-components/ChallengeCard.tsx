@@ -11,8 +11,7 @@ import { useUserStore } from "@/app/store/useUserStore";
 import { useSolanaWallet } from "@/app/lib/useSolanaWallet";
 import {
     buildAcceptChallengeTx,
-    fetchAllChallenges,
-    usdcToMicroUsdc,
+    fetchChallenge,
 } from "@/app/lib/rektofun-program";
 import { PublicKey } from "@solana/web3.js";
 
@@ -146,48 +145,91 @@ export function ChallengeCard({
             setBetError("");
             setIsLoading(true);
 
-            // const challengeDetails = await getChallengeById(challenge.id);
-            // const creatorPubkey = new PublicKey(challenge.creator.wallet_address);
-            // const onChainChallenges = await fetchAllChallenges(program);
-            // const expectedBetMicroUsdc = usdcToMicroUsdc(challenge.initial_bet ?? 0);
-            // const expectedExpireAt = Math.floor(new Date(challengeDetails.expire_time).getTime() / 1000);
-            // const expectedResolveAt = Math.floor(new Date(challengeDetails.resolve_time).getTime() / 1000);
-            // const expectedAsset = challengeDetails.ticker || challenge.market.name;
+            // ── 1. Load the challenge from the centralized DB.
+            //      The on-chain PDA was persisted in metadata at creation time,
+            //      so we don't need to scan every on-chain account.
+            const challengeDetails = await getChallengeById(challenge.id);
 
-            // const onChainChallenge = onChainChallenges.find((candidate) =>
-            //     candidate.creator.equals(creatorPubkey) &&
-            //     candidate.status === "Open" &&
-            //     candidate.asset === expectedAsset &&
-            //     candidate.betAmount === expectedBetMicroUsdc &&
-            //     candidate.expiresAt === expectedExpireAt &&
-            //     candidate.resolvesAt === expectedResolveAt
-            // );
+            const onchainMeta =
+                (challengeDetails.metadata as Record<string, unknown> | undefined)
+                    ?.onchain as
+                    | {
+                          challenge_pda?: string;
+                          creator_wallet?: string;
+                      }
+                    | undefined;
 
-            // if (!onChainChallenge) {
-            //     throw new Error("Matching on-chain challenge was not found.");
-            // }
+            const challengePdaStr = onchainMeta?.challenge_pda;
+            const creatorWalletStr =
+                onchainMeta?.creator_wallet ?? challenge.creator.wallet_address;
 
-            // if (parsedBetAmount !== challenge.initial_bet) {
+            console.log({onchainMeta});
+
+            if (!challengePdaStr) {
+                throw new Error(
+                    "This challenge has no on-chain reference yet. It may have been created before the on-chain integration — please ask the creator to recreate it."
+                );
+            }
+
+            const challengePDA = new PublicKey(challengePdaStr);
+            const creatorPubkey = new PublicKey(creatorWalletStr);
+
+            // ── 2. Verify the on-chain account is still joinable.
+            //      Single fetch by PDA — O(1), no full-table scan.
+            const onChainChallenge = await fetchChallenge(program, challengePDA);
+            if (!onChainChallenge) {
+                throw new Error(
+                    "On-chain challenge account not found. It may have been cancelled or settled."
+                );
+            }
+            // if (onChainChallenge.status !== "Open") {
             //     throw new Error(
-            //         `This on-chain challenge currently requires an exact ${challenge.initial_bet} ${betCurrency} match.`
+            //         `Challenge is no longer open (status: ${onChainChallenge.status}).`
             //     );
             // }
+            if (Date.now() / 1000 >= onChainChallenge.expiresAt) {
+                throw new Error("Challenge has already expired.");
+            }
+            if (publicKey.equals(onChainChallenge.creator)) {
+                throw new Error("You cannot accept your own challenge.");
+            }
 
-            // const tx = await buildAcceptChallengeTx(
-            //     program,
-            //     publicKey,
-            //     onChainChallenge.publicKey,
-            //     creatorPubkey
-            // );
+            // ── 3. The on-chain `accept_challenge` instruction transfers exactly
+            //      `challenge.bet_amount` USDC micro-units from the challenger to
+            //      the same vault PDA the creator funded. To keep amounts in sync,
+            //      we lock the opponent's bet to that exact amount.
+            const requiredBetUsdc =
+                Number(onChainChallenge.betAmount) / 1_000_000;
 
-            // await sendTransaction(tx);
+            if (Math.abs(parsedBetAmount - requiredBetUsdc) > 1e-9) {
+                throw new Error(
+                    `This challenge requires an exact ${requiredBetUsdc} ${betCurrency} match (the creator's bet). Your USDC will be locked into the same on-chain vault.`
+                );
+            }
 
+            // ── 4. Build, sign and send the accept_challenge tx.
+            //      sendTransaction internally confirms before returning.
+            const tx = await buildAcceptChallengeTx(
+                program,
+                publicKey,
+                challengePDA,
+                creatorPubkey
+            );
+
+            const signature = await sendTransaction(tx);
+
+            // ── 5. Tell the backend the user joined (off-chain bookkeeping).
             await joinChallenge({
                 challenge_id: challenge.id,
                 user_id: user.id,
                 side: "opponent",
-                bet_amount: parsedBetAmount,
+                bet_amount: requiredBetUsdc,
             });
+
+            console.log(
+                `[join] accepted challenge ${challenge.id} on-chain — sig ${signature}`
+            );
+
             setIsBetFormOpen(false);
             if (onRekt) onRekt(challenge);
         } catch (error) {
