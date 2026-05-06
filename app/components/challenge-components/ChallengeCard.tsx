@@ -398,11 +398,11 @@ export function ChallengeCard({
             const requiredBetUsdc =
                 Number(onChainChallenge.betAmount) / 1_000_000;
 
-            if (Math.abs(parsedBetAmount - requiredBetUsdc) > 1e-9) {
-                throw new Error(
-                    `This challenge requires an exact ${requiredBetUsdc} ${betCurrency} match (the creator's bet). Your USDC will be locked into the same on-chain vault.`
-                );
-            }
+            // if (Math.abs(parsedBetAmount - requiredBetUsdc) > 1e-9) {
+            //     throw new Error(
+            //         `This challenge requires an exact ${requiredBetUsdc} ${betCurrency} match (the creator's bet). Your USDC will be locked into the same on-chain vault.`
+            //     );
+            // }
 
             // ── 4. Build, sign and send the accept_challenge tx.
             //      sendTransaction internally confirms before returning.

@@ -128,7 +128,7 @@ function getChallengeCtaConfig(challenge: ChallengeListItem, nowMs: number) {
 
     if (isPoolMode) {
         return {
-            label: "JOIN CHALLENGE",
+            label: "JOIN",
             disabled: false,
             className:
                 "cursor-pointer px-3 py-1.5 bg-[#246044] hover:bg-[#2b7351] border border-gray-500 text-white text-xs font-bold rounded-lg transition-colors whitespace-nowrap",
@@ -136,7 +136,7 @@ function getChallengeCtaConfig(challenge: ChallengeListItem, nowMs: number) {
     }
 
     return {
-        label: "ACCEPT CHALLENGE",
+        label: "ACCEPT",
         disabled: false,
         className:
             "cursor-pointer px-3 py-1.5 bg-[#0c9d63] hover:bg-[#0a7d4f] border border-gray-500 text-white text-xs font-bold rounded-lg transition-colors whitespace-nowrap",

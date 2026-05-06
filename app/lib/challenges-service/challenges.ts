@@ -77,6 +77,81 @@ export interface GetChallengesParams {
 }
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const DEFAULT_TIMEOUT_MS = 10000;
+const DEFAULT_RETRIES = 2;
+
+interface RequestOptions {
+  signal?: AbortSignal;
+  timeoutMs?: number;
+  retries?: number;
+}
+
+function shouldRetryStatus(status: number): boolean {
+  return status === 408 || status === 429 || status >= 500;
+}
+
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function fetchJsonWithRetry<T>(url: string, init: RequestInit, options: RequestOptions = {}): Promise<T> {
+  const retries = options.retries ?? DEFAULT_RETRIES;
+  const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    let abortListener: (() => void) | undefined;
+
+    if (options.signal) {
+      abortListener = () => controller.abort();
+      options.signal.addEventListener('abort', abortListener, { once: true });
+    }
+
+    try {
+      const response = await fetch(url, {
+        ...init,
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        if (attempt < retries && shouldRetryStatus(response.status)) {
+          await wait(250 * (attempt + 1));
+          continue;
+        }
+        throw new Error(`Request failed (${response.status}): ${response.statusText}`);
+      }
+
+      return response.json() as Promise<T>;
+    } catch (error) {
+      const isAborted = error instanceof DOMException && error.name === 'AbortError';
+      const parentAborted = !!options.signal?.aborted;
+
+      if (parentAborted) {
+        throw error;
+      }
+
+      if (attempt < retries && isAborted) {
+        await wait(250 * (attempt + 1));
+        continue;
+      }
+
+      if (attempt < retries) {
+        await wait(250 * (attempt + 1));
+        continue;
+      }
+
+      throw error;
+    } finally {
+      clearTimeout(timeout);
+      if (options.signal && abortListener) {
+        options.signal.removeEventListener('abort', abortListener);
+      }
+    }
+  }
+
+  throw new Error('Request failed after retries');
+}
 
 export async function getChallengeById(id: string): Promise<Challenge> {
   const response = await fetch(`${API_BASE_URL}/challenges/${id}`, {
@@ -93,7 +168,10 @@ export async function getChallengeById(id: string): Promise<Challenge> {
   return response.json();
 }
 
-export async function getChallenges(params: GetChallengesParams = {}): Promise<ChallengesResponse> {
+export async function getChallenges(
+  params: GetChallengesParams = {},
+  requestOptions: RequestOptions = {},
+): Promise<ChallengesResponse> {
   const searchParams = new URLSearchParams();
 
   if (params.status) {
@@ -118,18 +196,12 @@ export async function getChallenges(params: GetChallengesParams = {}): Promise<C
   const queryString = searchParams.toString();
   const url = `${API_BASE_URL}/challenges${queryString ? `?${queryString}` : ''}`;
 
-  const response = await fetch(url, {
+  return fetchJsonWithRetry<ChallengesResponse>(url, {
     method: 'GET',
     headers: {
       'accept': 'application/json',
     },
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch challenges: ${response.statusText}`);
-  }
-
-  return response.json();
+  }, requestOptions);
 }
 
 export interface CreateChallengeParams {
