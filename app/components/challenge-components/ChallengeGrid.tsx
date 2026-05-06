@@ -23,6 +23,12 @@ export function ChallengeGrid({
     refreshKey = 0,
 }: ChallengeGridProps) {
     const PAGE_SIZE = 6;
+    const LOADING_MESSAGES = [
+        "Scanning live markets...",
+        "Calculating risk and odds...",
+        "Finding fresh challenges for you...",
+        "Almost there, sharpening the feed...",
+    ];
     const [challenges, setChallenges] = useState<ChallengeListItem[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [loadError, setLoadError] = useState<string | null>(null);
@@ -30,6 +36,7 @@ export function ChallengeGrid({
     const [offset, setOffset] = useState(0);
     const [hasMore, setHasMore] = useState(true);
     const [isLoadingMore, setIsLoadingMore] = useState(false);
+    const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
     const loadMoreRef = useRef<HTMLDivElement | null>(null);
     const requestIdRef = useRef(0);
     const { publicKey } = useSolanaWallet();
@@ -51,6 +58,8 @@ export function ChallengeGrid({
                 {
                     timeoutMs: 10000,
                     retries: 2,
+                    cacheTtlMs: 20000,
+                    bypassCache: currentOffset === 0 ? false : true,
                 },
             );
             if (requestId !== requestIdRef.current) return;
@@ -111,10 +120,38 @@ export function ChallengeGrid({
         return () => observer.disconnect();
     }, [fetchChallenges, hasMore, isLoading, isLoadingMore, offset]);
 
+    useEffect(() => {
+        if (!isLoading) return;
+        const timer = window.setInterval(() => {
+            setLoadingMessageIndex((prev) => (prev + 1) % LOADING_MESSAGES.length);
+        }, 1400);
+        return () => window.clearInterval(timer);
+    }, [isLoading]);
+
     if (isLoading) {
         return (
             <div className="max-w-7xl mx-auto px-6 lg:px-8 pb-16">
-                <div className="text-center py-16 text-gray-700">Loading challenges…</div>
+                {/* <div className="rounded-2xl border border-white/50 bg-white/60 px-6 py-6 mb-6">
+                    <p className="text-sm text-gray-500">Loading challenges</p>
+                    <p className="text-base font-medium text-gray-900 mt-1">{LOADING_MESSAGES[loadingMessageIndex]}</p>
+                    <div className="mt-4 h-1.5 w-full overflow-hidden rounded-full bg-gray-200">
+                        <div className="h-full w-1/2 animate-pulse rounded-full bg-gray-700/70" />
+                    </div>
+                </div> */}
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                    {Array.from({ length: 6 }).map((_, index) => (
+                        <div
+                            key={index}
+                            className="h-[300px] rounded-2xl border border-white/60 bg-white/50 p-5 animate-pulse"
+                        >
+                            <div className="h-6 w-3/4 rounded bg-gray-200" />
+                            <div className="mt-3 h-4 w-1/2 rounded bg-gray-200" />
+                            <div className="mt-8 h-4 w-full rounded bg-gray-200" />
+                            <div className="mt-2 h-4 w-5/6 rounded bg-gray-200" />
+                            <div className="mt-10 h-10 w-full rounded-xl bg-gray-200" />
+                        </div>
+                    ))}
+                </div>
             </div>
         );
     }
@@ -175,7 +212,7 @@ export function ChallengeGrid({
             {hasMore && (
                 <div ref={loadMoreRef} className="flex justify-center py-8">
                     {isLoadingMore ? (
-                        <span className="text-sm text-gray-600">Loading more challenges...</span>
+                        <span className="text-sm text-gray-600">Loading more challenges and warming local cache...</span>
                     ) : (
                         <span className="text-sm text-gray-400">Scroll to load more</span>
                     )}

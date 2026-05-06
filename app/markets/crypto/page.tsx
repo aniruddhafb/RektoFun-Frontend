@@ -13,7 +13,6 @@ import {
     getChallenges,
     type ChallengeListItem,
 } from "@/app/lib/challenges-service/challenges";
-import { LoadingPage } from "@/app/components";
 import ChallengeDetailModal from "@/app/components/challenge-components/ChallengeDetailModal";
 
 interface MarketCardData {
@@ -137,6 +136,12 @@ function getChallengeCtaConfig(challenge: ChallengeListItem, nowMs: number) {
 }
 
 export default function MarketsPage() {
+    const LOADING_MESSAGES = [
+        "Syncing crypto markets...",
+        "Loading active challenges...",
+        "Building your market cards...",
+        "Almost ready...",
+    ];
     const [bookmarkedMarkets, setBookmarkedMarkets] = useState<Set<string>>(new Set());
     const [searchTerm, setSearchTerm] = useState("");
     const [markets, setMarkets] = useState<MarketCardData[]>([]);
@@ -146,6 +151,7 @@ export default function MarketsPage() {
     const [currentTime, setCurrentTime] = useState(() => Date.now());
     const [selectedChallenge, setSelectedChallenge] = useState<ChallengeListItem | null>(null);
     const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+    const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
     const handleCreateClick = () => {
         setShowDevnetNotice(true);
         setTimeout(() => setShowDevnetNotice(false), 3000);
@@ -179,20 +185,31 @@ export default function MarketsPage() {
                 setIsLoading(true);
                 setError(null);
 
-                const marketsResponse = await getMarkets({ parent_name: "Crypto" });
+                const [marketsResponse, challengesResponse] = await Promise.all([
+                    getMarkets({ parent_name: "Crypto" }),
+                    getChallenges({
+                        status: "open",
+                        limit: 100,
+                    }),
+                ]);
 
-                const cardsSettled = await Promise.allSettled(
-                    marketsResponse.markets.map(async (market) => {
-                        const challengesResponse = await getChallenges({
-                            category: market.name,
-                            limit: 4,
-                        });
-                        return mapMarketToCardData(market, challengesResponse.challenges);
-                    })
-                );
+                const challengesByCategory = new Map<string, ChallengeListItem[]>();
+                for (const challenge of challengesResponse.challenges) {
+                    const key = (challenge.market?.name || "").toLowerCase();
+                    if (!key) continue;
+                    const list = challengesByCategory.get(key);
+                    if (list) {
+                        list.push(challenge);
+                    } else {
+                        challengesByCategory.set(key, [challenge]);
+                    }
+                }
 
-                const marketCards = cardsSettled.flatMap((result) =>
-                    result.status === "fulfilled" ? [result.value] : []
+                const marketCards = marketsResponse.markets.map((market) =>
+                    mapMarketToCardData(
+                        market,
+                        challengesByCategory.get(market.name.toLowerCase()) ?? []
+                    )
                 );
 
                 if (isMounted) {
@@ -220,6 +237,14 @@ export default function MarketsPage() {
             isMounted = false;
         };
     }, []);
+
+    useEffect(() => {
+        if (!isLoading) return;
+        const timer = window.setInterval(() => {
+            setLoadingMessageIndex((prev) => (prev + 1) % LOADING_MESSAGES.length);
+        }, 1300);
+        return () => window.clearInterval(timer);
+    }, [isLoading]);
 
     const filteredMarkets = markets.filter((market) => {
         const normalizedSearch = searchTerm.trim().toLowerCase();
@@ -293,7 +318,38 @@ export default function MarketsPage() {
                 </div>
 
                 {isLoading ? (
-                    <LoadingPage variant="simple" message="Loading challenge markets..." />
+                    <div>
+                        {/* <div className="rounded-2xl border border-white/50 bg-white/60 px-6 py-5 mb-6">
+                            <p className="text-sm text-gray-500">Loading challenge markets</p>
+                            <p className="text-base font-medium text-gray-900 mt-1">{LOADING_MESSAGES[loadingMessageIndex]}</p>
+                            <div className="mt-4 h-1.5 w-full overflow-hidden rounded-full bg-gray-200">
+                                <div className="h-full w-1/2 animate-pulse rounded-full bg-gray-700/70" />
+                            </div>
+                        </div> */}
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5 mb-8">
+                            {Array.from({ length: 6 }).map((_, idx) => (
+                                <div
+                                    key={idx}
+                                    className="bg-white/40 rounded-2xl p-4 sm:p-5 border border-gray-400 animate-pulse"
+                                >
+                                    <div className="flex items-start gap-3 mb-4">
+                                        <div className="w-12 h-12 rounded-full bg-white/70" />
+                                        <div className="flex-1">
+                                            <div className="h-5 w-2/3 rounded bg-white/70" />
+                                            <div className="mt-2 h-4 w-1/3 rounded bg-white/60" />
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <div className="h-10 rounded-lg bg-white/70" />
+                                        <div className="h-10 rounded-lg bg-white/70" />
+                                        <div className="h-10 rounded-lg bg-white/70" />
+                                    </div>
+                                    <div className="mt-5 h-10 rounded-xl bg-white/80" />
+                                </div>
+                            ))}
+                        </div>
+                    </div>
                 ) : error ? (
                     <div className="rounded-2xl bg-white/40 border border-white/50 p-8 text-center text-red-700">
                         {error}

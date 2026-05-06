@@ -84,7 +84,17 @@ interface RequestOptions {
   signal?: AbortSignal;
   timeoutMs?: number;
   retries?: number;
+  cacheKey?: string;
+  cacheTtlMs?: number;
+  bypassCache?: boolean;
 }
+
+interface CacheEntry<T> {
+  data: T;
+  expiresAt: number;
+}
+
+const requestCache = new Map<string, CacheEntry<unknown>>();
 
 function shouldRetryStatus(status: number): boolean {
   return status === 408 || status === 429 || status >= 500;
@@ -195,13 +205,30 @@ export async function getChallenges(
 
   const queryString = searchParams.toString();
   const url = `${API_BASE_URL}/challenges${queryString ? `?${queryString}` : ''}`;
+  const cacheKey = requestOptions.cacheKey ?? url;
+  const cacheTtlMs = requestOptions.cacheTtlMs ?? 20000;
+  const now = Date.now();
 
-  return fetchJsonWithRetry<ChallengesResponse>(url, {
+  if (!requestOptions.bypassCache) {
+    const cached = requestCache.get(cacheKey);
+    if (cached && cached.expiresAt > now) {
+      return cached.data as ChallengesResponse;
+    }
+  }
+
+  const response = await fetchJsonWithRetry<ChallengesResponse>(url, {
     method: 'GET',
     headers: {
       'accept': 'application/json',
     },
   }, requestOptions);
+
+  requestCache.set(cacheKey, {
+    data: response,
+    expiresAt: now + cacheTtlMs,
+  });
+
+  return response;
 }
 
 export interface CreateChallengeParams {

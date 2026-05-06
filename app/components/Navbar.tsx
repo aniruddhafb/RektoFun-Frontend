@@ -1,41 +1,44 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePrivy } from "@privy-io/react-auth";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { DepositModal } from "./DepositModal";
 import { useSolanaWallet } from "@/app/lib/useSolanaWallet";
 import * as components from "./navbar-components";
-import { createUser, updateUser, getUserByWallet, acceptReferral } from "@/app/lib/users-service/users";
+import { ensureUserByWallet, updateUser, getUserByWallet, acceptReferral, User } from "@/app/lib/users-service/users";
 import { useUserStore } from "@/app/store/useUserStore";
 
 export default function Navbar() {
     const { setUser, updateUser: updateStoreUser, clearUser } = useUserStore();
     const { login, authenticated, user, logout, ready } = usePrivy();
-    const { solanaWallet, publicKey, usdcBalance } = useSolanaWallet();
+    const { publicKey, usdcBalance } = useSolanaWallet();
     const walletAddress = publicKey?.toBase58() ?? null;
     const [searchQuery, setSearchQuery] = useState("");
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
     const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
-    const [isNewUser, setIsNewUser] = useState(false);
     const [editUsername, setEditUsername] = useState("");
     const [editBio, setEditBio] = useState("");
     const [editProfileIndex, setEditProfileIndex] = useState(0);
     const [editInviteCode, setEditInviteCode] = useState("");
     const [hasCalledCreateUser, setHasCalledCreateUser] = useState(false);
     const [userProfileData, setUserProfileData] = useState<{ username: string; profileImage: string } | null>(null);
-    const [inviteCodeFromUrl, setInviteCodeFromUrl] = useState("");
+    const [currentUser, setCurrentUser] = useState<User | null>(null);
+    const latestFetchedWalletRef = useRef<string | null>(null);
+    const inFlightProfileFetchRef = useRef<Map<string, Promise<User>>>(new Map());
     const pathname = usePathname();
+    const searchParams = useSearchParams();
+    const inviteCodeFromUrl = useMemo(() => searchParams.get("ref") || "", [searchParams]);
 
-    useEffect(() => {
-        if (typeof window === "undefined") {
-            return;
-        }
-
-        const params = new URLSearchParams(window.location.search);
-        setInviteCodeFromUrl(params.get("ref") || "");
-    }, []);
+    const applyUserToNavbarState = useCallback((userData: User) => {
+        setCurrentUser(userData);
+        setUser(userData);
+        setUserProfileData({
+            username: userData.username || "User",
+            profileImage: userData.profile_image || "",
+        });
+    }, [setCurrentUser, setUser, setUserProfileData]);
 
     const handleAuth = () => {
         console.log('[Navbar] handleAuth called - login() invoked');
@@ -45,6 +48,9 @@ export default function Navbar() {
     const handleLogout = () => {
         console.log('[Navbar] handleLogout called - logout() invoked');
         setHasCalledCreateUser(false);
+        latestFetchedWalletRef.current = null;
+        setCurrentUser(null);
+        setUserProfileData(null);
         clearUser();
         logout();
     };
@@ -66,29 +72,47 @@ export default function Navbar() {
     const username = getUsername();
 
     // Fetch user profile data when authenticated
-    const fetchUserProfileData = async () => {
-        if (!authenticated || !publicKey) {
+    const fetchUserProfileData = useCallback(async ({ force = false }: { force?: boolean } = {}) => {
+        if (!authenticated || !walletAddress) {
+            latestFetchedWalletRef.current = null;
+            setCurrentUser(null);
             setUserProfileData(null);
-            return;
+            return null;
         }
+
+        if (!force && latestFetchedWalletRef.current === walletAddress && currentUser) {
+            return currentUser;
+        }
+
+        const existingRequest = inFlightProfileFetchRef.current.get(walletAddress);
+        if (existingRequest) {
+            return existingRequest;
+        }
+
+        const request = getUserByWallet(walletAddress);
+        inFlightProfileFetchRef.current.set(walletAddress, request);
 
         try {
-            const walletAddress = publicKey.toBase58();
-            const userData = await getUserByWallet(walletAddress);
-            setUser(userData);
-            setUserProfileData({
-                username: userData.username,
-                profileImage: userData.profile_image,
-            });
+            const userData = await request;
+            latestFetchedWalletRef.current = walletAddress;
+            applyUserToNavbarState(userData);
+            return userData;
         } catch (error) {
             console.log('[Navbar] Could not fetch user profile data:', error);
+            setCurrentUser(null);
             setUserProfileData(null);
+            return null;
+        } finally {
+            inFlightProfileFetchRef.current.delete(walletAddress);
         }
-    };
-
-    useEffect(() => {
-        fetchUserProfileData();
-    }, [authenticated, publicKey]);
+    }, [
+        authenticated,
+        walletAddress,
+        currentUser,
+        applyUserToNavbarState,
+        setCurrentUser,
+        setUserProfileData,
+    ]);
 
     // Randomize profile function
     const randomizeProfile = () => {
@@ -100,13 +124,19 @@ export default function Navbar() {
     const handleProfileSubmit = async () => {
         if (!publicKey) return;
 
-        const walletAddress = publicKey.toBase58();
         const profileIndex = editProfileIndex + 1;
         const referralCode = editInviteCode || inviteCodeFromUrl;
 
         try {
-            // First get the user to get their ID
-            const existingUser = await getUserByWallet(walletAddress);
+            let existingUser = currentUser;
+            if (!existingUser) {
+                existingUser = await fetchUserProfileData({ force: true });
+            }
+
+            if (!existingUser) {
+                console.error('[Navbar] Could not load user before profile update');
+                return;
+            }
 
             // Update profile data
             const updatedData = {
@@ -121,7 +151,7 @@ export default function Navbar() {
             // Handle referral if there's an invite code
             if (referralCode) {
                 try {
-                    await acceptReferral(walletAddress, referralCode);
+                    await acceptReferral(publicKey.toBase58(), referralCode);
                     console.log('[Navbar] Referral accepted successfully');
                 } catch (referralError) {
                     console.error('[Navbar] Failed to accept referral:', referralError);
@@ -131,7 +161,7 @@ export default function Navbar() {
             console.error('[Navbar] Failed to update profile:', error);
         }
 
-        await fetchUserProfileData();
+        await fetchUserProfileData({ force: true });
         setIsProfileModalOpen(false);
     };
 
@@ -139,9 +169,15 @@ export default function Navbar() {
     useEffect(() => {
         const fetchUserData = async () => {
             if (isProfileModalOpen && publicKey) {
-                const walletAddress = publicKey.toBase58();
                 try {
-                    const existingUser = await getUserByWallet(walletAddress);
+                    const existingUser = (
+                        currentUser && walletAddress && latestFetchedWalletRef.current === walletAddress
+                            ? currentUser
+                            : await fetchUserProfileData({ force: true })
+                    );
+                    if (!existingUser) {
+                        throw new Error("User not found");
+                    }
                     setEditUsername(existingUser.username || username || "");
                     setEditBio(existingUser.description || "");
                     setEditProfileIndex(existingUser.profile_image ? parseInt(existingUser.profile_image.match(/profiles\/(\d+)\.svg/)?.[1] || '1') - 1 : 0);
@@ -154,14 +190,14 @@ export default function Navbar() {
             }
         };
         fetchUserData();
-    }, [isProfileModalOpen, username, inviteCodeFromUrl, publicKey]);
+    }, [isProfileModalOpen, username, inviteCodeFromUrl, publicKey, currentUser, walletAddress, fetchUserProfileData]);
 
-    // Call createUser when user authenticates (only once per session)
+    // Ensure user exists when user authenticates (only once per session)
     useEffect(() => {
-        const handleCreateUser = async () => {
+        const handleEnsureUser = async () => {
             // Wait forPrivy to be ready, user to be authenticated, and wallet to be connected
             if (!ready || !authenticated || !publicKey || hasCalledCreateUser) {
-                console.log('[Navbar] createUser skipped:', {
+                console.log('[Navbar] ensureUser skipped:', {
                     ready,
                     authenticated,
                     hasUser: !!publicKey,
@@ -170,43 +206,44 @@ export default function Navbar() {
                 return;
             }
 
-            const walletAddress = publicKey?.toBase58();
-            if (!walletAddress) {
-                console.log('[Navbar] createUser skipped - no wallet address');
+            const currentWalletAddress = publicKey?.toBase58();
+            if (!currentWalletAddress) {
+                console.log('[Navbar] ensureUser skipped - no wallet address');
                 return;
             }
 
-            console.log('[Navbar] Calling createUser for wallet:', walletAddress);
+            console.log('[Navbar] Calling ensureUser for wallet:', currentWalletAddress);
 
             try {
-                const userData = await createUser({
-                    wallet_address: walletAddress,
-                    username: `user-${walletAddress.slice(0, 8)}`,
+                const userData = await ensureUserByWallet(currentWalletAddress, {
+                    wallet_address: currentWalletAddress,
+                    username: `user-${currentWalletAddress.slice(0, 8)}`,
                     login_type: user?.email ? 'email' : 'wallet',
                 });
-                console.log('[Navbar] createUser success:', userData);
+                console.log('[Navbar] ensureUser success:', userData);
+
+                latestFetchedWalletRef.current = currentWalletAddress;
+                applyUserToNavbarState(userData);
 
                 // Check if this was a new user creation or existing user returned
                 // New users have default username format "user-XXXXXXXX"
-                const isNewUserCreated = userData.username === `user-${walletAddress.slice(0, 8)}`;
+                const isNewUserCreated = userData.username === `user-${currentWalletAddress.slice(0, 8)}`;
 
                 if (isNewUserCreated) {
                     // New user - show profile modal immediately
-                    setIsNewUser(true);
                     setIsProfileModalOpen(true);
                 } else {
                     console.log('[Navbar] Returning user detected, profile modal not shown');
                 }
             } catch (error) {
-                console.error('[Navbar] createUser error:', error);
+                console.error('[Navbar] ensureUser error:', error);
             } finally {
                 setHasCalledCreateUser(true);
-                await fetchUserProfileData();
             }
         };
 
-        handleCreateUser();
-    }, [ready, authenticated, user, hasCalledCreateUser, publicKey]);
+        handleEnsureUser();
+    }, [ready, authenticated, user, hasCalledCreateUser, publicKey, applyUserToNavbarState]);
 
     // Helper function to check if link is active
     const isActive = (href: string) => {
