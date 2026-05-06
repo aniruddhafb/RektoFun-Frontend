@@ -25,6 +25,8 @@ export default function ChallengesPage() {
   const [rektError, setRektError] = useState<string | null>(null);
   const [isRekting, setIsRekting] = useState(false);
   const [ignoreDeepLink, setIgnoreDeepLink] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [showCreateSuccessToast, setShowCreateSuccessToast] = useState(false);
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
@@ -85,8 +87,26 @@ export default function ChallengesPage() {
     setIsCreateModalOpen(true);
   };
 
+  const handleChallengeCreated = () => {
+    setIsCreateModalOpen(false);
+    setRefreshKey((prev) => prev + 1);
+    setShowCreateSuccessToast(true);
+  };
+
+  useEffect(() => {
+    if (!showCreateSuccessToast) return;
+    const timeout = window.setTimeout(() => setShowCreateSuccessToast(false), 3000);
+    return () => window.clearTimeout(timeout);
+  }, [showCreateSuccessToast]);
+
   return (
     <div className="min-h-full">
+      {showCreateSuccessToast && (
+        <div className="fixed top-4 right-4 z-[60] rounded-xl bg-green-600 text-white px-4 py-3 shadow-lg">
+          Challenge created successfully.
+        </div>
+      )}
+
       <ChallengeHeader onOpenModal={handleOpenCreateModal} />
 
       <ChallengeFiltersSection
@@ -109,6 +129,7 @@ export default function ChallengesPage() {
         onClick={handleChallengeClick}
         onOpenModal={() => setIsCreateModalOpen(true)}
         onChallengesLoaded={handleChallengesLoaded}
+        refreshKey={refreshKey}
       />
 
       <RektLoadingOverlay isLoading={isRekting} />
@@ -116,7 +137,7 @@ export default function ChallengesPage() {
       <CreateChallengeModal
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
-        onCreated={() => { }}
+        onCreated={handleChallengeCreated}
       />
 
       <ChallengeDetailModal

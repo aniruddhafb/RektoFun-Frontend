@@ -9,6 +9,7 @@ import { TopTradersSection } from "../../../components/market-slug-components/To
 import { FilterBar } from "../../../components/market-slug-components/FilterBar";
 import { LoadingPage } from "../../../components/LoadingPage";
 import { MarketChallengesGrid } from "../../../components/market-slug-components/MarketChallengesGrid";
+import ChallengeDetailModal from "@/app/components/challenge-components/ChallengeDetailModal";
 import {
     getChallenges,
     type ChallengeListItem,
@@ -40,13 +41,13 @@ export default function MarketPage() {
     const [challenges, setChallenges] = useState<ChallengeListItem[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [selectedChallenge, setSelectedChallenge] = useState<ChallengeListItem | null>(null);
+    const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+    const [showCreateSuccessToast, setShowCreateSuccessToast] = useState(false);
 
-    useEffect(() => {
-        let isMounted = true;
-
-        async function loadMarketChallenges() {
+    const loadMarketChallenges = async (isMountedCheck?: () => boolean) => {
             if (!slugName) {
-                if (isMounted) {
+                if (!isMountedCheck || isMountedCheck()) {
                     setMarket(null);
                     setChallenges([]);
                     setError("Market not found.");
@@ -69,12 +70,12 @@ export default function MarketPage() {
                         (item) => item.name.toLowerCase() === slugName.toLowerCase()
                     ) ?? null;
 
-                if (isMounted) {
+                if (!isMountedCheck || isMountedCheck()) {
                     setMarket(matchedMarket);
                     setChallenges(challengesResponse.challenges);
                 }
             } catch (fetchError) {
-                if (isMounted) {
+                if (!isMountedCheck || isMountedCheck()) {
                     setMarket(null);
                     setChallenges([]);
                     setError(
@@ -84,18 +85,27 @@ export default function MarketPage() {
                     );
                 }
             } finally {
-                if (isMounted) {
+                if (!isMountedCheck || isMountedCheck()) {
                     setIsLoading(false);
                 }
             }
-        }
+    };
 
-        loadMarketChallenges();
+    useEffect(() => {
+        let isMounted = true;
+
+        loadMarketChallenges(() => isMounted);
 
         return () => {
             isMounted = false;
         };
     }, [slugName]);
+
+    useEffect(() => {
+        if (!showCreateSuccessToast) return;
+        const timeout = window.setTimeout(() => setShowCreateSuccessToast(false), 3000);
+        return () => window.clearTimeout(timeout);
+    }, [showCreateSuccessToast]);
 
     const marketName = market?.name || slugName || "Market";
     const marketDescription =
@@ -129,8 +139,30 @@ export default function MarketPage() {
         return result;
     }, [challenges, selectedStatus, selectedMode]);
 
+    const handleChallengeClick = (challenge: ChallengeListItem) => {
+        setSelectedChallenge(challenge);
+        setIsDetailModalOpen(true);
+    };
+
+    const closeDetailModal = () => {
+        setIsDetailModalOpen(false);
+        window.setTimeout(() => setSelectedChallenge(null), 300);
+    };
+
+    const handleChallengeCreated = async () => {
+        setIsCreateChallengeOpen(false);
+        setShowCreateSuccessToast(true);
+        await loadMarketChallenges();
+    };
+
     return (
         <div className="min-h-screen" style={{ backgroundColor: "#f3e1d7" }}>
+            {showCreateSuccessToast && (
+                <div className="fixed top-4 right-4 z-[60] rounded-xl bg-green-600 text-white px-4 py-3 shadow-lg">
+                    Challenge created successfully.
+                </div>
+            )}
+
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
                 {/* header section  */}
                 <MarketHeader
@@ -176,7 +208,10 @@ export default function MarketPage() {
                                 No Challenges Found.
                             </div>
                         ) : (
-                            <MarketChallengesGrid challenges={filteredChallenges} />
+                            <MarketChallengesGrid
+                                challenges={filteredChallenges}
+                                onChallengeClick={handleChallengeClick}
+                            />
                         )}
                     </div>
                 </div>
@@ -185,7 +220,13 @@ export default function MarketPage() {
             <CreateChallengeModal
                 isOpen={isCreateChallengeOpen}
                 onClose={() => setIsCreateChallengeOpen(false)}
-                onCreated={() => { }}
+                onCreated={handleChallengeCreated}
+            />
+
+            <ChallengeDetailModal
+                challenge={selectedChallenge}
+                isOpen={isDetailModalOpen}
+                onClose={closeDetailModal}
             />
         </div>
     );

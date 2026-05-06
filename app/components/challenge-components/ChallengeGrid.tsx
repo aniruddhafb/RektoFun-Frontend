@@ -12,6 +12,7 @@ interface ChallengeGridProps {
     onOpenModal: () => void;
     onChallengesLoaded?: (challenges: ChallengeListItem[]) => void;
     isLoading?: boolean;
+    refreshKey?: number;
 }
 
 export function ChallengeGrid({
@@ -19,6 +20,7 @@ export function ChallengeGrid({
     onClick,
     onOpenModal,
     onChallengesLoaded,
+    refreshKey = 0,
 }: ChallengeGridProps) {
     const [challenges, setChallenges] = useState<ChallengeListItem[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -44,7 +46,7 @@ export function ChallengeGrid({
         }
 
         fetchChallenges();
-    }, [onChallengesLoaded]);
+    }, [onChallengesLoaded, refreshKey]);
 
     if (isLoading) {
         return (

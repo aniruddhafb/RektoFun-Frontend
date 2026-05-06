@@ -54,7 +54,7 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
     const formatExpiryCountdown = (timestamp: number | null, nowMs: number): string => {
         if (!timestamp) return "N/A";
         const diffMs = timestamp - nowMs;
-        if (diffMs <= 0) return "0m";
+        if (diffMs <= 0) return "Expired";
 
         const totalMinutes = Math.floor(diffMs / 60000);
         const days = Math.floor(totalMinutes / (24 * 60));
@@ -152,7 +152,6 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
 
     if (!isOpen || !challenge) return null;
 
-    const isAccepted = challenge.status === "locked" || challenge.status === "resolved";
     const hasWinnerData =
         typeof challenge.result === "object" &&
         challenge.result !== null &&
@@ -166,6 +165,10 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
     const creatorName = challenge.creator?.username || "Creator";
     const creatorAvatar = challenge.creator?.profile_image || assetLogo;
     const hasOpponentInfo = Boolean(challenge.opponent_info?.username || challenge.opponent_info?.wallet_address);
+    const isAccepted =
+        challenge.status === "locked" ||
+        challenge.status === "resolved" ||
+        hasOpponentInfo;
     const opponentDisplayName = challenge.opponent_info?.username || "Opponent";
     const opponentAvatar = challenge.opponent_info?.profile_image || assetLogo;
     const isPoolMode = challenge.mode === "pool";
@@ -177,6 +180,7 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
     const exactCountdownDetails = formatExactCountdownDetails(resolveTimestamp, currentTime);
     const createdTimeText = formatCreatedTimeAgo(createdTimestamp, currentTime);
     const expiresInText = formatExpiryCountdown(expiryTimestamp, currentTime);
+    const hasExpired = Boolean(expiryTimestamp && expiryTimestamp <= currentTime);
     const endsInText = formatEndsByCountdown(resolveTimestamp, currentTime);
     const resolveDayDateText = resolveTimestamp
         ? new Date(resolveTimestamp).toLocaleDateString("en-GB", {
@@ -350,18 +354,18 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
                                 }}
                                 className="inline-flex items-center gap-2.5 rounded-2xl border border-[#d8d2cb] bg-[#f6f3ef] px-3.5 py-2 transition-colors duration-200 hover:border-[#cbc3bb] cursor-pointer"
                             >
-                                <div className="h-7 w-7 rounded-full overflow-hidden border border-[#c8c1ba] shrink-0">
+                                <div className="h-8 w-8 rounded-full overflow-hidden border border-[#c8c1ba] shrink-0">
                                     <Image
                                         src={creatorAvatar}
                                         alt={creatorName}
-                                        width={28}
-                                        height={28}
+                                        width={30}
+                                        height={30}
                                         className="w-full h-full object-cover"
                                     />
                                 </div>
                                 <span className="flex flex-col leading-none text-left">
-                                    <span className="text-[13px] text-[#756d66]">Created by {creatorName}</span>
-                                    <span className="mt-1 text-[11px] text-[#9a9189]">{creatorWalletShort}</span>
+                                    <span className="text-[10px] text-[#9a9189]">Created by</span>
+                                    <span className="text-[13px] text-[#756d66] mt-1">{creatorName}</span>
                                 </span>
                             </button>
                         </div>
@@ -451,13 +455,13 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
                     {/* VS Section */}
                     <div className="mb-8">
                         <h3 className="text-center text-sm font-bold text-[#8b7355] uppercase tracking-wider mb-4">
-                            {isAccepted ? "Battle Matchup" : "Waiting for Challenger"}
+                            Battle Matchup
                         </h3>
 
                         <div className="flex flex-row items-center justify-center gap-2 sm:gap-4">
                             {/* Challenger Profile */}
                             <div className="relative group flex flex-col items-center">
-                                <div className={`w-[120px] h-[140px] flex flex-col items-center justify-center p-3 rounded-xl transition-all duration-300 ${hasWon
+                                <div className={`w-[138px] h-[168px] flex flex-col items-center justify-center text-center gap-2 p-4 rounded-xl transition-all duration-300 ${hasWon
                                     ? "bg-gradient-to-br from-amber-100 to-yellow-50 border-2 border-amber-400 shadow-lg shadow-amber-200"
                                     : hasLost
                                         ? "bg-gradient-to-br from-red-100 to-rose-50 border-2 border-red-300"
@@ -471,14 +475,14 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
                                     )}
 
                                     {/* Avatar */}
-                                    <div className="relative">
-                                        <div className={`w-14 h-14 rounded-full overflow-hidden border-2 ${hasWon ? "border-amber-400" : "border-[#d4a574]"
+                                    <div className="relative flex flex-col items-center">
+                                        <div className={`w-16 h-16 rounded-full overflow-hidden border-2 ${hasWon ? "border-amber-400" : "border-[#d4a574]"
                                             } shadow-md`}>
                                             <Image
                                                 src={creatorAvatar}
                                                 alt={creatorName}
-                                                width={56}
-                                                height={56}
+                                                width={64}
+                                                height={64}
                                                 className="w-full h-full object-cover"
                                             />
                                         </div>
@@ -489,7 +493,7 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
                                     </div>
 
                                     {/* Info */}
-                                    <div className="mt-2 text-center">
+                                    <div className="text-center">
                                         <p className="font-bold text-[#2d1f1a] text-xs">{creatorName}</p>
                                         <p className="text-[10px] text-[#8b7355] mt-0.5">
                                             {hasWon ? "Won the bet!" : hasLost ? "Lost the bet" : "Created challenge"}
@@ -510,7 +514,6 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
                                                 <p className={`text-lg font-black ${hasWon ? "text-amber-500" : "text-red-500"}`}>
                                                     {hasWon ? "+" : "-"}${betAmount}
                                                 </p>
-                                                <p className="text-[10px] text-[#8b7355]">SOL</p>
                                             </div>
                                         ) : null}
                                     </>
@@ -529,7 +532,7 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
                             {/* Opponent Profile */}
                             {hasOpponentInfo ? (
                                 <div className="relative group flex flex-col items-center">
-                                    <div className={`w-[120px] h-[140px] flex flex-col items-center justify-center p-3 rounded-xl transition-all duration-300 ${hasLost
+                                    <div className={`w-[138px] h-[168px] flex flex-col items-center justify-center text-center gap-2 p-4 rounded-xl transition-all duration-300 ${hasLost
                                         ? "bg-gradient-to-br from-amber-100 to-yellow-50 border-2 border-amber-400 shadow-lg shadow-amber-200"
                                         : hasWon
                                             ? "bg-gradient-to-br from-red-100 to-rose-50 border-2 border-red-300"
@@ -543,14 +546,14 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
                                         )}
 
                                         {/* Avatar */}
-                                        <div className="relative">
-                                            <div className={`w-14 h-14 rounded-full overflow-hidden border-2 ${hasLost ? "border-amber-400" : "border-[#d4a574]"
+                                        <div className="relative flex flex-col items-center">
+                                            <div className={`w-16 h-16 rounded-full overflow-hidden border-2 ${hasLost ? "border-amber-400" : "border-[#d4a574]"
                                                 } shadow-md`}>
                                                 <Image
                                                     src={opponentAvatar}
                                                     alt={opponentDisplayName}
-                                                    width={56}
-                                                    height={56}
+                                                    width={64}
+                                                    height={64}
                                                     className="w-full h-full object-cover"
                                                 />
                                             </div>
@@ -561,10 +564,10 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
                                         </div>
 
                                         {/* Info */}
-                                        <div className="mt-2 text-center">
+                                        <div className="text-center">
                                             <p className="font-bold text-[#2d1f1a] text-xs">{opponentDisplayName}</p>
                                             <p className="text-[10px] text-[#8b7355] mt-0.5">
-                                                {hasLost ? "Won the bet!" : hasWon ? "Lost the bet" : "Defending challenge"}
+                                                {hasLost ? "Won the bet!" : hasWon ? "Lost the bet" : "Opposing challenge"}
                                             </p>
                                         </div>
                                     </div>
@@ -572,14 +575,14 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
                             ) : (
 
                                 <div className="relative">
-                                    <div className="w-[120px] h-[140px] flex flex-col items-center justify-center p-3 rounded-xl bg-white/40 border-2 border-dashed border-[#d4a574]/30">
-                                        <div className="w-14 h-14 rounded-full bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center border-2 border-[#d4a574]/50">
+                                    <div className="w-[138px] h-[168px] flex flex-col items-center justify-center text-center gap-2 p-4 rounded-xl bg-white/40 border-2 border-dashed border-[#d4a574]/30">
+                                        <div className="w-16 h-16 rounded-full bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center border-2 border-[#d4a574]/50">
                                             <span className="text-xl">❓</span>
                                         </div>
                                         <div className="mt-1 px-1.5 py-0.5 bg-[#2d1f1a] text-white text-[9px] font-bold rounded-full">
                                             OPPONENT
                                         </div>
-                                        <div className="mt-2 text-center">
+                                        <div className="text-center">
                                             <p className="font-semibold text-[#8b7355] text-xs">No one yet</p>
                                             <p className="text-[10px] text-[#a08070] mt-0.5">Be the first to accept!</p>
                                         </div>
@@ -595,7 +598,7 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
                             Challenge Timeline
                         </h3>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 overflow-visible">
+                        <div className={`grid grid-cols-1 ${hasExpired ? "sm:grid-cols-3" : "sm:grid-cols-4"} gap-4 overflow-visible`}>
                             {/* Mode */}
                             <div className="relative p-4 bg-white/60 backdrop-blur-sm rounded-xl border border-[#d4a574]/20 hover:border-[#d4a574]/40 hover:shadow-lg transition-all duration-200 cursor-pointer overflow-visible">
                                 <div className="flex items-center gap-3 mb-2">
@@ -630,7 +633,9 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                         </svg>
                                         <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 p-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-[9999] text-center">
-                                            This challenge will expire in {expiresInText}. After that, no one can join.
+                                            {hasExpired
+                                                ? "This challenge has expired. No one can join now."
+                                                : `This challenge will expire in ${expiresInText}. After that, no one can join.`}
                                             <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
                                         </div>
                                     </div>
@@ -639,16 +644,18 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
                             </div>
 
                             {/* Resolves */}
-                            <div className="relative z-10 p-4 bg-white/60 backdrop-blur-sm rounded-xl border border-[#d4a574]/20 hover:border-[#d4a574]/40 hover:shadow-lg transition-all duration-200 cursor-pointer overflow-visible">
-                                <div className="flex items-center gap-3 mb-2">
-                                    <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
-                                        <AlertCircle className="w-4 h-4 text-blue-600" />
+                            {!hasExpired && (
+                                <div className="relative z-10 p-4 bg-white/60 backdrop-blur-sm rounded-xl border border-[#d4a574]/20 hover:border-[#d4a574]/40 hover:shadow-lg transition-all duration-200 cursor-pointer overflow-visible">
+                                    <div className="flex items-center gap-3 mb-2">
+                                        <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
+                                            <AlertCircle className="w-4 h-4 text-blue-600" />
+                                        </div>
+                                        <span className="text-xs font-semibold text-[#8b7355] uppercase">Resolves In</span>
                                     </div>
-                                    <span className="text-xs font-semibold text-[#8b7355] uppercase">Resolves In</span>
+                                    <p className="font-bold text-[#2d1f1a]">{endsInText}</p>
+                                    <p className="text-xs text-[#8b7355] mt-1">({resolveDayDateText})</p>
                                 </div>
-                                <p className="font-bold text-[#2d1f1a]">{endsInText}</p>
-                                <p className="text-xs text-[#8b7355] mt-1">({resolveDayDateText})</p>
-                            </div>
+                            )}
                         </div>
                     </div>
 

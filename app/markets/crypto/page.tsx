@@ -19,16 +19,14 @@ import {
     type ChallengeListItem,
 } from "@/app/lib/challenges-service/challenges";
 import { LoadingPage } from "@/app/components";
+import ChallengeDetailModal from "@/app/components/challenge-components/ChallengeDetailModal";
 
 interface MarketCardData {
     id: string;
     name: string;
     icon: string;
     available: number;
-    challenges: {
-        id: string;
-        title: string;
-    }[];
+    challenges: ChallengeListItem[];
     totalTraders: number;
     totalVolume: string;
 }
@@ -71,12 +69,77 @@ function mapMarketToCardData(
         name: market.name,
         icon: market.icon || market.image || "/scribbles/coins.png",
         available: challenges.length,
-        challenges: challenges.map((challenge) => ({
-            id: challenge.id,
-            title: challenge.title,
-        })),
+        challenges,
         totalTraders,
         totalVolume: formatCurrency(market.total_volume ?? 0),
+    };
+}
+
+function parseDateValue(value: string | number | null | undefined): number | null {
+    if (typeof value === "number") {
+        return Number.isFinite(value) ? value : null;
+    }
+    if (!value) return null;
+    const parsed = new Date(value).getTime();
+    return Number.isNaN(parsed) ? null : parsed;
+}
+
+function formatEndsByCountdown(timestamp: number | null, nowMs: number): string {
+    if (!timestamp) return "unknown";
+    const diffMs = timestamp - nowMs;
+    if (diffMs <= 0) return "ended";
+
+    const totalMinutes = Math.floor(diffMs / 60000);
+    const days = Math.floor(totalMinutes / (24 * 60));
+    const hours = Math.floor((totalMinutes % (24 * 60)) / 60);
+    const minutes = totalMinutes % 60;
+
+    if (days > 0) return `${days}d ${hours}h`;
+    if (hours > 0) return `${hours}h ${minutes}m`;
+    return `${minutes}m`;
+}
+
+function getChallengeCtaConfig(challenge: ChallengeListItem, nowMs: number) {
+    const expiryTimestamp = parseDateValue(challenge.expire_time);
+    const isAccepted = challenge.status === "locked" || challenge.status === "resolved";
+    const hasChallengeExpired = Boolean(
+        expiryTimestamp && expiryTimestamp <= nowMs && !isAccepted
+    );
+    const isPoolMode = challenge.mode === "pool";
+    const isPvpMode = !isPoolMode;
+
+    if (hasChallengeExpired) {
+        return {
+            label: "EXPIRED",
+            disabled: true,
+            className:
+                "cursor-not-allowed px-3 py-1.5 bg-red-100 border border-red-300 text-red-700 text-xs font-bold rounded-lg whitespace-nowrap",
+        };
+    }
+
+    if (isPvpMode && isAccepted) {
+        return {
+            label: "ONGOING",
+            disabled: true,
+            className:
+                "cursor-not-allowed px-3 py-1.5 bg-[#0c9d63] border border-gray-500 text-white text-xs font-bold rounded-lg whitespace-nowrap",
+        };
+    }
+
+    if (isPoolMode) {
+        return {
+            label: "JOIN CHALLENGE",
+            disabled: false,
+            className:
+                "cursor-pointer px-3 py-1.5 bg-[#246044] hover:bg-[#2b7351] border border-gray-500 text-white text-xs font-bold rounded-lg transition-colors whitespace-nowrap",
+        };
+    }
+
+    return {
+        label: "ACCEPT CHALLENGE",
+        disabled: false,
+        className:
+            "cursor-pointer px-3 py-1.5 bg-[#0c9d63] hover:bg-[#0a7d4f] border border-gray-500 text-white text-xs font-bold rounded-lg transition-colors whitespace-nowrap",
     };
 }
 
@@ -90,6 +153,9 @@ export default function MarketsPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [showDevnetNotice, setShowDevnetNotice] = useState(false);
+    const [currentTime, setCurrentTime] = useState(() => Date.now());
+    const [selectedChallenge, setSelectedChallenge] = useState<ChallengeListItem | null>(null);
+    const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
 
 
@@ -147,6 +213,14 @@ export default function MarketsPage() {
 
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+
+    useEffect(() => {
+        const interval = window.setInterval(() => {
+            setCurrentTime(Date.now());
+        }, 60000);
+
+        return () => window.clearInterval(interval);
     }, []);
 
     useEffect(() => {
@@ -208,6 +282,16 @@ export default function MarketsPage() {
             )
         );
     });
+
+    const handleChallengeClick = (challenge: ChallengeListItem) => {
+        setSelectedChallenge(challenge);
+        setIsDetailModalOpen(true);
+    };
+
+    const closeDetailModal = () => {
+        setIsDetailModalOpen(false);
+        setTimeout(() => setSelectedChallenge(null), 300);
+    };
 
     return (
         <div className="min-h-screen bg-[#f3e1d7]">
@@ -316,21 +400,33 @@ export default function MarketsPage() {
                                                 scrollbar-width: none;
                                             }
                                         `}</style>
-                                        <div className="pace-y-2">
+                                        <div className="pace-y-2 border border-gray-300 rounded-lg">
                                             {market.challenges.length > 0 ? (
-                                                market.challenges.map((challenge) => (
-                                                    <div
-                                                        key={challenge.id}
-                                                        className=" flex items-center border border-gray-300 justify-between p-2.5 bg-white/30 rounded-lg"
-                                                    >
-                                                        <span className="text-sm text-gray-800 font-medium truncate pr-2">
-                                                            {challenge.title}
-                                                        </span>
-                                                        <button className="cursor-pointer px-3 py-1.5 bg-[#0d9b62] hover:bg-[#11a76b] border border-gray-500 text-white text-xs font-medium rounded-lg transition-colors whitespace-nowrap">
-                                                            Accept
-                                                        </button>
-                                                    </div>
-                                                ))
+                                                market.challenges.map((challenge) => {
+                                                    const cta = getChallengeCtaConfig(challenge, currentTime);
+                                                    return (
+                                                        <div
+                                                            key={challenge.id}
+                                                            onClick={() => handleChallengeClick(challenge)}
+                                                            className="flex items-center border-b border-gray-300 justify-between p-2.5 bg-white/30 hover:bg-white/60 cursor-pointer"
+                                                        >
+                                                            <span className="text-sm text-gray-800 font-medium truncate pr-2">
+                                                                {challenge.title} In {formatEndsByCountdown(parseDateValue(challenge.resolve_time), currentTime)}
+                                                            </span>
+                                                            <button
+                                                                disabled={cta.disabled}
+                                                                onClick={(event) => {
+                                                                    event.stopPropagation();
+                                                                    if (cta.disabled) return;
+                                                                    handleChallengeClick(challenge);
+                                                                }}
+                                                                className={cta.className}
+                                                            >
+                                                                {cta.label}
+                                                            </button>
+                                                        </div>
+                                                    );
+                                                })
                                             ) : (
                                                 <div className="p-2.5 bg-white/30 border border-gray-200 rounded-lg text-sm text-gray-800">
                                                     No challenges available!!
@@ -400,6 +496,12 @@ export default function MarketsPage() {
                 </div> */}
 
             </div>
+
+            <ChallengeDetailModal
+                challenge={selectedChallenge}
+                isOpen={isDetailModalOpen}
+                onClose={closeDetailModal}
+            />
         </div>
     );
 }

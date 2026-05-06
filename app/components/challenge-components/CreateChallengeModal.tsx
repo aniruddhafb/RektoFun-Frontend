@@ -335,11 +335,11 @@ export function CreateChallengeModal({
     };
 
     const getButtonStyle = () => {
-        if (!authenticated) return "w-full py-4 bg-orange-500 hover:bg-orange-600 text-white rounded-full font-bold text-lg transition-colors";
-        if (isLoading) return "w-full py-4 bg-gray-400 text-white rounded-full font-bold text-lg cursor-not-allowed";
-        if (txStatus === "success") return "w-full py-4 bg-green-500 text-white rounded-full font-bold text-lg cursor-not-allowed";
-        if (txStatus === "error") return "w-full py-4 bg-red-500 hover:bg-red-600 text-white rounded-full font-bold text-lg transition-colors";
-        return "w-full py-4 bg-gray-900 hover:bg-gray-700 text-white rounded-full font-bold text-lg transition-colors";
+        if (!authenticated) return "cursor-pointer w-full py-4 bg-gray-900 hover:bg-gray-700 text-white rounded-full font-bold text-lg transition-colors";
+        if (isLoading) return "cursor-pointer w-full py-4 bg-gray-400 text-white rounded-full font-bold text-lg cursor-not-allowed";
+        if (txStatus === "success") return "cursor-pointer w-full py-4 bg-green-500 text-white rounded-full font-bold text-lg cursor-not-allowed";
+        if (txStatus === "error") return "cursor-pointer w-full py-4 bg-red-500 hover:bg-red-600 text-white rounded-full font-bold text-lg transition-colors";
+        return "cursor-pointer w-full py-4 bg-gray-900 hover:bg-gray-700 text-white rounded-full font-bold text-lg transition-colors";
     };
 
     return (
