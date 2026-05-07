@@ -33,7 +33,7 @@ export function ClanCard({ clan }: ClanCardProps) {
     return (
         <div
             onClick={handleClick}
-            className="group bg-white/80 backdrop-blur-md rounded-2xl border border-gray-200/60 shadow-sm hover:shadow-xl hover:border-gray-300/80 transition-all duration-300 overflow-hidden cursor-pointer hover:-translate-y-1"
+            className="group bg-white/80 backdrop-blur-md rounded-2xl border border-gray-500 shadow-sm hover:shadow-xl hover:border-gray-300/80 transition-all duration-300 overflow-hidden cursor-pointer hover:-translate-y-1"
         >
             {/* Header Section */}
             <div className="p-5">
@@ -145,7 +145,7 @@ export function ClanCard({ clan }: ClanCardProps) {
             <div className="px-5 pb-5 pt-2">
                 <button
                     onClick={handleViewClan}
-                    className="cursor-pointer w-full py-3 bg-gradient-to-r from-gray-900 to-gray-800 hover:from-gray-800 hover:to-gray-700 text-white font-semibold rounded-xl transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2 group/btn text-sm sm:text-base"
+                    className="cursor-pointer w-full py-3 bg-[#fef2f2] hover:bg-[#f0e6e6] text-gray-700 border border-gray-500 font-semibold rounded-xl transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2 group/btn text-sm sm:text-base"
                 >
                     View Clan
                     <ArrowRightIcon className="w-4 h-4 group-hover/btn:translate-x-1 transition-transform" />

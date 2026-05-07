@@ -1,4 +1,5 @@
 export { ChallengeCard } from "./ChallengeCard";
+export { AcceptChallengeModal } from "./AcceptChallengeModal";
 export { default as ChallengeDetailModal } from "./ChallengeDetailModal";
 export { ChallengeFiltersSection } from "./ChallengeFiltersSection";
 export { ChallengeGrid } from "./ChallengeGrid";

@@ -1,16 +1,11 @@
 "use client";
 import Link from "next/link";
 
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import {
     Search,
-    ChevronDown,
     ArrowRight,
-    TrendingUp,
-    Clock,
-    DollarSign,
-    Eye,
     Bookmark,
 } from "lucide-react";
 import { getMarkets, type Market as ApiMarket } from "@/app/lib/markets-service/market";
@@ -18,28 +13,17 @@ import {
     getChallenges,
     type ChallengeListItem,
 } from "@/app/lib/challenges-service/challenges";
+import ChallengeDetailModal from "@/app/components/challenge-components/ChallengeDetailModal";
 
 interface MarketCardData {
     id: string;
     name: string;
     icon: string;
     available: number;
-    challenges: {
-        id: string;
-        title: string;
-    }[];
+    challenges: ChallengeListItem[];
     totalTraders: number;
     totalVolume: string;
 }
-
-type SortOption = "Recently Added" | "Trending" | "Price Markets" | "My Watchlists";
-
-const sortOptions: { label: SortOption; icon: ReactNode }[] = [
-    { label: "Recently Added", icon: <Clock className="w-4 h-4" /> },
-    { label: "Trending", icon: <TrendingUp className="w-4 h-4" /> },
-    { label: "Price Markets", icon: <DollarSign className="w-4 h-4" /> },
-    { label: "My Watchlists", icon: <Eye className="w-4 h-4" /> },
-];
 
 function formatCompactNumber(value: number) {
     return new Intl.NumberFormat("en-US", {
@@ -61,7 +45,14 @@ function mapMarketToCardData(
     market: ApiMarket,
     challenges: ChallengeListItem[]
 ): MarketCardData {
-    const totalTraders = challenges.reduce((sum, challenge) => {
+    const sortedChallenges = [...challenges].sort((a, b) => {
+        const bTime = parseDateValue(b.created_at) ?? 0;
+        const aTime = parseDateValue(a.created_at) ?? 0;
+        return bTime - aTime;
+    });
+    const latestChallenges = sortedChallenges.slice(0, 4);
+
+    const totalTraders = latestChallenges.reduce((sum, challenge) => {
         return sum + challenge.total_challengers + challenge.total_opponents;
     }, 0);
 
@@ -69,27 +60,102 @@ function mapMarketToCardData(
         id: market.id,
         name: market.name,
         icon: market.icon || market.image || "/scribbles/coins.png",
-        available: challenges.length,
-        challenges: challenges.map((challenge) => ({
-            id: challenge.id,
-            title: challenge.title,
-        })),
+        available: latestChallenges.length,
+        challenges: latestChallenges,
         totalTraders,
         totalVolume: formatCurrency(market.total_volume ?? 0),
     };
 }
 
+function parseDateValue(value: string | number | null | undefined): number | null {
+    if (typeof value === "number") {
+        return Number.isFinite(value) ? value : null;
+    }
+    if (!value) return null;
+    const parsed = new Date(value).getTime();
+    return Number.isNaN(parsed) ? null : parsed;
+}
+
+function formatEndsByCountdown(timestamp: number | null, nowMs: number): string {
+    if (!timestamp) return "unknown";
+    const diffMs = timestamp - nowMs;
+    if (diffMs <= 0) return "ended";
+
+    const totalMinutes = Math.floor(diffMs / 60000);
+    const days = Math.floor(totalMinutes / (24 * 60));
+    const hours = Math.floor((totalMinutes % (24 * 60)) / 60);
+    const minutes = totalMinutes % 60;
+
+    if (days > 0) return `${days}d ${hours}h`;
+    if (hours > 0) return `${hours}h ${minutes}m`;
+    return `${minutes}m`;
+}
+
+function getChallengeCtaConfig(challenge: ChallengeListItem, nowMs: number) {
+    const expiryTimestamp = parseDateValue(challenge.expire_time);
+    const isAccepted = challenge.status === "locked" || challenge.status === "resolved";
+    const hasChallengeExpired = Boolean(
+        expiryTimestamp && expiryTimestamp <= nowMs && !isAccepted
+    );
+    const isPoolMode = challenge.mode === "pool";
+    const isPvpMode = !isPoolMode;
+
+    if (hasChallengeExpired) {
+        return {
+            label: "EXPIRED",
+            disabled: true,
+            className:
+                "cursor-not-allowed px-3 py-1.5 bg-red-100 border border-red-300 text-red-700 text-xs font-bold rounded-lg whitespace-nowrap",
+        };
+    }
+
+    if (isPvpMode && isAccepted) {
+        return {
+            label: "ONGOING",
+            disabled: true,
+            className:
+                "cursor-not-allowed px-3 py-1.5 bg-[#0c9d63] border border-gray-500 text-white text-xs font-bold rounded-lg whitespace-nowrap",
+        };
+    }
+
+    if (isPoolMode) {
+        return {
+            label: "JOIN",
+            disabled: false,
+            className:
+                "cursor-pointer px-3 py-1.5 bg-[#246044] hover:bg-[#2b7351] border border-gray-500 text-white text-xs font-bold rounded-lg transition-colors whitespace-nowrap",
+        };
+    }
+
+    return {
+        label: "ACCEPT",
+        disabled: false,
+        className:
+            "cursor-pointer px-3 py-1.5 bg-[#0c9d63] hover:bg-[#0a7d4f] border border-gray-500 text-white text-xs font-bold rounded-lg transition-colors whitespace-nowrap",
+    };
+}
+
 export default function MarketsPage() {
-    const [currentPage, setCurrentPage] = useState(1);
-    const [sortBy, setSortBy] = useState<SortOption>("Recently Added");
-    const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+    const LOADING_MESSAGES = [
+        "Syncing crypto markets...",
+        "Loading active challenges...",
+        "Building your market cards...",
+        "Almost ready...",
+    ];
     const [bookmarkedMarkets, setBookmarkedMarkets] = useState<Set<string>>(new Set());
     const [searchTerm, setSearchTerm] = useState("");
     const [markets, setMarkets] = useState<MarketCardData[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const dropdownRef = useRef<HTMLDivElement>(null);
-    
+    const [showDevnetNotice, setShowDevnetNotice] = useState(false);
+    const [currentTime, setCurrentTime] = useState(() => Date.now());
+    const [selectedChallenge, setSelectedChallenge] = useState<ChallengeListItem | null>(null);
+    const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+    const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
+    const handleCreateClick = () => {
+        setShowDevnetNotice(true);
+        setTimeout(() => setShowDevnetNotice(false), 3000);
+    };
 
     const toggleBookmark = (marketId: string) => {
         setBookmarkedMarkets((prev) => {
@@ -104,33 +170,46 @@ export default function MarketsPage() {
     };
 
     useEffect(() => {
-        function handleClickOutside(event: MouseEvent) {
-            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-                setIsDropdownOpen(false);
-            }
-        }
+        const interval = window.setInterval(() => {
+            setCurrentTime(Date.now());
+        }, 60000);
 
-        document.addEventListener("mousedown", handleClickOutside);
-        return () => document.removeEventListener("mousedown", handleClickOutside);
+        return () => window.clearInterval(interval);
     }, []);
 
     useEffect(() => {
         let isMounted = true;
 
         async function loadMarkets() {
-
-
             try {
                 setIsLoading(true);
                 setError(null);
 
-                const marketsResponse = await getMarkets({ parent_name: "Crypto" });
-                const marketCards = await Promise.all(
-                    marketsResponse.markets.map(async (market) => {
-                        console.log("market", market);
-                        const challengesResponse = await getChallenges({ category: market.name });
-                        return mapMarketToCardData(market, challengesResponse.challenges);
-                    })
+                const [marketsResponse, challengesResponse] = await Promise.all([
+                    getMarkets({ parent_name: "Crypto" }),
+                    getChallenges({
+                        status: "open",
+                        limit: 100,
+                    }),
+                ]);
+
+                const challengesByCategory = new Map<string, ChallengeListItem[]>();
+                for (const challenge of challengesResponse.challenges) {
+                    const key = (challenge.market?.name || "").toLowerCase();
+                    if (!key) continue;
+                    const list = challengesByCategory.get(key);
+                    if (list) {
+                        list.push(challenge);
+                    } else {
+                        challengesByCategory.set(key, [challenge]);
+                    }
+                }
+
+                const marketCards = marketsResponse.markets.map((market) =>
+                    mapMarketToCardData(
+                        market,
+                        challengesByCategory.get(market.name.toLowerCase()) ?? []
+                    )
                 );
 
                 if (isMounted) {
@@ -159,6 +238,14 @@ export default function MarketsPage() {
         };
     }, []);
 
+    useEffect(() => {
+        if (!isLoading) return;
+        const timer = window.setInterval(() => {
+            setLoadingMessageIndex((prev) => (prev + 1) % LOADING_MESSAGES.length);
+        }, 1300);
+        return () => window.clearInterval(timer);
+    }, [isLoading]);
+
     const filteredMarkets = markets.filter((market) => {
         const normalizedSearch = searchTerm.trim().toLowerCase();
 
@@ -174,17 +261,44 @@ export default function MarketsPage() {
         );
     });
 
+    const handleChallengeClick = (challenge: ChallengeListItem) => {
+        setSelectedChallenge(challenge);
+        setIsDetailModalOpen(true);
+    };
+
+    const closeDetailModal = () => {
+        setIsDetailModalOpen(false);
+        setTimeout(() => setSelectedChallenge(null), 300);
+    };
+
     return (
         <div className="min-h-screen bg-[#f3e1d7]">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6 sm:mb-8">
                     <div>
                         <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-2">
-                            Markets Challenges
+                            Challenge Markets
                         </h1>
                         <p className="text-gray-600 text-base sm:text-lg">
                             Predict trends and earn big on top challenge markets
                         </p>
+                    </div>
+                    <div className="relative">
+                        <button
+                            onClick={handleCreateClick}
+                            className="inline-flex items-center justify-center px-6 py-3 bg-white/50 border border-gray-400 text-black text-sm font-medium rounded-full cursor-not-allowed"
+
+                        >
+                            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                            </svg>
+                            Create Market
+                        </button>
+                        {showDevnetNotice && (
+                            <div className="absolute top-full mt-2 right-0 bg-yellow-50 border border-yellow-300 text-yellow-800 text-sm px-4 py-2 rounded-xl shadow-lg whitespace-nowrap z-10">
+                                ⚠️ Creating challenge markets is disabled on devnet
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -197,54 +311,44 @@ export default function MarketsPage() {
                                 value={searchTerm}
                                 onChange={(event) => setSearchTerm(event.target.value)}
                                 placeholder="Search"
-                                className="pl-10 pr-4 py-2.5 bg-white/50 rounded-full text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-200 w-full sm:w-48 lg:w-88"
+                                className="pl-10 pr-4 py-2.5 bg-white/50 rounded-full border border-gray-400 text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-200 w-full sm:w-48 lg:w-88"
                             />
-                        </div>
-
-                        <div className="relative" ref={dropdownRef}>
-                            <button
-                                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                                className="cursor-pointer flex items-center gap-2 px-3 sm:px-4 py-2.5 bg-white/50 rounded-full text-sm text-gray-700 hover:bg-white/70 transition-colors whitespace-nowrap"
-                            >
-                                <span className="hidden sm:inline">{sortBy}</span>
-                                <span className="sm:hidden">
-                                    {sortOptions.find((option) => option.label === sortBy)?.icon}
-                                </span>
-                                <ChevronDown
-                                    className={`w-4 h-4 transition-transform ${
-                                        isDropdownOpen ? "rotate-180" : ""
-                                    }`}
-                                />
-                            </button>
-
-                            {isDropdownOpen && (
-                                <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-100 py-2 z-10">
-                                    {sortOptions.map((option) => (
-                                        <button
-                                            key={option.label}
-                                            onClick={() => {
-                                                setSortBy(option.label);
-                                                setIsDropdownOpen(false);
-                                            }}
-                                            className={`w-full cursor-pointer flex items-center gap-3 px-4 py-2.5 text-sm text-left transition-colors ${
-                                                sortBy === option.label
-                                                    ? "text-black font-semibold"
-                                                    : "text-gray-700 hover:bg-gray-50"
-                                            }`}
-                                        >
-                                            {option.icon}
-                                            {option.label}
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
                         </div>
                     </div>
                 </div>
 
                 {isLoading ? (
-                    <div className="rounded-2xl bg-white/40 border border-white/50 p-8 text-center text-gray-700">
-                        Loading markets...
+                    <div>
+                        {/* <div className="rounded-2xl border border-white/50 bg-white/60 px-6 py-5 mb-6">
+                            <p className="text-sm text-gray-500">Loading challenge markets</p>
+                            <p className="text-base font-medium text-gray-900 mt-1">{LOADING_MESSAGES[loadingMessageIndex]}</p>
+                            <div className="mt-4 h-1.5 w-full overflow-hidden rounded-full bg-gray-200">
+                                <div className="h-full w-1/2 animate-pulse rounded-full bg-gray-700/70" />
+                            </div>
+                        </div> */}
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5 mb-8">
+                            {Array.from({ length: 6 }).map((_, idx) => (
+                                <div
+                                    key={idx}
+                                    className="bg-white/40 rounded-2xl p-4 sm:p-5 border border-gray-400 animate-pulse"
+                                >
+                                    <div className="flex items-start gap-3 mb-4">
+                                        <div className="w-12 h-12 rounded-full bg-white/70" />
+                                        <div className="flex-1">
+                                            <div className="h-5 w-2/3 rounded bg-white/70" />
+                                            <div className="mt-2 h-4 w-1/3 rounded bg-white/60" />
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <div className="h-10 rounded-lg bg-white/70" />
+                                        <div className="h-10 rounded-lg bg-white/70" />
+                                        <div className="h-10 rounded-lg bg-white/70" />
+                                    </div>
+                                    <div className="mt-5 h-10 rounded-xl bg-white/80" />
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 ) : error ? (
                     <div className="rounded-2xl bg-white/40 border border-white/50 p-8 text-center text-red-700">
@@ -259,7 +363,7 @@ export default function MarketsPage() {
                         {filteredMarkets.map((market) => (
                             <div
                                 key={market.id}
-                                className="bg-white/40 backdrop-blur-sm rounded-2xl p-4 sm:p-5 border border-white/50 hover:shadow-lg transition-shadow duration-300 flex flex-col"
+                                className="bg-white/40 backdrop-blur-sm rounded-2xl p-4 sm:p-5 border border-gray-500 hover:shadow-lg transition-shadow duration-300 flex flex-col"
                             >
                                 <div className="flex items-start gap-3 mb-3 sm:mb-4">
                                     <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full overflow-hidden bg-white/50 flex-shrink-0">
@@ -273,7 +377,7 @@ export default function MarketsPage() {
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <h3 className="font-semibold text-gray-900 text-base sm:text-lg leading-tight mb-1">
-                                            {market.name}
+                                            {market.name} Challenges
                                         </h3>
                                     </div>
                                     <button
@@ -286,11 +390,10 @@ export default function MarketsPage() {
                                         }
                                     >
                                         <Bookmark
-                                            className={`w-5 h-5 transition-colors ${
-                                                bookmarkedMarkets.has(market.id)
-                                                    ? "fill-[#5a7c6c] text-[#5a7c6c]"
-                                                    : "text-gray-400 hover:text-gray-600"
-                                            }`}
+                                            className={`w-5 h-5 transition-colors ${bookmarkedMarkets.has(market.id)
+                                                ? "fill-[#5a7c6c] text-[#5a7c6c]"
+                                                : "text-gray-400 hover:text-gray-600"
+                                                }`}
                                         />
                                     </button>
                                 </div>
@@ -306,24 +409,36 @@ export default function MarketsPage() {
                                                 scrollbar-width: none;
                                             }
                                         `}</style>
-                                        <div className="pace-y-2">
+                                        <div className="pace-y-2 border border-gray-300 rounded-lg">
                                             {market.challenges.length > 0 ? (
-                                                market.challenges.map((challenge) => (
-                                                    <div
-                                                        key={challenge.id}
-                                                        className="flex items-center justify-between p-2.5 bg-white/30 rounded-lg"
-                                                    >
-                                                        <span className="text-sm text-gray-800 font-medium truncate pr-2">
-                                                            {challenge.title}
-                                                        </span>
-                                                        <button className="px-3 py-1.5 bg-[#246044] hover:bg-[#2b7351] text-white text-xs font-medium rounded-lg transition-colors whitespace-nowrap">
-                                                            Accept
-                                                        </button>
-                                                    </div>
-                                                ))
+                                                market.challenges.map((challenge) => {
+                                                    const cta = getChallengeCtaConfig(challenge, currentTime);
+                                                    return (
+                                                        <div
+                                                            key={challenge.id}
+                                                            onClick={() => handleChallengeClick(challenge)}
+                                                            className="flex items-center border-b border-gray-300 justify-between p-2.5 bg-white/30 hover:bg-white/60 cursor-pointer"
+                                                        >
+                                                            <span className="text-sm text-gray-800 font-medium truncate pr-2">
+                                                                {challenge.title} In {formatEndsByCountdown(parseDateValue(challenge.resolve_time), currentTime)}
+                                                            </span>
+                                                            <button
+                                                                disabled={cta.disabled}
+                                                                onClick={(event) => {
+                                                                    event.stopPropagation();
+                                                                    if (cta.disabled) return;
+                                                                    handleChallengeClick(challenge);
+                                                                }}
+                                                                className={cta.className}
+                                                            >
+                                                                {cta.label}
+                                                            </button>
+                                                        </div>
+                                                    );
+                                                })
                                             ) : (
-                                                <div className="p-2.5 bg-white/30 rounded-lg text-sm text-gray-600">
-                                                    No challenges available.
+                                                <div className="p-2.5 bg-white/30 border border-gray-200 rounded-lg text-sm text-gray-800">
+                                                    No challenges available!!
                                                 </div>
                                             )}
                                         </div>
@@ -358,7 +473,7 @@ export default function MarketsPage() {
                                 </div>
 
                                 <Link href={`/markets/crypto/${market.name}`}>
-                                    <button className="w-full py-2.5 sm:py-3 bg-[#2b7351] hover:bg-[#246044] text-white font-medium rounded-xl transition-colors flex items-center justify-center gap-2 group text-sm sm:text-base">
+                                    <button className="cursor-pointer w-full py-2.5 sm:py-3 bg-[#0d9b62] hover:bg-[#11a76b] border border-gray-700 text-white font-medium rounded-xl transition-colors flex items-center justify-center gap-2 group text-sm sm:text-base">
                                         View Challenges
                                         <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                                     </button>
@@ -368,17 +483,17 @@ export default function MarketsPage() {
                     </div>
                 )}
 
-                <div className="flex items-center justify-center gap-2">
+                {/* pagination  */}
+                {/* <div className="flex items-center justify-center gap-2">
                     <div className="flex items-center gap-1">
                         {[1, 2, 3].map((page) => (
                             <button
                                 key={page}
                                 onClick={() => setCurrentPage(page)}
-                                className={`w-10 h-10 rounded-lg text-sm font-medium transition-colors ${
-                                    currentPage === page
-                                        ? "bg-[#d4c4b5] text-gray-800"
-                                        : "text-gray-600 hover:bg-white/30"
-                                }`}
+                                className={`w-10 h-10 rounded-lg text-sm font-medium transition-colors ${currentPage === page
+                                    ? "bg-[#d4c4b5] text-gray-800"
+                                    : "text-gray-600 hover:bg-white/30"
+                                    }`}
                             >
                                 {page}
                             </button>
@@ -387,8 +502,15 @@ export default function MarketsPage() {
                             <ChevronDown className="w-4 h-4 rotate-[-90deg]" />
                         </button>
                     </div>
-                </div>
+                </div> */}
+
             </div>
+
+            <ChallengeDetailModal
+                challenge={selectedChallenge}
+                isOpen={isDetailModalOpen}
+                onClose={closeDetailModal}
+            />
         </div>
     );
 }

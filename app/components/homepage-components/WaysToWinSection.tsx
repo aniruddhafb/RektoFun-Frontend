@@ -57,10 +57,10 @@ export function WaysToWinSection() {
                         {/* Text */}
                         <div className="p-5 flex flex-col flex-1">
                             <h3 className="text-xl font-bold text-black mb-3 leading-snug">
-                                Create permissionless challenges
+                                Create Permissionless Predictions
                             </h3>
                             <p className="text-gray-500 text-sm leading-relaxed">
-                                Create permissionless challenges around crypto and sports at anytime, on anything.
+                                Create permissionless prediction challenges around crypto and sports at anytime, on anything.
                             </p>
                         </div>
                     </div>
@@ -111,7 +111,7 @@ export function WaysToWinSection() {
                         {/* Text */}
                         <div className="p-5 flex flex-col flex-1">
                             <h3 className="text-xl font-bold text-black mb-3 leading-snug">
-                                PvP prediction battles
+                                PvP Prediction Battles
                             </h3>
                             <p className="text-gray-500 text-sm leading-relaxed">
                                 Join challenges, compete in prediction battles and test your knowledge, go head-to-head, and prove you&apos;re the best.
@@ -171,10 +171,10 @@ export function WaysToWinSection() {
                         {/* Text */}
                         <div className="p-5 flex flex-col flex-1">
                             <h3 className="text-xl font-bold text-black mb-3 leading-snug">
-                                Earn REKTO points
+                                Community Verified Outcomes
                             </h3>
                             <p className="text-gray-500 text-sm leading-relaxed">
-                                Get points for creating and joining challenges, participating in clan battles and reffering friends.
+                                Challenge outcomes and disputes are resolved by the NFT holders community through a transparent voting process.
                             </p>
                         </div>
                     </div>

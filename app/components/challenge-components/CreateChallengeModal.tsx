@@ -5,16 +5,15 @@ import Image from "next/image";
 import { DatePickerModal } from "./DatePickerModal";
 import { DurationPickerModal } from "./DurationPickerModal";
 import { useSolanaWallet } from "@/app/lib/useSolanaWallet";
-import { Connection } from "@solana/web3.js";
 import {
     buildCreateChallengeTx,
     deriveChallengePDA,
     deriveCreatorCounter,
-    RPC_ENDPOINT,
 } from "@/app/lib/rektofun-program";
 import { createChallenge } from "@/app/lib/challenges-service/challenges";
 import { getMarkets, Market } from "@/app/lib/markets-service/market";
 import { useUserStore } from "@/app/store/useUserStore";
+import { blockedContentError, hasBlockedContent } from "@/app/lib/content-moderation";
 
 interface CreateChallengeModalProps {
     isOpen: boolean;
@@ -31,6 +30,7 @@ export function CreateChallengeModal({
     onClose,
     onCreated,
 }: CreateChallengeModalProps) {
+    const DIA_ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
     const [markets, setMarkets] = useState<Market[]>([]);
     const [selectedMarket, setSelectedMarket] = useState<Market | null>(null);
     const [marketsLoading, setMarketsLoading] = useState(true);
@@ -44,12 +44,16 @@ export function CreateChallengeModal({
     const [predictionDirection, setPredictionDirection] = useState("Above");
     const [isDirectionDropdownOpen, setIsDirectionDropdownOpen] = useState(false);
     const [predictionPrice, setPredictionPrice] = useState("66500");
+    const [basePredictionPrice, setBasePredictionPrice] = useState<number | null>(null);
     const [selectedDate, setSelectedDate] = useState(new Date(Date.now() + 24 * 60 * 60 * 1000));
     const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
     const [duration, setDuration] = useState({ hours: 4, minutes: 0 });
     const [isDurationPickerOpen, setIsDurationPickerOpen] = useState(false);
     const [challengeMode, setChallengeMode] = useState<"pvp" | "multi">("pvp");
     const [challengeStatement, setChallengeStatement] = useState("");
+    const [challengeStatementError, setChallengeStatementError] = useState<string | null>(null);
+    const [sportsResolutionConsent, setSportsResolutionConsent] = useState(false);
+    const [sportsResolutionConsentError, setSportsResolutionConsentError] = useState<string | null>(null);
 
     const { user } = useUserStore();
 
@@ -79,6 +83,9 @@ export function CreateChallengeModal({
             setTxStatus("idle");
             setTxError(null);
             setTxSignature(null);
+            setChallengeStatementError(null);
+            setSportsResolutionConsentError(null);
+            setSportsResolutionConsent(false);
         }
     }, [isOpen]);
 
@@ -136,6 +143,50 @@ export function CreateChallengeModal({
 
         fetchChildMarkets();
     }, [isOpen, selectedMarket]);
+
+    useEffect(() => {
+        const resolveDiaBlockchain = (market: Market): string => {
+            const symbol = (market.symbol || "").toUpperCase();
+            if (symbol === "SOL") return "Solana";
+            if (symbol === "ETH") return "Ethereum";
+            if (symbol === "BTC") return "Bitcoin";
+            return market.description || market.name || symbol;
+        };
+
+        const fetchCurrentAssetPrice = async () => {
+            if (!isOpen || !selectedChildMarket) return;
+
+            try {
+                const blockchain = resolveDiaBlockchain(selectedChildMarket);
+                if (!blockchain) return;
+
+                const url = `https://api.diadata.org/v1/assetQuotation/${encodeURIComponent(blockchain)}/${DIA_ZERO_ADDRESS}`;
+                const response = await fetch(url);
+                if (!response.ok) return;
+
+                const data = await response.json();
+                const price = Number(data?.Price);
+                if (!Number.isFinite(price) || price <= 0) return;
+
+                setBasePredictionPrice(price);
+            } catch (error) {
+                console.error("Error fetching DIA asset quotation:", error);
+            }
+        };
+
+        fetchCurrentAssetPrice();
+    }, [isOpen, selectedChildMarket]);
+
+    useEffect(() => {
+        if (!isOpen || !basePredictionPrice || basePredictionPrice <= 0) return;
+
+        const adjustedPrice =
+            predictionDirection === "Below"
+                ? basePredictionPrice * 0.9
+                : basePredictionPrice * 1.1;
+
+        setPredictionPrice(String(Math.floor(adjustedPrice)));
+    }, [isOpen, basePredictionPrice, predictionDirection]);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -201,7 +252,19 @@ export function CreateChallengeModal({
         }
         if (isSportsSelected) {
             if (!challengeStatement.trim()) {
+                setChallengeStatementError("Please enter a challenge statement.");
                 setTxError("Please enter a challenge statement.");
+                return;
+            }
+            setChallengeStatementError(null);
+            if (!sportsResolutionConsent) {
+                setSportsResolutionConsentError("Please check this box to continue.");
+                setTxError("Please check the box to confirm the sports challenge resolution terms.");
+                return;
+            }
+            setSportsResolutionConsentError(null);
+            if (hasBlockedContent(challengeStatement)) {
+                setTxError(blockedContentError("Challenge statement"));
                 return;
             }
         } else {
@@ -225,7 +288,6 @@ export function CreateChallengeModal({
 
         try {
             const creatorPubkey = publicKey;
-            const connection = new Connection(RPC_ENDPOINT, "confirmed");
 
             // Calculate timestamps
             const nowSec = Math.floor(Date.now() / 1000);
@@ -251,13 +313,6 @@ export function CreateChallengeModal({
             const signature = await sendTransaction(tx);
             setTxSignature(signature);
             setTxStatus("confirming");
-
-            // Wait for confirmation
-            const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
-            await connection.confirmTransaction(
-                { signature, blockhash, lastValidBlockHeight },
-                "confirmed"
-            );
 
             // Derive challenge PDA to get challenge_id for backend
             const [counterPDA] = deriveCreatorCounter(creatorPubkey);
@@ -335,11 +390,11 @@ export function CreateChallengeModal({
     };
 
     const getButtonStyle = () => {
-        if (!authenticated) return "w-full py-4 bg-orange-500 hover:bg-orange-600 text-white rounded-full font-bold text-lg transition-colors";
-        if (isLoading) return "w-full py-4 bg-gray-400 text-white rounded-full font-bold text-lg cursor-not-allowed";
-        if (txStatus === "success") return "w-full py-4 bg-green-500 text-white rounded-full font-bold text-lg cursor-not-allowed";
-        if (txStatus === "error") return "w-full py-4 bg-red-500 hover:bg-red-600 text-white rounded-full font-bold text-lg transition-colors";
-        return "w-full py-4 bg-gray-900 hover:bg-gray-700 text-white rounded-full font-bold text-lg transition-colors";
+        if (!authenticated) return "cursor-pointer w-full py-4 bg-gray-900 hover:bg-gray-700 text-white rounded-full font-bold text-lg transition-colors";
+        if (isLoading) return "cursor-pointer w-full py-4 bg-gray-400 text-white rounded-full font-bold text-lg cursor-not-allowed";
+        if (txStatus === "success") return "cursor-pointer w-full py-4 bg-green-500 text-white rounded-full font-bold text-lg cursor-not-allowed";
+        if (txStatus === "error") return "cursor-pointer w-full py-4 bg-red-500 hover:bg-red-600 text-white rounded-full font-bold text-lg transition-colors";
+        return "cursor-pointer w-full py-4 bg-gray-900 hover:bg-gray-700 text-white rounded-full font-bold text-lg transition-colors";
     };
 
     return (
@@ -360,6 +415,31 @@ export function CreateChallengeModal({
                 </div>
 
                 <div className="px-6 py-4 space-y-4 overflow-y-auto">
+
+                    {/* challenge market  */}
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium text-gray-700">Challenge Market</label>
+                        <div className="flex items-center gap-2 p-1 bg-[#faf0eb] border border-[#e8d5c8] rounded-xl">
+                            {marketsLoading ? (
+                                <div className="flex-1 py-2 px-4 text-sm text-gray-500 text-center">Loading markets...</div>
+                            ) : markets.length > 0 ? (
+                                markets.map((m) => (
+                                    <button
+                                        key={m.id}
+                                        onClick={() => setSelectedMarket(m)}
+                                        className={`flex-1 py-2 px-4 rounded-lg text-sm font-semibold transition-colors ${selectedMarket?.id === m.id
+                                            ? "bg-gray-900 text-white"
+                                            : "bg-transparent text-gray-600 hover:bg-[#f3e1d7]"
+                                            }`}
+                                    >
+                                        {m.symbol || m.name}
+                                    </button>
+                                ))
+                            ) : (
+                                <div className="flex-1 py-2 px-4 text-sm text-gray-500 text-center">No markets available</div>
+                            )}
+                        </div>
+                    </div>
 
                     {/* challenge mode selection (pvp vs multi) */}
                     <div className="space-y-2">
@@ -391,34 +471,11 @@ export function CreateChallengeModal({
                         </p>
                     </div>
 
-                    {/* challenge market  */}
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700">Challenge Market</label>
-                        <div className="flex items-center gap-2 p-1 bg-[#faf0eb] border border-[#e8d5c8] rounded-xl">
-                            {marketsLoading ? (
-                                <div className="flex-1 py-2 px-4 text-sm text-gray-500 text-center">Loading markets...</div>
-                            ) : markets.length > 0 ? (
-                                markets.map((m) => (
-                                    <button
-                                        key={m.id}
-                                        onClick={() => setSelectedMarket(m)}
-                                        className={`flex-1 py-2 px-4 rounded-lg text-sm font-semibold transition-colors ${selectedMarket?.id === m.id
-                                            ? "bg-gray-900 text-white"
-                                            : "bg-transparent text-gray-600 hover:bg-[#f3e1d7]"
-                                            }`}
-                                    >
-                                        {m.symbol || m.name}
-                                    </button>
-                                ))
-                            ) : (
-                                <div className="flex-1 py-2 px-4 text-sm text-gray-500 text-center">No markets available</div>
-                            )}
-                        </div>
-                    </div>
-
                     {/* select token  */}
                     <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700">Select Token</label>
+                        {isSportsSelected ? (
+                            <label className="text-sm font-medium text-gray-700">Select Sport Event</label>
+                        ) : <label className="text-sm font-medium text-gray-700">Select Token</label>}
                         <div className="relative" ref={coinDropdownRef}>
                             <button onClick={() => { closeAllDropdowns(); setIsCoinDropdownOpen(!isCoinDropdownOpen); }} className="w-full flex items-center justify-between px-4 py-3 bg-[#faf0eb] border border-[#e8d5c8] rounded-xl hover:border-[#d4b8a8] transition-colors">
                                 <div className="flex items-center gap-3">
@@ -512,12 +569,26 @@ export function CreateChallengeModal({
                     {/* challenge statement (for sports market) */}
                     {isSportsSelected && (
                         <div className="space-y-2">
-                            <label className="text-sm font-medium text-gray-700">Challenge Statement</label>
+                            <div className="flex items-center gap-2">
+                                <label className="text-sm font-medium text-gray-700">Challenge Statement</label>
+                                <span className="relative group/info">
+                                    <svg className="w-4 h-4 text-gray-400 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    <span className="absolute left-0 bottom-full mb-2 px-3 py-2 text-xs text-white bg-gray-800 rounded-lg opacity-0 group-hover/info:opacity-100 transition-opacity pointer-events-none z-20 w-max max-w-[260px]">
+                                        This is the statement on which you are taking a bet, it can be any prediction or outcome conviction related to the selected sport.
+                                    </span>
+                                </span>
+                            </div>
                             <input
                                 required
                                 type="text"
                                 value={challengeStatement}
-                                onChange={(e) => setChallengeStatement(e.target.value)}
+                                onChange={(e) => {
+                                    setChallengeStatement(e.target.value);
+                                    if (challengeStatementError) setChallengeStatementError(null);
+                                    if (txError) setTxError(null);
+                                }}
                                 placeholder={
                                     selectedChildMarket?.symbol?.toLowerCase() === 'cricket'
                                         ? "e.g. rohit sharma will hit a six in todays MI vs RCB IPL match"
@@ -527,13 +598,16 @@ export function CreateChallengeModal({
                                 }
                                 className="w-full px-4 py-3 bg-[#faf0eb] border border-[#e8d5c8] rounded-xl text-lg text-gray-900 focus:outline-none focus:border-[#d4b8a8] placeholder:text-gray-400 placeholder:text-sm"
                             />
+                            {challengeStatementError && (
+                                <p className="text-red-500 text-sm mt-1">{challengeStatementError}</p>
+                            )}
                         </div>
                     )}
 
                     {/* predict price and direction section (non-sports markets) */}
                     {!isSportsSelected && (
                         <div className="space-y-2">
-                            <label className="text-sm font-medium text-gray-700">Predict Price</label>
+                            <label className="text-sm font-medium text-gray-700">Predict Price Movement</label>
                             <div className="flex gap-2">
                                 <div className="relative flex-1" ref={directionDropdownRef}>
                                     <button onClick={() => { closeAllDropdowns(); setIsDirectionDropdownOpen(!isDirectionDropdownOpen); }} className="w-full flex items-center justify-between px-4 py-3 bg-[#faf0eb] border border-[#e8d5c8] rounded-xl hover:border-[#d4b8a8] transition-colors">
@@ -582,7 +656,7 @@ export function CreateChallengeModal({
                     </div>
 
                     {/* challenge end date (non-sports markets) */}
-                    {!isSportsSelected && (
+                    {!isSportsSelected ? (
                         <div className="space-y-2">
                             <div className="flex items-center gap-2">
                                 <label className="text-sm font-medium text-gray-700">Challenge End Date</label>
@@ -605,20 +679,41 @@ export function CreateChallengeModal({
                                 Ends in <span className="font-medium text-gray-700">{Math.floor((selectedDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24))}</span> days <span className="font-medium text-gray-700">{Math.floor(((selectedDate.getTime() - Date.now()) % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))}</span> hours
                             </p>
                         </div>
+                    ) : (
+                        <div className="space-y-1">
+                            <label className="flex items-start gap-2 p-3 bg-[#faf0eb] border border-[#e8d5c8] rounded-xl cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={sportsResolutionConsent}
+                                    onChange={(e) => {
+                                        setSportsResolutionConsent(e.target.checked);
+                                        if (e.target.checked) setSportsResolutionConsentError(null);
+                                        if (txError) setTxError(null);
+                                    }}
+                                    className="mt-0.5 h-4 w-4 rounded border-[#d4b8a8] text-gray-900 focus:ring-gray-700"
+                                />
+                                <span className="text-xs font-medium text-gray-700">
+                                    Challenge will end after the selected sport event is completed and will be resolved by the community based on the outcome of the challenge statement posted by you.
+                                </span>
+                            </label>
+                            {sportsResolutionConsentError && (
+                                <p className="text-red-500 text-sm mt-1">{sportsResolutionConsentError}</p>
+                            )}
+                        </div>
                     )}
 
                     {/* summary section - adapts to sports vs non-sports */}
                     <div className="text-center py-2">
                         {isSportsSelected ? (
                             <p className="text-gray-700">
-                                You win <span className="font-bold text-gray-900">{(betAmount * 2 * 0.975).toFixed(4)} USDC</span> if your statement is correct
+                                You win <span className="font-bold text-gray-900">${(betAmount * 2 * 0.975).toFixed(4)}</span> if your statement is correct
                             </p>
                         ) : (
                             <p className="text-gray-700">
-                                You win <span className="font-bold text-gray-900">{(betAmount * 2 * 0.975).toFixed(4)} USDC</span> if {selectedChildMarket?.symbol} closes {predictionDirection.toLowerCase()} ${Number(predictionPrice).toLocaleString()} in {formatDuration(duration)}
+                                You win <span className="font-bold text-gray-900">${(betAmount * 2 * 0.975).toFixed(4)}</span> if ${selectedChildMarket?.symbol} closes {predictionDirection.toLowerCase()} ${Number(predictionPrice).toLocaleString()} in {formatDuration(duration)}
                             </p>
                         )}
-                        <p className="text-xs text-gray-500 mt-1">3% platform fee applies</p>
+                        <p className="text-xs text-gray-500 mt-1">6% platform fee applies</p>
                     </div>
 
                     {/* Error message */}

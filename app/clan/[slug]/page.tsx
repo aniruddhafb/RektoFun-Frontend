@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import * as ClanComponents from "@/app/components/clan-slug-components";
 import { useSolanaWallet } from "@/app/lib/useSolanaWallet";
 import type { Tab } from "@/app/components/clan-slug-components";
@@ -10,9 +10,47 @@ import { getClanMembers } from "@/app/lib/clan-service/clanMembers";
 import { getUserByWallet } from "@/app/lib/users-service/users";
 import { LoadingPage } from "@/app/components/LoadingPage";
 
+const inFlightClanRequests = new Map<string, Promise<ClanData>>();
+const inFlightMembersRequests = new Map<string, Promise<Awaited<ReturnType<typeof getClanMembers>>>>();
+const inFlightUserByWalletRequests = new Map<string, Promise<Awaited<ReturnType<typeof getUserByWallet>>>>();
+
+function getClanDataBySlugDeduped(slug: string): Promise<ClanData> {
+    const existing = inFlightClanRequests.get(slug);
+    if (existing) return existing;
+
+    const request = getClanDataBySlug(slug).finally(() => {
+        inFlightClanRequests.delete(slug);
+    });
+    inFlightClanRequests.set(slug, request);
+    return request;
+}
+
+function getClanMembersDeduped(slug: string) {
+    const existing = inFlightMembersRequests.get(slug);
+    if (existing) return existing;
+
+    const request = getClanMembers(slug).finally(() => {
+        inFlightMembersRequests.delete(slug);
+    });
+    inFlightMembersRequests.set(slug, request);
+    return request;
+}
+
+function getUserByWalletDeduped(walletAddress: string) {
+    const existing = inFlightUserByWalletRequests.get(walletAddress);
+    if (existing) return existing;
+
+    const request = getUserByWallet(walletAddress).finally(() => {
+        inFlightUserByWalletRequests.delete(walletAddress);
+    });
+    inFlightUserByWalletRequests.set(walletAddress, request);
+    return request;
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function ClanDetailPage({ params }: { params: Promise<{ slug: string }> }) {
     const { publicKey: userWallet } = useSolanaWallet();
+    const walletAddress = userWallet?.toBase58() ?? "";
     const [slug, setSlug] = useState<string>("");
     const [isMember, setIsMember] = useState(false);
     const [membersRefreshKey, setMembersRefreshKey] = useState(0);
@@ -20,6 +58,20 @@ export default function ClanDetailPage({ params }: { params: Promise<{ slug: str
     const [clanData, setClanData] = useState<ClanData | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const refreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const scheduleClanRefresh = () => {
+        if (refreshTimeoutRef.current) {
+            clearTimeout(refreshTimeoutRef.current);
+        }
+
+        refreshTimeoutRef.current = setTimeout(() => {
+            if (!slug) return;
+            getClanDataBySlugDeduped(slug)
+                .then((freshData) => setClanData(freshData))
+                .catch((err) => console.error("Failed to refresh clan data:", err));
+        }, 500);
+    };
 
     // Handle clan membership change (when user joins or leaves)
     const handleClanMembershipChange = (newMemberCount: number) => {
@@ -35,25 +87,13 @@ export default function ClanDetailPage({ params }: { params: Promise<{ slug: str
         setMembersRefreshKey(prev => prev + 1);
 
         // Refresh clan data from server after a short delay
-        setTimeout(() => {
-            if (slug) {
-                getClanDataBySlug(slug)
-                    .then((freshData) => setClanData(freshData))
-                    .catch((err) => console.error("Failed to refresh clan data:", err));
-            }
-        }, 500);
+        scheduleClanRefresh();
     };
 
     // Handle clan data update (when clan settings are saved)
     const handleClanDataUpdate = () => {
         // Refresh clan data from server after a short delay
-        setTimeout(() => {
-            if (slug) {
-                getClanDataBySlug(slug)
-                    .then((freshData) => setClanData(freshData))
-                    .catch((err) => console.error("Failed to refresh clan data:", err));
-            }
-        }, 500);
+        scheduleClanRefresh();
     };
 
     // Resolve params promise
@@ -71,19 +111,18 @@ export default function ClanDetailPage({ params }: { params: Promise<{ slug: str
                 setError(null);
                 console.log("Fetching clan with slug:", slug);
                 // Fetch clan by slug (ID) and transform to ClanData format
-                const clan = await getClanDataBySlug(slug);
+                const clan = await getClanDataBySlugDeduped(slug);
                 console.log("Fetched clan data:", clan);
                 setClanData(clan);
 
                 // Check if user is a member
-                if (userWallet) {
-                    const walletAddress = userWallet.toBase58();
+                if (walletAddress) {
                     try {
                         // First, get the user ID associated with this wallet
-                        const user = await getUserByWallet(walletAddress);
+                        const user = await getUserByWalletDeduped(walletAddress);
                         const userId = user.id;
 
-                        const membersResponse = await getClanMembers(slug);
+                        const membersResponse = await getClanMembersDeduped(slug);
 
                         // Check if the user's ID is in the clan members list
                         // We check both the internal userId and the wallet address
@@ -111,7 +150,13 @@ export default function ClanDetailPage({ params }: { params: Promise<{ slug: str
         }
 
         fetchClan();
-    }, [slug, userWallet]);
+
+        return () => {
+            if (refreshTimeoutRef.current) {
+                clearTimeout(refreshTimeoutRef.current);
+            }
+        };
+    }, [slug, walletAddress]);
 
     const tabs: Tab[] = ["Overview", "Chat"];
 

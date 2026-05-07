@@ -2,8 +2,6 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { useState, useRef } from "react";
-import { Search, ChevronDown } from "lucide-react";
 
 // SVG Icons
 const TrendingUpIcon = () => (
@@ -63,24 +61,7 @@ const ArrowRightIcon = () => (
     </svg>
 );
 
-const BoltIcon = () => (
-    <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
-        <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
-    </svg>
-);
-
 export default function CategoryPage() {
-    const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-    const [sortBy, setSortBy] = useState("Trending");
-    const dropdownRef = useRef(null);
-
-    const sortOptions = [
-        { label: "Trending", icon: <TrendingUpIcon /> },
-        { label: "Top Rated", icon: <TrophyIcon /> },
-        { label: "Volume", icon: <BarChartIcon /> },
-        { label: "Newest", icon: <BoltIcon /> },
-    ];
-
     return (
         <div className="min-h-screen bg-[#f3e1d7]">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
@@ -98,17 +79,13 @@ export default function CategoryPage() {
 
                     {/* ── Crypto Markets Card ── */}
                     <div
-                        className="group relative rounded-2xl overflow-hidden flex flex-col transition-all duration-300 hover:scale-[1.02] hover:shadow-xl"
+                        className="group relative rounded-3xl overflow-hidden flex flex-col transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl"
                         style={{
-                            background: "linear-gradient(145deg, #f3e1d7 0%, #f8ede4 40%, #f5e4d0 100%)",
-                            boxShadow: "0 4px 24px -6px rgba(220,180,140,0.3), 0 1px 4px rgba(0,0,0,0.04)",
-                            border: "1.5px solid rgba(230,180,130,0.25)",
+                            background: "linear-gradient(145deg, #fff7f2 0%, #f8ebdf 50%, #f3e1d7 100%)",
+                            boxShadow: "0 10px 30px -14px rgba(85,50,20,0.28), 0 1px 6px rgba(0,0,0,0.06)",
+                            border: "2.5px solid rgba(0, 0, 0, 0.18)",
                         }}
                     >
-                        {/* Decorative top stripe */}
-                        <div className="h-1.5 w-full" style={{ background: "linear-gradient(90deg, #e8a050, #f0b060, #f5c880)" }} />
-
-                        {/* Top visual area — shorter for rectangular look */}
                         <div className="relative h-44 sm:h-48 overflow-hidden flex-shrink-0 px-6 pt-6">
 
                             {/* Subtle dot-grid background */}
@@ -135,16 +112,21 @@ export default function CategoryPage() {
                                     <TrendingUpIcon />
                                 </div>
                                 <div>
-                                    <p className="text-[10px] font-bold text-[#d4a050] uppercase tracking-widest">Category</p>
+                                    <p className="text-[10px] font-bold text-[#be8240] uppercase tracking-widest">Category</p>
                                     <h2 className="text-xl sm:text-2xl font-black text-[#1a1a1a] leading-tight">
                                         Crypto <span className="text-[#d09040]">Markets</span>
                                     </h2>
                                 </div>
                             </div>
 
-                            <p className="relative z-10 text-[#888] text-xs sm:text-sm font-medium leading-relaxed max-w-[200px]">
+                            <p className="relative z-10 text-[#6e6258] text-xs sm:text-sm font-medium leading-relaxed max-w-[220px]">
                                 Predict price movements, market trends and major crypto events.
                             </p>
+
+                            <div className="relative z-10 mt-3 flex items-center gap-2">
+                                <span className="rounded-full border border-[#e4c39b] bg-white/70 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-[#8f5e2a]">Live Odds</span>
+                                <span className="rounded-full border border-[#e4c39b] bg-white/70 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-[#8f5e2a]">High Volume</span>
+                            </div>
 
                             {/* Scribble coin images — scattered layout, slightly smaller */}
                             <div className="absolute right-0 bottom-0 w-[55%] h-full pointer-events-none select-none">
@@ -197,30 +179,30 @@ export default function CategoryPage() {
                         </div>
 
                         {/* Divider */}
-                        <div className="mx-5 h-px bg-gradient-to-r from-transparent via-[#e8c8a0]/50 to-transparent" />
+                        <div className="mx-5 h-px bg-gradient-to-r from-transparent via-[#d8b892]/60 to-transparent" />
 
                         {/* Stats row — more compact */}
-                        <div className="mx-5 my-3.5 rounded-xl px-4 py-3 bg-white/70 backdrop-blur-sm border border-[#e8c8a0]/50">
-                            <div className="grid grid-cols-4 divide-x divide-[#e8c8a0]/50">
+                        <div className="mx-5 my-3.5 rounded-2xl px-4 py-3 bg-white/80 backdrop-blur-sm border border-[#e8c8a0]/50 shadow-[inset_0_1px_0_rgba(255,255,255,0.55)]">
+                            <div className="grid grid-cols-4 divide-x divide-[#e8c8a0]/45">
                                 <div className="flex flex-col items-center gap-0.5 px-1">
                                     <span className="text-[#d4a050]"><BarChartIcon /></span>
                                     <span className="text-sm sm:text-base font-black text-[#1a1a1a]">124</span>
-                                    <span className="text-[9px] text-[#999] font-semibold uppercase tracking-wide">Markets</span>
+                                    <span className="text-[9px] text-[#8f7e6e] font-semibold uppercase tracking-wide">Markets</span>
                                 </div>
                                 <div className="flex flex-col items-center gap-0.5 px-1">
                                     <span className="text-[#d4a050]"><UsersIcon /></span>
                                     <span className="text-sm sm:text-base font-black text-[#1a1a1a]">12.5K</span>
-                                    <span className="text-[9px] text-[#999] font-semibold uppercase tracking-wide">Traders</span>
+                                    <span className="text-[9px] text-[#8f7e6e] font-semibold uppercase tracking-wide">Traders</span>
                                 </div>
                                 <div className="flex flex-col items-center gap-0.5 px-1">
                                     <span className="text-[#d4a050]"><CoinsIcon /></span>
                                     <span className="text-sm sm:text-base font-black text-[#1a1a1a]">$12.4M</span>
-                                    <span className="text-[9px] text-[#999] font-semibold uppercase tracking-wide">24H Vol</span>
+                                    <span className="text-[9px] text-[#8f7e6e] font-semibold uppercase tracking-wide">24H Vol</span>
                                 </div>
                                 <div className="flex flex-col items-center gap-0.5 px-1">
                                     <span className="text-[#d4a050]"><FlameIcon /></span>
-                                    <span className="text-sm sm:text-base font-black text-[#d09040]">Hot 🔥</span>
-                                    <span className="text-[9px] text-[#999] font-semibold uppercase tracking-wide">Trend</span>
+                                    <span className="text-sm sm:text-base font-black text-[#d09040]">Rising</span>
+                                    <span className="text-[9px] text-[#8f7e6e] font-semibold uppercase tracking-wide">Trend</span>
                                 </div>
                             </div>
                         </div>
@@ -229,7 +211,7 @@ export default function CategoryPage() {
                         <div className="px-5 pb-4">
                             <Link
                                 href="/markets/crypto"
-                                className="group/btn flex items-center justify-between w-full px-5 py-3.5 rounded-xl text-white font-bold text-sm sm:text-base transition-all duration-300 hover:opacity-95 hover:scale-[1.02] active:scale-[0.98]"
+                                className="group/btn border border-[#8c5a2a] flex items-center justify-between w-full px-5 py-3.5 rounded-2xl text-white font-bold text-sm sm:text-base transition-all duration-300 hover:opacity-95 hover:scale-[1.01] active:scale-[0.98]"
                                 style={{
                                     background: "linear-gradient(135deg, #e8a050 0%, #d09040 100%)",
                                     boxShadow: "0 4px 16px rgba(220,150,60,0.3), inset 0 1px 0 rgba(255,255,255,0.15)",
@@ -245,88 +227,72 @@ export default function CategoryPage() {
 
                     {/* ── Sports Markets Card ── */}
                     <div
-                        className="group relative rounded-2xl overflow-hidden flex flex-col transition-all duration-300 hover:scale-[1.02] hover:shadow-xl"
+                        className="group relative rounded-3xl overflow-hidden flex flex-col transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl"
                         style={{
-                            background: "linear-gradient(145deg, #f3e1d7 0%, #f0e8ef 40%, #ece4f5 100%)",
-                            boxShadow: "0 4px 24px -6px rgba(200,170,190,0.3), 0 1px 4px rgba(0,0,0,0.04)",
-                            border: "1.5px solid rgba(190,160,210,0.25)",
+                            background: "linear-gradient(145deg, #fff8f3 0%, #f3ece2 50%, #ece4d9 100%)",
+                            border: "2.5px solid rgba(0, 0, 0, 0.17)",
                         }}
                     >
-                        {/* Decorative top stripe */}
-                        <div className="h-1.5 w-full" style={{ background: "linear-gradient(90deg, #b080d0, #c8a0e0, #d8b8e8)" }} />
-
-                        {/* Top visual area — shorter for rectangular look */}
                         <div className="relative h-44 sm:h-48 overflow-hidden flex-shrink-0 px-6 pt-6">
 
                             {/* Subtle dot-grid background */}
                             <div
                                 className="absolute inset-0 opacity-[0.05]"
                                 style={{
-                                    backgroundImage: "radial-gradient(circle, #b080d0 1px, transparent 1px)",
+                                    backgroundImage: "radial-gradient(circle, #73927f 1px, transparent 1px)",
                                     backgroundSize: "20px 20px",
                                 }}
                             />
 
-                            {/* Purple glow blob */}
+                            {/* Glow blob */}
                             <div
                                 className="absolute -right-8 -top-8 w-48 h-48 rounded-full opacity-20 blur-3xl"
-                                style={{ background: "radial-gradient(circle, #c8a0e0, #b080d0)" }}
+                                style={{ background: "radial-gradient(circle, #88a793, #587160)" }}
                             />
 
                             {/* Icon badge + label */}
                             <div className="relative z-10 flex items-center gap-3 mb-3">
                                 <div
-                                    className="w-11 h-11 rounded-xl flex items-center justify-center text-[#a070c0] shadow-sm transition-transform duration-300 group-hover:rotate-12 group-hover:scale-110"
+                                    className="w-11 h-11 rounded-xl flex items-center justify-center text-[#587160] shadow-sm transition-transform duration-300 group-hover:rotate-6 group-hover:scale-110"
                                     style={{ background: "rgba(255,255,255,0.85)" }}
                                 >
                                     <TrophyIcon />
                                 </div>
                                 <div>
-                                    <p className="text-[10px] font-bold text-[#b088d0] uppercase tracking-widest">Category</p>
+                                    <p className="text-[10px] font-bold text-[#6f8a79] uppercase tracking-widest">Category</p>
                                     <h2 className="text-xl sm:text-2xl font-black text-[#1a1a1a] leading-tight">
-                                        Sports <span className="text-[#a070c0]">Markets</span>
+                                        Sports <span className="text-[#587160]">Markets</span>
                                     </h2>
                                 </div>
                             </div>
 
-                            <p className="relative z-10 text-[#888] text-xs sm:text-sm font-medium leading-relaxed max-w-[200px]">
+                            <p className="relative z-10 text-[#6e6258] text-xs sm:text-sm font-medium leading-relaxed max-w-[220px]">
                                 Predict match outcomes, player performances and sports events.
                             </p>
+
+                            <div className="relative z-10 mt-3 flex items-center gap-2">
+                                <span className="rounded-full border border-[#bfd0c3] bg-white/70 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-[#4f6657]">Matchday Live</span>
+                                <span className="rounded-full border border-[#bfd0c3] bg-white/70 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-[#4f6657]">Top Leagues</span>
+                            </div>
 
                             {/* Sports visuals — scattered balls */}
                             <div className="absolute right-0 bottom-0 w-[55%] h-full pointer-events-none select-none flex items-end justify-center pb-4">
                                 <div className="relative w-44 h-44">
-
-                                    {/* Cricket player silhouette */}
-                                    <div className="absolute top-0 right-6 w-20 h-32 flex items-center justify-center z-10">
-                                        <div className="relative" style={{ transform: "scale(0.7)" }}>
-                                            <div className="w-8 h-8 rounded-full absolute -top-8 left-1/2 -translate-x-1/2"
-                                                style={{ background: "linear-gradient(135deg, #c8a8e0, #a070c0)" }} />
-                                            <div className="w-9 h-5 rounded-t-full absolute -top-10 left-1/2 -translate-x-1/2"
-                                                style={{ background: "#8860a8" }} />
-                                            <div className="w-10 h-20 rounded-t-full mx-auto"
-                                                style={{ background: "linear-gradient(180deg, #c8a8e0 0%, #a070c0 100%)" }} />
-                                            <div className="absolute -top-4 -right-8 w-16 h-2 rounded-full"
-                                                style={{ background: "#c8a060", transform: "rotate(-45deg)", transformOrigin: "left center" }} />
-                                            <div className="flex gap-1 mt-1">
-                                                <div className="w-4 h-12 rounded-b-full" style={{ background: "#a070c0" }} />
-                                                <div className="w-4 h-12 rounded-b-full" style={{ background: "#a070c0", transform: "rotate(10deg)" }} />
-                                            </div>
-                                        </div>
-                                    </div>
+                                    <div className="absolute top-2 right-3 w-24 h-24 rounded-full border-4 border-[#95b19f]/70 animate-spin-slow" />
+                                    <div className="absolute top-9 right-10 w-10 h-10 rounded-full border-2 border-[#6f8a79]/70" />
 
                                     {/* Soccer ball */}
                                     <div
                                         className="absolute bottom-4 left-0 w-14 h-14 rounded-full animate-float-gentle"
                                         style={{
-                                            background: "radial-gradient(circle at 35% 35%, #ede9fe, #c8a8e0 60%, #a880c8 100%)",
-                                            boxShadow: "0 6px 20px rgba(160,110,190,0.3), inset 0 -4px 8px rgba(0,0,0,0.12)",
+                                            background: "radial-gradient(circle at 35% 35%, #f5f7f6, #c9d8cf 60%, #9db6a7 100%)",
+                                            boxShadow: "0 6px 20px rgba(89,118,101,0.26), inset 0 -4px 8px rgba(0,0,0,0.12)",
                                         }}
                                     >
                                         <div className="absolute inset-0 rounded-full overflow-hidden opacity-35">
-                                            <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-[#8860a8]" />
-                                            <div className="absolute top-0 bottom-0 left-1/2 w-0.5 bg-[#8860a8]" />
-                                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-5 h-5 bg-[#8860a8] rounded-sm rotate-45" />
+                                            <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-[#5b7664]" />
+                                            <div className="absolute top-0 bottom-0 left-1/2 w-0.5 bg-[#5b7664]" />
+                                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-5 h-5 bg-[#5b7664] rounded-sm rotate-45" />
                                         </div>
                                     </div>
 
@@ -346,47 +312,35 @@ export default function CategoryPage() {
                                             <div className="absolute bottom-1/4 left-1/4 right-1/4 h-0.5 bg-[#b08040] rounded-full" style={{ transform: "rotate(20deg)" }} />
                                         </div>
                                     </div>
-
-                                    {/* Trophy accent */}
-                                    <div
-                                        className="absolute top-2 left-2 w-9 h-9 rounded-xl flex items-center justify-center animate-float-wavy"
-                                        style={{
-                                            background: "rgba(255,255,255,0.85)",
-                                            boxShadow: "0 4px 12px rgba(190,160,210,0.25)",
-                                            animationDelay: "1.2s",
-                                        }}
-                                    >
-                                        <span className="text-lg">🏆</span>
-                                    </div>
                                 </div>
                             </div>
                         </div>
 
                         {/* Divider */}
-                        <div className="mx-5 h-px bg-gradient-to-r from-transparent via-[#d8c0e8]/50 to-transparent" />
+                        <div className="mx-5 h-px bg-gradient-to-r from-transparent via-[#c4d2c8]/70 to-transparent" />
 
                         {/* Stats row — more compact */}
-                        <div className="mx-5 my-3.5 rounded-xl px-4 py-3 bg-white/70 backdrop-blur-sm border border-[#d8c0e8]/50">
-                            <div className="grid grid-cols-4 divide-x divide-[#d8c0e8]/50">
+                        <div className="mx-5 my-3.5 rounded-2xl px-4 py-3 bg-white/80 backdrop-blur-sm border border-[#bfd0c3]/60 shadow-[inset_0_1px_0_rgba(255,255,255,0.55)]">
+                            <div className="grid grid-cols-4 divide-x divide-[#bfd0c3]/60">
                                 <div className="flex flex-col items-center gap-0.5 px-1">
-                                    <span className="text-[#b088d0]"><TrophyIcon /></span>
+                                    <span className="text-[#5d7766]"><TrophyIcon /></span>
                                     <span className="text-sm sm:text-base font-black text-[#1a1a1a]">98</span>
-                                    <span className="text-[9px] text-[#999] font-semibold uppercase tracking-wide">Markets</span>
+                                    <span className="text-[9px] text-[#8f7e6e] font-semibold uppercase tracking-wide">Markets</span>
                                 </div>
                                 <div className="flex flex-col items-center gap-0.5 px-1">
-                                    <span className="text-[#b088d0]"><UsersIcon /></span>
+                                    <span className="text-[#5d7766]"><UsersIcon /></span>
                                     <span className="text-sm sm:text-base font-black text-[#1a1a1a]">8.7K</span>
-                                    <span className="text-[9px] text-[#999] font-semibold uppercase tracking-wide">Traders</span>
+                                    <span className="text-[9px] text-[#8f7e6e] font-semibold uppercase tracking-wide">Traders</span>
                                 </div>
                                 <div className="flex flex-col items-center gap-0.5 px-1">
-                                    <span className="text-[#b088d0]"><CoinsIcon /></span>
+                                    <span className="text-[#5d7766]"><CoinsIcon /></span>
                                     <span className="text-sm sm:text-base font-black text-[#1a1a1a]">$8.3M</span>
-                                    <span className="text-[9px] text-[#999] font-semibold uppercase tracking-wide">24H Vol</span>
+                                    <span className="text-[9px] text-[#8f7e6e] font-semibold uppercase tracking-wide">24H Vol</span>
                                 </div>
                                 <div className="flex flex-col items-center gap-0.5 px-1">
-                                    <span className="text-[#b088d0]"><FlameIcon /></span>
-                                    <span className="text-sm sm:text-base font-black text-[#a070c0]">Hot 🔥</span>
-                                    <span className="text-[9px] text-[#999] font-semibold uppercase tracking-wide">Trend</span>
+                                    <span className="text-[#5d7766]"><FlameIcon /></span>
+                                    <span className="text-sm sm:text-base font-black text-[#587160]">Rising</span>
+                                    <span className="text-[9px] text-[#8f7e6e] font-semibold uppercase tracking-wide">Trend</span>
                                 </div>
                             </div>
                         </div>
@@ -395,10 +349,10 @@ export default function CategoryPage() {
                         <div className="px-5 pb-4">
                             <Link
                                 href="/markets/sports"
-                                className="group/btn flex items-center justify-between w-full px-5 py-3.5 rounded-xl text-white font-bold text-sm sm:text-base transition-all duration-300 hover:opacity-95 hover:scale-[1.02] active:scale-[0.98]"
+                                className="group/btn border border-[#4f6657] flex items-center justify-between w-full px-5 py-3.5 rounded-2xl text-white font-bold text-sm sm:text-base transition-all duration-300 hover:opacity-95 hover:scale-[1.01] active:scale-[0.98]"
                                 style={{
-                                    background: "linear-gradient(135deg, #b080d0 0%, #a070c0 100%)",
-                                    boxShadow: "0 4px 16px rgba(190,150,210,0.3), inset 0 1px 0 rgba(255,255,255,0.15)",
+                                    background: "linear-gradient(135deg, #729282 0%, #587160 100%)",
+                                    boxShadow: "0 4px 16px rgba(87,113,96,0.34), inset 0 1px 0 rgba(255,255,255,0.15)",
                                 }}
                             >
                                 <span>Explore Sports Markets</span>

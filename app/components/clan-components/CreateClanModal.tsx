@@ -4,6 +4,7 @@ import { useState } from "react";
 import Image from "next/image";
 import { countriesList, type Country } from "./CountriesList";
 import { createClan, type CreateClanParams } from "../../lib/clan-service/clans";
+import { blockedContentError, hasBlockedContent } from "../../lib/content-moderation";
 
 interface CreateClanModalProps {
     isOpen: boolean;
@@ -33,6 +34,14 @@ export function CreateClanModal({ isOpen, onClose, onClanCreated, userId }: Crea
         e.preventDefault();
         if (!userId) {
             setSubmitError("Please log in to create a clan");
+            return;
+        }
+        if (hasBlockedContent(clanName)) {
+            setSubmitError(blockedContentError("Clan name"));
+            return;
+        }
+        if (hasBlockedContent(clanDescription)) {
+            setSubmitError(blockedContentError("Description"));
             return;
         }
 

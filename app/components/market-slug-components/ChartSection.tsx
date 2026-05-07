@@ -1,49 +1,80 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
-export function TradingViewChart() {
+export function TradingViewChart({ slugName }: { slugName: string }) {
     const containerRef = useRef<HTMLDivElement>(null);
+    const [isScriptLoaded, setIsScriptLoaded] = useState(false);
 
+    // Load the TradingView library once
     useEffect(() => {
-        if (!containerRef.current) return;
+        if (typeof window === 'undefined' || isScriptLoaded) return;
+
+        const existingScript = document.getElementById('tradingview-library');
+        if (existingScript) {
+            // Wait for it to be ready
+            const checkReady = setInterval(() => {
+                if ((window as any).TradingView) {
+                    setIsScriptLoaded(true);
+                    clearInterval(checkReady);
+                }
+            }, 100);
+            return () => clearInterval(checkReady);
+        }
+
+        const script = document.createElement('script');
+        script.id = 'tradingview-library';
+        script.src = 'https://s3.tradingview.com/tv.js';
+        script.async = true;
+        script.onload = () => setIsScriptLoaded(true);
+        document.head.appendChild(script);
+
+        return () => {
+            // Don't remove the script on unmount, let other instances reuse it
+        };
+    }, [isScriptLoaded]);
+
+    // Create/destroy the widget when the library is ready or slugName changes
+    useEffect(() => {
+        if (!containerRef.current || !slugName || !(window as any).TradingView) return;
 
         // Clear any existing content
         containerRef.current.innerHTML = '';
 
-        // Create the TradingView widget script
-        const script = document.createElement('script');
-        script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
-        script.type = 'text/javascript';
-        script.async = true;
-        script.innerHTML = JSON.stringify({
-            "autosize": true,
-            "symbol": "BITSTAMP:BTCUSD",
-            "interval": "15",
-            "timezone": "exchange",
-            "theme": "light",
-            "style": "1",
-            "locale": "en",
-            "enable_publishing": false,
-            "backgroundColor": "rgba(255, 255, 255, 0)",
-            "gridColor": "rgba(0, 0, 0, 0.05)",
-            "withdateranges": true,
-            "hide_side_toolbar": false,
-            "allow_symbol_change": false,
-            "save_image": false,
-            "calendar": true,
-            "hide_volume": false,
-            "support_host": "https://www.tradingview.com"
-        });
+        // Create a div for the widget to mount into
+        const widgetDiv = document.createElement('div');
+        widgetDiv.id = `tv-chart-${slugName}`;
+        widgetDiv.style.height = '100%';
+        widgetDiv.style.width = '100%';
+        containerRef.current.appendChild(widgetDiv);
 
-        containerRef.current.appendChild(script);
+        const widget = new (window as any).TradingView.widget({
+            container_id: widgetDiv.id,
+            autosize: true,
+            symbol: `BITSTAMP:${slugName.toUpperCase()}USD`,
+            interval: "15",
+            timezone: "exchange",
+            theme: "light",
+            style: "1",
+            locale: "en",
+            enable_publishing: false,
+            backgroundColor: "rgba(255, 255, 255, 0)",
+            gridColor: "rgba(0, 0, 0, 0.05)",
+            withdateranges: true,
+            hide_side_toolbar: false,
+            allow_symbol_change: false,
+            save_image: false,
+            calendar: true,
+            hide_volume: false,
+            support_host: "https://www.tradingview.com",
+        });
 
         return () => {
             if (containerRef.current) {
                 containerRef.current.innerHTML = '';
             }
         };
-    }, []);
+    }, [slugName, isScriptLoaded]);
 
     return (
         <div
@@ -60,16 +91,17 @@ export function TradingViewChart() {
 }
 
 interface ChartSectionProps {
+    slugName: string;
     showChart: boolean;
     onToggleChart: () => void;
 }
 
-export function ChartSection({ showChart, onToggleChart }: ChartSectionProps) {
+export function ChartSection({ slugName, showChart, onToggleChart }: ChartSectionProps) {
     return (
-        <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-4 sm:p-6 mb-4 sm:mb-6">
+        <div className="bg-white/60 border border-gray-400 backdrop-blur-sm rounded-2xl p-4 sm:p-6 mb-4 sm:mb-6">
             <div className="flex items-center justify-between mb-4">
                 <div>
-                    <span className="font-semibold text-gray-900 text-base sm:text-lg">BTC/USD Chart</span>
+                    <span className="font-semibold text-gray-900 text-base sm:text-lg">{slugName} Chart 📈</span>
                 </div>
                 <button
                     onClick={onToggleChart}
@@ -97,7 +129,7 @@ export function ChartSection({ showChart, onToggleChart }: ChartSectionProps) {
             </div>
 
             {/* TradingView Chart */}
-            {showChart && <TradingViewChart />}
+            {showChart && <TradingViewChart slugName={slugName} />}
         </div>
     );
 }

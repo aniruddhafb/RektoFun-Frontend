@@ -5,6 +5,7 @@ import { usePrivy } from "@privy-io/react-auth";
 import Image from "next/image";
 import { useSolanaWallet } from "@/app/lib/useSolanaWallet";
 import { getUserByWallet, updateUser } from "@/app/lib/users-service/users";
+import { blockedContentError, hasBlockedContent } from "@/app/lib/content-moderation";
 
 
 const PROFILE_SVGS = Array.from({ length: 31 }, (_, i) => `/profiles/${i + 1}.svg`);
@@ -102,6 +103,14 @@ export default function SettingsPage() {
     // Save profile changes
     const saveProfile = async () => {
         if (!publicKey) return;
+        if (hasBlockedContent(username)) {
+            setSaveError(blockedContentError("Username"));
+            return;
+        }
+        if (hasBlockedContent(description)) {
+            setSaveError(blockedContentError("Bio"));
+            return;
+        }
 
         setSaveError(null);
         setIsSavingProfile(true);
@@ -260,7 +269,10 @@ export default function SettingsPage() {
                                 <textarea
                                     maxLength={100}
                                     value={description}
-                                    onChange={(e) => setDescription(e.target.value)}
+                                    onChange={(e) => {
+                                        setDescription(e.target.value);
+                                        if (saveError) setSaveError(null);
+                                    }}
                                     rows={2}
                                     className="w-full px-4 py-2 bg-white/80 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-black/20 focus:border-transparent resize-none"
                                     placeholder="Tell us about yourself..."

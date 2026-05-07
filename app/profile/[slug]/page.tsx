@@ -12,109 +12,14 @@ import {
 import { LoadingPage } from "@/app/components/LoadingPage";
 import { getUserByWallet, User } from "@/app/lib/users-service/users";
 import { useSolanaWallet } from "@/app/lib/useSolanaWallet";
-import { ChallengeListItem } from "@/app/lib/challenges-service/challenges";
-
-// Activity item interface
-interface ActivityItem {
-    id: string;
-    type: "bet" | "win" | "follow" | "buy";
-    user: {
-        name: string;
-        avatar: string;
-    };
-    action: string;
-    target?: string;
-    amount?: string;
-    details: string;
-    subAction?: {
-        user: string;
-        action: string;
-        icon?: string;
-        highlight?: string;
-    };
-    timestamp: string;
-}
+import {
+    ChallengeListItem,
+    getChallenges,
+} from "@/app/lib/challenges-service/challenges";
 
 // Tab types
 type TabType = "challenges" | "activity";
 
-// Activity data matching the activity page style
-const activityData: ActivityItem[] = [
-    {
-        id: "1",
-        type: "win",
-        user: { name: "DegenLord", avatar: "/scribbles/pepe.png" },
-        action: "won",
-        amount: "+2.5 SOL",
-        target: "Bitcoin Above $95K",
-        details: "vs CryptoKing",
-        subAction: {
-            user: "BTC",
-            action: "bought",
-            highlight: "🎫",
-        },
-        timestamp: "2hr ago",
-    },
-    {
-        id: "2",
-        type: "bet",
-        user: { name: "DegenLord", avatar: "/scribbles/pepe.png" },
-        action: "got REKT",
-        amount: "-1.2 SOL",
-        target: "Ethereum Below $3,200",
-        details: "by BearWhale",
-        subAction: {
-            user: "ETH",
-            action: "bought",
-            highlight: "Down",
-        },
-        timestamp: "5hr ago",
-    },
-    {
-        id: "3",
-        type: "bet",
-        user: { name: "DegenLord", avatar: "/scribbles/pepe.png" },
-        action: "created challenge",
-        amount: "1.0 SOL",
-        target: "SOL Above $160",
-        details: "",
-        subAction: {
-            user: "SOL",
-            action: "bought",
-            highlight: "🎫",
-        },
-        timestamp: "1 day ago",
-    },
-    {
-        id: "4",
-        type: "follow",
-        user: { name: "DegenLord", avatar: "/scribbles/pepe.png" },
-        action: "joined",
-        target: "MoonBoy's challenge",
-        details: "x0.5 SOL bet",
-        subAction: {
-            user: "DOGE",
-            action: "bought",
-            highlight: "🥞",
-        },
-        timestamp: "2 days ago",
-    },
-    {
-        id: "5",
-        type: "win",
-        user: { name: "DegenLord", avatar: "/scribbles/pepe.png" },
-        action: "hit jackpot!",
-        amount: "+5.0 SOL",
-        target: "PEPE Above $0.000015",
-        details: "",
-        subAction: {
-            user: "PEPE",
-            action: "bought",
-            highlight: "Up x5",
-        },
-        timestamp: "3 days ago",
-    },
-];
 
 export default function ProfilePage() {
     const params = useParams();
@@ -126,14 +31,17 @@ export default function ProfilePage() {
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [userChallenges, setUserChallenges] = useState<ChallengeListItem[]>([]);
+    const [challengesLoading, setChallengesLoading] = useState(false);
+
+    const walletFromSlug = decodeURIComponent(slug || "");
 
     // Fetch user data by wallet address (slug)
     useEffect(() => {
         async function fetchUser() {
             try {
                 setLoading(true);
-                const userData = await getUserByWallet(slug);
-                console.log("Fetched user data:", userData);
+                const userData = await getUserByWallet(walletFromSlug);
                 setUser(userData);
                 setError(null);
             } catch (err) {
@@ -144,10 +52,37 @@ export default function ProfilePage() {
             }
         }
 
-        if (slug) {
+        if (walletFromSlug) {
             fetchUser();
         }
-    }, [slug]);
+    }, [walletFromSlug]);
+
+    // Fetch challenges created by this user id
+    useEffect(() => {
+        async function fetchUserChallenges() {
+            if (!user?.id) {
+                setUserChallenges([]);
+                return;
+            }
+
+            try {
+                setChallengesLoading(true);
+                const challengeData = await getChallenges({
+                    created_by: user.id,
+                    limit: 100,
+                    offset: 0,
+                });
+                setUserChallenges(challengeData.challenges || []);
+            } catch (challengeError) {
+                console.error("Failed to fetch user challenges:", challengeError);
+                setUserChallenges([]);
+            } finally {
+                setChallengesLoading(false);
+            }
+        }
+
+        fetchUserChallenges();
+    }, [user?.id]);
 
     // Handle challenge card click
     const handleChallengeClick = (challenge: ChallengeListItem) => {
@@ -222,9 +157,9 @@ export default function ProfilePage() {
                                 usdcUsd: usdcBalance ?? 0, // USDC is 1:1 with USD
                             }}
                             stats={{
-                                wins: 0, // These would come from challenges data
+                                wins: userChallenges.filter((c) => c.status === "resolved").length,
                                 rekts: 0,
-                                totalChallenges: 0,
+                                totalChallenges: userChallenges.length,
                                 winRatio: 0,
                             }}
                         />
@@ -233,13 +168,21 @@ export default function ProfilePage() {
                         <ProfileTabs activeTab={activeTab} onTabChange={setActiveTab} />
 
                         {/* Challenges Tab Content */}
-                        {/* {activeTab === "challenges" && (
-                            <ProfileChallenges onChallengeClick={handleChallengeClick} />
-                        )} */}
+                        {activeTab === "challenges" && (
+                            <ProfileChallenges
+                                challenges={userChallenges}
+                                loading={challengesLoading}
+                                onChallengeClick={handleChallengeClick}
+                            />
+                        )}
 
                         {/* Activity Tab Content */}
                         {activeTab === "activity" && (
-                            <ProfileActivity activityData={activityData} />
+                            <ProfileActivity
+                                userId={user.id}
+                                username={user.username}
+                                avatar={user.profile_image || "/scribbles/pepe.png"}
+                            />
                         )}
                     </>
                 )}

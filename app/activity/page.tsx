@@ -1,166 +1,110 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import ChallengeDetailModal from "@/app/components/challenge-components/ChallengeDetailModal";
+import {
+    ChallengeListItem,
+    getChallenges,
+} from "@/app/lib/challenges-service/challenges";
 
-// Activity types
-type ActivityType = "all" | "bets" | "wins" | "follows";
+type ActivityType = "all";
 
-// Activity item interface
-interface ActivityItem {
-    id: string;
-    type: "bet" | "win" | "follow" | "buy";
-    user: {
-        name: string;
-        avatar: string;
-    };
-    action: string;
-    target?: string;
-    amount?: string;
-    details: string;
-    subAction?: {
-        user: string;
-        action: string;
-        icon?: string;
-        highlight?: string;
-    };
-    timestamp: string;
+const filterTabs: { label: string; value: ActivityType; count?: number }[] = [
+    { label: "All Activity", value: "all" }
+];
+const SKELETON_CARDS_COUNT = 5;
+
+function formatTimeAgo(dateString: string): string {
+    const dateMs = new Date(dateString).getTime();
+    if (Number.isNaN(dateMs)) return "recently";
+    const diffMs = Date.now() - dateMs;
+    if (diffMs < 0) return "just now";
+
+    const minutes = Math.floor(diffMs / 60000);
+    const hours = Math.floor(diffMs / 3600000);
+    const days = Math.floor(diffMs / 86400000);
+
+    if (days > 0) return `${days}d ago`;
+    if (hours > 0) return `${hours}h ago`;
+    if (minutes > 0) return `${minutes}m ago`;
+    return "just now";
 }
 
-// Mock activity data
-const activityData: ActivityItem[] = [
-    {
-        id: "1",
-        type: "bet",
-        user: { name: "WhaleKing", avatar: "/scribbles/sol.png" },
-        action: "bet",
-        amount: "1.5 SOL",
-        target: "Solana Above $170",
-        details: "in 20 h",
-        subAction: {
-            user: "SOL",
-            action: "bought",
-            highlight: "🎫",
-        },
-        timestamp: "1hr ago",
-    },
-    {
-        id: "2",
-        type: "bet",
-        user: { name: "Brenda", avatar: "/scribbles/pepe.png" },
-        action: "bet",
-        amount: "0.9 SOL",
-        target: "Pepe Below 0.000010",
-        details: "in 2 h",
-        subAction: {
-            user: "Brenda",
-            action: "bought",
-            highlight: "Down 9x",
-        },
-        timestamp: "9m ago",
-    },
-    {
-        id: "3",
-        type: "win",
-        user: { name: "TraderX", avatar: "/scribbles/sol.png" },
-        action: "hit jackpot!",
-        amount: "+110 SOL",
-        details: "",
-        subAction: {
-            user: "CryptoNinja",
-            action: "bought",
-            highlight: "🎫",
-        },
-        timestamp: "19m ago",
-    },
-    {
-        id: "4",
-        type: "bet",
-        user: { name: "CryptoNinja", avatar: "/scribbles/pepe.png" },
-        action: "bet",
-        amount: "3.5 SOL",
-        target: "Ethereum Below $3,200",
-        details: "",
-        subAction: {
-            user: "SOL",
-            action: "bought",
-            highlight: "🎫 x3.5 SOL",
-        },
-        timestamp: "27m ago",
-    },
-    {
-        id: "5",
-        type: "follow",
-        user: { name: "DegenLord", avatar: "/scribbles/doge.png" },
-        action: "followed",
-        target: "WhaleKing",
-        details: "x1.5 SOL bet",
-        subAction: {
-            user: "SOL",
-            action: "bought",
-            highlight: "🥞",
-        },
-        timestamp: "35m ago",
-    },
-    {
-        id: "6",
-        type: "buy",
-        user: { name: "ChadDegenerate", avatar: "/scribbles/btc.png" },
-        action: "bought",
-        amount: "Up x2.7 SOL",
-        target: "Bitcoin Above $65,500",
-        details: "",
-        subAction: {
-            user: "Bitcoin",
-            action: "bought",
-            highlight: "Up",
-        },
-        timestamp: "750m ago",
-    },
-    {
-        id: "7",
-        type: "bet",
-        user: { name: "CryptoQueen", avatar: "/scribbles/pengu.png" },
-        action: "YOLO bet",
-        amount: "Up x1 SOL",
-        target: "Dogewhale",
-        details: "🐶",
-        subAction: {
-            user: "CryptoQueen",
-            action: "bought",
-            highlight: "Up",
-        },
-        timestamp: "1hr ago",
-    },
-];
+function formatResolveCountdown(resolveTime: string): string {
+    const resolveMs = new Date(resolveTime).getTime();
+    if (Number.isNaN(resolveMs)) return "";
 
-// Filter tabs
-const filterTabs: { label: string; value: ActivityType; count?: number }[] = [
-    { label: "All Activity", value: "all" },
-    { label: "Created", value: "bets" },
-    { label: "Accepted", value: "wins" },
-    { label: "Expired", value: "follows" }
-];
+    const diffMs = resolveMs - Date.now();
+    if (diffMs <= 0) return "ended";
+
+    const totalMinutes = Math.floor(diffMs / 60000);
+    const days = Math.floor(totalMinutes / (24 * 60));
+    const hours = Math.floor((totalMinutes % (24 * 60)) / 60);
+    const minutes = totalMinutes % 60;
+
+    if (days > 0) return `in ${days}d ${hours}h`;
+    if (hours > 0) return `in ${hours}h ${minutes}m`;
+    return `in ${minutes}m`;
+}
 
 export default function ActivityPage() {
+    const PAGE_SIZE = 5;
     const [activeFilter, setActiveFilter] = useState<ActivityType>("all");
+    const [activities, setActivities] = useState<ChallengeListItem[]>([]);
+    const [totalActivities, setTotalActivities] = useState(0);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const [selectedChallenge, setSelectedChallenge] = useState<ChallengeListItem | null>(null);
+    const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
 
-    // Filter activities based on selected filter
-    const filteredActivities = activityData.filter((item) => {
-        if (activeFilter === "all") return true;
-        return item.type === activeFilter.slice(0, -1);
-    });
+    useEffect(() => {
+        let isMounted = true;
 
-    // Get highlight color based on text
-    const getHighlightColor = (text?: string) => {
-        if (!text) return "text-gray-500";
-        if (text.includes("Up")) return "text-green-600";
-        if (text.includes("Down")) return "text-red-600";
-        return "text-amber-600";
+        const loadActivities = async () => {
+            try {
+                setIsLoading(true);
+                setError(null);
+                setActivities([]);
+                const offset = (currentPage - 1) * PAGE_SIZE;
+                const response = await getChallenges({ limit: PAGE_SIZE, offset });
+                if (!isMounted) return;
+
+                const sorted = [...response.challenges].sort(
+                    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+                );
+                setActivities(sorted);
+                setTotalActivities(response.count ?? 0);
+            } catch (fetchError) {
+                if (!isMounted) return;
+                setError(fetchError instanceof Error ? fetchError.message : "Failed to load activity.");
+            } finally {
+                if (isMounted) setIsLoading(false);
+            }
+        };
+
+        loadActivities();
+        return () => {
+            isMounted = false;
+        };
+    }, [currentPage]);
+
+    const filteredActivities = useMemo(() => {
+        if (activeFilter === "all") return activities;
+        return activities;
+    }, [activeFilter, activities]);
+    const totalPages = Math.max(1, Math.ceil(totalActivities / PAGE_SIZE));
+    const visiblePages = useMemo(
+        () => Array.from({ length: totalPages }, (_, index) => index + 1),
+        [totalPages]
+    );
+
+    const handleActivityClick = (challenge: ChallengeListItem) => {
+        setSelectedChallenge(challenge);
+        setIsDetailModalOpen(true);
     };
-
-
 
     return (
         <div className="min-h-screen bg-[#f3e1d7]">
@@ -202,19 +146,76 @@ export default function ActivityPage() {
             {/* Activity Feed */}
             <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 pb-20">
                 <div className="space-y-3">
-                    {filteredActivities.map((item) => {
+                    {isLoading && (
+                        Array.from({ length: SKELETON_CARDS_COUNT }).map((_, index) => (
+                            <div
+                                key={`activity-skeleton-${index}`}
+                                className="bg-[#f8ede7] rounded-2xl p-4 border border-[#e8d5c8] animate-pulse"
+                                aria-hidden="true"
+                            >
+                                <div className="flex items-start gap-4">
+                                    <div className="w-12 h-12 rounded-full bg-[#e8d5c8] flex-shrink-0" />
+
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <div className="h-4 w-24 rounded-full bg-[#e8d5c8]" />
+                                            <div className="h-4 w-10 rounded-full bg-[#e8d5c8]" />
+                                            <div className="h-4 w-14 rounded-full bg-[#e8d5c8]" />
+                                            <div className="h-4 w-8 rounded-full bg-[#e8d5c8]" />
+                                            <div className="h-4 w-40 rounded-full bg-[#e8d5c8]" />
+                                        </div>
+                                        <div className="mt-2 h-3 w-16 rounded-full bg-[#e8d5c8]" />
+                                    </div>
+
+                                    <div className="w-8 h-8 rounded-full bg-[#e8d5c8] flex-shrink-0" />
+                                </div>
+                            </div>
+                        ))
+                    )}
+
+                    {!isLoading && error && (
+                        <div className="bg-red-50 rounded-2xl p-6 border border-red-200 text-red-700">
+                            Failed to load activity: {error}
+                        </div>
+                    )}
+
+                    {!isLoading && !error && filteredActivities.length === 0 && (
+                        <div className="bg-[#f8ede7] rounded-2xl p-6 border border-[#e8d5c8] text-[#5c4a42]">
+                            No activity yet.
+                        </div>
+                    )}
+
+                    {!isLoading && filteredActivities.map((item) => {
+                        const creatorName = item.creator.username || "Unknown user";
+                        const creatorWallet = item.creator.wallet_address || "";
+                        const profileSlug = creatorWallet || creatorName;
+                        const avatar = item.creator.profile_image || item.market.icon || "/scribbles/btc.png";
+                        const betAmount = item.initial_bet ?? 0;
+                        const betUnit = item.market.name || "SOL";
+                        const timeAgo = formatTimeAgo(item.created_at);
+                        const resolveCountdown = formatResolveCountdown(item.resolve_time);
+
                         return (
                             <div
                                 key={item.id}
-                                className="group bg-[#f8ede7] hover:bg-white/50 rounded-2xl p-4 transition-all duration-200 border border-[#e8d5c8] hover:border-[#d4b8a8] hover:shadow-lg"
+                                role="button"
+                                tabIndex={0}
+                                onClick={() => handleActivityClick(item)}
+                                onKeyDown={(event) => {
+                                    if (event.key === "Enter" || event.key === " ") {
+                                        event.preventDefault();
+                                        handleActivityClick(item);
+                                    }
+                                }}
+                                className="cursor-pointer group bg-[#f8ede7] hover:bg-white/50 rounded-2xl p-4 transition-all duration-200 border border-[#e8d5c8] hover:border-[#d4b8a8] hover:shadow-lg"
                             >
                                 <div className="flex items-start gap-4">
                                     {/* Avatar with status */}
                                     <div className="relative flex-shrink-0">
                                         <div className={`w-12 h-12 rounded-full overflow-hidden border-2 border-[#d4b8a8] shadow-md bg-white`}>
                                             <Image
-                                                src={item.user.avatar}
-                                                alt={item.user.name}
+                                                src={avatar}
+                                                alt={creatorName}
                                                 width={48}
                                                 height={48}
                                                 className="w-full h-full object-cover"
@@ -227,72 +228,26 @@ export default function ActivityPage() {
                                         {/* Main Activity Line */}
                                         <div className="flex flex-wrap items-center gap-x-1.5 text-sm sm:text-base leading-relaxed">
                                             <Link
-                                                href={`/profile/${item.user.name}`}
+                                                href={`/profile/${profileSlug}`}
+                                                onClick={(event) => event.stopPropagation()}
                                                 className="font-bold text-[#2d1f1a] hover:text-[#5c4a42] transition-colors"
                                             >
-                                                {item.user.name}
+                                                {creatorName}
                                             </Link>
-                                            <span className="text-[#5c4a42]">{item.action}</span>
-                                            {item.amount && (
-                                                <span className={`font-bold ${item.amount.includes("+") ? "text-green-700" : item.amount.includes("Up") ? "text-green-700" : "text-[#2d1f1a]"}`}>
-                                                    {item.amount}
-                                                </span>
-                                            )}
-                                            {item.target && (
-                                                <>
-                                                    <span className="text-[#5c4a42]">on</span>
-                                                    <span className="font-semibold text-[#2d1f1a]">{item.target}</span>
-                                                </>
-                                            )}
-                                            {item.details && (
-                                                <span className="text-[#8b7355]">{item.details}</span>
-                                            )}
+                                            <span className="text-[#5c4a42]">bet</span>
+                                            <span className="font-bold text-[#2d1f1a]">${betAmount}</span>
+                                            <span className="text-[#5c4a42]">on</span>
+                                            <span className="font-semibold text-[#2d1f1a]">{item.title}</span>
+                                            {resolveCountdown && <span className="text-[#8b7355]">{resolveCountdown}</span>}
                                         </div>
 
-                                        {/* Sub Action Line */}
-                                        {item.subAction && (
-                                            <div className="flex items-center gap-2 mt-2 text-sm flex-wrap">
-                                                <div className="flex items-center gap-1.5 bg-[#f3e1d7]/50 rounded-full px-2.5 py-1">
-                                                    <div className="w-4 h-4 rounded-full bg-white flex items-center justify-center overflow-hidden border border-[#d4b8a8]">
-                                                        <Image
-                                                            src={item.user.avatar}
-                                                            alt=""
-                                                            width={14}
-                                                            height={14}
-                                                            className="w-3.5 h-3.5 object-cover"
-                                                        />
-                                                    </div>
-                                                    <span className="text-[#5c4a42] font-medium">{item.subAction.user}</span>
-                                                    <span className="text-[#8b7355]">
-                                                        {item.subAction.action}
-                                                    </span>
-                                                    {item.subAction.highlight && (
-                                                        <span
-                                                            className={`font-semibold ${getHighlightColor(
-                                                                item.subAction.highlight
-                                                            )}`}
-                                                        >
-                                                            {item.subAction.highlight}
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                <span className="text-[#a08070] text-xs">• {item.timestamp}</span>
-                                            </div>
-                                        )}
-
-                                        {/* Timestamp for items without subAction */}
-                                        {!item.subAction && (
-                                            <div className="mt-1.5">
-                                                <span className="text-[#a08070] text-xs">{item.timestamp}</span>
-                                            </div>
-                                        )}
+                                        <div className="mt-1.5">
+                                            <span className="text-[#a08070] text-xs">{timeAgo}</span>
+                                        </div>
                                     </div>
 
                                     {/* Action Button */}
-                                    <Link
-                                        href={`/activity/${item.id}`}
-                                        className="flex-shrink-0 w-8 h-8 rounded-full bg-[#f3e1d7]/50 hover:bg-[#2d1f1a] text-[#5c4a42] hover:text-[#f3e1d7] transition-all duration-200 flex items-center justify-center group-hover:shadow-md"
-                                    >
+                                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-[#f3e1d7]/50 group-hover:bg-[#2d1f1a] text-[#5c4a42] group-hover:text-[#f3e1d7] transition-all duration-200 flex items-center justify-center group-hover:shadow-md">
                                         <svg
                                             className="w-4 h-4"
                                             fill="none"
@@ -306,20 +261,42 @@ export default function ActivityPage() {
                                                 d="M9 5l7 7-7 7"
                                             />
                                         </svg>
-                                    </Link>
+                                    </div>
                                 </div>
                             </div>
                         );
                     })}
                 </div>
 
-                {/* Load More Button */}
-                <div className="mt-8 text-center">
-                    <button className="px-8 py-3.5 bg-white/50 border border-gray-300 hover:bg-white/80 text-black rounded-full text-sm font-semibold transition-all duration-200 shadow-lg hover:shadow-xl hover:scale-105 active:scale-95">
-                        Load More Activity
-                    </button>
-                </div>
+                {!isLoading && !error && totalActivities > 0 && (
+                    <div className="mt-8 flex items-center justify-center gap-2">
+                        <div className="flex items-center gap-1 overflow-x-auto pb-1 max-w-full scrollbar-hide">
+                            {visiblePages.map((page) => (
+                                <button
+                                    key={page}
+                                    type="button"
+                                    onClick={() => setCurrentPage(page)}
+                                    className={`w-10 h-10 rounded-lg text-sm font-medium transition-colors ${currentPage === page
+                                        ? "bg-[#d4c4b5] text-gray-800"
+                                        : "text-gray-600 hover:bg-white/30"
+                                        }`}
+                                >
+                                    {page}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                )}
             </div>
+
+            <ChallengeDetailModal
+                challenge={selectedChallenge}
+                isOpen={isDetailModalOpen}
+                onClose={() => {
+                    setIsDetailModalOpen(false);
+                    setSelectedChallenge(null);
+                }}
+            />
 
             {/* Custom scrollbar hide styles */}
             <style jsx>{`

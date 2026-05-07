@@ -43,10 +43,6 @@ export default function SportsPage() {
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
                 {/* Header */}
                 <div className="text-center mb-10 sm:mb-14">
-                    <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-white/40 rounded-full text-sm text-gray-600 mb-4">
-                        <Sparkles className="w-4 h-4 text-[#2b7351]" />
-                        <span>Featured Sport Events</span>
-                    </div>
                     <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 mb-3">
                         Sports Markets
                     </h1>
@@ -61,7 +57,7 @@ export default function SportsPage() {
                     {sports.map((sport) => (
                         <div
                             key={sport.id}
-                            className="bg-[#f8ede7] rounded-2xl p-5 shadow-sm border border-gray-300 hover:shadow-lg transition-all duration-300"
+                            className="bg-[#f8ede7] rounded-2xl p-5 shadow-sm border border-gray-400 hover:shadow-lg transition-all duration-300"
                         >
 
                             {/* Header */}

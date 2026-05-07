@@ -251,7 +251,7 @@ const ClanHeader = ({ clanData, onClanMembershipChange, onClanDataUpdate, onMemb
                     <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-white/60 border border-gray-200/60 group-hover:bg-white/80 group-hover:border-gray-300/80 transition-all duration-300 shadow-sm">
                         <ChevronLeftIcon className="w-4 h-4" />
                     </div>
-                    <span className="hidden sm:inline">Back to Clans</span>
+                    <span className="sm:inline">Back to Clans</span>
                 </Link>
                 <button
                     onClick={() => {
@@ -271,7 +271,7 @@ const ClanHeader = ({ clanData, onClanMembershipChange, onClanDataUpdate, onMemb
                     aria-label="Share Clan"
                 >
                     <ShareIcon className="w-4 h-4 group-hover:scale-110 transition-transform duration-300" />
-                    <span className="hidden sm:inline">Share</span>
+                    <span className="sm:inline">Share</span>
                 </button>
             </div>
 

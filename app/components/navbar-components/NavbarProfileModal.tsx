@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { blockedContentError, hasBlockedContent } from "@/app/lib/content-moderation";
 
 type NavbarProfileModalProps = {
     defaultUsername: string;
@@ -13,6 +14,7 @@ type NavbarProfileModalProps = {
     onEditUsernameChange: (value: string) => void;
     onRandomizeProfile: () => void;
     onSave: () => void;
+    saveError?: string | null;
     profileSvgs: string[];
 };
 
@@ -27,8 +29,19 @@ export function NavbarProfileModal({
     onEditUsernameChange,
     onRandomizeProfile,
     onSave,
+    saveError,
     profileSvgs,
 }: NavbarProfileModalProps) {
+    const handleSave = () => {
+        if (hasBlockedContent(editUsername)) return;
+        onSave();
+    };
+
+    const moderationError = hasBlockedContent(editUsername)
+        ? blockedContentError("Username")
+        : null;
+    const visibleError = moderationError || saveError || null;
+
     if (!isOpen) {
         return null;
     }
@@ -106,8 +119,11 @@ export function NavbarProfileModal({
                             value={editUsername}
                             onChange={(event) => onEditUsernameChange(event.target.value)}
                             placeholder={defaultUsername}
-                            className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-black/20 focus:border-transparent transition-all"
+                            className={`w-full px-4 py-3 bg-white border rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-black/20 focus:border-transparent transition-all ${visibleError ? "border-red-300" : "border-gray-300"}`}
                         />
+                        {visibleError && (
+                            <p className="text-sm text-red-600 mt-2">{visibleError}</p>
+                        )}
                     </div>
 
                     <div className="space-y-2">
@@ -137,7 +153,8 @@ export function NavbarProfileModal({
                     </button>
                     <button
                         type="button"
-                        onClick={onSave}
+                        onClick={handleSave}
+                        disabled={!!moderationError}
                         className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-black rounded-full hover:bg-gray-800 transition-colors"
                     >
                         Save Changes

@@ -8,6 +8,20 @@ import { ClanGrid } from "./ClanGrid";
 import { getClans } from "@/app/lib/clan-service/clans";
 
 const CLANS_PER_PAGE = 10;
+type GetClansResult = Awaited<ReturnType<typeof getClans>>;
+const inFlightClanRequests = new Map<string, Promise<GetClansResult>>();
+
+function getClansDeduped(limit: number, offset: number): Promise<GetClansResult> {
+    const key = `${limit}-${offset}`;
+    const existingRequest = inFlightClanRequests.get(key);
+    if (existingRequest) return existingRequest;
+
+    const request = getClans(limit, offset).finally(() => {
+        inFlightClanRequests.delete(key);
+    });
+    inFlightClanRequests.set(key, request);
+    return request;
+}
 
 export default function ClansPage() {
     const [search, setSearch] = useState("");
@@ -27,7 +41,7 @@ export default function ClansPage() {
             setError(null);
             try {
                 const offset = (currentPage - 1) * CLANS_PER_PAGE;
-                const result = await getClans(CLANS_PER_PAGE, offset);
+                const result = await getClansDeduped(CLANS_PER_PAGE, offset);
                 setClans(result.clans);
                 setTotalClans(result.total);
             } catch (err) {

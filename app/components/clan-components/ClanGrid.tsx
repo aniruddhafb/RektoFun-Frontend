@@ -32,9 +32,9 @@ export function ClanGrid({ clans, loading, error }: ClanGridProps) {
     if (clans.length === 0) {
         return (
             <div className="flex flex-col items-center justify-center py-20 text-center">
-                <ShieldIcon className="w-16 h-16 text-gray-300 mb-4" />
+                <ShieldIcon className="w-16 h-16 text-gray-700 mb-4" />
                 <h3 className="text-xl font-semibold text-gray-600 mb-2">No clans found</h3>
-                <p className="text-gray-400">Try adjusting your search or filters.</p>
+                <p className="text-gray-700">Try adjusting your search or filters.</p>
             </div>
         );
     }

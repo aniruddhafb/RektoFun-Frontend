@@ -65,16 +65,16 @@ const ChallengeCard = ({ challenge }: { challenge: ClanChallenge }) => {
                     </div>
                 </div>
 
-                {/* Defender */}
+                {/* opponent */}
                 <div className="flex flex-col items-center gap-0.5 sm:gap-1">
                     <span className="text-[8px] sm:text-[10px] font-bold bg-gray-700 text-white px-1.5 sm:px-2 py-0.5 rounded-full">
-                        {challenge.defender ? challenge.defender.label : "DEFENDER"}
+                        {challenge.opponent ? challenge.opponent.label : "opponent"}
                     </span>
                     <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full overflow-hidden border-2 border-white shadow-sm bg-gray-100 flex items-center justify-center">
-                        {challenge.defender ? (
+                        {challenge.opponent ? (
                             <Image
-                                src={challenge.defender.avatar}
-                                alt={challenge.defender.name}
+                                src={challenge.opponent.avatar}
+                                alt={challenge.opponent.name}
                                 width={48}
                                 height={48}
                                 className="w-full h-full object-cover"
@@ -84,10 +84,10 @@ const ChallengeCard = ({ challenge }: { challenge: ClanChallenge }) => {
                         )}
                     </div>
                     <span className="text-[10px] sm:text-xs font-semibold text-gray-800 mt-0.5 sm:mt-1 truncate max-w-[60px] sm:max-w-none">
-                        {challenge.defender ? challenge.defender.name : "No one yet!"}
+                        {challenge.opponent ? challenge.opponent.name : "No one yet!"}
                     </span>
                     <span className="hidden sm:inline text-[10px] text-gray-400">
-                        {challenge.defender ? challenge.defender.sublabel : ""}
+                        {challenge.opponent ? challenge.opponent.sublabel : ""}
                     </span>
                 </div>
 

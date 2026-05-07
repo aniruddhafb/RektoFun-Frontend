@@ -7,7 +7,9 @@ import { MarketHeader } from "../../../components/market-slug-components/MarketH
 import { ChartSection } from "../../../components/market-slug-components/ChartSection";
 import { TopTradersSection } from "../../../components/market-slug-components/TopTradersSection";
 import { FilterBar } from "../../../components/market-slug-components/FilterBar";
+import { LoadingPage } from "../../../components/LoadingPage";
 import { MarketChallengesGrid } from "../../../components/market-slug-components/MarketChallengesGrid";
+import ChallengeDetailModal from "@/app/components/challenge-components/ChallengeDetailModal";
 import {
     getChallenges,
     type ChallengeListItem,
@@ -18,90 +20,184 @@ import {
 } from "@/app/lib/markets-service/market";
 
 function formatMarketTitle(name: string) {
-    return `${name} Challenge Markets`;
+    return `${name}`;
 }
 
 function formatMarketDescription(name: string) {
-    return `Predict and earn by betting on ${name} market movements`;
+    return `${name}`;
 }
 
 export default function MarketPage() {
+    const CREATE_TOAST_DURATION_MS = 3000;
     const params = useParams<{ slug: string }>();
     const slugName = useMemo(() => decodeURIComponent(params.slug ?? ""), [params.slug]);
-    const [showChart, setShowChart] = useState(true);
+    const [showChart, setShowChart] = useState(false);
     const [showTopTraders, setShowTopTraders] = useState(false);
-    const [filterOpen, setFilterOpen] = useState(false);
-    const [selectedFilter, setSelectedFilter] = useState("Latest");
+    const [statusOpen, setStatusOpen] = useState(false);
+    const [modeOpen, setModeOpen] = useState(false);
+    const [selectedStatus, setSelectedStatus] = useState("Latest");
+    const [selectedMode, setSelectedMode] = useState("All Modes");
     const [isCreateChallengeOpen, setIsCreateChallengeOpen] = useState(false);
     const [market, setMarket] = useState<Market | null>(null);
     const [challenges, setChallenges] = useState<ChallengeListItem[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [selectedChallenge, setSelectedChallenge] = useState<ChallengeListItem | null>(null);
+    const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+    const [showCreateSuccessToast, setShowCreateSuccessToast] = useState(false);
+    const [createToastProgress, setCreateToastProgress] = useState(100);
+
+    const loadMarketChallenges = async (isMountedCheck?: () => boolean) => {
+        if (!slugName) {
+            if (!isMountedCheck || isMountedCheck()) {
+                setMarket(null);
+                setChallenges([]);
+                setError("Market not found.");
+                setIsLoading(false);
+            }
+            return;
+        }
+
+        try {
+            setIsLoading(true);
+            setError(null);
+
+            const [marketsResponse, challengesResponse] = await Promise.all([
+                getMarkets({ parent_name: "Crypto" }),
+                getChallenges({ category: slugName }),
+            ]);
+
+            const matchedMarket =
+                marketsResponse.markets.find(
+                    (item) => item.name.toLowerCase() === slugName.toLowerCase()
+                ) ?? null;
+
+            if (!isMountedCheck || isMountedCheck()) {
+                setMarket(matchedMarket);
+                setChallenges(challengesResponse.challenges);
+            }
+        } catch (fetchError) {
+            if (!isMountedCheck || isMountedCheck()) {
+                setMarket(null);
+                setChallenges([]);
+                setError(
+                    fetchError instanceof Error
+                        ? fetchError.message
+                        : "Something went wrong while loading challenges."
+                );
+            }
+        } finally {
+            if (!isMountedCheck || isMountedCheck()) {
+                setIsLoading(false);
+            }
+        }
+    };
 
     useEffect(() => {
         let isMounted = true;
 
-        async function loadMarketChallenges() {
-            if (!slugName) {
-                if (isMounted) {
-                    setMarket(null);
-                    setChallenges([]);
-                    setError("Market not found.");
-                    setIsLoading(false);
-                }
-                return;
-            }
-
-            try {
-                setIsLoading(true);
-                setError(null);
-
-                const [marketsResponse, challengesResponse] = await Promise.all([
-                    getMarkets({ parent_name: "Crypto" }),
-                    getChallenges({ category: slugName }),
-                ]);
-
-                const matchedMarket =
-                    marketsResponse.markets.find(
-                        (item) => item.name.toLowerCase() === slugName.toLowerCase()
-                    ) ?? null;
-
-                if (isMounted) {
-                    setMarket(matchedMarket);
-                    setChallenges(challengesResponse.challenges);
-                }
-            } catch (fetchError) {
-                if (isMounted) {
-                    setMarket(null);
-                    setChallenges([]);
-                    setError(
-                        fetchError instanceof Error
-                            ? fetchError.message
-                            : "Something went wrong while loading challenges."
-                    );
-                }
-            } finally {
-                if (isMounted) {
-                    setIsLoading(false);
-                }
-            }
-        }
-
-        loadMarketChallenges();
+        loadMarketChallenges(() => isMounted);
 
         return () => {
             isMounted = false;
         };
     }, [slugName]);
 
+    useEffect(() => {
+        if (!showCreateSuccessToast) return;
+        const start = Date.now();
+        const interval = window.setInterval(() => {
+            const elapsed = Date.now() - start;
+            const nextProgress = Math.max(0, 100 - (elapsed / CREATE_TOAST_DURATION_MS) * 100);
+            setCreateToastProgress(nextProgress);
+        }, 50);
+        const timeout = window.setTimeout(() => {
+            setShowCreateSuccessToast(false);
+            setCreateToastProgress(100);
+        }, CREATE_TOAST_DURATION_MS);
+
+        return () => {
+            window.clearInterval(interval);
+            window.clearTimeout(timeout);
+        };
+    }, [showCreateSuccessToast]);
+
     const marketName = market?.name || slugName || "Market";
     const marketDescription =
         market?.description || formatMarketDescription(marketName);
     const marketLogo = market?.icon || market?.image || "/scribbles/coins.png";
 
+    // Filter challenges based on selected status and mode
+    const filteredChallenges = useMemo(() => {
+        let result = challenges;
+
+        // Filter by status
+        if (selectedStatus !== "Latest") {
+            const statusMap: Record<string, string> = {
+                "Expired": "cancelled",
+                "Expiring Soon": "locked",
+                "Ongoing": "open",
+                "Completed": "resolved",
+            };
+            const mappedStatus = statusMap[selectedStatus];
+            if (mappedStatus) {
+                result = result.filter((c) => c.status === mappedStatus);
+            }
+        }
+
+        // Filter by mode
+        if (selectedMode !== "All Modes") {
+            const modeValue = selectedMode === "PVP" ? "pvp" : "multi";
+            result = result.filter((c) => c.mode?.toLowerCase() === modeValue);
+        }
+
+        return result;
+    }, [challenges, selectedStatus, selectedMode]);
+
+    const handleChallengeClick = (challenge: ChallengeListItem) => {
+        setSelectedChallenge(challenge);
+        setIsDetailModalOpen(true);
+    };
+
+    const closeDetailModal = () => {
+        setIsDetailModalOpen(false);
+        window.setTimeout(() => setSelectedChallenge(null), 300);
+    };
+
+    const handleChallengeCreated = async () => {
+        setIsCreateChallengeOpen(false);
+        setCreateToastProgress(100);
+        setShowCreateSuccessToast(true);
+        await loadMarketChallenges();
+    };
+
     return (
         <div className="min-h-screen" style={{ backgroundColor: "#f3e1d7" }}>
+            {showCreateSuccessToast && (
+                <div className="fixed right-4 top-40 sm:top-40 z-[60] w-[min(92vw,24rem)] overflow-hidden rounded-xl border border-green-300 bg-green-600 text-white shadow-2xl">
+                    <button
+                        type="button"
+                        onClick={() => setShowCreateSuccessToast(false)}
+                        className="absolute right-3 top-2 text-lg leading-none text-green-100 transition hover:text-white"
+                        aria-label="Close success notification"
+                    >
+                        ×
+                    </button>
+                    <div className="px-5 pb-4 pt-4 pr-10">
+                        <p className="text-base font-semibold">Challenge created successfully</p>
+                        <p className="mt-1 text-sm text-green-100">Your challenge is now live and visible to everyone.</p>
+                    </div>
+                    <div className="h-1.5 w-full bg-green-500/60">
+                        <div
+                            className="h-full bg-white/90 transition-[width] duration-75 ease-linear"
+                            style={{ width: `${createToastProgress}%` }}
+                        />
+                    </div>
+                </div>
+            )}
+
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
+                {/* header section  */}
                 <MarketHeader
                     marketName={formatMarketTitle(marketName)}
                     marketDescription={marketDescription}
@@ -109,39 +205,46 @@ export default function MarketPage() {
                     onCreateChallenge={() => setIsCreateChallengeOpen(true)}
                 />
 
+                {/* main section  */}
                 <div className="flex flex-col lg:flex-row gap-4 sm:gap-6">
                     <div className="flex-1 min-w-0">
                         <ChartSection
+                            slugName={slugName}
                             showChart={showChart}
                             onToggleChart={() => setShowChart(!showChart)}
                         />
 
-                        <TopTradersSection
+                        {/* <TopTradersSection
                             showTopTraders={showTopTraders}
                             onToggleTopTraders={() => setShowTopTraders(!showTopTraders)}
-                        />
+                        /> */}
 
                         <FilterBar
-                            selectedFilter={selectedFilter}
-                            onFilterChange={setSelectedFilter}
-                            filterOpen={filterOpen}
-                            onFilterOpenChange={setFilterOpen}
+                            selectedStatus={selectedStatus}
+                            onStatusChange={setSelectedStatus}
+                            selectedMode={selectedMode}
+                            onModeChange={setSelectedMode}
+                            statusOpen={statusOpen}
+                            onStatusOpenChange={setStatusOpen}
+                            modeOpen={modeOpen}
+                            onModeOpenChange={setModeOpen}
                         />
 
                         {isLoading ? (
-                            <div className="rounded-2xl bg-white/40 border border-white/50 p-8 text-center text-gray-700">
-                                Loading challenges...
-                            </div>
+                            <LoadingPage variant="simple" message="Loading challenges..." />
                         ) : error ? (
-                            <div className="rounded-2xl bg-white/40 border border-white/50 p-8 text-center text-red-700">
+                            <div className="mt-4 rounded-2xl bg-white/40 border border-white/50 p-8 text-center text-red-700">
                                 {error}
                             </div>
-                        ) : challenges.length === 0 ? (
-                            <div className="rounded-2xl bg-white/40 border border-white/50 p-8 text-center text-gray-700">
-                                No challenges found for {marketName}.
+                        ) : filteredChallenges.length === 0 ? (
+                            <div className="mt-4 rounded-2xl bg-white/40 border border-white/50 p-8 text-center text-gray-700">
+                                No Challenges Found.
                             </div>
                         ) : (
-                            <MarketChallengesGrid challenges={challenges} />
+                            <MarketChallengesGrid
+                                challenges={filteredChallenges}
+                                onChallengeClick={handleChallengeClick}
+                            />
                         )}
                     </div>
                 </div>
@@ -150,8 +253,15 @@ export default function MarketPage() {
             <CreateChallengeModal
                 isOpen={isCreateChallengeOpen}
                 onClose={() => setIsCreateChallengeOpen(false)}
-                onCreated={() => { }}
+                onCreated={handleChallengeCreated}
+            />
+
+            <ChallengeDetailModal
+                challenge={selectedChallenge}
+                isOpen={isDetailModalOpen}
+                onClose={closeDetailModal}
             />
         </div>
     );
 }
+
