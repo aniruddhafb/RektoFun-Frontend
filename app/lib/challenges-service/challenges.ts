@@ -38,6 +38,7 @@ export interface ChallengeListItem {
   min_bet?: number;
   total_pool: number;
   status: 'open' | 'locked' | 'resolved' | 'cancelled';
+  resolution_status?: string;
   expire_time: string;
   resolve_time: string;
   resolved_at: string | null;
@@ -321,7 +322,9 @@ export async function createChallenge(params: CreateChallengeParams): Promise<Cr
     throw new Error(`Failed to create challenge: ${response.statusText}`);
   }
 
-  return response.json();
+  const json = await response.json();
+  requestCache.clear();
+  return json;
 }
 
 export async function joinChallenge(params: JoinChallengeParams): Promise<JoinChallengeResponse> {
@@ -338,7 +341,9 @@ export async function joinChallenge(params: JoinChallengeParams): Promise<JoinCh
     throw new Error(`Failed to join challenge: ${response.statusText}`);
   }
 
-  return response.json();
+  const json = await response.json();
+  requestCache.clear();
+  return json;
 }
 
 export async function getChallengeSides(params: GetChallengeSidesParams = {}): Promise<ChallengeSidesResponse> {
@@ -470,3 +475,4 @@ export async function getPositions(params: GetPositionsParams = {}): Promise<Pos
 
   return response.json();
 }
+

@@ -122,6 +122,56 @@ export default function Navbar() {
         setEditProfileIndex(randomIndex);
     };
 
+    const generateRandomUsername = useCallback(() => {
+        const gamerPartsA = [
+            "void",
+            "rift",
+            "hex",
+            "nova",
+            "drift",
+            "glitch",
+            "crypt",
+            "blitz",
+            "shadow",
+            "pixel",
+            "frost",
+            "vortex",
+            "phantom",
+            "neon",
+            "omega",
+        ];
+        const gamerPartsB = [
+            "reaper",
+            "sniper",
+            "raider",
+            "byte",
+            "wraith",
+            "core",
+            "slayer",
+            "runner",
+            "forge",
+            "venom",
+            "spark",
+            "quake",
+            "drone",
+            "spike",
+            "nexus",
+        ];
+        const joiners = ["", "", "_", "x", "z", "q"];
+
+        const partA = gamerPartsA[Math.floor(Math.random() * gamerPartsA.length)];
+        const partB = gamerPartsB[Math.floor(Math.random() * gamerPartsB.length)];
+        const joiner = joiners[Math.floor(Math.random() * joiners.length)];
+
+        // Timestamp + random chars makes collisions very unlikely.
+        const uniq = `${Date.now().toString(36).slice(-3)}${Math.random().toString(36).slice(2, 4)}`;
+        const rawUsername = `${partA}${joiner}${partB}${uniq}`;
+        const nextUsername = rawUsername.slice(0, 18);
+
+        setEditUsername(nextUsername);
+        if (profileFormError) setProfileFormError(null);
+    }, [profileFormError]);
+
     // Handle profile form submission
     const handleProfileSubmit = async () => {
         if (!publicKey) return;
@@ -405,9 +455,18 @@ export default function Navbar() {
                                     </div>
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Username*
-                                    </label>
+                                    <div className="flex items-center justify-between mb-2">
+                                        <label className="block text-sm font-medium text-gray-700">
+                                            Username*
+                                        </label>
+                                        <button
+                                            type="button"
+                                            onClick={generateRandomUsername}
+                                            className="px-3 py-1.5 bg-white/80 border border-gray-300 rounded-lg text-xs font-semibold text-gray-700 hover:bg-white transition-colors"
+                                        >
+                                            Randomize
+                                        </button>
+                                    </div>
                                     <input
                                         maxLength={18}
                                         type="text"
