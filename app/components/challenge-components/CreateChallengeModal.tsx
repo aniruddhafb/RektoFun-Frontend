@@ -12,6 +12,7 @@ import {
 } from "@/app/lib/rektofun-program";
 import { createChallenge } from "@/app/lib/challenges-service/challenges";
 import { getMarkets, Market } from "@/app/lib/markets-service/market";
+import { transform } from "@/app/lib/transformation-text-ai/transform";
 import { useUserStore } from "@/app/store/useUserStore";
 import { blockedContentError, hasBlockedContent } from "@/app/lib/content-moderation";
 
@@ -52,6 +53,10 @@ export function CreateChallengeModal({
     const [challengeMode, setChallengeMode] = useState<"pvp" | "multi">("pvp");
     const [challengeStatement, setChallengeStatement] = useState("");
     const [challengeStatementError, setChallengeStatementError] = useState<string | null>(null);
+    const [validateSuggestions, setValidateSuggestions] = useState<string[]>([]);
+    const [transformValid, setTransformValid] = useState(true);
+    const [isValidateLoading, setIsValidateLoading] = useState(false);
+    const [transformError, setTransformError] = useState<string | null>(null);
     const [sportsResolutionConsent, setSportsResolutionConsent] = useState(false);
     const [sportsResolutionConsentError, setSportsResolutionConsentError] = useState<string | null>(null);
 
@@ -205,15 +210,67 @@ export function CreateChallengeModal({
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
+    const isSportsSelected = selectedMarket?.symbol?.toLowerCase() === 'sports' || selectedMarket?.name?.toLowerCase() === 'sports';
+
+    useEffect(() => {
+        if (!isOpen || !selectedMarket) {
+            setValidateSuggestions([]);
+            setTransformValid(true);
+            setIsValidateLoading(false);
+            setTransformError(null);
+            return;
+        }
+
+        if (!isSportsSelected) {
+            setValidateSuggestions([]);
+            setTransformValid(true);
+            setTransformError(null);
+        } else {
+            // When switching to sports, disable create button until validated
+            setTransformValid(false);
+            setValidateSuggestions([]);
+            setTransformError(null);
+        }
+    }, [isOpen, selectedMarket, selectedChildMarket, isSportsSelected]);
+
     const closeAllDropdowns = () => {
         setIsMarketDropdownOpen(false);
         setIsCoinDropdownOpen(false);
         setIsDirectionDropdownOpen(false);
     };
 
-    if (!isOpen) return null;
+    const handleValidateChallengeStatement = async () => {
+        if (!isSportsSelected) return;
 
-    const isSportsSelected = selectedMarket?.symbol?.toLowerCase() === 'sports' || selectedMarket?.name?.toLowerCase() === 'sports';
+        if (!challengeStatement.trim()) {
+            setChallengeStatementError("Please enter a challenge statement.");
+            return;
+        }
+
+        setChallengeStatementError(null);
+        setTransformError(null);
+        setIsValidateLoading(true);
+
+        try {
+            const category = selectedChildMarket?.symbol || selectedChildMarket?.name || "sports";
+            const response = await transform({ category, statement: challengeStatement });
+
+            setValidateSuggestions(response.statements || []);
+            setTransformValid(response.valid);
+            if (!response.valid) {
+                setTransformError("The statement could not be validated. Please revise or choose a suggestion.");
+            }
+        } catch (error) {
+            console.error("Validate transform error:", error);
+            setTransformError("Unable to validate right now. Please try again.");
+            setTransformValid(false);
+            setValidateSuggestions([]);
+        } finally {
+            setIsValidateLoading(false);
+        }
+    };
+
+    if (!isOpen) return null;
 
     const formatDate = (date: Date) => {
         const options: Intl.DateTimeFormatOptions = { month: "long", day: "numeric", year: "numeric" };
@@ -392,7 +449,7 @@ export function CreateChallengeModal({
 
     const getButtonStyle = () => {
         if (!authenticated) return "cursor-pointer w-full py-4 bg-gray-900 hover:bg-gray-700 text-white rounded-full font-bold text-lg transition-colors";
-        if (isLoading) return "cursor-pointer w-full py-4 bg-gray-400 text-white rounded-full font-bold text-lg cursor-not-allowed";
+        if (isLoading || (isSportsSelected && !transformValid)) return "cursor-pointer w-full py-4 bg-gray-400 text-white rounded-full font-bold text-lg cursor-not-allowed";
         if (txStatus === "success") return "cursor-pointer w-full py-4 bg-green-500 text-white rounded-full font-bold text-lg cursor-not-allowed";
         if (txStatus === "error") return "cursor-pointer w-full py-4 bg-red-500 hover:bg-red-600 text-white rounded-full font-bold text-lg transition-colors";
         return "cursor-pointer w-full py-4 bg-gray-900 hover:bg-gray-700 text-white rounded-full font-bold text-lg transition-colors";
@@ -587,8 +644,16 @@ export function CreateChallengeModal({
                                 value={challengeStatement}
                                 onChange={(e) => {
                                     setChallengeStatement(e.target.value);
+                                    setValidateSuggestions([]);
                                     if (challengeStatementError) setChallengeStatementError(null);
                                     if (txError) setTxError(null);
+                                    // For sports, require re-validation when statement changes
+                                    if (isSportsSelected) {
+                                        setTransformValid(false);
+                                    } else {
+                                        setTransformValid(true);
+                                    }
+                                    if (transformError) setTransformError(null);
                                 }}
                                 placeholder={
                                     selectedChildMarket?.symbol?.toLowerCase() === 'cricket'
@@ -599,6 +664,39 @@ export function CreateChallengeModal({
                                 }
                                 className="w-full px-4 py-3 bg-[#faf0eb] border border-[#e8d5c8] rounded-xl text-lg text-gray-900 focus:outline-none focus:border-[#d4b8a8] placeholder:text-gray-400 placeholder:text-sm"
                             />
+                            <button
+                                type="button"
+                                className="mt-2 inline-flex items-center justify-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-full font-semibold text-sm transition-colors disabled:bg-gray-400"
+                                onClick={handleValidateChallengeStatement}
+                                disabled={isValidateLoading}
+                            >
+                                {isValidateLoading ? "Validating..." : "Validate"}
+                            </button>
+                            {validateSuggestions.length > 0 && (
+                                <div className="space-y-2 mt-3">
+                                    <p className="text-sm font-medium text-gray-700">Suggested validations</p>
+                                    <div className="space-y-2">
+                                        {validateSuggestions.map((suggestion, index) => (
+                                            <button
+                                                key={`${suggestion}-${index}`}
+                                                type="button"
+                                                className="w-full text-left px-4 py-3 bg-white border border-[#e8d5c8] rounded-2xl hover:bg-[#f3e1d7] transition-colors text-sm text-gray-900"
+                                                onClick={() => {
+                                                    setChallengeStatement(suggestion);
+                                                    setValidateSuggestions([]);
+                                                    setTransformValid(true);
+                                                    setTransformError(null);
+                                                }}
+                                            >
+                                                {suggestion}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                            {transformError && (
+                                <p className="text-red-500 text-sm mt-1">{transformError}</p>
+                            )}
                             {challengeStatementError && (
                                 <p className="text-red-500 text-sm mt-1">{challengeStatementError}</p>
                             )}
@@ -756,7 +854,7 @@ export function CreateChallengeModal({
 
                     <button
                         onClick={handleCreateChallenge}
-                        disabled={isLoading || txStatus === "success"}
+                        disabled={isLoading || txStatus === "success" || (isSportsSelected && !transformValid)}
                         className={getButtonStyle()}
                     >
                         {getButtonLabel()}
