@@ -480,7 +480,7 @@ export function CreateChallengeModal({
                         <div className="relative" ref={coinDropdownRef}>
                             <button onClick={() => { closeAllDropdowns(); setIsCoinDropdownOpen(!isCoinDropdownOpen); }} className="w-full flex items-center justify-between px-4 py-3 bg-[#faf0eb] border border-[#e8d5c8] rounded-xl hover:border-[#d4b8a8] transition-colors">
                                 <div className="flex items-center gap-3">
-                                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center overflow-hidden">
+                                    <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
                                         {selectedChildMarket?.image ? (
                                             <Image src={selectedChildMarket.image} alt={selectedChildMarket.symbol || selectedChildMarket.name} width={24} height={24} className="w-6 h-6 object-contain" />
                                         ) : (
@@ -502,7 +502,7 @@ export function CreateChallengeModal({
                                     ) : childMarkets.length > 0 ? (
                                         childMarkets.map((childMarket) => (
                                             <button key={childMarket.id} onClick={() => { setChildMarket(childMarket); setIsCoinDropdownOpen(false); }} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#f3e1d7] transition-colors">
-                                                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center overflow-hidden">
+                                                <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
                                                     {childMarket.image ? (
                                                         <Image src={childMarket.image} alt={childMarket.symbol || childMarket.name} width={24} height={24} className="w-6 h-6 object-contain" />
                                                     ) : (

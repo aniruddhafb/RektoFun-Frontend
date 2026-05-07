@@ -6,7 +6,11 @@ import { CreateClanModal } from "./CreateClanModal";
 import { useSolanaWallet } from "@/app/lib/useSolanaWallet";
 import { getUserIdByWallet } from "@/app/lib/clan-service/clans";
 
-export function ClanHeader() {
+interface ClanHeaderProps {
+    onClanCreated?: () => void;
+}
+
+export function ClanHeader({ onClanCreated }: ClanHeaderProps) {
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const { publicKey } = useSolanaWallet();
     const [userId, setUserId] = useState<string | undefined>(undefined);
@@ -61,7 +65,7 @@ export function ClanHeader() {
                 onClose={() => setIsCreateModalOpen(false)}
                 userId={userId}
                 onClanCreated={() => {
-                    console.log("Clan created successfully, refreshing...");
+                    onClanCreated?.();
                 }}
             />
         </>

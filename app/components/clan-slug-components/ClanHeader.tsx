@@ -41,7 +41,7 @@ const ClanHeader = ({ clanData, onClanMembershipChange, onClanDataUpdate, onMemb
     const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
 
     // Clan Settings state
-    const CLAN_LOGOS = Array.from({ length: 14 }, (_, i) => `https://earningrecords.com/assets/clans/${i + 1}.webp`);
+    const CLAN_LOGOS = Array.from({ length: 14 }, (_, i) => `https://earningrecords.com/assets/rektofun/clans/${i + 1}.webp`);
     const getInitialLogoIndex = () => {
         const currentLogo = clanData.logo;
         for (let i = 0; i < CLAN_LOGOS.length; i++) {

@@ -35,23 +35,23 @@ export default function ClansPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    useEffect(() => {
-        const fetchClans = async () => {
-            setLoading(true);
-            setError(null);
-            try {
-                const offset = (currentPage - 1) * CLANS_PER_PAGE;
-                const result = await getClansDeduped(CLANS_PER_PAGE, offset);
-                setClans(result.clans);
-                setTotalClans(result.total);
-            } catch (err) {
-                setError(err instanceof Error ? err.message : "Failed to fetch clans");
-            } finally {
-                setLoading(false);
-            }
-        };
+    const fetchClans = async (page: number) => {
+        setLoading(true);
+        setError(null);
+        try {
+            const offset = (page - 1) * CLANS_PER_PAGE;
+            const result = await getClansDeduped(CLANS_PER_PAGE, offset);
+            setClans(result.clans);
+            setTotalClans(result.total);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Failed to fetch clans");
+        } finally {
+            setLoading(false);
+        }
+    };
 
-        fetchClans();
+    useEffect(() => {
+        fetchClans(currentPage);
     }, [currentPage]);
 
     const totalPages = Math.ceil(totalClans / CLANS_PER_PAGE);
@@ -70,7 +70,7 @@ export default function ClansPage() {
     return (
         <div className="min-h-screen" style={{ backgroundColor: "#f3e1d7" }}>
             <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                <ClanHeader />
+                <ClanHeader onClanCreated={() => fetchClans(currentPage)} />
                 <ClanFilters
                     search={search}
                     onSearchChange={setSearch}

@@ -122,7 +122,7 @@ export default function SettingsPage() {
             await updateUser(existingUser.id, {
                 username: username,
                 description: description,
-                profile_image: `https://earningrecords.com/assets/profiles/${profileIndex}.svg`,
+                profile_image: `https://earningrecords.com/assets/rektofun/profiles/${profileIndex}.svg`,
             });
             console.log('[Settings] Profile saved successfully');
             setIsEditingProfile(false);
@@ -324,7 +324,7 @@ export default function SettingsPage() {
 
                     <div className="space-y-3">
                         {/* Twitter */}
-                        <div className={`flex items-center justify-between p-4 rounded-xl border-2 transition-all ${linkedTwitter
+                        {/* <div className={`flex items-center justify-between p-4 rounded-xl border-2 transition-all ${linkedTwitter
                             ? "bg-blue-50/50 border-blue-300"
                             : "bg-white/50 border-gray-300 hover:border-gray-400"
                             }`}>
@@ -364,10 +364,10 @@ export default function SettingsPage() {
                                     </button>
                                 )}
                             </div>
-                        </div>
+                        </div> */}
 
                         {/* Google */}
-                        <div className={`flex items-center justify-between p-4 rounded-xl border-2 transition-all ${linkedGoogle
+                        {/* <div className={`flex items-center justify-between p-4 rounded-xl border-2 transition-all ${linkedGoogle
                             ? "bg-red-50/50 border-red-300"
                             : "bg-white/50 border-gray-300 hover:border-gray-400"
                             }`}>
@@ -410,7 +410,7 @@ export default function SettingsPage() {
                                     </button>
                                 )}
                             </div>
-                        </div>
+                        </div> */}
 
                         {/* Wallet Login Indicator */}
                         {currentLoginMethod === "wallet" && (

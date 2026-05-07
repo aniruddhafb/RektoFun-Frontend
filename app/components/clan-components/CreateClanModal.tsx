@@ -14,7 +14,7 @@ interface CreateClanModalProps {
 }
 
 // Clan logo options from earningrecords.com
-const CLAN_LOGOS = Array.from({ length: 14 }, (_, i) => `https://earningrecords.com/assets/clans/${i + 1}.webp`);
+const CLAN_LOGOS = Array.from({ length: 14 }, (_, i) => `https://earningrecords.com/assets/rektofun/clans/${i + 1}.webp`);
 
 export function CreateClanModal({ isOpen, onClose, onClanCreated, userId }: CreateClanModalProps) {
     const [clanName, setClanName] = useState("");

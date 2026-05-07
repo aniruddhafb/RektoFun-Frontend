@@ -8,6 +8,7 @@ import { ClanData } from "./types";
 import { ClanMessage, getClanMessages, createClanMessage } from "@/app/lib/clan-service/clanMessages";
 import { useSolanaWallet } from "@/app/lib/useSolanaWallet";
 import { getUserByWallet } from "@/app/lib/users-service/users";
+import { blockedContentError, hasBlockedContent } from "@/app/lib/content-moderation";
 
 interface ChatSectionProps {
     clanData: ClanData;
@@ -115,14 +116,21 @@ const ChatSection = ({ clanData }: ChatSectionProps) => {
 
     const handleSendMessage = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!newMessage.trim() || !currentUser?.id || !walletAddress || !clanData.slug || sending) return;
+        const trimmedMessage = newMessage.trim();
+        if (!trimmedMessage || !currentUser?.id || !walletAddress || !clanData.slug || sending) return;
+
+        if (hasBlockedContent(trimmedMessage)) {
+            setError(blockedContentError("Message"));
+            return;
+        }
 
         setSending(true);
+        setError(null);
         try {
             const message = await createClanMessage(clanData.slug, {
                 clan_id: clanData.slug, // Pass the clan slug/ID
                 sender_id: currentUser.id,
-                message: newMessage.trim(),
+                message: trimmedMessage,
             });
 
             setMessages((prev) => [...prev, message]);

@@ -14,6 +14,7 @@ import { getMarkets } from "../lib/markets-service/market";
 
 export default function ChallengesPage() {
   const CREATE_TOAST_DURATION_MS = 3000;
+  const BOOKMARKS_STORAGE_KEY = "rektofun:challenge-bookmarks";
   const [activeFilter, setActiveFilter] = useState("Latest");
   const [activeAsset, setActiveAsset] = useState("All Markets");
   const [searchQuery, setSearchQuery] = useState("");
@@ -31,9 +32,43 @@ export default function ChallengesPage() {
   const [showCreateSuccessToast, setShowCreateSuccessToast] = useState(false);
   const [createToastProgress, setCreateToastProgress] = useState(100);
   const [marketOptions, setMarketOptions] = useState<string[]>(["All Markets"]);
+  const [bookmarkedChallengeIds, setBookmarkedChallengeIds] = useState<string[]>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const rawBookmarks = window.localStorage.getItem(BOOKMARKS_STORAGE_KEY);
+      if (!rawBookmarks) return [];
+      const parsed = JSON.parse(rawBookmarks);
+      if (!Array.isArray(parsed)) return [];
+      return parsed.filter((value): value is string => typeof value === "string");
+    } catch (error) {
+      console.error("Failed to read challenge bookmarks from localStorage:", error);
+      return [];
+    }
+  });
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(BOOKMARKS_STORAGE_KEY, JSON.stringify(bookmarkedChallengeIds));
+    } catch (error) {
+      console.error("Failed to persist challenge bookmarks to localStorage:", error);
+    }
+  }, [bookmarkedChallengeIds]);
+
+  const toggleBookmark = useCallback((challengeId: string) => {
+    setBookmarkedChallengeIds((prev) =>
+      prev.includes(challengeId)
+        ? prev.filter((id) => id !== challengeId)
+        : [...prev, challengeId]
+    );
+  }, []);
+
+  const isChallengeBookmarked = useCallback(
+    (challengeId: string) => bookmarkedChallengeIds.includes(challengeId),
+    [bookmarkedChallengeIds]
+  );
 
   // Handle challenge card click
   const handleChallengeClick = (challenge: ChallengeListItem) => {
@@ -185,6 +220,8 @@ export default function ChallengesPage() {
       <ChallengeGrid
         onRekt={handleRekt}
         onClick={handleChallengeClick}
+        onToggleBookmark={toggleBookmark}
+        isBookmarked={isChallengeBookmarked}
         onOpenModal={() => setIsCreateModalOpen(true)}
         onChallengesLoaded={handleChallengesLoaded}
         refreshKey={refreshKey}

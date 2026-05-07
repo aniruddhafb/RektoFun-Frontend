@@ -16,6 +16,7 @@ interface ChallengeFiltersSectionProps {
 const filterOptions: { label: string; icon: React.ReactNode }[] = [
     { label: "Latest", icon: <TrendingUp className="w-4 h-4" /> },
     { label: "Expiring Soon", icon: <Clock className="w-4 h-4" /> },
+    { label: "Bookmarked", icon: <Bookmark className="w-4 h-4" /> },
     { label: "My Bets", icon: <Bookmark className="w-4 h-4" /> },
     { label: "Created By Me", icon: <Eye className="w-4 h-4" /> },
 ];

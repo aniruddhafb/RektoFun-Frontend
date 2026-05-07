@@ -7,12 +7,11 @@ import type { Tab } from "@/app/components/clan-slug-components";
 import type { ClanData } from "@/app/components/clan-slug-components/types";
 import { getClanDataBySlug } from "@/app/lib/clan-service/clans";
 import { getClanMembers } from "@/app/lib/clan-service/clanMembers";
-import { getUserByWallet } from "@/app/lib/users-service/users";
+import type { ClanMember } from "@/app/lib/clan-service/clanMembers";
 import { LoadingPage } from "@/app/components/LoadingPage";
 
 const inFlightClanRequests = new Map<string, Promise<ClanData>>();
 const inFlightMembersRequests = new Map<string, Promise<Awaited<ReturnType<typeof getClanMembers>>>>();
-const inFlightUserByWalletRequests = new Map<string, Promise<Awaited<ReturnType<typeof getUserByWallet>>>>();
 
 function getClanDataBySlugDeduped(slug: string): Promise<ClanData> {
     const existing = inFlightClanRequests.get(slug);
@@ -33,17 +32,6 @@ function getClanMembersDeduped(slug: string) {
         inFlightMembersRequests.delete(slug);
     });
     inFlightMembersRequests.set(slug, request);
-    return request;
-}
-
-function getUserByWalletDeduped(walletAddress: string) {
-    const existing = inFlightUserByWalletRequests.get(walletAddress);
-    if (existing) return existing;
-
-    const request = getUserByWallet(walletAddress).finally(() => {
-        inFlightUserByWalletRequests.delete(walletAddress);
-    });
-    inFlightUserByWalletRequests.set(walletAddress, request);
     return request;
 }
 
@@ -104,47 +92,49 @@ export default function ClanDetailPage({ params }: { params: Promise<{ slug: str
     }, [params]);
 
     useEffect(() => {
+        let isCancelled = false;
+
         async function fetchClan() {
             if (!slug) return;
             try {
                 setLoading(true);
                 setError(null);
                 console.log("Fetching clan with slug:", slug);
-                // Fetch clan by slug (ID) and transform to ClanData format
-                const clan = await getClanDataBySlugDeduped(slug);
+                const [clan, membersResponse] = await Promise.all([
+                    getClanDataBySlugDeduped(slug),
+                    getClanMembersDeduped(slug),
+                ]);
+
+                if (isCancelled) return;
                 console.log("Fetched clan data:", clan);
                 setClanData(clan);
 
                 // Check if user is a member
                 if (walletAddress) {
                     try {
-                        // First, get the user ID associated with this wallet
-                        const user = await getUserByWalletDeduped(walletAddress);
-                        const userId = user.id;
-
-                        const membersResponse = await getClanMembersDeduped(slug);
-
-                        // Check if the user's ID is in the clan members list
-                        // We check both the internal userId and the wallet address
-                        const memberExists = membersResponse.members.some((m: any) =>
-                            m.id === userId ||
-                            m.id === walletAddress ||
-                            m.name === userId ||
-                            m.name === walletAddress
+                        // Resolve membership directly from member records to avoid wallet->user lookup races.
+                        const memberExists = membersResponse.members.some((m: ClanMember) =>
+                            (m.wallet_address || "").toLowerCase() === walletAddress.toLowerCase() ||
+                            m.id === walletAddress
                         );
-                        console.log("Membership check:", { userId, walletAddress, memberExists });
+                        if (isCancelled) return;
+                        console.log("Membership check:", { walletAddress, memberExists });
                         setIsMember(memberExists);
                     } catch (err) {
                         console.error("Failed to check membership:", err);
+                        if (isCancelled) return;
                         setIsMember(false);
                     }
                 } else {
+                    if (isCancelled) return;
                     setIsMember(false);
                 }
             } catch (err) {
                 console.error("Failed to fetch clan:", err);
+                if (isCancelled) return;
                 setError(err instanceof Error ? err.message : "Failed to fetch clan");
             } finally {
+                if (isCancelled) return;
                 setLoading(false);
             }
         }
@@ -152,6 +142,7 @@ export default function ClanDetailPage({ params }: { params: Promise<{ slug: str
         fetchClan();
 
         return () => {
+            isCancelled = true;
             if (refreshTimeoutRef.current) {
                 clearTimeout(refreshTimeoutRef.current);
             }
@@ -189,7 +180,7 @@ export default function ClanDetailPage({ params }: { params: Promise<{ slug: str
                             <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
                                 {/* Left: Clan Challenges */}
                                 <div className="lg:col-span-2">
-                                    <ClanComponents.ClanChallenges challenges={ClanComponents.challengesData} />
+                                    <ClanComponents.ClanChallenges clanId={clanData.slug} />
                                 </div>
 
                                 {/* Right: Members */}
@@ -223,7 +214,7 @@ export default function ClanDetailPage({ params }: { params: Promise<{ slug: str
                 <div className="min-h-screen" style={{ backgroundColor: "#f3e1d7" }}>
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
                         <div className="bg-white/60 backdrop-blur-sm rounded-2xl border border-white/70 shadow-sm p-5 flex flex-col items-center justify-center">
-                            <p className="text-gray-500 text-sm">Clan not found</p>
+                            <p className="text-gray-500 text-sm">{error || "Clan not found"}</p>
                         </div>
                     </div>
                 </div>

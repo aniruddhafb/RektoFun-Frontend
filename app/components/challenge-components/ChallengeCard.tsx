@@ -22,6 +22,8 @@ interface ChallengeCardProps {
     challenge: ChallengeListItem;
     onClick?: (challenge: ChallengeListItem) => void;
     onRekt?: (challenge: ChallengeListItem) => void;
+    onToggleBookmark?: (challengeId: string) => void;
+    isBookmarked?: boolean;
     ownerAddress?: string;
 }
 
@@ -197,7 +199,9 @@ function formatExactCountdownDetails(timestamp: number | null, nowMs: number): {
 export function ChallengeCard({
     challenge,
     onClick,
-    onRekt
+    onRekt,
+    onToggleBookmark,
+    isBookmarked = false,
 }: ChallengeCardProps) {
     const router = useRouter();
     const { user } = useUserStore();
@@ -513,12 +517,18 @@ export function ChallengeCard({
         }
     };
 
+    const handleBookmarkClick = (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onToggleBookmark?.(challenge.id);
+    };
+
     // ChallengeListItem doesn't have metadata or resolution_details in the same way as Challenge
     // We use the flattened properties provided by ChallengeListItem
     const uiMeta: UIMetadata = {};
     const market = challenge.market ?? null;
     const assetMeta: AssetMetadata = {
-        symbol: market?.symbol,
+        symbol: market?.name,
         name: market?.name,
         icon: market?.icon,
     };
@@ -601,6 +611,13 @@ export function ChallengeCard({
     const createdTimeText = formatCreatedTimeAgo(parseDateValue(challenge.created_at));
     const resolveTimestamp = parseDateValue(challenge.resolve_time);
     const challengeEndTimeText = formatUtcDateTime(resolveTimestamp);
+    const resolveDateByText = resolveTimestamp
+        ? new Date(resolveTimestamp).toLocaleDateString("en-GB", {
+            day: "numeric",
+            month: "long",
+            year: "numeric",
+        })
+        : "";
     const endsByCountdown = formatEndsByCountdown(resolveTimestamp, currentTime);
     const exactCountdownDetails = formatExactCountdownDetails(resolveTimestamp, currentTime);
     const isCreator = user?.wallet_address === creator.wallet_address;
@@ -620,7 +637,8 @@ export function ChallengeCard({
         ""
     ).toLowerCase();
     const isResolutionPending = resolutionStatusRaw === "pending";
-    const isResolutionResolved = resolutionStatusRaw === "resolved";
+    const isResolutionResolved = resolutionStatusRaw === "resolved" || challenge.status === "resolved";
+    console.log({ isResolutionPending, isResolutionResolved });
 
     let ctaLabel = "";
     let ctaDisabled = false;
@@ -641,12 +659,12 @@ export function ChallengeCard({
         `${ctaBaseClassName} bg-gray-200 border border-gray-300 text-gray-700 shadow-sm cursor-not-allowed`;
 
     if (isPvpMode) {
-        if (isResolveTimeAchieved && isResolutionResolved) {
+        if (isResolveTimeAchieved && hasOpponents && isResolutionResolved) {
             ctaLabel = "COMPLETED ✅";
             ctaDisabled = true;
             ctaClassName = completedCtaClassName;
-        } else if (isResolveTimeAchieved && isResolutionPending) {
-            ctaLabel = "RESOLVING...";
+        } else if (isResolveTimeAchieved && hasOpponents && isResolutionPending) {
+            ctaLabel = "RESOLVING ⌛";
             ctaDisabled = true;
             ctaClassName = resolvingCtaClassName;
         } else if (!isResolveTimeAchieved && hasOpponents) {
@@ -663,12 +681,12 @@ export function ChallengeCard({
             ctaClassName = activePvpCtaClassName;
         }
     } else if (isPoolMode) {
-        if (isResolveTimeAchieved && isResolutionResolved) {
-            ctaLabel = "COMPLETED";
+        if (isResolveTimeAchieved && hasOpponents && isResolutionResolved) {
+            ctaLabel = "COMPLETED ✅";
             ctaDisabled = true;
             ctaClassName = completedCtaClassName;
-        } else if (isResolveTimeAchieved && isResolutionPending) {
-            ctaLabel = "RESOLVING...";
+        } else if (isResolveTimeAchieved && hasOpponents && isResolutionPending) {
+            ctaLabel = "RESOLVING ⌛";
             ctaDisabled = true;
             ctaClassName = resolvingCtaClassName;
         } else if (isExpireTimeAchieved && !hasOpponents) {
@@ -676,11 +694,11 @@ export function ChallengeCard({
             ctaDisabled = true;
             ctaClassName = expiredCtaClassName;
         } else if (!isExpireTimeAchieved) {
-            ctaLabel = "JOIN CHALLENGE";
+            ctaLabel = "JOIN CHALLENGE ⚔️";
             ctaDisabled = isLoading;
             ctaClassName = activeCtaClassName;
         } else {
-            ctaLabel = "ONGOING";
+            ctaLabel = "ONGOING ⚔️";
             ctaDisabled = true;
             ctaClassName = ongoingCtaClassName;
         }
@@ -689,8 +707,8 @@ export function ChallengeCard({
     const showCreatorCtaHoverHint = isCreator && ctaLabel === "ACCEPT CHALLENGE";
     const isBattleOnState = !isResolveTimeAchieved && hasOpponents;
     const isChallengeExpiredState = isExpireTimeAchieved && !hasOpponents;
-    const isResolvingState = isResolveTimeAchieved && isResolutionPending;
-    const isCompletedState = isResolveTimeAchieved && isResolutionResolved;
+    const isResolvingState = isResolveTimeAchieved && hasOpponents && isResolutionPending;
+    const isCompletedState = isResolveTimeAchieved && hasOpponents && isResolutionResolved;
     const isExpiresInState = !isExpireTimeAchieved && !hasOpponents;
 
     const expiryStatusText = isCompletedState
@@ -720,50 +738,66 @@ export function ChallengeCard({
                 {/* Header */}
                 <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center overflow-hidden">
-                            <Image
-                                src={assetIcon}
-                                alt={assetName}
-                                width={32}
-                                height={32}
-                                className="w-8 h-8 object-contain"
-                            />
-                        </div>
+                        <Image
+                            src={assetIcon}
+                            alt={assetName}
+                            width={32}
+                            height={32}
+                            className="w-8 h-8 object-contain"
+                        />
                         <div>
                             <h3 className="text-gray-900 leading-tight">
-                                <span
-                                    onClick={handleClick}
-                                    className="block text-[16px] font-bold tracking-tight cursor-pointer"
-                                >
-                                    {title} In
-                                </span>
-                                <span
-                                    onClick={handleClick}
-                                    className="block text-[16px] font-bold tracking-tight cursor-pointer"
-                                >
-                                    Next
-                                    <span className="ml-2 inline-flex items-center gap-1.5">
-                                        <span className="text-sm font-bold text-emerald-900">{endsByCountdown}</span>
-                                        <span className="group relative inline-flex items-center">
-                                            <svg className="w-3.5 h-3.5 text-emerald-600 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                            </svg>
-                                            <span className="absolute left-1/2 top-full z-10 mt-2 w-60 -translate-x-1/2 rounded-lg bg-gray-900 p-2 text-[11px] font-medium text-white opacity-0 invisible transition-all duration-200 group-hover:opacity-100 group-hover:visible normal-case leading-relaxed shadow-lg">
-                                                <span className="block">Exact countdown: {exactCountdownDetails.exactCountdown}</span>
-                                                <span className="block">Time left: {exactCountdownDetails.timeLeftText}</span>
-                                                <span className="block">Resolves on: {exactCountdownDetails.dayLabel}</span>
-                                                <span className="absolute left-1/2 top-0 -translate-x-1/2 -translate-y-full border-4 border-transparent border-b-gray-900"></span>
+                                {isResolveTimeAchieved ? (
+                                    <span
+                                        onClick={handleClick}
+                                        className="block text-[16px] font-bold tracking-tight cursor-pointer"
+                                    >
+                                        {title} by {resolveDateByText}
+                                    </span>
+                                ) : (
+                                    <>
+                                        <span
+                                            onClick={handleClick}
+                                            className="block text-[16px] font-bold tracking-tight cursor-pointer"
+                                        >
+                                            {title} In
+                                        </span>
+                                        <span
+                                            onClick={handleClick}
+                                            className="block text-[16px] font-bold tracking-tight cursor-pointer"
+                                        >
+                                            Next
+                                            <span className="ml-2 inline-flex items-center gap-1.5">
+                                                <span className="text-sm font-bold text-emerald-900">{endsByCountdown}</span>
+                                                <span className="group relative inline-flex items-center">
+                                                    <svg className="w-3.5 h-3.5 text-emerald-600 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                    </svg>
+                                                    <span className="absolute left-1/2 top-full z-10 mt-2 w-60 -translate-x-1/2 rounded-lg bg-gray-900 p-2 text-[11px] font-medium text-white opacity-0 invisible transition-all duration-200 group-hover:opacity-100 group-hover:visible normal-case leading-relaxed shadow-lg">
+                                                        <span className="block">Exact countdown: {exactCountdownDetails.exactCountdown}</span>
+                                                        <span className="block">Time left: {exactCountdownDetails.timeLeftText}</span>
+                                                        <span className="block">Resolves on: {exactCountdownDetails.dayLabel}</span>
+                                                        <span className="absolute left-1/2 top-0 -translate-x-1/2 -translate-y-full border-4 border-transparent border-b-gray-900"></span>
+                                                    </span>
+                                                </span>
                                             </span>
                                         </span>
-                                    </span>
-                                </span>
+                                    </>
+                                )}
                             </h3>
                         </div>
                     </div>
                     {/* Watchlist Button */}
-                    <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                        <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                    <button
+                        type="button"
+                        onClick={handleBookmarkClick}
+                        aria-label={isBookmarked ? "Remove bookmark" : "Add bookmark"}
+                        title={isBookmarked ? "Remove bookmark" : "Add bookmark"}
+                        className="cursor-pointer p-2 bg-white/50 hover:bg-white/20 border border-gray-400 hover:text-gray-500 rounded-lg transition-colors"
+                    >
+                        <svg className="w-5 h-5 text-black rotate-45" stroke="currentColor" viewBox="0 0 24 24" fill={isBookmarked ? "currentColor" : "none"}>
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 17v4" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 3h8l-1 6 3 3H6l3-3-1-6z" />
                         </svg>
                     </button>
                 </div>
@@ -847,6 +881,22 @@ export function ChallengeCard({
                                     </p>
                                 </div>
                             </div>
+                            {!isExpireTimeAchieved && !isCreator && isPoolMode && (
+                                <button
+                                    type="button"
+                                    onClick={(e) => openBetForm(e)}
+                                    className={`absolute -bottom-4.5 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border-2 text-[28px] font-black leading-none shadow-md transition hover:scale-105 ${hasWon
+                                        ? "border-amber-400 bg-gradient-to-br from-amber-100 to-yellow-50 text-amber-700 hover:from-amber-200 hover:to-yellow-100"
+                                        : hasLost
+                                            ? "border-red-300 bg-gradient-to-br from-red-100 to-rose-50 text-red-700 hover:from-red-200 hover:to-rose-100"
+                                            : "border-[#d4a574]/40 bg-white/90 text-[#2d1f1a] hover:bg-white"
+                                        }`}
+                                    aria-label="Accept challenge"
+                                    title="Accept challenge"
+                                >
+                                    +
+                                </button>
+                            )}
                         </div>
 
                         {/* VS Badge or Pending Badge */}
@@ -941,25 +991,59 @@ export function ChallengeCard({
                                         </p>
                                     </div>
                                 </div>
+                                {!isExpireTimeAchieved && !isCreator && isPoolMode && (
+                                    <button
+                                        type="button"
+                                        onClick={(e) => openBetForm(e)}
+                                        className={`absolute -bottom-4.5 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border-2 text-[28px] font-black leading-none shadow-md transition hover:scale-105 ${hasLost
+                                            ? "border-amber-400 bg-gradient-to-br from-amber-100 to-yellow-50 text-amber-700 hover:from-amber-200 hover:to-yellow-100"
+                                            : hasWon
+                                                ? "border-red-300 bg-gradient-to-br from-red-100 to-rose-50 text-red-700 hover:from-red-200 hover:to-rose-100"
+                                                : "border-[#d4a574]/40 bg-white/90 text-[#2d1f1a] hover:bg-white"
+                                            }`}
+                                        aria-label="Accept challenge"
+                                        title="Accept challenge"
+                                    >
+                                        +
+                                    </button>
+                                )}
                             </div>
                         ) : (
                             /* Placeholder for pending state */
-                            <div className="relative w-[120px] h-[140px] flex flex-col items-center justify-center p-3 rounded-xl opponent-placeholder-bg border-2 border-dashed border-[#d4a574]/30">
-                                <div className="w-14 h-14 rounded-full bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center border-2 border-[#d4a574]/50 opponent-placeholder-icon">
-                                    <span className="text-xl">❓</span>
-                                </div>
-                                <div className="mt-1 px-1.5 py-0.5 bg-[#2d1f1a] text-white text-[9px] font-bold rounded-full">
-                                    {challenge.mode === "multi" ? " OPPONENTS" : "OPPONENT"}
-                                </div>
-                                {isExpireTimeAchieved && !hasOpponents ? (
-                                    <div className="mt-2 text-center">
-                                        <p className="text-[10px] text-[#8b7355] mt-0.5">No one joined, challenge expired!</p>
+                            <div className="flex flex-col items-center">
+                                <div className="relative w-[120px] h-[140px] flex flex-col items-center justify-center p-3 rounded-xl opponent-placeholder-bg border-2 border-dashed border-[#d4a574]/30">
+                                    <div className="w-14 h-14 rounded-full bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center border-2 border-[#d4a574]/50 opponent-placeholder-icon">
+                                        <span className="text-xl">❓</span>
                                     </div>
-                                ) :
-                                    (<div className="mt-2 text-center">
-                                        <p className="font-semibold text-[#8b7355] text-xs">No one yet!</p>
-                                        <p className="text-[10px] text-[#8b7355] mt-0.5">Be the first to join!</p>
-                                    </div>)}
+                                    <div className="mt-1 px-1.5 py-0.5 bg-[#2d1f1a] text-white text-[9px] font-bold rounded-full">
+                                        {challenge.mode === "multi" ? " OPPONENTS" : "OPPONENT"}
+                                    </div>
+                                    {isExpireTimeAchieved && !hasOpponents ? (
+                                        <div className="mt-2 text-center">
+                                            <p className="text-[10px] text-[#8b7355] mt-0.5">No one joined, challenge expired!</p>
+                                        </div>
+                                    ) :
+                                        (<div className="mt-2 text-center">
+                                            <p className="font-semibold text-[#8b7355] text-xs">No one yet!</p>
+                                            <p className="text-[10px] text-[#8b7355] mt-0.5">Be the first to join!</p>
+                                        </div>)}
+                                    {!isExpireTimeAchieved && !isCreator && isPoolMode && (
+                                        <button
+                                            type="button"
+                                            onClick={(e) => openBetForm(e)}
+                                            className={`absolute -bottom-4.5 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border-2 text-[28px] font-black leading-none shadow-md transition hover:scale-105 ${hasWon
+                                                ? "border-amber-400 bg-gradient-to-br from-amber-100 to-yellow-50 text-amber-700 hover:from-amber-200 hover:to-yellow-100"
+                                                : hasLost
+                                                    ? "border-red-300 bg-gradient-to-br from-red-100 to-rose-50 text-red-700 hover:from-red-200 hover:to-rose-100"
+                                                    : "border-[#d4a574]/40 bg-white/90 text-[#2d1f1a] hover:bg-white"
+                                                }`}
+                                            aria-label="Accept challenge"
+                                            title="Accept challenge"
+                                        >
+                                            +
+                                        </button>
+                                    )}
+                                </div>
                             </div>
                         )}
                     </div>
@@ -1121,3 +1205,4 @@ export function ChallengeCard({
         </>
     );
 }
+

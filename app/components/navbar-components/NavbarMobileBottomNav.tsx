@@ -6,11 +6,13 @@ import Link from "next/link";
 type NavbarMobileBottomNavProps = {
     isActive: (href: string) => boolean;
     profileHref: string;
+    onSearchClick: () => void;
 };
 
 export function NavbarMobileBottomNav({
     isActive,
     profileHref,
+    onSearchClick,
 }: NavbarMobileBottomNavProps) {
     return (
         <div
@@ -67,9 +69,7 @@ export function NavbarMobileBottomNav({
 
                 <button
                     type="button"
-                    onClick={() => {
-                        window.scrollTo({ top: 0, behavior: "smooth" });
-                    }}
+                    onClick={onSearchClick}
                     className="flex flex-col items-center justify-center gap-0.5 min-w-0 flex-1 text-gray-500"
                 >
                     <svg
