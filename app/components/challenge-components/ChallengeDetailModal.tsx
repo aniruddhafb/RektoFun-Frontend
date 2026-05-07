@@ -846,6 +846,22 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
                                         </p>
                                     </div>
                                 </div>
+                                {!isExpireTimeAchieved && !isCreator && isPoolMode && (
+                                    <button
+                                        type="button"
+                                        onClick={handleCtaClick}
+                                        className={`absolute -bottom-3.5 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border-2 text-[28px] font-black leading-none shadow-md transition hover:scale-105 ${hasWon
+                                            ? "border-amber-400 bg-gradient-to-br from-amber-100 to-yellow-50 text-amber-700 hover:from-amber-200 hover:to-yellow-100"
+                                            : hasLost
+                                                ? "border-red-300 bg-gradient-to-br from-red-100 to-rose-50 text-red-700 hover:from-red-200 hover:to-rose-100"
+                                                : "border-[#d4a574]/40 bg-white/90 text-[#2d1f1a] hover:bg-white"
+                                            }`}
+                                        aria-label="Accept challenge"
+                                        title="Accept challenge"
+                                    >
+                                        +
+                                    </button>
+                                )}
                             </div>
 
                             {/* VS Badge or Pending Badge */}
@@ -928,10 +944,26 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
                                             </p>
                                         </div>
                                     </div>
+                                    {!isExpireTimeAchieved && !isCreator && isPoolMode && (
+                                        <button
+                                            type="button"
+                                            onClick={handleCtaClick}
+                                            className={`absolute -bottom-3.5 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border-2 text-[28px] font-black leading-none shadow-md transition hover:scale-105 ${hasLost
+                                                ? "border-amber-400 bg-gradient-to-br from-amber-100 to-yellow-50 text-amber-700 hover:from-amber-200 hover:to-yellow-100"
+                                                : hasWon
+                                                    ? "border-red-300 bg-gradient-to-br from-red-100 to-rose-50 text-red-700 hover:from-red-200 hover:to-rose-100"
+                                                    : "border-[#d4a574]/40 bg-white/90 text-[#2d1f1a] hover:bg-white"
+                                                }`}
+                                            aria-label="Accept challenge"
+                                            title="Accept challenge"
+                                        >
+                                            +
+                                        </button>
+                                    )}
                                 </div>
                             ) : (
 
-                                <div className="relative">
+                                <div className="relative flex flex-col items-center">
                                     <div className="w-[138px] h-[168px] flex flex-col items-center justify-center text-center gap-2 p-4 rounded-xl bg-white/40 border-2 border-dashed border-[#d4a574]/30">
                                         <div className="w-16 h-16 rounded-full bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center border-2 border-[#d4a574]/50">
                                             <span className="text-xl">❓</span>
@@ -944,6 +976,17 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
                                             <p className="text-[10px] text-[#a08070] mt-0.5">Be the first to accept!</p>
                                         </div>
                                     </div>
+                                    {!isExpireTimeAchieved && !isCreator && isPoolMode && (
+                                        <button
+                                            type="button"
+                                            onClick={handleCtaClick}
+                                            className="absolute -bottom-3.5 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border-2 border-[#d4a574]/40 bg-white/90 text-[28px] font-black leading-none text-[#2d1f1a] shadow-md transition hover:scale-105 hover:bg-white"
+                                            aria-label="Accept challenge"
+                                            title="Accept challenge"
+                                        >
+                                            +
+                                        </button>
+                                    )}
                                 </div>
                             )}
                         </div>

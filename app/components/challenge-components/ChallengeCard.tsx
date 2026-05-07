@@ -866,6 +866,22 @@ export function ChallengeCard({
                                     </p>
                                 </div>
                             </div>
+                            {!isExpireTimeAchieved && !isCreator && isPoolMode && (
+                                <button
+                                    type="button"
+                                    onClick={(e) => openBetForm(e)}
+                                    className={`absolute -bottom-4.5 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border-2 text-[28px] font-black leading-none shadow-md transition hover:scale-105 ${hasWon
+                                        ? "border-amber-400 bg-gradient-to-br from-amber-100 to-yellow-50 text-amber-700 hover:from-amber-200 hover:to-yellow-100"
+                                        : hasLost
+                                            ? "border-red-300 bg-gradient-to-br from-red-100 to-rose-50 text-red-700 hover:from-red-200 hover:to-rose-100"
+                                            : "border-[#d4a574]/40 bg-white/90 text-[#2d1f1a] hover:bg-white"
+                                        }`}
+                                    aria-label="Accept challenge"
+                                    title="Accept challenge"
+                                >
+                                    +
+                                </button>
+                            )}
                         </div>
 
                         {/* VS Badge or Pending Badge */}
@@ -960,25 +976,59 @@ export function ChallengeCard({
                                         </p>
                                     </div>
                                 </div>
+                                {!isExpireTimeAchieved && !isCreator && isPoolMode && (
+                                    <button
+                                        type="button"
+                                        onClick={(e) => openBetForm(e)}
+                                        className={`absolute -bottom-4.5 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border-2 text-[28px] font-black leading-none shadow-md transition hover:scale-105 ${hasLost
+                                            ? "border-amber-400 bg-gradient-to-br from-amber-100 to-yellow-50 text-amber-700 hover:from-amber-200 hover:to-yellow-100"
+                                            : hasWon
+                                                ? "border-red-300 bg-gradient-to-br from-red-100 to-rose-50 text-red-700 hover:from-red-200 hover:to-rose-100"
+                                                : "border-[#d4a574]/40 bg-white/90 text-[#2d1f1a] hover:bg-white"
+                                            }`}
+                                        aria-label="Accept challenge"
+                                        title="Accept challenge"
+                                    >
+                                        +
+                                    </button>
+                                )}
                             </div>
                         ) : (
                             /* Placeholder for pending state */
-                            <div className="relative w-[120px] h-[140px] flex flex-col items-center justify-center p-3 rounded-xl opponent-placeholder-bg border-2 border-dashed border-[#d4a574]/30">
-                                <div className="w-14 h-14 rounded-full bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center border-2 border-[#d4a574]/50 opponent-placeholder-icon">
-                                    <span className="text-xl">❓</span>
-                                </div>
-                                <div className="mt-1 px-1.5 py-0.5 bg-[#2d1f1a] text-white text-[9px] font-bold rounded-full">
-                                    {challenge.mode === "multi" ? " OPPONENTS" : "OPPONENT"}
-                                </div>
-                                {isExpireTimeAchieved && !hasOpponents ? (
-                                    <div className="mt-2 text-center">
-                                        <p className="text-[10px] text-[#8b7355] mt-0.5">No one joined, challenge expired!</p>
+                            <div className="flex flex-col items-center">
+                                <div className="relative w-[120px] h-[140px] flex flex-col items-center justify-center p-3 rounded-xl opponent-placeholder-bg border-2 border-dashed border-[#d4a574]/30">
+                                    <div className="w-14 h-14 rounded-full bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center border-2 border-[#d4a574]/50 opponent-placeholder-icon">
+                                        <span className="text-xl">❓</span>
                                     </div>
-                                ) :
-                                    (<div className="mt-2 text-center">
-                                        <p className="font-semibold text-[#8b7355] text-xs">No one yet!</p>
-                                        <p className="text-[10px] text-[#8b7355] mt-0.5">Be the first to join!</p>
-                                    </div>)}
+                                    <div className="mt-1 px-1.5 py-0.5 bg-[#2d1f1a] text-white text-[9px] font-bold rounded-full">
+                                        {challenge.mode === "multi" ? " OPPONENTS" : "OPPONENT"}
+                                    </div>
+                                    {isExpireTimeAchieved && !hasOpponents ? (
+                                        <div className="mt-2 text-center">
+                                            <p className="text-[10px] text-[#8b7355] mt-0.5">No one joined, challenge expired!</p>
+                                        </div>
+                                    ) :
+                                        (<div className="mt-2 text-center">
+                                            <p className="font-semibold text-[#8b7355] text-xs">No one yet!</p>
+                                            <p className="text-[10px] text-[#8b7355] mt-0.5">Be the first to join!</p>
+                                        </div>)}
+                                {!isExpireTimeAchieved && !isCreator && isPoolMode && (
+                                        <button
+                                            type="button"
+                                            onClick={(e) => openBetForm(e)}
+                                            className={`absolute -bottom-4.5 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border-2 text-[28px] font-black leading-none shadow-md transition hover:scale-105 ${hasWon
+                                                ? "border-amber-400 bg-gradient-to-br from-amber-100 to-yellow-50 text-amber-700 hover:from-amber-200 hover:to-yellow-100"
+                                                : hasLost
+                                                    ? "border-red-300 bg-gradient-to-br from-red-100 to-rose-50 text-red-700 hover:from-red-200 hover:to-rose-100"
+                                                    : "border-[#d4a574]/40 bg-white/90 text-[#2d1f1a] hover:bg-white"
+                                                }`}
+                                            aria-label="Accept challenge"
+                                            title="Accept challenge"
+                                        >
+                                            +
+                                        </button>
+                                    )}
+                                </div>
                             </div>
                         )}
                     </div>
@@ -1140,3 +1190,4 @@ export function ChallengeCard({
         </>
     );
 }
+
