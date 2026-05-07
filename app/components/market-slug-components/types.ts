@@ -47,7 +47,7 @@ export const PLACEHOLDER_CHALLENGES: any[] = [
         likes: 0,
         mode: "pvp",
         challengerCount: 1,
-        defenderCount: 0,
+        opponentCount: 0,
         totalPool: 100,
     },
     {
@@ -76,7 +76,7 @@ export const PLACEHOLDER_CHALLENGES: any[] = [
         likes: 0,
         mode: "pvp",
         challengerCount: 1,
-        defenderCount: 0,
+        opponentCount: 0,
         totalPool: 50,
     },
 ];
@@ -256,4 +256,5 @@ export const topTradersData: TopTrader[] = [
 ];
 
 // Filter options
-export const filterOptions = ["Latest", "Expired", "Expiring Soon", "Ongoing", "Completed"];
+export const statusFilterOptions = ["Latest", "Expired", "Expiring Soon", "Ongoing", "Completed"];
+export const modeFilterOptions = ["All Modes", "PVP", "Multi"];

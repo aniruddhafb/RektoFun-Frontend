@@ -36,6 +36,8 @@ export const PROGRAM_ID = new PublicKey(
 export const RPC_ENDPOINT =
   process.env.NEXT_PUBLIC_SOLANA_RPC || "https://api.devnet.solana.com";
 
+const sharedReadonlyConnection = new Connection(RPC_ENDPOINT, "confirmed");
+
 /** USDC mint on Solana devnet */
 export const USDC_MINT = new PublicKey(
   "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU"
@@ -121,7 +123,7 @@ export function getRektoProgram(wallet: {
   signTransaction: (tx: Transaction) => Promise<Transaction>;
   signAllTransactions: (txs: Transaction[]) => Promise<Transaction[]>;
 }): Program {
-  const connection = new Connection(RPC_ENDPOINT, "confirmed");
+  const connection = sharedReadonlyConnection;
   const provider = new AnchorProvider(connection, wallet as any, {
     commitment: "confirmed",
   });
@@ -129,7 +131,7 @@ export function getRektoProgram(wallet: {
 }
 
 export function getReadonlyConnection(): Connection {
-  return new Connection(RPC_ENDPOINT, "confirmed");
+  return sharedReadonlyConnection;
 }
 
 // ─── Instruction Builders ─────────────────────────────────────────────────────
@@ -146,7 +148,7 @@ export async function buildCreateChallengeTx(
   creator: PublicKey,
   args: CreateChallengeArgs
 ): Promise<Transaction> {
-  const connection = new Connection(RPC_ENDPOINT, "confirmed");
+  const connection = getReadonlyConnection();
 
   const [counterPDA] = deriveCreatorCounter(creator);
 
@@ -224,7 +226,7 @@ export async function buildAcceptChallengeTx(
   challengePDA: PublicKey,
   creatorPubkey: PublicKey
 ): Promise<Transaction> {
-  const connection = new Connection(RPC_ENDPOINT, "confirmed");
+  const connection = getReadonlyConnection();
   const [vaultPDA] = deriveVaultPDA(challengePDA);
 
   // Derive the challenger's USDC ATA

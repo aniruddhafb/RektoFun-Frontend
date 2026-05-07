@@ -29,163 +29,163 @@ interface Challenge {
 const challengesData: Challenge[] = [
     {
         id: 1,
-        coin: "SOL",
-        coinSymbol: "SOL",
-        coinColor: "#9945FF",
-        coinBg: "#1a1a2e",
-        coinIcon: "S",
-        category: "Crypto Price",
-        title: "SOL Above $160 in 1 Hour?",
-        creator: "DegenLord",
+        coin: "IPL",
+        coinSymbol: "IPL",
+        coinColor: "#1e3a8a",
+        coinBg: "#1e3a8a",
+        coinIcon: "I",
+        category: "Cricket - IPL",
+        title: "CSK To Win By 15+ Runs Tonight?",
+        creator: "CricketNerd",
         mode: "PVP Mode",
-        eventDetails: "Will the price of SOL on Binance spot market rise above $160 within 1 hour?",
-        pool: "$500",
-        participants: 24,
-        split: "12 vs 12",
-        expiresIn: "59m 12s",
-        expiresMs: 59 * 60 * 1000 + 12 * 1000,
-        submittedAgo: "2h ago",
-        market: "Binance",
+        eventDetails: "In tonight's IPL match, will Chennai Super Kings defeat Mumbai Indians by 15 or more runs?",
+        pool: "$850",
+        participants: 26,
+        split: "13 vs 13",
+        expiresIn: "1h 08m",
+        expiresMs: 1 * 60 * 60 * 1000 + 8 * 60 * 1000,
+        submittedAgo: "36m ago",
+        market: "FanDuel",
     },
     {
         id: 2,
-        coin: "BTC",
-        coinSymbol: "BTC",
-        coinColor: "#F7931A",
-        coinBg: "#F7931A",
-        coinIcon: "₿",
-        category: "Crypto Price",
-        title: "BTC Above $95K in 2 Hours?",
-        creator: "CryptoKing",
+        coin: "FIFA",
+        coinSymbol: "FIFA",
+        coinColor: "#0f766e",
+        coinBg: "#0f766e",
+        coinIcon: "F",
+        category: "FIFA World Cup",
+        title: "Brazil To Keep A Clean Sheet?",
+        creator: "GoalGuru",
         mode: "Multi Mode",
-        eventDetails: "Will the price of BTC on Binance spot market rise above $95,000 within 2 hours?",
-        pool: "$2,250",
-        participants: 30,
-        split: "15 vs 15",
-        expiresIn: "1h 45m",
-        expiresMs: 1 * 60 * 60 * 1000 + 45 * 60 * 1000,
-        submittedAgo: "3h ago",
-        market: "Binance",
+        eventDetails: "Will Brazil keep a clean sheet in their next FIFA World Cup group-stage match?",
+        pool: "$1,420",
+        participants: 34,
+        split: "19 vs 15",
+        expiresIn: "2h 12m",
+        expiresMs: 2 * 60 * 60 * 1000 + 12 * 60 * 1000,
+        submittedAgo: "1h ago",
+        market: "Bet365",
     },
     {
         id: 3,
-        coin: "ETH",
-        coinSymbol: "ETH",
-        coinColor: "#627EEA",
-        coinBg: "#627EEA",
-        coinIcon: "Ξ",
-        category: "Crypto Price",
-        title: "ETH Below $3,200 in 30 mins?",
-        creator: "BearWhale",
+        coin: "IPL",
+        coinSymbol: "IPL",
+        coinColor: "#d97706",
+        coinBg: "#d97706",
+        coinIcon: "I",
+        category: "Cricket - IPL",
+        title: "Virat Kohli 50+ Runs?",
+        creator: "MidwicketMind",
         mode: "PVP Mode",
-        eventDetails: "Will the price of ETH on Binance spot market fall below $3,200 within 30 minutes?",
-        pool: "$2,500",
+        eventDetails: "Will Virat Kohli score 50 or more runs in Royal Challengers Bengaluru's next IPL fixture?",
+        pool: "$1,050",
         participants: 16,
         split: "8 vs 8",
-        expiresIn: "28m 45s",
-        expiresMs: 28 * 60 * 1000 + 45 * 1000,
-        submittedAgo: "1h ago",
-        market: "Binance",
+        expiresIn: "42m 10s",
+        expiresMs: 42 * 60 * 1000 + 10 * 1000,
+        submittedAgo: "25m ago",
+        market: "Dream11",
     },
     {
         id: 4,
-        coin: "DOGE",
-        coinSymbol: "DOGE",
-        coinColor: "#C2A633",
-        coinBg: "#f5d020",
-        coinIcon: "Ð",
-        category: "Crypto Price",
-        title: "DOGE Above $0.18 in 1 Hour?",
-        creator: "DegenLord",
+        coin: "FIFA",
+        coinSymbol: "FIFA",
+        coinColor: "#7c3aed",
+        coinBg: "#7c3aed",
+        coinIcon: "F",
+        category: "FIFA World Cup",
+        title: "Argentina To Win In 90 Minutes?",
+        creator: "CounterAttack",
         mode: "Multi Mode",
-        eventDetails: "Will the price of DOGE on Binance spot market rise above $0.18 within 1 hour?",
-        pool: "$50",
-        participants: 10,
-        split: "5 vs 5",
-        expiresIn: "52m 30s",
-        expiresMs: 52 * 60 * 1000 + 30 * 1000,
-        submittedAgo: "4h ago",
-        market: "Binance",
+        eventDetails: "Will Argentina win their Round of 16 FIFA World Cup match within regular time?",
+        pool: "$2,060",
+        participants: 28,
+        split: "18 vs 10",
+        expiresIn: "3h 05m",
+        expiresMs: 3 * 60 * 60 * 1000 + 5 * 60 * 1000,
+        submittedAgo: "2h ago",
+        market: "BetMGM",
     },
     {
         id: 5,
-        coin: "PEPE",
-        coinSymbol: "PEPE",
-        coinColor: "#4CAF50",
-        coinBg: "#2d5a27",
-        coinIcon: "🐸",
-        category: "Crypto Price",
-        title: "PEPE Above $0.000015 in 3 Hours?",
-        creator: "MoonBoy",
+        coin: "IPL",
+        coinSymbol: "IPL",
+        coinColor: "#be123c",
+        coinBg: "#be123c",
+        coinIcon: "I",
+        category: "Cricket - IPL",
+        title: "Total Match Sixes Over 16.5?",
+        creator: "PowerplayPro",
         mode: "PVP Mode",
-        eventDetails: "Will the price of PEPE on Binance spot market rise above $0.000015 within 3 hours?",
-        pool: "$900",
-        participants: 14,
-        split: "7 vs 7",
-        expiresIn: "2h 15m",
-        expiresMs: 2 * 60 * 60 * 1000 + 15 * 60 * 1000,
-        submittedAgo: "2h ago",
-        market: "Binance",
+        eventDetails: "In Rajasthan Royals vs Sunrisers Hyderabad, will total sixes scored be over 16.5?",
+        pool: "$730",
+        participants: 20,
+        split: "11 vs 9",
+        expiresIn: "1h 34m",
+        expiresMs: 1 * 60 * 60 * 1000 + 34 * 60 * 1000,
+        submittedAgo: "48m ago",
+        market: "FanDuel",
     },
     {
         id: 6,
-        coin: "LINK",
-        coinSymbol: "LINK",
-        coinColor: "#2A5ADA",
-        coinBg: "#2A5ADA",
-        coinIcon: "⬡",
-        category: "Crypto Price",
-        title: "LINK Above $18 in 2 Hours?",
-        creator: "ChainLink",
+        coin: "FIFA",
+        coinSymbol: "FIFA",
+        coinColor: "#0369a1",
+        coinBg: "#0369a1",
+        coinIcon: "F",
+        category: "FIFA World Cup",
+        title: "Kylian Mbappe To Score Anytime?",
+        creator: "TikiTakaIQ",
         mode: "PVP Mode",
-        eventDetails: "Will the price of LINK on Binance spot market rise above $18 within 2 hours?",
-        pool: "$1,200",
-        participants: 20,
-        split: "10 vs 10",
-        expiresIn: "1h 30m",
-        expiresMs: 1 * 60 * 60 * 1000 + 30 * 60 * 1000,
-        submittedAgo: "5h ago",
-        market: "Binance",
+        eventDetails: "Will Kylian Mbappe score at least one goal in France's next FIFA World Cup game?",
+        pool: "$1,800",
+        participants: 24,
+        split: "14 vs 10",
+        expiresIn: "2h 48m",
+        expiresMs: 2 * 60 * 60 * 1000 + 48 * 60 * 1000,
+        submittedAgo: "1h ago",
+        market: "Bet365",
     },
     {
         id: 7,
-        coin: "ADA",
-        coinSymbol: "ADA",
-        coinColor: "#0033AD",
-        coinBg: "#0033AD",
-        coinIcon: "₳",
-        category: "Crypto Price",
-        title: "ADA Above $0.65 in 1 Hour?",
-        creator: "CardanoFan",
+        coin: "IPL",
+        coinSymbol: "IPL",
+        coinColor: "#166534",
+        coinBg: "#166534",
+        coinIcon: "I",
+        category: "Cricket - IPL",
+        title: "KKR Powerplay Score 55+?",
+        creator: "SlipCordon",
         mode: "Multi Mode",
-        eventDetails: "Will the price of ADA on Binance spot market rise above $0.65 within 1 hour?",
-        pool: "$750",
+        eventDetails: "Will Kolkata Knight Riders score 55 or more runs in the first 6 overs?",
+        pool: "$920",
         participants: 18,
         split: "9 vs 9",
-        expiresIn: "45m 20s",
-        expiresMs: 45 * 60 * 1000 + 20 * 1000,
-        submittedAgo: "3h ago",
-        market: "Binance",
+        expiresIn: "37m 55s",
+        expiresMs: 37 * 60 * 1000 + 55 * 1000,
+        submittedAgo: "31m ago",
+        market: "Dream11",
     },
     {
         id: 8,
-        coin: "AVAX",
-        coinSymbol: "AVAX",
-        coinColor: "#E84142",
-        coinBg: "#E84142",
-        coinIcon: "A",
-        category: "Crypto Price",
-        title: "AVAX Above $40 in 3 Hours?",
-        creator: "AvalancheKing",
+        coin: "FIFA",
+        coinSymbol: "FIFA",
+        coinColor: "#b45309",
+        coinBg: "#b45309",
+        coinIcon: "F",
+        category: "FIFA World Cup",
+        title: "Match To Go Into Extra Time?",
+        creator: "FinalWhistle",
         mode: "PVP Mode",
-        eventDetails: "Will the price of AVAX on Binance spot market rise above $40 within 3 hours?",
-        pool: "$3,000",
+        eventDetails: "Will the FIFA World Cup semifinal between Spain and Germany be level after 90 minutes?",
+        pool: "$2,450",
         participants: 22,
         split: "11 vs 11",
-        expiresIn: "2h 50m",
-        expiresMs: 2 * 60 * 60 * 1000 + 50 * 60 * 1000,
-        submittedAgo: "1h ago",
-        market: "Binance",
+        expiresIn: "4h 10m",
+        expiresMs: 4 * 60 * 60 * 1000 + 10 * 60 * 1000,
+        submittedAgo: "2h ago",
+        market: "BetMGM",
     },
 ];
 
@@ -252,11 +252,8 @@ const ChevronDown2 = ({ className }: { className?: string }) => (
 // ─── Coin Avatar ──────────────────────────────────────────────────────────────
 const CoinAvatar = ({ challenge }: { challenge: Challenge }) => {
     const coinImages: Record<string, string> = {
-        SOL: "/scribbles/sol.png",
-        BTC: "/scribbles/btc.png",
-        ETH: "/scribbles/coins.png",
-        DOGE: "/scribbles/doge.png",
-        PEPE: "/scribbles/pepe.png",
+        IPL: "/scribbles/ipl.png",
+        FIFA: "/scribbles/fifa.png",
     };
 
     const imgSrc = coinImages[challenge.coinSymbol];
@@ -468,30 +465,6 @@ const ResolverStatus = () => {
             <div className="bg-white/65 backdrop-blur-sm rounded-2xl border border-white/70 shadow-sm p-5">
                 <h3 className="text-base font-bold text-gray-900 mb-4">Your Resolver Status</h3>
 
-                {/* Level badge */}
-                <div className="flex items-center gap-3 mb-4">
-                    <div className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0"
-                        style={{ background: "linear-gradient(135deg, #f97316, #ea580c)" }}>
-                        <ShieldIcon className="w-6 h-6 text-white" />
-                    </div>
-                    <div className="flex-1">
-                        <div className="flex items-center justify-between">
-                            <span className="text-sm font-bold text-orange-500">Level 3 Resolver</span>
-                            <span className="text-xs font-semibold text-orange-500">{xp} / {maxXp} XP</span>
-                        </div>
-                        {/* Progress bar */}
-                        <div className="mt-1.5 h-2 bg-gray-100 rounded-full overflow-hidden">
-                            <div
-                                className="h-full rounded-full transition-all duration-500"
-                                style={{
-                                    width: `${progress}%`,
-                                    background: "linear-gradient(90deg, #f97316, #ea580c)"
-                                }}
-                            />
-                        </div>
-                    </div>
-                </div>
-
                 {/* Stats */}
                 <div className="grid grid-cols-3 divide-x divide-gray-100">
                     <div className="text-center pr-3">
@@ -530,7 +503,7 @@ const ResolverStatus = () => {
                         {
                             step: 3,
                             title: "Earn Rewards",
-                            desc: "Earn XP and reputation for accurate resolutions.",
+                            desc: "Earn points and rewards for accurate resolutions.",
                         },
                     ].map(({ step, title, desc }) => (
                         <div key={step} className="flex gap-3">
@@ -552,7 +525,7 @@ const ResolverStatus = () => {
                         <div>
                             <p className="text-sm font-semibold text-gray-900">NFT Holders only</p>
                             <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
-                                Verify your NFT to start resolving challenges.
+                                Only Rekto Masters NFT Holders can participate in resolving challenges.
                             </p>
                         </div>
                     </div>
@@ -593,29 +566,10 @@ export default function ResolvePage() {
                     <div>
                         <div className="flex items-center gap-2.5">
                             <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900">Resolve Challenges</h1>
-                            <div className="w-8 h-8 rounded-full flex items-center justify-center"
-                                style={{ background: "linear-gradient(135deg, #f97316, #ea580c)" }}>
-                                <ShieldIcon className="w-4 h-4 text-white" />
-                            </div>
                         </div>
                         <p className="text-gray-500 mt-1 text-sm sm:text-base">
                             Review real-world event challenges and help the community reach a fair resolution.
                         </p>
-                    </div>
-
-                    {/* NFT Verify Banner */}
-                    <div className="flex items-center gap-3 bg-white/65 backdrop-blur-sm rounded-2xl border border-white/70 shadow-sm px-4 py-3 flex-shrink-0">
-                        <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
-                            style={{ background: "linear-gradient(135deg, #fbbf24, #f59e0b)" }}>
-                            <ShieldIcon className="w-5 h-5 text-white" />
-                        </div>
-                        <div className="hidden sm:block">
-                            <p className="text-xs font-semibold text-gray-900">Only NFT Holders can resolve</p>
-                            <p className="text-xs text-gray-500">Verify your NFT to start resolving.</p>
-                        </div>
-                        <button className="ml-2 px-4 py-2 bg-gray-900 hover:bg-gray-800 text-white rounded-xl text-sm font-semibold transition-all shadow-sm whitespace-nowrap">
-                            Verify NFT
-                        </button>
                     </div>
                 </div>
 
@@ -660,9 +614,9 @@ export default function ResolvePage() {
                                 className="appearance-none pl-3 pr-8 py-2 bg-white/80 border border-gray-200 rounded-xl text-xs sm:text-sm text-gray-700 font-medium focus:outline-none focus:ring-2 focus:ring-orange-200 shadow-sm cursor-pointer"
                             >
                                 <option>All Categories</option>
-                                <option>Crypto Price</option>
-                                <option>Sports</option>
-                                <option>Politics</option>
+                                <option>Cricket - IPL</option>
+                                <option>FIFA World Cup</option>
+                                <option>Global Sports</option>
                             </select>
                             <ChevronDownIcon className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
                         </div>
@@ -675,9 +629,10 @@ export default function ResolvePage() {
                                 className="appearance-none pl-3 pr-8 py-2 bg-white/80 border border-gray-200 rounded-xl text-xs sm:text-sm text-gray-700 font-medium focus:outline-none focus:ring-2 focus:ring-orange-200 shadow-sm cursor-pointer"
                             >
                                 <option>All Markets</option>
-                                <option>Binance</option>
-                                <option>Coinbase</option>
-                                <option>Kraken</option>
+                                <option>FanDuel</option>
+                                <option>Bet365</option>
+                                <option>BetMGM</option>
+                                <option>Dream11</option>
                             </select>
                             <ChevronDownIcon className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
                         </div>

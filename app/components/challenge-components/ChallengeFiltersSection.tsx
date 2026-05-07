@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Search, ChevronDown, Clock, TrendingUp, DollarSign, Eye, Bookmark } from "lucide-react";
+import { Search, ChevronDown, Clock, TrendingUp, Eye, Bookmark } from "lucide-react";
 
 interface ChallengeFiltersSectionProps {
     activeFilter: string;
@@ -10,21 +10,14 @@ interface ChallengeFiltersSectionProps {
     setActiveAsset: (asset: string) => void;
     searchQuery: string;
     setSearchQuery: (query: string) => void;
+    marketOptions: string[];
 }
 
 const filterOptions: { label: string; icon: React.ReactNode }[] = [
+    { label: "Latest", icon: <TrendingUp className="w-4 h-4" /> },
     { label: "Expiring Soon", icon: <Clock className="w-4 h-4" /> },
-    { label: "Ending Soon", icon: <TrendingUp className="w-4 h-4" /> },
-    { label: "High Stakes", icon: <DollarSign className="w-4 h-4" /> },
     { label: "My Bets", icon: <Bookmark className="w-4 h-4" /> },
-    { label: "My Watchlists", icon: <Eye className="w-4 h-4" /> },
-];
-
-const marketOptions: { label: string; icon: React.ReactNode }[] = [
-    { label: "All Markets", icon: null },
-    { label: "Bitcoin Markets", icon: null },
-    { label: "Ethereum Markets", icon: null },
-    { label: "Altcoin Markets", icon: null },
+    { label: "Created By Me", icon: <Eye className="w-4 h-4" /> },
 ];
 
 export function ChallengeFiltersSection({
@@ -34,6 +27,7 @@ export function ChallengeFiltersSection({
     setActiveAsset,
     searchQuery,
     setSearchQuery,
+    marketOptions,
 }: ChallengeFiltersSectionProps) {
     const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
     const [isMarketDropdownOpen, setIsMarketDropdownOpen] = useState(false);
@@ -77,7 +71,7 @@ export function ChallengeFiltersSection({
                         placeholder="Search challenges..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2.5 bg-white/50 rounded-full text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-200"
+                        className="w-full pl-10 pr-4 py-2.5 bg-white/50 rounded-full border border-gray-400 text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-200"
                     />
                 </div>
 
@@ -87,7 +81,7 @@ export function ChallengeFiltersSection({
                     <div className="relative" ref={filterDropdownRef}>
                         <button
                             onClick={() => setIsFilterDropdownOpen(!isFilterDropdownOpen)}
-                            className="cursor-pointer flex items-center gap-2 px-3 py-2 bg-white/50 rounded-full text-sm text-gray-700 hover:bg-white/70 transition-colors justify-between flex-1"
+                            className=" border border-gray-400 cursor-pointer flex items-center gap-2 px-3 py-2 bg-white/50 rounded-full text-sm text-gray-700 hover:bg-white/70 transition-colors justify-between flex-1"
                         >
                             <div className="flex items-center gap-2">
                                 <span>{getCurrentFilterIcon()}</span>
@@ -122,7 +116,7 @@ export function ChallengeFiltersSection({
                     <div className="relative" ref={marketDropdownRef}>
                         <button
                             onClick={() => setIsMarketDropdownOpen(!isMarketDropdownOpen)}
-                            className="cursor-pointer flex items-center gap-2 px-3 py-2 bg-white/50 rounded-full text-sm text-gray-700 hover:bg-white/70 transition-colors justify-between flex-1"
+                            className=" border border-gray-400 cursor-pointer flex items-center gap-2 px-3 py-2 bg-white/50 rounded-full text-sm text-gray-700 hover:bg-white/70 transition-colors justify-between flex-1"
                         >
                             <div className="flex items-center gap-2">
                                 <span>{activeAsset}</span>
@@ -134,18 +128,17 @@ export function ChallengeFiltersSection({
                             <div className="absolute left-0 sm:right-0 top-full mt-2 w-full sm:w-56 bg-white rounded-xl shadow-lg border border-gray-100 py-2 z-10">
                                 {marketOptions.map((option) => (
                                     <button
-                                        key={option.label}
+                                        key={option}
                                         onClick={() => {
-                                            setActiveAsset(option.label);
+                                            setActiveAsset(option);
                                             setIsMarketDropdownOpen(false);
                                         }}
-                                        className={`w-full cursor-pointer flex items-center gap-3 px-4 py-2.5 text-sm text-left transition-colors ${activeAsset === option.label
+                                        className={`w-full cursor-pointer flex items-center gap-3 px-4 py-2.5 text-sm text-left transition-colors ${activeAsset === option
                                             ? "text-black font-semibold"
                                             : "text-gray-700 hover:bg-gray-50"
                                             }`}
                                     >
-                                        {option.icon}
-                                        {option.label}
+                                        {option}
                                     </button>
                                 ))}
                             </div>

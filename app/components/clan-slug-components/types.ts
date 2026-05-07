@@ -16,7 +16,7 @@ export interface Member {
 export interface ChallengeParticipant {
     name: string;
     avatar: string;
-    label: "CHALLENGER" | "DEFENDER";
+    label: "CHALLENGER" | "opponent";
     sublabel: string;
     pool?: string;
 }
@@ -29,7 +29,7 @@ export interface ClanChallenge {
     creator: string;
     mode: ChallengeMode;
     challenger: ChallengeParticipant;
-    defender: ChallengeParticipant | null;
+    opponent: ChallengeParticipant | null;
     action: ChallengeAction;
     expiresIn: string;
     createdAgo: string;
@@ -113,10 +113,10 @@ export const challengesData: ClanChallenge[] = [
             sublabel: "Created",
             pool: "$500",
         },
-        defender: {
+        opponent: {
             name: "CryptoKing",
             avatar: "/profiles/4.svg",
-            label: "DEFENDER",
+            label: "opponent",
             sublabel: "Defending",
         },
         action: "ACCEPT",
@@ -139,7 +139,7 @@ export const challengesData: ClanChallenge[] = [
             sublabel: "Created",
             pool: "$2250",
         },
-        defender: null,
+        opponent: null,
         action: "JOIN CHALLENGE",
         expiresIn: "1h 45m",
         createdAgo: "2h ago",
@@ -160,7 +160,7 @@ export const challengesData: ClanChallenge[] = [
             sublabel: "Created",
             pool: "$2500",
         },
-        defender: null,
+        opponent: null,
         action: "ACCEPT",
         expiresIn: "28m 45s",
         createdAgo: "2h ago",

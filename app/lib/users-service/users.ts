@@ -25,6 +25,15 @@ export interface CreateUserParams {
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
+class ApiError extends Error {
+  status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.status = status;
+  }
+}
+
 export async function createUser(params: CreateUserParams): Promise<User> {
   const response = await fetch(`${API_BASE_URL}/users`, {
     method: 'POST',
@@ -36,9 +45,27 @@ export async function createUser(params: CreateUserParams): Promise<User> {
   });
 
   if (!response.ok) {
-    const error = new Error(`Failed to create user: ${response.statusText}`);
-    (error as any).status = response.status;
-    throw error;
+    throw new ApiError(`Failed to create user: ${response.statusText}`, response.status);
+  }
+
+  return response.json();
+}
+
+export async function ensureUserByWallet(
+  walletAddress: string,
+  params?: Partial<CreateUserParams>
+): Promise<User> {
+  const response = await fetch(`${API_BASE_URL}/users/wallet/${encodeURIComponent(walletAddress)}/ensure`, {
+    method: 'POST',
+    headers: {
+      'accept': 'application/json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(params ?? {}),
+  });
+
+  if (!response.ok) {
+    throw new ApiError(`Failed to ensure user: ${response.statusText}`, response.status);
   }
 
   return response.json();

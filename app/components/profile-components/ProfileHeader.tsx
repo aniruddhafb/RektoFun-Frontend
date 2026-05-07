@@ -68,7 +68,7 @@ export function ProfileHeader({
         : username;
 
     return (
-        <div className="flex flex-col lg:flex-row lg:items-stretch gap-6 p-6 bg-white/40 backdrop-blur-xl rounded-3xl border border-orange-100/50 shadow-lg">
+        <div className="flex flex-col lg:flex-row lg:items-stretch gap-6 p-6 bg-white/40 backdrop-blur-xl rounded-3xl border border-gray-400 shadow-lg">
             {/* Left: Avatar and Info */}
             <div className="flex flex-col sm:flex-row gap-5 sm:gap-6 flex-1">
                 {/* Avatar with glow effect */}
