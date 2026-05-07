@@ -339,6 +339,7 @@ export function CreateChallengeModal({
                     category: selectedChildMarket?.name || "",
                     event_type: "binary",
                     ticker: selectedChildMarket?.symbol || "",
+                    asset_name: selectedChildMarket?.name ||  "",
                     created_by: user?.id || "",
                     mode: challengeMode,
                     initial_bet: betAmount,

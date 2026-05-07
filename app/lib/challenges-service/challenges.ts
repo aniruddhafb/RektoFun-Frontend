@@ -246,6 +246,7 @@ export interface CreateChallengeParams {
   category: string;
   event_type: string;
   ticker: string;
+  asset_name: string;
   created_by: string;
   mode: string;
   initial_bet: number;
