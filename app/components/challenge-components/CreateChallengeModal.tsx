@@ -78,7 +78,7 @@ export function CreateChallengeModal({
     const directionDropdownRef = useRef<HTMLDivElement>(null);
 
     // Privy wallet hook
-    const { authenticated, login, program, sendTransaction, publicKey } = useSolanaWallet();
+    const { authenticated, login, program, sendTransaction, publicKey, refreshBalances } = useSolanaWallet();
     const isSportsSelected = selectedMarket?.symbol?.toLowerCase() === 'sports' || selectedMarket?.name?.toLowerCase() === 'sports';
 
     useEffect(() => {
@@ -278,6 +278,45 @@ export function CreateChallengeModal({
         setIsDirectionDropdownOpen(false);
     };
 
+    const resetModalState = () => {
+        setSelectedMarket(null);
+        setChildMarkets([]);
+        setChildMarket(null);
+        setSportsEventMarkets([]);
+        setSelectedSportsEventMarket(null);
+        setIsMarketDropdownOpen(false);
+        setIsCoinDropdownOpen(false);
+        setIsSportsEventMarketDropdownOpen(false);
+        setIsDirectionDropdownOpen(false);
+        setBetAmount(5);
+        setBetAmountError(null);
+        setPredictionDirection("Above");
+        setPredictionPrice("66500");
+        setBasePredictionPrice(null);
+        setSelectedDate(new Date(Date.now() + 24 * 60 * 60 * 1000));
+        setIsDatePickerOpen(false);
+        setDuration({ hours: 4, minutes: 0 });
+        setIsDurationPickerOpen(false);
+        setChallengeMode("pvp");
+        setChallengeStatement("");
+        setChallengeStatementError(null);
+        setValidateSuggestions([]);
+        setTransformValid(true);
+        setIsValidateLoading(false);
+        setTransformError(null);
+        setSelectedValidationSuggestion(null);
+        setSportsResolutionConsent(false);
+        setSportsResolutionConsentError(null);
+        setTxStatus("idle");
+        setTxError(null);
+        setTxSignature(null);
+    };
+
+    const handleModalClose = () => {
+        resetModalState();
+        onClose();
+    };
+
     const handleValidateChallengeStatement = async () => {
         if (!isSportsSelected) return;
 
@@ -329,6 +368,15 @@ export function CreateChallengeModal({
         if (remainingHours > 0) result += `${remainingHours}h `;
         if (dur.minutes > 0) result += `${dur.minutes}m`;
         return result.trim();
+    };
+
+    const getTimeRemainingParts = (targetDate: Date) => {
+        const diffMs = Math.max(0, targetDate.getTime() - Date.now());
+        const totalMinutes = Math.floor(diffMs / (1000 * 60));
+        const days = Math.floor(totalMinutes / (60 * 24));
+        const hours = Math.floor((totalMinutes % (60 * 24)) / 60);
+        const minutes = totalMinutes % 60;
+        return { days, hours, minutes };
     };
 
     const handleCreateChallenge = async () => {
@@ -384,6 +432,13 @@ export function CreateChallengeModal({
             setTxError("Challenge end date must be in the future.");
             return;
         }
+        if (!isSportsSelected) {
+            const expiryTimeMs = Date.now() + (duration.hours * 60 + duration.minutes) * 60 * 1000;
+            if (selectedDate.getTime() < expiryTimeMs) {
+                setTxError("Challenge end date cannot be earlier than challenge expiry time.");
+                return;
+            }
+        }
 
         setTxStatus("building");
         setTxError(null);
@@ -416,6 +471,7 @@ export function CreateChallengeModal({
             const signature = await sendTransaction(tx);
             setTxSignature(signature);
             setTxStatus("confirming");
+            await refreshBalances();
 
             // Derive challenge PDA to get challenge_id for backend
             const [counterPDA] = deriveCreatorCounter(creatorPubkey);
@@ -515,15 +571,17 @@ export function CreateChallengeModal({
         return "cursor-pointer w-full py-3 sm:py-4 bg-gray-900 hover:bg-gray-700 text-white rounded-full font-bold text-base sm:text-lg transition-colors";
     };
 
+    const endTimeRemaining = getTimeRemainingParts(selectedDate);
+
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
-            <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={onClose} />
+            <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={handleModalClose} />
             <div className="relative bg-[#f3e1d7] rounded-2xl sm:rounded-3xl w-full max-w-md md:max-w-2xl max-h-[94vh] sm:max-h-[90vh] overflow-hidden shadow-2xl flex flex-col">
                 <div className="bg-[#f3e1d7] rounded-t-2xl sm:rounded-t-3xl px-4 sm:px-6 pt-4 sm:pt-6 pb-3 sm:pb-4 border-b border-[#e8d5c8]">
                     <div className="flex items-center justify-between">
                         <div className="w-8" />
                         <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 text-center">Create Challenge</h2>
-                        <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-[#e8d5c8] hover:bg-[#dcc9bc] transition-colors">
+                        <button onClick={handleModalClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-[#e8d5c8] hover:bg-[#dcc9bc] transition-colors">
                             <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                             </svg>
@@ -572,20 +630,21 @@ export function CreateChallengeModal({
                             >
                                 PVP
                             </button>
-                            <button
-                                onClick={() => setChallengeMode("multi")}
-                                className={`flex-1 py-2 px-4 rounded-lg text-sm font-semibold transition-colors ${challengeMode === "multi"
-                                    ? "bg-gray-900 text-white"
-                                    : "bg-transparent text-gray-600 hover:bg-[#f3e1d7]"
-                                    }`}
-                            >
-                                Multi
-                            </button>
+                            <div className="relative flex-1 group">
+                                <button
+                                    type="button"
+                                    disabled
+                                    className="w-full py-2 px-4 rounded-lg text-sm font-semibold bg-transparent text-gray-400 cursor-not-allowed border border-dashed border-[#d4b8a8]"
+                                >
+                                    Multi (Coming Soon)
+                                </button>
+                                <span className="pointer-events-none absolute left-1/2 top-full z-20 mt-2 w-max max-w-[260px] -translate-x-1/2 rounded-lg bg-gray-800 px-3 py-2 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100">
+                                    Multiple people can compete against you or join you on your challenge
+                                </span>
+                            </div>
                         </div>
                         <p className="text-xs text-gray-500">
-                            {challengeMode === "pvp"
-                                ? "One opponent competes against your prediction"
-                                : "Multiple opponents can compete against your prediction"}
+                            One opponent competes against your challenge.
                         </p>
                     </div>
 
@@ -925,7 +984,7 @@ export function CreateChallengeModal({
                                 </svg>
                             </button>
                             <p className="text-xs text-gray-500">
-                                Ends in <span className="font-medium text-gray-700">{Math.floor((selectedDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24))}</span> days <span className="font-medium text-gray-700">{Math.floor(((selectedDate.getTime() - Date.now()) % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))}</span> hours
+                                Ends in <span className="font-medium text-gray-700">{endTimeRemaining.days}</span> days <span className="font-medium text-gray-700">{endTimeRemaining.hours}</span> hours <span className="font-medium text-gray-700">{endTimeRemaining.minutes}</span> minutes
                             </p>
                         </div>
                     ) : (

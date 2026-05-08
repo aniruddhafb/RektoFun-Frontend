@@ -205,7 +205,7 @@ export function ChallengeCard({
 }: ChallengeCardProps) {
     const router = useRouter();
     const { user } = useUserStore();
-    const { authenticated, login, program, publicKey, sendTransaction, usdcBalance } = useSolanaWallet();
+    const { authenticated, login, program, publicKey, sendTransaction, usdcBalance, refreshBalances } = useSolanaWallet();
     const [isLoading, setIsLoading] = React.useState(false);
     const [isBetFormOpen, setIsBetFormOpen] = React.useState(false);
     const [betInput, setBetInput] = React.useState(String(challenge.initial_bet ?? ""));
@@ -461,6 +461,7 @@ export function ChallengeCard({
             );
 
             const signature = await sendTransaction(tx);
+            await refreshBalances();
 
             // ── 5. Tell the backend the user joined (off-chain bookkeeping).
             await joinChallenge({

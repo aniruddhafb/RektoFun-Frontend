@@ -24,10 +24,10 @@ type NavbarProfileDropdownProps = {
 type MenuActionProps = {
     children: ReactNode;
     icon: ReactNode;
+    onClick?: () => void;
 } & (
         | {
             href: string;
-            onClick?: never;
         }
         | {
             href?: never;
@@ -48,7 +48,7 @@ function MenuAction(props: MenuActionProps) {
 
     if ("href" in props && props.href) {
         return (
-            <Link href={props.href} className={className}>
+            <Link href={props.href} onClick={props.onClick} className={className}>
                 {content}
             </Link>
         );
@@ -136,6 +136,7 @@ export function NavbarProfileDropdown({
                         <div className="p-4 bg-white from-gray-50 to-gray-100 border-b border-gray-300">
                             <Link
                                 href={profileHref}
+                                onClick={onClose}
                                 className="flex items-center gap-3"
                             >
                                 {displayProfileImage ? (
@@ -202,6 +203,7 @@ export function NavbarProfileDropdown({
 
                             <MenuAction
                                 href="/referral"
+                                onClick={onClose}
                                 icon={
                                     <svg
                                         className="w-5 h-5 text-gray-500"
@@ -223,6 +225,7 @@ export function NavbarProfileDropdown({
 
                             <MenuAction
                                 href="/settings"
+                                onClick={onClose}
                                 icon={
                                     <svg
                                         className="w-5 h-5 text-gray-500"
@@ -252,6 +255,7 @@ export function NavbarProfileDropdown({
 
                             <MenuAction
                                 href="/terms"
+                                onClick={onClose}
                                 icon={
                                     <svg
                                         className="w-5 h-5 text-gray-500"
@@ -273,6 +277,7 @@ export function NavbarProfileDropdown({
 
                             <MenuAction
                                 href="/privacy"
+                                onClick={onClose}
                                 icon={
                                     <svg
                                         className="w-5 h-5 text-gray-500"
@@ -296,6 +301,7 @@ export function NavbarProfileDropdown({
                                 href="https://rektofun.gitbook.io/rektofun/"
                                 target="_blank"
                                 rel="noreferrer"
+                                onClick={onClose}
                                 className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:text-black transition-colors cursor-pointer"
                             >
                                 <svg
@@ -323,6 +329,7 @@ export function NavbarProfileDropdown({
                                         href="https://x.com/Rektofun"
                                         target="_blank"
                                         rel="noreferrer"
+                                        onClick={onClose}
                                         className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 hover:bg-black hover:text-white transition-colors cursor-pointer"
                                         aria-label="Twitter"
                                     >
@@ -353,6 +360,7 @@ export function NavbarProfileDropdown({
                                         href="https://discord.gg/Uk22qDtzcQ"
                                         target="_blank"
                                         rel="noreferrer"
+                                        onClick={onClose}
                                         className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 hover:bg-[#5865F2] hover:text-white transition-colors cursor-pointer"
                                         aria-label="Discord"
                                     >
@@ -371,7 +379,10 @@ export function NavbarProfileDropdown({
 
                             <button
                                 type="button"
-                                onClick={onLogout}
+                                onClick={() => {
+                                    onClose();
+                                    onLogout();
+                                }}
                                 className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
                             >
                                 <svg

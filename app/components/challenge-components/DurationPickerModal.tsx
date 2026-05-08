@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 interface DurationPickerModalProps {
     isOpen: boolean;
@@ -18,9 +18,13 @@ export function DurationPickerModal({
     const [hours, setHours] = useState(selectedDuration.hours);
     const [minutes, setMinutes] = useState(selectedDuration.minutes);
 
-    if (!isOpen) return null;
+    useEffect(() => {
+        if (!isOpen) return;
+        setHours(selectedDuration.hours);
+        setMinutes(selectedDuration.minutes);
+    }, [isOpen, selectedDuration.hours, selectedDuration.minutes]);
 
-    const maxHours = 7 * 24;
+    if (!isOpen) return null;
 
     const formatDuration = () => {
         if (hours === 0 && minutes === 0) return "Select duration";
@@ -38,7 +42,7 @@ export function DurationPickerModal({
             <div className="absolute inset-0 bg-black/20" onClick={onClose} />
             <div className="relative bg-[#f3e1d7] rounded-2xl p-6 shadow-2xl w-full max-w-sm">
                 <h3 className="text-lg font-bold text-gray-900 mb-4 text-center">Challenge Duration</h3>
-                <p className="text-sm text-gray-600 text-center mb-6">Max duration: 7 days</p>
+                <p className="text-sm text-gray-600 text-center mb-6">Set any duration in hours and minutes</p>
                 <div className="bg-[#faf0eb] rounded-xl p-4 mb-6 text-center">
                     <span className="text-2xl font-bold text-gray-900">{formatDuration()}</span>
                 </div>
@@ -46,8 +50,8 @@ export function DurationPickerModal({
                     <label className="text-sm font-medium text-gray-700 mb-2 block">Hours</label>
                     <div className="flex items-center gap-3">
                         <button onClick={() => hours > 0 && setHours(hours - 1)} className="w-10 h-10 rounded-lg bg-[#e8d5c8] hover:bg-[#dcc9bc] flex items-center justify-center text-gray-700 font-bold">-</button>
-                        <input type="number" value={hours} onChange={(e) => { const v = Number(e.target.value); if (v >= 0 && v <= maxHours) setHours(v); }} className="flex-1 text-center py-2 bg-[#faf0eb] border border-[#e8d5c8] rounded-lg text-lg font-semibold" min={0} max={maxHours} />
-                        <button onClick={() => hours < maxHours && setHours(hours + 1)} className="w-10 h-10 rounded-lg bg-[#e8d5c8] hover:bg-[#dcc9bc] flex items-center justify-center text-gray-700 font-bold">+</button>
+                        <input type="number" value={hours} onChange={(e) => { const v = Number(e.target.value); if (v >= 0) setHours(v); }} className="flex-1 text-center py-2 bg-[#faf0eb] border border-[#e8d5c8] rounded-lg text-lg font-semibold" min={0} />
+                        <button onClick={() => setHours(hours + 1)} className="w-10 h-10 rounded-lg bg-[#e8d5c8] hover:bg-[#dcc9bc] flex items-center justify-center text-gray-700 font-bold">+</button>
                     </div>
                 </div>
                 <div className="mb-6">

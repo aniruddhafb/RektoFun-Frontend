@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { usePrivy } from "@privy-io/react-auth";
 import { useWallets } from "@privy-io/react-auth/solana";
 import { PublicKey, Transaction } from "@solana/web3.js";
@@ -95,6 +95,74 @@ export function useSolanaWallet() {
     // Derive a stable publicKey string for dependency tracking
     const publicKeyBase58 = adapter?.publicKey?.toBase58() ?? null;
 
+    const fetchSharedBalances = useCallback(async (walletAddress: string, options?: { force?: boolean }): Promise<SharedBalanceSnapshot> => {
+        const now = Date.now();
+        const cached = sharedBalanceCache.get(walletAddress);
+
+        if (!options?.force && cached?.value && cached.fetchedAt && now - cached.fetchedAt < BALANCE_CACHE_TTL_MS) {
+            return cached.value;
+        }
+
+        if (cached?.inFlight) {
+            return cached.inFlight;
+        }
+
+        const inFlight = (async () => {
+            const connection = getReadonlyConnection();
+            const walletPublicKey = new PublicKey(walletAddress);
+
+            const [tokenAccounts, solLamports] = await Promise.all([
+                connection.getParsedTokenAccountsByOwner(walletPublicKey, { mint: USDC_MINT }),
+                connection.getBalance(walletPublicKey),
+            ]);
+
+            const nextValue: SharedBalanceSnapshot = {
+                usdcBalance:
+                    tokenAccounts.value.length > 0
+                        ? Number(tokenAccounts.value[0].account.data.parsed.info.tokenAmount.uiAmount ?? 0)
+                        : 0,
+                solBalance: solLamports / 1e9,
+            };
+
+            sharedBalanceCache.set(walletAddress, {
+                value: nextValue,
+                fetchedAt: Date.now(),
+            });
+
+            return nextValue;
+        })();
+
+        sharedBalanceCache.set(walletAddress, {
+            ...cached,
+            inFlight,
+        });
+
+        try {
+            return await inFlight;
+        } finally {
+            const latest = sharedBalanceCache.get(walletAddress);
+            if (latest?.inFlight === inFlight) {
+                sharedBalanceCache.set(walletAddress, {
+                    value: latest.value,
+                    fetchedAt: latest.fetchedAt,
+                });
+            }
+        }
+    }, []);
+
+    const refreshBalances = useCallback(async () => {
+        if (!publicKeyBase58) return null;
+        try {
+            const snapshot = await fetchSharedBalances(publicKeyBase58, { force: true });
+            setUsdcBalance(snapshot.usdcBalance);
+            setSolBalance(snapshot.solBalance);
+            return snapshot;
+        } catch (error) {
+            console.error("[useSolanaWallet] Failed to refresh balances:", error);
+            return null;
+        }
+    }, [publicKeyBase58, fetchSharedBalances]);
+
     const program: Program | null = useMemo(() => {
         if (!adapter) return null;
         try {
@@ -116,61 +184,6 @@ export function useSolanaWallet() {
         // Track if this fetch has been superseded by a newer trigger
         let isStale = false;
         let timeoutId: ReturnType<typeof setTimeout>;
-
-        const fetchSharedBalances = async (walletAddress: string): Promise<SharedBalanceSnapshot> => {
-            const now = Date.now();
-            const cached = sharedBalanceCache.get(walletAddress);
-
-            if (cached?.value && cached.fetchedAt && now - cached.fetchedAt < BALANCE_CACHE_TTL_MS) {
-                return cached.value;
-            }
-
-            if (cached?.inFlight) {
-                return cached.inFlight;
-            }
-
-            const inFlight = (async () => {
-                const connection = getReadonlyConnection();
-                const walletPublicKey = new PublicKey(walletAddress);
-
-                const [tokenAccounts, solLamports] = await Promise.all([
-                    connection.getParsedTokenAccountsByOwner(walletPublicKey, { mint: USDC_MINT }),
-                    connection.getBalance(walletPublicKey),
-                ]);
-
-                const nextValue: SharedBalanceSnapshot = {
-                    usdcBalance:
-                        tokenAccounts.value.length > 0
-                            ? Number(tokenAccounts.value[0].account.data.parsed.info.tokenAmount.uiAmount ?? 0)
-                            : 0,
-                    solBalance: solLamports / 1e9,
-                };
-
-                sharedBalanceCache.set(walletAddress, {
-                    value: nextValue,
-                    fetchedAt: Date.now(),
-                });
-
-                return nextValue;
-            })();
-
-            sharedBalanceCache.set(walletAddress, {
-                ...cached,
-                inFlight,
-            });
-
-            try {
-                return await inFlight;
-            } finally {
-                const latest = sharedBalanceCache.get(walletAddress);
-                if (latest?.inFlight === inFlight) {
-                    sharedBalanceCache.set(walletAddress, {
-                        value: latest.value,
-                        fetchedAt: latest.fetchedAt,
-                    });
-                }
-            }
-        };
 
         const run = async () => {
             try {
@@ -194,7 +207,7 @@ export function useSolanaWallet() {
             isStale = true;
             clearTimeout(timeoutId);
         };
-    }, [publicKeyBase58]);
+    }, [publicKeyBase58, fetchSharedBalances]);
 
     /**
      * Send a pre-built transaction via the Solana wallet.
@@ -269,5 +282,6 @@ export function useSolanaWallet() {
         publicKey: adapter?.publicKey ?? null,
         usdcBalance,
         solBalance,
+        refreshBalances,
     };
 }

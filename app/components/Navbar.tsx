@@ -11,7 +11,7 @@ import { useUserStore } from "@/app/store/useUserStore";
 import { blockedContentError, hasBlockedContent } from "@/app/lib/content-moderation";
 
 export default function Navbar() {
-    const { setUser, updateUser: updateStoreUser, clearUser } = useUserStore();
+    const { user: storeUser, setUser, updateUser: updateStoreUser, clearUser } = useUserStore();
     const { login, authenticated, user, logout, ready } = usePrivy();
     const { publicKey, usdcBalance } = useSolanaWallet();
     const walletAddress = publicKey?.toBase58() ?? null;
@@ -72,6 +72,19 @@ export default function Navbar() {
     };
 
     const username = getUsername();
+
+    useEffect(() => {
+        if (!storeUser) return;
+        if (walletAddress && storeUser.wallet_address && storeUser.wallet_address !== walletAddress) {
+            return;
+        }
+
+        setCurrentUser(storeUser);
+        setUserProfileData({
+            username: storeUser.username || "User",
+            profileImage: storeUser.profile_image || "",
+        });
+    }, [storeUser, walletAddress]);
 
     // Fetch user profile data when authenticated
     const fetchUserProfileData = useCallback(async ({ force = false }: { force?: boolean } = {}) => {

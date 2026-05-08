@@ -35,6 +35,7 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
     const [modalMaxAcceptBet, setModalMaxAcceptBet] = React.useState<number | undefined>(undefined);
     const [escrowAddress, setEscrowAddress] = React.useState<string | undefined>(undefined);
     const [isDescriptionExpanded, setIsDescriptionExpanded] = React.useState(false);
+    const [isTitleExpanded, setIsTitleExpanded] = React.useState(false);
 
     const formatEndsByCountdown = (timestamp: number | null, nowMs: number): string => {
         if (!timestamp) return "unknown";
@@ -176,6 +177,11 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
 
     useEffect(() => {
         if (!isOpen) return;
+        setIsDescriptionExpanded(false);
+    }, [isOpen, challenge?.id]);
+
+    useEffect(() => {
+        if (!isOpen) return;
 
         let isMounted = true;
         const marketDescription = encodeURIComponent(
@@ -294,6 +300,11 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
     const creatorWalletShort = creatorWalletAddress
         ? `${creatorWalletAddress.slice(0, 6)}...${creatorWalletAddress.slice(-4)}`
         : "Unknown wallet";
+    const titleWords = challenge.title.trim().split(/\s+/).filter(Boolean);
+    const canExpandTitle = titleWords.length > 6;
+    const displayedTitle = isTitleExpanded || !canExpandTitle
+        ? challenge.title
+        : `${titleWords.slice(0, 6).join(" ")}...`;
     const startPrice = betAmount;
     const targetPrice = challenge.target_price ?? challenge.total_pool ?? betAmount;
     const currentPrice = liveSolPrice ?? challenge.total_pool ?? 0;
@@ -304,11 +315,25 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
     const isManualResolution = String(challenge.resolution_source ?? "").toLowerCase() === "manual";
     const challengeTicker = challenge.market?.name?.trim().toLowerCase() || "this asset";
     const challengeDescriptionText = `The challenger thinks ${challengeTicker} will ${isBelowChallenge ? "fall below" : isAboveChallenge ? "rise above" : "hit"} $${targetPrice.toLocaleString()} by the resolution time. If you think opposite you can counter it and win the total pool of $${betAmount} if you're right.`;
-    const challengeDescriptionWords = challengeDescriptionText.trim().split(/\s+/);
-    const isDescriptionTruncatable = challengeDescriptionWords.length > 8;
+    const challengeDescriptionWords = challengeDescriptionText.trim().split(/\s+/).filter(Boolean);
+    const isDescriptionTruncatable = challengeDescriptionWords.length > 7;
     const challengeDescriptionPreviewText = isDescriptionTruncatable
-        ? `${challengeDescriptionWords.slice(0, 6).join(" ")}...`
+        ? `${challengeDescriptionWords.slice(0, 7).join(" ")}...`
         : challengeDescriptionText;
+    const displayedDescriptionText =
+        isDescriptionExpanded && isDescriptionTruncatable
+            ? challengeDescriptionText
+            : challengeDescriptionPreviewText;
+    const manualDescriptionText = `The challenger has a conviction, ${challenge?.title}. If you don't think so you can counter it and win $${betAmount} if you are right.`;
+    const manualDescriptionWords = manualDescriptionText.trim().split(/\s+/).filter(Boolean);
+    const isManualDescriptionTruncatable = manualDescriptionWords.length > 7;
+    const manualDescriptionPreviewText = isManualDescriptionTruncatable
+        ? `${manualDescriptionWords.slice(0, 7).join(" ")}...`
+        : manualDescriptionText;
+    const displayedManualDescriptionText =
+        isDescriptionExpanded && isManualDescriptionTruncatable
+            ? manualDescriptionText
+            : manualDescriptionPreviewText;
     const isDirectionalBelow = isBelowChallenge && !isAboveChallenge;
     const progressThemeClass = isDirectionalBelow
         ? "from-red-500 to-red-300"
@@ -675,29 +700,119 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
                             </div> */}
 
                             {/* Title */}
-                            <h2 className="mt-2 text-[#2d1f1a] leading-tight mb-3">
+                            <h2 className="mt-2 mb-3 text-[#2d1f1a] leading-tight min-w-0">
                                 {isManualResolution ? (
                                     <>
                                         <span className="block sm:hidden text-[22px] font-bold tracking-tight break-words">
-                                            {challenge.title}
+                                            {displayedTitle}
+                                            {canExpandTitle && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setIsTitleExpanded((prev) => !prev)}
+                                                    className="mr-1 inline-flex h-5 w-5 align-middle items-center justify-center rounded-full border border-[#d4a574]/50 text-[#246044] hover:bg-white/60 transition-colors"
+                                                    aria-label={isTitleExpanded ? "Collapse title" : "Expand title"}
+                                                    title={isTitleExpanded ? "Collapse title" : "Expand title"}
+                                                >
+                                                    <svg
+                                                        className={`h-3.5 w-3.5 transition-transform ${isTitleExpanded ? "rotate-180" : ""}`}
+                                                        fill="none"
+                                                        stroke="currentColor"
+                                                        viewBox="0 0 24 24"
+                                                    >
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                                    </svg>
+                                                </button>
+                                            )}
                                         </span>
-                                        <span className="hidden sm:block sm:text-3xl sm:font-bold sm:tracking-tight sm:whitespace-nowrap">
-                                            {challenge.title}
+                                        <span className="hidden sm:block sm:text-3xl sm:font-bold sm:tracking-tight break-words">
+                                            {displayedTitle}
+                                            {canExpandTitle && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setIsTitleExpanded((prev) => !prev)}
+                                                    className="mr-2 inline-flex h-6 w-6 align-middle items-center justify-center rounded-full border border-[#d4a574]/50 text-[#246044] hover:bg-white/60 transition-colors"
+                                                    aria-label={isTitleExpanded ? "Collapse title" : "Expand title"}
+                                                    title={isTitleExpanded ? "Collapse title" : "Expand title"}
+                                                >
+                                                    <svg
+                                                        className={`h-4 w-4 transition-transform ${isTitleExpanded ? "rotate-180" : ""}`}
+                                                        fill="none"
+                                                        stroke="currentColor"
+                                                        viewBox="0 0 24 24"
+                                                    >
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                                    </svg>
+                                                </button>
+                                            )}
                                         </span>
                                     </>
                                 ) : isResolveTimeAchieved ? (
                                     <>
                                         <span className="block sm:hidden text-[22px] font-bold tracking-tight break-words">
-                                            {challenge.title} by {resolveDateByText}
+                                            {displayedTitle} by {resolveDateByText}
+                                            {canExpandTitle && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setIsTitleExpanded((prev) => !prev)}
+                                                    className="mr-1 inline-flex h-5 w-5 align-middle items-center justify-center rounded-full border border-[#d4a574]/50 text-[#246044] hover:bg-white/60 transition-colors"
+                                                    aria-label={isTitleExpanded ? "Collapse title" : "Expand title"}
+                                                    title={isTitleExpanded ? "Collapse title" : "Expand title"}
+                                                >
+                                                    <svg
+                                                        className={`h-3.5 w-3.5 transition-transform ${isTitleExpanded ? "rotate-180" : ""}`}
+                                                        fill="none"
+                                                        stroke="currentColor"
+                                                        viewBox="0 0 24 24"
+                                                    >
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                                    </svg>
+                                                </button>
+                                            )}
                                         </span>
-                                        <span className="hidden sm:block sm:text-3xl sm:font-bold sm:tracking-tight sm:whitespace-nowrap">
-                                            {challenge.title} by {resolveDateByText}
+                                        <span className="hidden sm:block sm:text-3xl sm:font-bold sm:tracking-tight break-words">
+                                            {displayedTitle} by {resolveDateByText}
+                                            {canExpandTitle && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setIsTitleExpanded((prev) => !prev)}
+                                                    className="mr-2 inline-flex h-6 w-6 align-middle items-center justify-center rounded-full border border-[#d4a574]/50 text-[#246044] hover:bg-white/60 transition-colors"
+                                                    aria-label={isTitleExpanded ? "Collapse title" : "Expand title"}
+                                                    title={isTitleExpanded ? "Collapse title" : "Expand title"}
+                                                >
+                                                    <svg
+                                                        className={`h-4 w-4 transition-transform ${isTitleExpanded ? "rotate-180" : ""}`}
+                                                        fill="none"
+                                                        stroke="currentColor"
+                                                        viewBox="0 0 24 24"
+                                                    >
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                                    </svg>
+                                                </button>
+                                            )}
                                         </span>
                                     </>
                                 ) : (
                                     <>
                                         <span className="block sm:hidden text-[22px] font-bold tracking-tight break-words">
-                                            {challenge.title} In Next{" "}
+                                            {canExpandTitle && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setIsTitleExpanded((prev) => !prev)}
+                                                    className="mr-1 inline-flex h-5 w-5 align-middle items-center justify-center rounded-full border border-[#d4a574]/50 text-[#246044] hover:bg-white/60 transition-colors"
+                                                    aria-label={isTitleExpanded ? "Collapse title" : "Expand title"}
+                                                    title={isTitleExpanded ? "Collapse title" : "Expand title"}
+                                                >
+                                                    <svg
+                                                        className={`h-3.5 w-3.5 transition-transform ${isTitleExpanded ? "rotate-180" : ""}`}
+                                                        fill="none"
+                                                        stroke="currentColor"
+                                                        viewBox="0 0 24 24"
+                                                    >
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                                    </svg>
+                                                </button>
+                                            )}
+                                            {displayedTitle} In Next{" "}
                                             <span className="inline-flex items-center gap-1.5 align-middle">
                                                 <span className="font-bold text-emerald-900 whitespace-nowrap">{endsByCountdown}</span>
                                                 <span className="group relative inline-flex items-center">
@@ -713,8 +828,26 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
                                                 </span>
                                             </span>
                                         </span>
-                                        <span className="hidden sm:flex sm:items-center sm:gap-2 sm:text-3xl sm:font-bold sm:tracking-tight sm:whitespace-nowrap">
-                                            <span>{challenge.title} In Next</span>
+                                        <span className="hidden sm:flex sm:flex-wrap sm:items-center sm:gap-2 sm:text-3xl sm:font-bold sm:tracking-tight break-words">
+                                            {canExpandTitle && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setIsTitleExpanded((prev) => !prev)}
+                                                    className="inline-flex h-6 w-6 align-middle items-center justify-center rounded-full border border-[#d4a574]/50 text-[#246044] hover:bg-white/60 transition-colors"
+                                                    aria-label={isTitleExpanded ? "Collapse title" : "Expand title"}
+                                                    title={isTitleExpanded ? "Collapse title" : "Expand title"}
+                                                >
+                                                    <svg
+                                                        className={`h-4 w-4 transition-transform ${isTitleExpanded ? "rotate-180" : ""}`}
+                                                        fill="none"
+                                                        stroke="currentColor"
+                                                        viewBox="0 0 24 24"
+                                                    >
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                                    </svg>
+                                                </button>
+                                            )}
+                                            <span className="break-words">{displayedTitle} In Next</span>
                                             <span className="inline-flex items-center gap-1.5 align-middle">
                                                 <span className="font-bold text-emerald-900 whitespace-nowrap">{endsByCountdown}</span>
                                                 <span className="group relative inline-flex items-center">
@@ -734,25 +867,34 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
                                 )}
                             </h2>
                             {!isManualResolution ? (
-                                <div className="mb-2 text-[16px] text-[#756d66] leading-relaxed flex gap-1">
-                                    <p>
-                                        {isDescriptionExpanded ? challengeDescriptionText : challengeDescriptionPreviewText}
+                                <div className="mb-2 text-[14px] sm:text-[16px] text-[#756d66] leading-relaxed flex flex-wrap items-center justify-start gap-1 max-[350px]:gap-0.5">
+                                    <p className="inline max-[350px]:basis-full">
+                                        {displayedDescriptionText}
                                     </p>
                                     {isDescriptionTruncatable && (
                                         <button
                                             type="button"
                                             onClick={() => setIsDescriptionExpanded((prev) => !prev)}
-                                            className="text-sm text-[#246044] hover:text-[#2d6f4a] transition-colors cursor-pointer"
+                                            className={`text-[12px] max-[350px]:text-[11px] sm:text-sm font-semibold text-[#246044] hover:text-[#2d6f4a] transition-colors cursor-pointer whitespace-nowrap mt-0.5 ${isDescriptionExpanded ? "block w-full text-center sm:inline sm:w-auto sm:text-left" : "max-[350px]:self-start"}`}
                                         >
-                                            {isDescriptionExpanded ? "" : "read more"}
+                                            {isDescriptionExpanded ? "Show less" : "Show more"}
                                         </button>
                                     )}
                                 </div>
                             ) : (
-                                <div className="mb-2 text-[16px] text-[#756d66] leading-relaxed flex gap-1">
-                                    <p>
-                                        The challenger thinks {challenge?.title}. If you don't think so you can counter it and win ${betAmount} if you are right.
+                                <div className="mb-2 text-[14px] sm:text-[16px] text-[#756d66] leading-relaxed flex flex-wrap items-center justify-start gap-1 max-[350px]:gap-0.5">
+                                    <p className="inline max-[350px]:basis-full">
+                                        {displayedManualDescriptionText}
                                     </p>
+                                    {isManualDescriptionTruncatable && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsDescriptionExpanded((prev) => !prev)}
+                                            className={`text-[12px] max-[350px]:text-[11px] sm:text-sm font-semibold text-[#246044] hover:text-[#2d6f4a] transition-colors cursor-pointer whitespace-nowrap mt-0.5 ${isDescriptionExpanded ? "block w-full text-center sm:inline sm:w-auto sm:text-left" : "max-[350px]:self-start"}`}
+                                        >
+                                            {isDescriptionExpanded ? "Show less" : "Show more"}
+                                        </button>
+                                    )}
                                 </div>
                             )}
 
@@ -881,10 +1023,10 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
                             Battle Matchup
                         </h3>
 
-                        <div className="flex flex-col items-center justify-center gap-4 sm:flex-row sm:gap-4">
+                        <div className="flex w-full flex-row items-center justify-center gap-2.5 max-[350px]:gap-1.5 sm:gap-4">
                             {/* Challenger Profile */}
                             <div className="relative group flex flex-col items-center">
-                            <div className={`w-full max-w-[138px] min-h-[168px] flex flex-col items-center justify-center text-center gap-2 p-4 rounded-xl transition-all duration-300 ${hasWon
+                                <div className={`w-[112px] h-[142px] max-[350px]:w-[98px] max-[350px]:h-[132px] sm:w-full sm:max-w-[138px] sm:min-h-[168px] sm:h-auto flex flex-col items-center justify-center text-center gap-1.5 max-[350px]:gap-1 sm:gap-2 p-2.5 max-[350px]:p-2 sm:p-4 rounded-lg sm:rounded-xl transition-all duration-300 ${hasWon
                                     ? "bg-gradient-to-br from-amber-100 to-yellow-50 border-2 border-amber-400 shadow-lg shadow-amber-200"
                                     : hasLost
                                         ? "bg-gradient-to-br from-red-100 to-rose-50 border-2 border-red-300"
@@ -899,7 +1041,7 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
 
                                     {/* Avatar */}
                                     <div className="relative flex flex-col items-center">
-                                        <div className={`w-16 h-16 rounded-full overflow-hidden border-2 ${hasWon ? "border-amber-400" : "border-[#d4a574]"
+                                        <div className={`w-12 h-12 max-[350px]:w-10 max-[350px]:h-10 sm:w-16 sm:h-16 rounded-full overflow-hidden border-2 ${hasWon ? "border-amber-400" : "border-[#d4a574]"
                                             } shadow-md`}>
                                             <Image
                                                 src={creatorAvatar}
@@ -910,15 +1052,15 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
                                             />
                                         </div>
                                         {/* Label */}
-                                        <div className="mt-1 px-1.5 py-0.5 bg-[#2d1f1a] text-white text-[9px] font-bold rounded-full">
+                                        <div className="mt-1 px-1.5 py-0.5 max-[350px]:px-1 max-[350px]:text-[7px] bg-[#2d1f1a] text-white text-[8px] sm:text-[9px] font-bold rounded-full">
                                             CHALLENGER
                                         </div>
                                     </div>
 
                                     {/* Info */}
-                                    <div className="text-center">
-                                        <p className="font-bold text-[#2d1f1a] text-xs">{creatorName}</p>
-                                        <p className="text-[10px] text-[#8b7355] mt-0.5">
+                                    <div className="text-center max-[350px]:w-full max-[350px]:px-0.5">
+                                        <p className="font-bold text-[#2d1f1a] text-[11px] max-[350px]:text-[10px] sm:text-xs truncate">{creatorName}</p>
+                                        <p className="text-[9px] max-[350px]:text-[8px] sm:text-[10px] text-[#8b7355] mt-0.5 leading-tight">
                                             {hasOpponents ? creatorOutcomeText : "Created challenge"}
                                         </p>
                                     </div>
@@ -942,10 +1084,10 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
                             </div>
 
                             {/* VS Badge or Pending Badge */}
-                            <div className="flex flex-col items-center justify-center px-2">
+                            <div className="flex flex-col items-center justify-center px-1 max-[350px]:px-0.5 sm:px-2 shrink-0">
                                 {isAccepted ? (
                                     <>
-                                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#2d1f1a] to-[#4a3830] flex items-center justify-center shadow-lg">
+                                        <div className="w-9 h-9 max-[350px]:w-8 max-[350px]:h-8 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-[#2d1f1a] to-[#4a3830] flex items-center justify-center shadow-lg">
                                             {isOngoingCta ? (
                                                 <video
                                                     src="/animations/Sword%20Battle.webm"
@@ -953,15 +1095,15 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
                                                     loop
                                                     muted
                                                     playsInline
-                                                    className="w-10 h-10 object-contain"
+                                                    className="w-7 h-7 max-[350px]:w-6 max-[350px]:h-6 sm:w-10 sm:h-10 object-contain"
                                                 />
                                             ) : (
-                                                <span className="text-lg font-black text-[#f3e1d7]">VS</span>
+                                                <span className="text-sm max-[350px]:text-xs sm:text-lg font-black text-[#f3e1d7]">VS</span>
                                             )}
                                         </div>
                                         {isFinalOutcome && (hasWon || hasLost) ? (
                                             <div className="mt-1 text-center">
-                                                <p className={`text-lg font-black ${hasWon ? "text-amber-500" : "text-red-500"}`}>
+                                                <p className={`text-sm sm:text-lg font-black ${hasWon ? "text-amber-500" : "text-red-500"}`}>
                                                     {hasWon ? "+" : "-"}${betAmount}
                                                 </p>
                                             </div>
@@ -969,11 +1111,11 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
                                     </>
                                 ) : (
                                     <>
-                                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-gray-300 to-gray-400 flex items-center justify-center shadow-lg animate-pulse">
-                                            <User className="w-6 h-6 text-white/50" />
+                                        <div className="w-9 h-9 max-[350px]:w-8 max-[350px]:h-8 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-gray-300 to-gray-400 flex items-center justify-center shadow-lg animate-pulse">
+                                            <User className="w-5 h-5 max-[350px]:w-4 max-[350px]:h-4 sm:w-6 sm:h-6 text-white/50" />
                                         </div>
-                                        <div className="mt-2 px-2.5 py-1 bg-[#8b7355]/20 rounded-full">
-                                            <p className="text-xs font-semibold text-[#8b7355]">
+                                        <div className="mt-1.5 sm:mt-2 px-2 max-[350px]:px-1.5 py-0.5 sm:px-2.5 sm:py-1 bg-[#8b7355]/20 rounded-full">
+                                            <p className="text-[10px] max-[350px]:text-[9px] sm:text-xs font-semibold text-[#8b7355]">
                                                 {isExpireTimeAchieved && !hasOpponents ? "Expired" : "Seeking Opponent"}
                                             </p>
                                         </div>
@@ -984,7 +1126,7 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
                             {/* Opponent Profile */}
                             {hasOpponentInfo ? (
                                 <div className="relative group flex flex-col items-center">
-                                    <div className={`w-full max-w-[138px] min-h-[168px] flex flex-col items-center justify-center text-center gap-2 p-4 rounded-xl transition-all duration-300 ${hasLost
+                                    <div className={`w-[112px] h-[142px] max-[350px]:w-[98px] max-[350px]:h-[132px] sm:w-[138px] sm:h-[168px] flex flex-col items-center justify-center text-center gap-1.5 max-[350px]:gap-1 sm:gap-2 p-2.5 max-[350px]:p-2 sm:p-4 rounded-lg sm:rounded-xl transition-all duration-300 ${hasLost
                                         ? "bg-gradient-to-br from-amber-100 to-yellow-50 border-2 border-amber-400 shadow-lg shadow-amber-200"
                                         : hasWon
                                             ? "bg-gradient-to-br from-red-100 to-rose-50 border-2 border-red-300"
@@ -999,7 +1141,7 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
 
                                         {/* Avatar */}
                                         <div className="relative flex flex-col items-center">
-                                            <div className={`w-16 h-16 rounded-full overflow-hidden border-2 ${hasLost ? "border-amber-400" : "border-[#d4a574]"
+                                            <div className={`w-12 h-12 max-[350px]:w-10 max-[350px]:h-10 sm:w-16 sm:h-16 rounded-full overflow-hidden border-2 ${hasLost ? "border-amber-400" : "border-[#d4a574]"
                                                 } shadow-md`}>
                                                 <Image
                                                     src={opponentAvatar}
@@ -1010,15 +1152,15 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
                                                 />
                                             </div>
                                             {/* Label */}
-                                            <div className="mt-1 px-1.5 py-0.5 bg-[#2d1f1a] text-white text-[9px] font-bold rounded-full">
+                                            <div className="mt-1 px-1.5 py-0.5 max-[350px]:px-1 max-[350px]:text-[7px] bg-[#2d1f1a] text-white text-[8px] sm:text-[9px] font-bold rounded-full">
                                                 {isPoolMode ? "POOL" : "OPPONENT"}
                                             </div>
                                         </div>
 
                                         {/* Info */}
-                                        <div className="text-center">
-                                            <p className="font-bold text-[#2d1f1a] text-xs">{opponentDisplayName}</p>
-                                            <p className="text-[10px] text-[#8b7355] mt-0.5">
+                                        <div className="text-center max-[350px]:w-full max-[350px]:px-0.5">
+                                            <p className="font-bold text-[#2d1f1a] text-[11px] max-[350px]:text-[10px] sm:text-xs truncate">{opponentDisplayName}</p>
+                                            <p className="text-[9px] max-[350px]:text-[8px] sm:text-[10px] text-[#8b7355] mt-0.5 leading-tight">
                                                 {hasOpponents ? opponentOutcomeText : "Opposing challenge"}
                                             </p>
                                         </div>
@@ -1043,16 +1185,16 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
                             ) : (
 
                                 <div className="relative flex flex-col items-center">
-                                    <div className="w-full max-w-[138px] min-h-[168px] flex flex-col items-center justify-center text-center gap-2 p-4 rounded-xl bg-white/40 border-2 border-dashed border-[#d4a574]/30">
-                                        <div className="w-16 h-16 rounded-full bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center border-2 border-[#d4a574]/50">
-                                            <span className="text-xl">❓</span>
+                                    <div className="w-[112px] h-[142px] max-[350px]:w-[98px] max-[350px]:h-[132px] sm:w-[138px] sm:h-[168px] flex flex-col items-center justify-center text-center gap-1.5 max-[350px]:gap-1 sm:gap-2 p-2.5 max-[350px]:p-2 sm:p-4 rounded-lg sm:rounded-xl bg-white/40 border-2 border-dashed border-[#d4a574]/30">
+                                        <div className="w-12 h-12 max-[350px]:w-10 max-[350px]:h-10 sm:w-16 sm:h-16 rounded-full bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center border-2 border-[#d4a574]/50">
+                                            <span className="text-base max-[350px]:text-sm sm:text-xl">❓</span>
                                         </div>
-                                        <div className="mt-1 px-1.5 py-0.5 bg-[#2d1f1a] text-white text-[9px] font-bold rounded-full">
+                                        <div className="mt-1 px-1.5 py-0.5 max-[350px]:px-1 max-[350px]:text-[7px] bg-[#2d1f1a] text-white text-[8px] sm:text-[9px] font-bold rounded-full">
                                             OPPONENT
                                         </div>
                                         <div className="text-center">
-                                            <p className="font-semibold text-[#8b7355] text-xs">No one yet</p>
-                                            <p className="text-[10px] text-[#a08070] mt-0.5">Be the first to accept!</p>
+                                            <p className="font-semibold text-[#8b7355] text-[11px] max-[350px]:text-[10px] sm:text-xs">No one yet</p>
+                                            <p className="text-[9px] max-[350px]:text-[8px] sm:text-[10px] text-[#a08070] mt-0.5 leading-tight">Be the first to accept!</p>
                                         </div>
                                     </div>
                                     {!isExpireTimeAchieved && !isCreator && isPoolMode && (
@@ -1073,43 +1215,43 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
 
                     {/* Timeline Section */}
                     <div className="mb-6">
-                        <h3 className="text-center text-sm font-bold text-[#8b7355] uppercase tracking-wider mb-4">
+                        <h3 className="text-center text-xs sm:text-sm font-bold text-[#8b7355] uppercase tracking-wider mb-3 sm:mb-4">
                             Challenge Timeline
                         </h3>
 
-                        <div className={`grid grid-cols-1 ${timelineColumns === 4 ? "sm:grid-cols-4" : timelineColumns === 3 ? "sm:grid-cols-3" : "sm:grid-cols-2"} gap-4 overflow-visible`}>
+                        <div className={`grid grid-cols-2 ${timelineColumns === 4 ? "sm:grid-cols-4" : timelineColumns === 3 ? "sm:grid-cols-3" : "sm:grid-cols-2"} gap-2.5 sm:gap-4 overflow-visible`}>
                             {/* Mode */}
-                            <div className="relative p-4 bg-white/60 backdrop-blur-sm rounded-xl border border-[#d4a574]/20 hover:border-[#d4a574]/40 hover:shadow-lg transition-all duration-200 cursor-pointer overflow-visible">
-                                <div className="flex items-center gap-3 mb-2">
-                                    <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center">
-                                        <Calendar className="w-4 h-4 text-emerald-600" />
+                            <div className="relative p-2.5 sm:p-4 bg-white/60 backdrop-blur-sm rounded-lg sm:rounded-xl border border-[#d4a574]/20 hover:border-[#d4a574]/40 hover:shadow-lg transition-all duration-200 cursor-pointer overflow-visible">
+                                <div className="flex items-center gap-2 sm:gap-3 mb-1.5 sm:mb-2">
+                                    <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-emerald-100 flex items-center justify-center">
+                                        <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600" />
                                     </div>
-                                    <span className="text-xs font-semibold text-[#8b7355] uppercase">Mode</span>
+                                    <span className="text-[10px] sm:text-xs font-semibold text-[#8b7355] uppercase">Mode</span>
                                 </div>
-                                <p className="font-bold text-[#2d1f1a]">{challenge.mode === "pool" ? "Multi Mode" : "PvP Mode"}</p>
+                                <p className="font-bold text-[11px] sm:text-base text-[#2d1f1a] leading-tight">{challenge.mode === "pool" ? "Multi Mode" : "PvP Mode"}</p>
                             </div>
 
                             {/* Created */}
-                            <div className="relative p-4 bg-white/60 backdrop-blur-sm rounded-xl border border-[#d4a574]/20 hover:border-[#d4a574]/40 hover:shadow-lg transition-all duration-200 cursor-pointer overflow-visible">
-                                <div className="flex items-center gap-3 mb-2">
-                                    <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center">
-                                        <Calendar className="w-4 h-4 text-emerald-600" />
+                            <div className="relative p-2.5 sm:p-4 bg-white/60 backdrop-blur-sm rounded-lg sm:rounded-xl border border-[#d4a574]/20 hover:border-[#d4a574]/40 hover:shadow-lg transition-all duration-200 cursor-pointer overflow-visible">
+                                <div className="flex items-center gap-2 sm:gap-3 mb-1.5 sm:mb-2">
+                                    <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-emerald-100 flex items-center justify-center">
+                                        <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600" />
                                     </div>
-                                    <span className="text-xs font-semibold text-[#8b7355] uppercase">Created</span>
+                                    <span className="text-[10px] sm:text-xs font-semibold text-[#8b7355] uppercase">Created</span>
                                 </div>
-                                <p className="font-bold text-[#2d1f1a]">{createdTimeText}</p>
+                                <p className="font-bold text-[11px] sm:text-base text-[#2d1f1a] leading-tight">{createdTimeText}</p>
                             </div>
 
                             {/* Expires */}
                             {!hideExpiresBox && (
-                                <div className="relative z-20 hover:z-50 p-4 bg-white/60 backdrop-blur-sm rounded-xl border border-[#d4a574]/20 hover:border-[#d4a574]/40 hover:shadow-lg transition-all duration-200 cursor-pointer overflow-visible">
-                                    <div className="flex items-center gap-3 mb-2">
-                                        <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center">
-                                            <Clock className="w-4 h-4 text-amber-600" />
+                                <div className="relative z-20 hover:z-50 p-2.5 sm:p-4 bg-white/60 backdrop-blur-sm rounded-lg sm:rounded-xl border border-[#d4a574]/20 hover:border-[#d4a574]/40 hover:shadow-lg transition-all duration-200 cursor-pointer overflow-visible">
+                                    <div className="flex items-center gap-2 sm:gap-3 mb-1.5 sm:mb-2">
+                                        <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-amber-100 flex items-center justify-center">
+                                            <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-600" />
                                         </div>
-                                        <span className="text-xs font-semibold text-[#8b7355] uppercase">Expires In</span>
+                                        <span className="text-[10px] sm:text-xs font-semibold text-[#8b7355] uppercase">Expires In</span>
                                         <div className="group relative z-[60]">
-                                            <svg className="w-3.5 h-3.5 text-amber-600 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <svg className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-amber-600 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                             </svg>
                                             <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 p-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-[9999] text-center">
@@ -1122,7 +1264,7 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
                                             </div>
                                         </div>
                                     </div>
-                                    <p className="font-bold text-[#2d1f1a]">{expiresInTextForBox}</p>
+                                    <p className="font-bold text-[11px] sm:text-base text-[#2d1f1a] leading-tight">{expiresInTextForBox}</p>
                                 </div>
                             )}
 
@@ -1130,27 +1272,27 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
                             {showResolvesBox && (
                                 <div>
                                     {!isManualResolution ? (
-                                        <div className="relative z-10 p-4 bg-white/60 backdrop-blur-sm rounded-xl border border-[#d4a574]/20 hover:border-[#d4a574]/40 hover:shadow-lg transition-all duration-200 cursor-pointer overflow-visible">
-                                            <div className="flex items-center gap-3 mb-2">
-                                                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
-                                                    <AlertCircle className="w-4 h-4 text-blue-600" />
+                                        <div className="relative z-10 p-2.5 sm:p-4 bg-white/60 backdrop-blur-sm rounded-lg sm:rounded-xl border border-[#d4a574]/20 hover:border-[#d4a574]/40 hover:shadow-lg transition-all duration-200 cursor-pointer overflow-visible">
+                                            <div className="flex items-center gap-2 sm:gap-3 mb-1.5 sm:mb-2">
+                                                <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-blue-100 flex items-center justify-center">
+                                                    <AlertCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-600" />
                                                 </div>
-                                                <span className="text-xs font-semibold text-[#8b7355] uppercase">Resolves In</span>
+                                                <span className="text-[10px] sm:text-xs font-semibold text-[#8b7355] uppercase">Resolves In</span>
                                             </div>
-                                            <p className="font-bold text-[#2d1f1a]">{resolvesInText}</p>
+                                            <p className="font-bold text-[11px] sm:text-base text-[#2d1f1a] leading-tight">{resolvesInText}</p>
                                             {resolvesInSubtext && (
-                                                <p className="text-xs text-[#8b7355] mt-1">{resolvesInSubtext}</p>
+                                                <p className="text-[10px] sm:text-xs text-[#8b7355] mt-1 leading-tight">{resolvesInSubtext}</p>
                                             )}
                                         </div>
                                     ) : (
-                                        <div className="relative z-10 p-4 bg-white/60 backdrop-blur-sm rounded-xl border border-[#d4a574]/20 hover:border-[#d4a574]/40 hover:shadow-lg transition-all duration-200 cursor-pointer overflow-visible">
-                                            <div className="flex items-center gap-3 mb-2">
-                                                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
-                                                    <AlertCircle className="w-4 h-4 text-blue-600" />
+                                        <div className="relative z-10 p-2.5 sm:p-4 bg-white/60 backdrop-blur-sm rounded-lg sm:rounded-xl border border-[#d4a574]/20 hover:border-[#d4a574]/40 hover:shadow-lg transition-all duration-200 cursor-pointer overflow-visible">
+                                            <div className="flex items-center gap-2 sm:gap-3 mb-1.5 sm:mb-2">
+                                                <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-blue-100 flex items-center justify-center">
+                                                    <AlertCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-600" />
                                                 </div>
-                                                <span className="text-xs font-semibold text-[#8b7355] uppercase">Resolves On</span>
+                                                <span className="text-[10px] sm:text-xs font-semibold text-[#8b7355] uppercase">Resolves On</span>
                                             </div>
-                                            <p className="font-bold text-[#2d1f1a]">Match Day</p>
+                                            <p className="font-bold text-[11px] sm:text-base text-[#2d1f1a] leading-tight">Match Day</p>
                                         </div>
                                     )}
                                 </div>

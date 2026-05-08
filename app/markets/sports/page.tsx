@@ -141,7 +141,7 @@ export default function SportsPage() {
                                         />
                                     </svg>
                                     <span>
-                                        <span className="font-semibold text-gray-900">24</span> markets
+                                        <span className="font-semibold text-gray-900">2</span> markets
                                         available
                                     </span>
                                 </div>

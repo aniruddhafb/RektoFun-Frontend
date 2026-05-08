@@ -6,12 +6,14 @@ import Image from "next/image";
 import { useSolanaWallet } from "@/app/lib/useSolanaWallet";
 import { getUserByWallet, updateUser } from "@/app/lib/users-service/users";
 import { blockedContentError, hasBlockedContent } from "@/app/lib/content-moderation";
+import { useUserStore } from "@/app/store/useUserStore";
 
 
 const PROFILE_SVGS = Array.from({ length: 31 }, (_, i) => `/profiles/${i + 1}.svg`);
 
 export default function SettingsPage() {
     const { user, authenticated, logout, login, linkWallet, linkTwitter, linkGoogle } = usePrivy();
+    const { setUser: setStoreUser } = useUserStore();
 
     // Profile state
     const [username, setUsername] = useState("");
@@ -119,11 +121,12 @@ export default function SettingsPage() {
             const existingUser = await getUserByWallet(walletAddress);
             const profileIndex = editProfileIndex + 1;
 
-            await updateUser(existingUser.id, {
+            const updatedUser = await updateUser(existingUser.id, {
                 username: username,
                 description: description,
                 profile_image: `https://earningrecords.com/assets/rektofun/profiles/${profileIndex}.svg`,
             });
+            setStoreUser(updatedUser);
             setIsEditingProfile(false);
             setShowSuccessMessage(true);
             setTimeout(() => setShowSuccessMessage(false), 3000);
