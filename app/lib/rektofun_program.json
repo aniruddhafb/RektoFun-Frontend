@@ -64,6 +64,9 @@
         },
         {
           "name": "vault",
+          "docs": [
+            "USDC vault token account — owned by the challenge PDA"
+          ],
           "writable": true,
           "pda": {
             "seeds": [
@@ -83,6 +86,20 @@
               }
             ]
           }
+        },
+        {
+          "name": "challenger_usdc_account",
+          "docs": [
+            "Challenger's USDC token account (source of the matching bet)"
+          ],
+          "writable": true
+        },
+        {
+          "name": "usdc_mint"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
         },
         {
           "name": "system_program",
@@ -145,6 +162,9 @@
         },
         {
           "name": "vault",
+          "docs": [
+            "USDC vault token account — owned by the challenge PDA"
+          ],
           "writable": true,
           "pda": {
             "seeds": [
@@ -164,6 +184,20 @@
               }
             ]
           }
+        },
+        {
+          "name": "creator_usdc_account",
+          "docs": [
+            "Creator's USDC token account (refund destination)"
+          ],
+          "writable": true
+        },
+        {
+          "name": "usdc_mint"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
         },
         {
           "name": "system_program",
@@ -265,7 +299,8 @@
         {
           "name": "vault",
           "docs": [
-            "SOL vault that holds both bets — a plain system-owned PDA"
+            "USDC vault token account — an ATA owned by the challenge PDA.",
+            "Holds both bets in USDC."
           ],
           "writable": true,
           "pda": {
@@ -286,6 +321,23 @@
               }
             ]
           }
+        },
+        {
+          "name": "creator_usdc_account",
+          "docs": [
+            "Creator's USDC token account (source of the bet)"
+          ],
+          "writable": true
+        },
+        {
+          "name": "usdc_mint",
+          "docs": [
+            "USDC mint — must match the devnet USDC address"
+          ]
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
         },
         {
           "name": "system_program",
@@ -329,16 +381,10 @@
           "signer": true
         },
         {
-          "name": "creator",
-          "writable": true
+          "name": "creator"
         },
         {
-          "name": "challenger",
-          "writable": true
-        },
-        {
-          "name": "treasury",
-          "writable": true
+          "name": "challenger"
         },
         {
           "name": "challenge",
@@ -374,6 +420,9 @@
         },
         {
           "name": "vault",
+          "docs": [
+            "USDC vault token account — owned by the challenge PDA"
+          ],
           "writable": true,
           "pda": {
             "seeds": [
@@ -393,6 +442,27 @@
               }
             ]
           }
+        },
+        {
+          "name": "winner_usdc_account",
+          "docs": [
+            "Winner's USDC token account (creator or challenger depending on outcome)"
+          ],
+          "writable": true
+        },
+        {
+          "name": "treasury_usdc_account",
+          "docs": [
+            "Platform treasury USDC token account (receives the fee)"
+          ],
+          "writable": true
+        },
+        {
+          "name": "usdc_mint"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
         },
         {
           "name": "system_program",
@@ -650,7 +720,7 @@
           {
             "name": "bet_amount",
             "docs": [
-              "Bet amount in lamports"
+              "Bet amount in USDC micro-units (6 decimals, e.g. $5 = 5_000_000)"
             ],
             "type": "u64"
           },

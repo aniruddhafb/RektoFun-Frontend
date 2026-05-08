@@ -1,4 +1,5 @@
-use anchor_lang::{prelude::*, system_program};
+use anchor_lang::prelude::*;
+use anchor_spl::token::{self, Token, TokenAccount, Transfer};
 
 use crate::{
     constants::*,
@@ -27,13 +28,28 @@ pub struct AcceptChallenge<'info> {
     )]
     pub challenge: Account<'info, ChallengeAccount>,
 
+    /// USDC vault token account — owned by the challenge PDA
     #[account(
         mut,
         seeds = [VAULT_SEED, challenge.key().as_ref()],
         bump = challenge.vault_bump,
+        token::mint = usdc_mint,
+        token::authority = challenge,
     )]
-    pub vault: SystemAccount<'info>,
+    pub vault: Account<'info, TokenAccount>,
 
+    /// Challenger's USDC token account (source of the matching bet)
+    #[account(
+        mut,
+        token::mint = usdc_mint,
+        token::authority = challenger,
+    )]
+    pub challenger_usdc_account: Account<'info, TokenAccount>,
+
+    /// CHECK: USDC mint — validated by token account constraints above
+    pub usdc_mint: AccountInfo<'info>,
+
+    pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
 }
 
@@ -48,13 +64,14 @@ pub fn handler(ctx: Context<AcceptChallenge>) -> Result<()> {
 
     let bet_amount = challenge.bet_amount;
 
-    // Transfer matching bet from challenger to vault
-    system_program::transfer(
+    // Transfer matching USDC bet from challenger to vault
+    token::transfer(
         CpiContext::new(
-            system_program::ID,
-            system_program::Transfer {
-                from: ctx.accounts.challenger.to_account_info(),
+            ctx.accounts.token_program.key(),
+            Transfer {
+                from: ctx.accounts.challenger_usdc_account.to_account_info(),
                 to: ctx.accounts.vault.to_account_info(),
+                authority: ctx.accounts.challenger.to_account_info(),
             },
         ),
         bet_amount,
@@ -64,7 +81,7 @@ pub fn handler(ctx: Context<AcceptChallenge>) -> Result<()> {
     challenge.status = ChallengeStatus::Active;
 
     msg!(
-        "Challenge #{} accepted by {} — vault holds {} lamports",
+        "Challenge #{} accepted by {} — vault holds {} USDC micro-units",
         challenge.challenge_id,
         ctx.accounts.challenger.key(),
         bet_amount * 2,

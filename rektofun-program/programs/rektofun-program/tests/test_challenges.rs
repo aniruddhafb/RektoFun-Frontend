@@ -8,7 +8,7 @@ use rektofun_program::{
     accounts as rektofun_accounts,
     instruction as rektofun_ix,
     state::{ChallengeAccount, ChallengeStatus, CreatorCounter},
-    CreateChallengeParams, PROGRAM_ID,
+    CreateChallengeParams,
 };
 use solana_keypair::Keypair;
 use solana_message::{Message, VersionedMessage};
@@ -20,6 +20,10 @@ use solana_transaction::versioned::VersionedTransaction;
 const CHALLENGE_SEED: &[u8] = b"challenge";
 const VAULT_SEED: &[u8] = b"vault";
 const COUNTER_SEED: &[u8] = b"creator_counter";
+
+fn system_program_id() -> Pubkey {
+    Pubkey::default()
+}
 
 fn find_counter(creator: &Pubkey) -> (Pubkey, u8) {
     Pubkey::find_program_address(&[COUNTER_SEED, creator.as_ref()], &rektofun_program::ID)
@@ -42,20 +46,7 @@ fn send_ix(
     accounts: Vec<solana_message::AccountMeta>,
     data: Vec<u8>,
     signers: &[&Keypair],
-) -> Result<(), Box<dyn std::error::Error>> {
-    let ix = solana_message::compiled_instruction::CompiledInstruction {
-        program_id_index: 0,
-        accounts: vec![],
-        data: vec![],
-    };
-    // Build a legacy instruction
-    let instruction = solana_message::legacy::Message::new(
-        &[solana_sdk_macro::instruction!(rektofun_program::ID, accounts, data)],
-        Some(&payer.pubkey()),
-    );
-    let _ = ix;
-    let _ = instruction;
-    // Use the simpler approach via solana_message
+) -> Result<(), String> {
     let msg = Message::new_with_blockhash(
         &[solana_message::Instruction {
             program_id: rektofun_program::ID,
@@ -65,8 +56,10 @@ fn send_ix(
         Some(&payer.pubkey()),
         &svm.latest_blockhash(),
     );
-    let mut tx = VersionedTransaction::try_new(VersionedMessage::Legacy(msg), signers)?;
-    svm.send_transaction(tx)?;
+    let tx = VersionedTransaction::try_new(VersionedMessage::Legacy(msg), signers)
+        .map_err(|e| format!("Failed to sign tx: {e}"))?;
+    svm.send_transaction(tx)
+        .map_err(|e| format!("Transaction failed: {e:?}"))?;
     Ok(())
 }
 
@@ -114,7 +107,10 @@ fn test_create_and_accept_challenge() {
         creator_counter: counter_pda,
         challenge: challenge_pda,
         vault: vault_pda,
-        system_program: solana_message::system_program::id(),
+        creator_usdc_account: Pubkey::default(),
+        usdc_mint: Pubkey::default(),
+        token_program: Pubkey::default(),
+        system_program: system_program_id(),
     }
     .to_account_metas(None);
 
@@ -139,7 +135,10 @@ fn test_create_and_accept_challenge() {
         creator: creator.pubkey(),
         challenge: challenge_pda,
         vault: vault_pda,
-        system_program: solana_message::system_program::id(),
+        challenger_usdc_account: Pubkey::default(),
+        usdc_mint: Pubkey::default(),
+        token_program: Pubkey::default(),
+        system_program: system_program_id(),
     }
     .to_account_metas(None);
 
@@ -201,7 +200,10 @@ fn test_cancel_challenge() {
         creator_counter: counter_pda,
         challenge: challenge_pda,
         vault: vault_pda,
-        system_program: solana_message::system_program::id(),
+        creator_usdc_account: Pubkey::default(),
+        usdc_mint: Pubkey::default(),
+        token_program: Pubkey::default(),
+        system_program: system_program_id(),
     }
     .to_account_metas(None);
 
@@ -220,7 +222,10 @@ fn test_cancel_challenge() {
         creator: creator.pubkey(),
         challenge: challenge_pda,
         vault: vault_pda,
-        system_program: solana_message::system_program::id(),
+        creator_usdc_account: Pubkey::default(),
+        usdc_mint: Pubkey::default(),
+        token_program: Pubkey::default(),
+        system_program: system_program_id(),
     }
     .to_account_metas(None);
 

@@ -1,4 +1,5 @@
-use anchor_lang::{prelude::*, system_program};
+use anchor_lang::prelude::*;
+use anchor_spl::token::{self, Token, TokenAccount, Transfer};
 
 use crate::{
     constants::*,
@@ -10,7 +11,7 @@ use crate::{
 pub struct CreateChallengeParams {
     /// Asset symbol, e.g. "BTC"
     pub asset: String,
-    /// Bet amount in lamports
+    /// Bet amount in USDC micro-units (6 decimals, e.g. $5 = 5_000_000)
     pub bet_amount: u64,
     /// Target price in USD cents (e.g. $66,500 → 6_650_000)
     pub target_price_usd_cents: u64,
@@ -52,14 +53,31 @@ pub struct CreateChallenge<'info> {
     )]
     pub challenge: Account<'info, ChallengeAccount>,
 
-    /// SOL vault that holds both bets — a plain system-owned PDA
+    /// USDC vault token account — an ATA owned by the challenge PDA.
+    /// Holds both bets in USDC.
     #[account(
-        mut,
+        init,
+        payer = creator,
+        token::mint = usdc_mint,
+        token::authority = challenge,
         seeds = [VAULT_SEED, challenge.key().as_ref()],
         bump,
     )]
-    pub vault: SystemAccount<'info>,
+    pub vault: Account<'info, TokenAccount>,
 
+    /// Creator's USDC token account (source of the bet)
+    #[account(
+        mut,
+        token::mint = usdc_mint,
+        token::authority = creator,
+    )]
+    pub creator_usdc_account: Account<'info, TokenAccount>,
+
+    /// USDC mint — must match the devnet USDC address
+    /// CHECK: validated by token account constraints above
+    pub usdc_mint: AccountInfo<'info>,
+
+    pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
 }
 
@@ -69,7 +87,7 @@ pub fn handler(ctx: Context<CreateChallenge>, params: CreateChallengeParams) -> 
 
     // --- Validations ---
     require!(params.asset.len() <= 10, RektoError::AssetTooLong);
-    require!(params.bet_amount >= MIN_BET_LAMPORTS, RektoError::BetTooSmall);
+    require!(params.bet_amount >= MIN_BET_AMOUNT, RektoError::BetTooSmall);
 
     let duration = params.expires_at.saturating_sub(now);
     require!(duration >= MIN_DURATION_SECS, RektoError::DurationTooShort);
@@ -79,19 +97,7 @@ pub fn handler(ctx: Context<CreateChallenge>, params: CreateChallengeParams) -> 
         RektoError::InvalidResolvesAt
     );
 
-    // --- Transfer bet from creator to vault ---
-    system_program::transfer(
-        CpiContext::new(
-            system_program::ID,
-            system_program::Transfer {
-                from: ctx.accounts.creator.to_account_info(),
-                to: ctx.accounts.vault.to_account_info(),
-            },
-        ),
-        params.bet_amount,
-    )?;
-
-    // --- Initialise / update counter ---
+    // --- Initialise / update counter (before challenge PDA is used as vault authority) ---
     let counter = &mut ctx.accounts.creator_counter;
     if counter.creator == Pubkey::default() {
         counter.creator = ctx.accounts.creator.key();
@@ -119,14 +125,28 @@ pub fn handler(ctx: Context<CreateChallenge>, params: CreateChallengeParams) -> 
     challenge.vault_bump = ctx.bumps.vault;
     challenge.bump = ctx.bumps.challenge;
 
+    // --- Transfer USDC bet from creator to vault ---
+    token::transfer(
+        CpiContext::new(
+            ctx.accounts.token_program.key(),
+            Transfer {
+                from: ctx.accounts.creator_usdc_account.to_account_info(),
+                to: ctx.accounts.vault.to_account_info(),
+                authority: ctx.accounts.creator.to_account_info(),
+            },
+        ),
+        params.bet_amount,
+    )?;
+
     msg!(
-        "Challenge #{} created by {} — {} {} ${} — expires {}",
+        "Challenge #{} created by {} — {} {} ${} — expires {} — bet {} USDC micro-units",
         challenge_id,
         ctx.accounts.creator.key(),
         params.asset,
         if params.direction_above { "ABOVE" } else { "BELOW" },
         params.target_price_usd_cents / 100,
         params.expires_at,
+        params.bet_amount,
     );
 
     Ok(())

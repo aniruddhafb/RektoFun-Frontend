@@ -1,4 +1,5 @@
-use anchor_lang::{prelude::*, system_program};
+use anchor_lang::prelude::*;
+use anchor_spl::token::{self, Token, TokenAccount, Transfer};
 
 use crate::{
     constants::*,
@@ -13,23 +14,17 @@ pub struct SettleChallenge<'info> {
     #[account(mut)]
     pub admin: Signer<'info>,
 
-    /// CHECK: creator receives funds if they win; validated via challenge.creator
+    /// CHECK: creator receives USDC if they win; validated via challenge.creator
     #[account(
-        mut,
         constraint = creator.key() == challenge.creator @ RektoError::UnauthorizedSettle,
     )]
     pub creator: UncheckedAccount<'info>,
 
-    /// CHECK: challenger receives funds if they win; validated via challenge.challenger
+    /// CHECK: challenger receives USDC if they win; validated via challenge.challenger
     #[account(
-        mut,
         constraint = challenger.key() == challenge.challenger @ RektoError::UnauthorizedSettle,
     )]
     pub challenger: UncheckedAccount<'info>,
-
-    /// CHECK: platform treasury receives the fee
-    #[account(mut)]
-    pub treasury: UncheckedAccount<'info>,
 
     #[account(
         mut,
@@ -43,13 +38,34 @@ pub struct SettleChallenge<'info> {
     )]
     pub challenge: Account<'info, ChallengeAccount>,
 
+    /// USDC vault token account — owned by the challenge PDA
     #[account(
         mut,
         seeds = [VAULT_SEED, challenge.key().as_ref()],
         bump = challenge.vault_bump,
+        token::mint = usdc_mint,
+        token::authority = challenge,
     )]
-    pub vault: SystemAccount<'info>,
+    pub vault: Account<'info, TokenAccount>,
 
+    /// Winner's USDC token account (creator or challenger depending on outcome)
+    #[account(
+        mut,
+        token::mint = usdc_mint,
+    )]
+    pub winner_usdc_account: Account<'info, TokenAccount>,
+
+    /// Platform treasury USDC token account (receives the fee)
+    #[account(
+        mut,
+        token::mint = usdc_mint,
+    )]
+    pub treasury_usdc_account: Account<'info, TokenAccount>,
+
+    /// CHECK: USDC mint — validated by token account constraints above
+    pub usdc_mint: AccountInfo<'info>,
+
+    pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
 }
 
@@ -76,38 +92,41 @@ pub fn handler(ctx: Context<SettleChallenge>, creator_wins: bool) -> Result<()> 
 
     let winner_payout = total_pot.checked_sub(fee).ok_or(RektoError::Overflow)?;
 
-    // PDA signer seeds for the vault
+    // PDA signer seeds for the vault (challenge PDA is the vault authority)
     let challenge_key = ctx.accounts.challenge.key();
-    let vault_bump = challenge.vault_bump;
-    let vault_seeds: &[&[u8]] = &[VAULT_SEED, challenge_key.as_ref(), &[vault_bump]];
-    let signer_seeds = &[vault_seeds];
+    let challenge_bump = challenge.bump;
+    let challenge_id_bytes = challenge.challenge_id.to_le_bytes();
+    let creator_key = challenge.creator;
+    let vault_signer_seeds: &[&[u8]] = &[
+        CHALLENGE_SEED,
+        creator_key.as_ref(),
+        &challenge_id_bytes,
+        &[challenge_bump],
+    ];
+    let signer_seeds = &[vault_signer_seeds];
 
-    // Pay winner
-    let winner_account = if creator_wins {
-        ctx.accounts.creator.to_account_info()
-    } else {
-        ctx.accounts.challenger.to_account_info()
-    };
-
-    system_program::transfer(
+    // Pay winner USDC
+    token::transfer(
         CpiContext::new_with_signer(
-            system_program::ID,
-            system_program::Transfer {
+            ctx.accounts.token_program.key(),
+            Transfer {
                 from: ctx.accounts.vault.to_account_info(),
-                to: winner_account,
+                to: ctx.accounts.winner_usdc_account.to_account_info(),
+                authority: ctx.accounts.challenge.to_account_info(),
             },
             signer_seeds,
         ),
         winner_payout,
     )?;
 
-    // Pay platform fee to treasury
-    system_program::transfer(
+    // Pay platform fee to treasury USDC account
+    token::transfer(
         CpiContext::new_with_signer(
-            system_program::ID,
-            system_program::Transfer {
+            ctx.accounts.token_program.key(),
+            Transfer {
                 from: ctx.accounts.vault.to_account_info(),
-                to: ctx.accounts.treasury.to_account_info(),
+                to: ctx.accounts.treasury_usdc_account.to_account_info(),
+                authority: ctx.accounts.challenge.to_account_info(),
             },
             signer_seeds,
         ),
@@ -119,7 +138,7 @@ pub fn handler(ctx: Context<SettleChallenge>, creator_wins: bool) -> Result<()> 
     challenge.status = ChallengeStatus::Settled;
 
     msg!(
-        "Challenge #{} settled — {} wins {} lamports (fee: {})",
+        "Challenge #{} settled — {} wins {} USDC micro-units (fee: {})",
         challenge.challenge_id,
         if creator_wins { "creator" } else { "challenger" },
         winner_payout,

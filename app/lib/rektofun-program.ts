@@ -4,9 +4,12 @@
  * Provides typed helpers for interacting with the on-chain rektofun_program.
  * Uses @anchor-lang/core (Anchor v1) + @solana/web3.js.
  *
+ * Bet amounts are denominated in USDC (6 decimals).
+ * e.g. $5 USDC = 5_000_000 micro-USDC units.
+ *
  * Security notes:
  *  - All transactions are built client-side and signed via the user's wallet.
- *  - Never stores private keys; relies on Privy embedded wallet or external wallet.
+ *  - Never stores private keys; expects an external wallet adapter supplied by the app.
  *  - Defaults to devnet; switch RPC_ENDPOINT for mainnet.
  */
 
@@ -15,9 +18,13 @@ import {
   Connection,
   PublicKey,
   SystemProgram,
-  LAMPORTS_PER_SOL,
   Transaction,
 } from "@solana/web3.js";
+import {
+  TOKEN_PROGRAM_ID,
+  getAssociatedTokenAddress,
+  createAssociatedTokenAccountInstruction,
+} from "@solana/spl-token";
 import idl from "./rektofun_program.json";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -28,6 +35,17 @@ export const PROGRAM_ID = new PublicKey(
 
 export const RPC_ENDPOINT =
   process.env.NEXT_PUBLIC_SOLANA_RPC || "https://api.devnet.solana.com";
+
+const sharedReadonlyConnection = new Connection(RPC_ENDPOINT, "confirmed");
+
+/** USDC mint on Solana devnet */
+export const USDC_MINT = new PublicKey(
+  "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU"
+);
+
+/** USDC has 6 decimal places */
+export const USDC_DECIMALS = 6;
+export const USDC_MULTIPLIER = 10 ** USDC_DECIMALS; // 1_000_000
 
 // Seed prefixes — must match the Rust constants
 const CHALLENGE_SEED = Buffer.from("challenge");
@@ -70,12 +88,12 @@ export function deriveVaultPDA(challengePDA: PublicKey): [PublicKey, number] {
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface CreateChallengeArgs {
-  asset: string; // e.g. "BTC"
-  betAmountSol: number; // in SOL (will be converted to lamports)
+  asset: string;              // e.g. "BTC"
+  betAmountUsdc: number;      // in whole USDC (e.g. 5 = $5 USDC)
   targetPriceUsdCents: number; // e.g. 6_650_000 for $66,500
-  directionAbove: boolean; // true = ABOVE, false = BELOW
-  expiresAt: number; // unix timestamp
-  resolvesAt: number; // unix timestamp
+  directionAbove: boolean;    // true = ABOVE, false = BELOW
+  expiresAt: number;          // unix timestamp
+  resolvesAt: number;         // unix timestamp
 }
 
 export interface OnChainChallenge {
@@ -84,7 +102,7 @@ export interface OnChainChallenge {
   challenger: PublicKey;
   challengeId: number;
   asset: string;
-  betAmount: bigint; // lamports
+  betAmount: bigint; // USDC micro-units (6 decimals)
   targetPriceUsdCents: bigint;
   direction: "Above" | "Below";
   expiresAt: number;
@@ -105,7 +123,7 @@ export function getRektoProgram(wallet: {
   signTransaction: (tx: Transaction) => Promise<Transaction>;
   signAllTransactions: (txs: Transaction[]) => Promise<Transaction[]>;
 }): Program {
-  const connection = new Connection(RPC_ENDPOINT, "confirmed");
+  const connection = sharedReadonlyConnection;
   const provider = new AnchorProvider(connection, wallet as any, {
     commitment: "confirmed",
   });
@@ -113,20 +131,25 @@ export function getRektoProgram(wallet: {
 }
 
 export function getReadonlyConnection(): Connection {
-  return new Connection(RPC_ENDPOINT, "confirmed");
+  return sharedReadonlyConnection;
 }
 
 // ─── Instruction Builders ─────────────────────────────────────────────────────
 
 /**
- * Build a `create_challenge` transaction.
- * The caller must sign and send it.
+ * Build a `create_challenge` transaction using USDC as the bet currency.
+ *
+ * The creator's USDC ATA must already exist and have sufficient balance.
+ * The vault is a PDA-owned token account seeded from the challenge PDA.
+ * The caller must sign and send the returned transaction.
  */
 export async function buildCreateChallengeTx(
   program: Program,
   creator: PublicKey,
   args: CreateChallengeArgs
 ): Promise<Transaction> {
+  const connection = getReadonlyConnection();
+
   const [counterPDA] = deriveCreatorCounter(creator);
 
   // Fetch current count (0 if counter doesn't exist yet)
@@ -143,14 +166,36 @@ export async function buildCreateChallengeTx(
   const [challengePDA] = deriveChallengePDA(creator, currentCount);
   const [vaultPDA] = deriveVaultPDA(challengePDA);
 
-  const betAmountLamports = new BN(
-    Math.floor(args.betAmountSol * LAMPORTS_PER_SOL)
+  // Convert whole USDC to micro-units (6 decimals)
+  const betAmountMicroUsdc = new BN(
+    Math.floor(args.betAmountUsdc * USDC_MULTIPLIER)
   );
+
+  // Derive the creator's USDC Associated Token Account
+  const creatorUsdcAta = await getAssociatedTokenAddress(
+    USDC_MINT,
+    creator,
+    false
+  );
+
+  // Check if the creator's USDC ATA exists; if not, prepend an init instruction
+  const preTxInstructions: any[] = [];
+  const ataInfo = await connection.getAccountInfo(creatorUsdcAta);
+  if (!ataInfo) {
+    preTxInstructions.push(
+      createAssociatedTokenAccountInstruction(
+        creator,       // payer
+        creatorUsdcAta, // ata
+        creator,       // owner
+        USDC_MINT      // mint
+      )
+    );
+  }
 
   const tx = await (program.methods as any)
     .createChallenge({
       asset: args.asset,
-      betAmount: betAmountLamports,
+      betAmount: betAmountMicroUsdc,
       targetPriceUsdCents: new BN(args.targetPriceUsdCents),
       directionAbove: args.directionAbove,
       expiresAt: new BN(args.expiresAt),
@@ -161,15 +206,19 @@ export async function buildCreateChallengeTx(
       creatorCounter: counterPDA,
       challenge: challengePDA,
       vault: vaultPDA,
+      creatorUsdcAccount: creatorUsdcAta,
+      usdcMint: USDC_MINT,
+      tokenProgram: TOKEN_PROGRAM_ID,
       systemProgram: SystemProgram.programId,
     })
+    .preInstructions(preTxInstructions)
     .transaction();
 
   return tx;
 }
 
 /**
- * Build an `accept_challenge` (REKT HIM) transaction.
+ * Build an `accept_challenge` (REKT HIM) transaction using USDC.
  */
 export async function buildAcceptChallengeTx(
   program: Program,
@@ -177,7 +226,29 @@ export async function buildAcceptChallengeTx(
   challengePDA: PublicKey,
   creatorPubkey: PublicKey
 ): Promise<Transaction> {
+  const connection = getReadonlyConnection();
   const [vaultPDA] = deriveVaultPDA(challengePDA);
+
+  // Derive the challenger's USDC ATA
+  const challengerUsdcAta = await getAssociatedTokenAddress(
+    USDC_MINT,
+    challenger,
+    false
+  );
+
+  // Check if the challenger's USDC ATA exists; if not, prepend an init instruction
+  const preTxInstructions: any[] = [];
+  const ataInfo = await connection.getAccountInfo(challengerUsdcAta);
+  if (!ataInfo) {
+    preTxInstructions.push(
+      createAssociatedTokenAccountInstruction(
+        challenger,
+        challengerUsdcAta,
+        challenger,
+        USDC_MINT
+      )
+    );
+  }
 
   const tx = await (program.methods as any)
     .acceptChallenge()
@@ -186,15 +257,19 @@ export async function buildAcceptChallengeTx(
       creator: creatorPubkey,
       challenge: challengePDA,
       vault: vaultPDA,
+      challengerUsdcAccount: challengerUsdcAta,
+      usdcMint: USDC_MINT,
+      tokenProgram: TOKEN_PROGRAM_ID,
       systemProgram: SystemProgram.programId,
     })
+    .preInstructions(preTxInstructions)
     .transaction();
 
   return tx;
 }
 
 /**
- * Build a `cancel_challenge` transaction.
+ * Build a `cancel_challenge` transaction (refunds USDC to creator).
  */
 export async function buildCancelChallengeTx(
   program: Program,
@@ -203,12 +278,22 @@ export async function buildCancelChallengeTx(
 ): Promise<Transaction> {
   const [vaultPDA] = deriveVaultPDA(challengePDA);
 
+  // Derive the creator's USDC ATA
+  const creatorUsdcAta = await getAssociatedTokenAddress(
+    USDC_MINT,
+    creator,
+    false
+  );
+
   const tx = await (program.methods as any)
     .cancelChallenge()
     .accounts({
       creator,
       challenge: challengePDA,
       vault: vaultPDA,
+      creatorUsdcAccount: creatorUsdcAta,
+      usdcMint: USDC_MINT,
+      tokenProgram: TOKEN_PROGRAM_ID,
       systemProgram: SystemProgram.programId,
     })
     .transaction();
@@ -285,12 +370,14 @@ export async function fetchChallenge(
 
 // ─── Formatting Helpers ───────────────────────────────────────────────────────
 
-export function lamportsToSol(lamports: bigint): number {
-  return Number(lamports) / LAMPORTS_PER_SOL;
+/** Convert USDC micro-units to whole USDC (e.g. 5_000_000 → 5.0) */
+export function microUsdcToUsdc(microUsdc: bigint): number {
+  return Number(microUsdc) / USDC_MULTIPLIER;
 }
 
-export function solToLamports(sol: number): bigint {
-  return BigInt(Math.floor(sol * LAMPORTS_PER_SOL));
+/** Convert whole USDC to micro-units (e.g. 5.0 → 5_000_000) */
+export function usdcToMicroUsdc(usdc: number): bigint {
+  return BigInt(Math.floor(usdc * USDC_MULTIPLIER));
 }
 
 export function formatTimeRemaining(expiresAt: number): string {

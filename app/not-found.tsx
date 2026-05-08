@@ -10,72 +10,78 @@ export default function NotFound() {
 
             {/* BTC - Top Left */}
             <div className="absolute left-[5%] top-[10%] w-24 h-24 md:w-36 md:h-36 animate-airdrop delay-100">
-                <div className="w-full h-full scribble-btc">
+                <div className="relative w-full h-full scribble-btc">
                     <Image
                         src="/scribbles/btc.png"
                         alt="Bitcoin"
                         fill
                         className="object-contain opacity-60"
+                        sizes="144px"
                     />
                 </div>
             </div>
 
             {/* SOL - Top Right */}
             <div className="absolute right-[5%] top-[15%] w-20 h-20 md:w-32 md:h-32 animate-airdrop delay-200">
-                <div className="w-full h-full scribble-sol">
+                <div className="relative w-full h-full scribble-sol">
                     <Image
                         src="/scribbles/sol.png"
                         alt="Solana"
                         fill
                         className="object-contain opacity-60"
+                        sizes="128px"
                     />
                 </div>
             </div>
 
             {/* DOGE - Bottom Left */}
             <div className="absolute left-[8%] bottom-[15%] w-28 h-28 md:w-40 md:h-40 animate-airdrop delay-300">
-                <div className="w-full h-full scribble-doge">
+                <div className="relative w-full h-full scribble-doge">
                     <Image
                         src="/scribbles/doge.png"
                         alt="Doge"
                         fill
                         className="object-contain opacity-50"
+                        sizes="160px"
                     />
                 </div>
             </div>
 
             {/* PEPE - Bottom Right */}
             <div className="absolute right-[10%] bottom-[10%] w-24 h-24 md:w-36 md:h-36 animate-airdrop delay-400">
-                <div className="w-full h-full scribble-pepe">
+                <div className="relative w-full h-full scribble-pepe">
                     <Image
                         src="/scribbles/pepe.png"
                         alt="Pepe"
                         fill
                         className="object-contain opacity-50"
+                        sizes="144px"
                     />
                 </div>
             </div>
 
             {/* Coins - Center Left */}
             <div className="hidden md:block absolute left-[15%] top-[40%] w-20 h-20 animate-airdrop delay-500">
-                <div className="w-full h-full scribble-coins">
+                <div className="relative w-full h-full scribble-coins">
                     <Image
                         src="/scribbles/coins.png"
                         alt="Coins"
                         fill
                         className="object-contain opacity-40"
+                        sizes="80px"
                     />
                 </div>
             </div>
 
             {/* Bags - Center Right */}
             <div className="hidden md:block absolute right-[15%] top-[45%] w-20 h-20 animate-airdrop delay-600">
-                <div className="w-full h-full scribble-bags">
+                <div className="relative w-full h-full scribble-bags">
                     <Image
                         src="/scribbles/bags.png"
                         alt="Money Bags"
                         fill
                         className="object-contain opacity-40"
+                        sizes="80px"
                     />
                 </div>
             </div>
