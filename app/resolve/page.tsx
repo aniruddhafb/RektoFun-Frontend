@@ -23,6 +23,15 @@ interface Challenge {
     expiresMs: number;
     submittedAgo: string;
     market: string;
+    validatorCount: number;
+    validatorTarget: number;
+    verificationResources: string[];
+    resolvedTrueCount: number;
+    resolvedFalseCount: number;
+    rektoPointsWon: number;
+    usdcRewards: string;
+    wrongDecisionPointsPenalty: number;
+    wrongDecisionUsdcPenalty: string;
 }
 
 // ─── Mock Data ────────────────────────────────────────────────────────────────
@@ -35,10 +44,10 @@ const challengesData: Challenge[] = [
         coinBg: "#1e3a8a",
         coinIcon: "I",
         category: "Cricket - IPL",
-        title: "CSK To Win By 15+ Runs Tonight?",
+        title: "CSK To Win By 15+ Runs Tonight",
         creator: "CricketNerd",
         mode: "PVP Mode",
-        eventDetails: "In tonight's IPL match, will Chennai Super Kings defeat Mumbai Indians by 15 or more runs?",
+        eventDetails: "has Chennai Super Kings defeat Mumbai Indians by 15 or more runs?",
         pool: "$850",
         participants: 26,
         split: "13 vs 13",
@@ -46,6 +55,19 @@ const challengesData: Challenge[] = [
         expiresMs: 1 * 60 * 60 * 1000 + 8 * 60 * 1000,
         submittedAgo: "36m ago",
         market: "FanDuel",
+        validatorCount: 5,
+        validatorTarget: 75,
+        verificationResources: [
+            "Official IPL Match Center",
+            "ESPNcricinfo Live Scorecard",
+            "Cricbuzz Post Match Report",
+        ],
+        resolvedTrueCount: 41,
+        resolvedFalseCount: 19,
+        rektoPointsWon: 40,
+        usdcRewards: "0.00",
+        wrongDecisionPointsPenalty: 20,
+        wrongDecisionUsdcPenalty: "0.00",
     },
     {
         id: 2,
@@ -55,10 +77,10 @@ const challengesData: Challenge[] = [
         coinBg: "#0f766e",
         coinIcon: "F",
         category: "FIFA World Cup",
-        title: "Brazil To Keep A Clean Sheet?",
+        title: "Brazil To Win FIFA 2026",
         creator: "GoalGuru",
         mode: "Multi Mode",
-        eventDetails: "Will Brazil keep a clean sheet in their next FIFA World Cup group-stage match?",
+        eventDetails: "Has Brazil won the FIFA 2026 cup?",
         pool: "$1,420",
         participants: 34,
         split: "19 vs 15",
@@ -66,6 +88,19 @@ const challengesData: Challenge[] = [
         expiresMs: 2 * 60 * 60 * 1000 + 12 * 60 * 1000,
         submittedAgo: "1h ago",
         market: "Bet365",
+        validatorCount: 22,
+        validatorTarget: 75,
+        verificationResources: [
+            "FIFA Official Match Report",
+            "Sofascore Match Stats",
+            "BBC Sport Match Summary",
+        ],
+        resolvedTrueCount: 33,
+        resolvedFalseCount: 21,
+        rektoPointsWon: 40,
+        usdcRewards: "0.00",
+        wrongDecisionPointsPenalty: 20,
+        wrongDecisionUsdcPenalty: "0.00",
     },
     {
         id: 3,
@@ -75,10 +110,10 @@ const challengesData: Challenge[] = [
         coinBg: "#d97706",
         coinIcon: "I",
         category: "Cricket - IPL",
-        title: "Virat Kohli 50+ Runs?",
+        title: "Virat Kohli 50+ Runs Tonight",
         creator: "MidwicketMind",
         mode: "PVP Mode",
-        eventDetails: "Will Virat Kohli score 50 or more runs in Royal Challengers Bengaluru's next IPL fixture?",
+        eventDetails: "Has Virat Kohli scored 50 or more runs in today's RCB vs MI match?",
         pool: "$1,050",
         participants: 16,
         split: "8 vs 8",
@@ -86,107 +121,20 @@ const challengesData: Challenge[] = [
         expiresMs: 42 * 60 * 1000 + 10 * 1000,
         submittedAgo: "25m ago",
         market: "Dream11",
-    },
-    {
-        id: 4,
-        coin: "FIFA",
-        coinSymbol: "FIFA",
-        coinColor: "#7c3aed",
-        coinBg: "#7c3aed",
-        coinIcon: "F",
-        category: "FIFA World Cup",
-        title: "Argentina To Win In 90 Minutes?",
-        creator: "CounterAttack",
-        mode: "Multi Mode",
-        eventDetails: "Will Argentina win their Round of 16 FIFA World Cup match within regular time?",
-        pool: "$2,060",
-        participants: 28,
-        split: "18 vs 10",
-        expiresIn: "3h 05m",
-        expiresMs: 3 * 60 * 60 * 1000 + 5 * 60 * 1000,
-        submittedAgo: "2h ago",
-        market: "BetMGM",
-    },
-    {
-        id: 5,
-        coin: "IPL",
-        coinSymbol: "IPL",
-        coinColor: "#be123c",
-        coinBg: "#be123c",
-        coinIcon: "I",
-        category: "Cricket - IPL",
-        title: "Total Match Sixes Over 16.5?",
-        creator: "PowerplayPro",
-        mode: "PVP Mode",
-        eventDetails: "In Rajasthan Royals vs Sunrisers Hyderabad, will total sixes scored be over 16.5?",
-        pool: "$730",
-        participants: 20,
-        split: "11 vs 9",
-        expiresIn: "1h 34m",
-        expiresMs: 1 * 60 * 60 * 1000 + 34 * 60 * 1000,
-        submittedAgo: "48m ago",
-        market: "FanDuel",
-    },
-    {
-        id: 6,
-        coin: "FIFA",
-        coinSymbol: "FIFA",
-        coinColor: "#0369a1",
-        coinBg: "#0369a1",
-        coinIcon: "F",
-        category: "FIFA World Cup",
-        title: "Kylian Mbappe To Score Anytime?",
-        creator: "TikiTakaIQ",
-        mode: "PVP Mode",
-        eventDetails: "Will Kylian Mbappe score at least one goal in France's next FIFA World Cup game?",
-        pool: "$1,800",
-        participants: 24,
-        split: "14 vs 10",
-        expiresIn: "2h 48m",
-        expiresMs: 2 * 60 * 60 * 1000 + 48 * 60 * 1000,
-        submittedAgo: "1h ago",
-        market: "Bet365",
-    },
-    {
-        id: 7,
-        coin: "IPL",
-        coinSymbol: "IPL",
-        coinColor: "#166534",
-        coinBg: "#166534",
-        coinIcon: "I",
-        category: "Cricket - IPL",
-        title: "KKR Powerplay Score 55+?",
-        creator: "SlipCordon",
-        mode: "Multi Mode",
-        eventDetails: "Will Kolkata Knight Riders score 55 or more runs in the first 6 overs?",
-        pool: "$920",
-        participants: 18,
-        split: "9 vs 9",
-        expiresIn: "37m 55s",
-        expiresMs: 37 * 60 * 1000 + 55 * 1000,
-        submittedAgo: "31m ago",
-        market: "Dream11",
-    },
-    {
-        id: 8,
-        coin: "FIFA",
-        coinSymbol: "FIFA",
-        coinColor: "#b45309",
-        coinBg: "#b45309",
-        coinIcon: "F",
-        category: "FIFA World Cup",
-        title: "Match To Go Into Extra Time?",
-        creator: "FinalWhistle",
-        mode: "PVP Mode",
-        eventDetails: "Will the FIFA World Cup semifinal between Spain and Germany be level after 90 minutes?",
-        pool: "$2,450",
-        participants: 22,
-        split: "11 vs 11",
-        expiresIn: "4h 10m",
-        expiresMs: 4 * 60 * 60 * 1000 + 10 * 60 * 1000,
-        submittedAgo: "2h ago",
-        market: "BetMGM",
-    },
+        validatorCount: 13,
+        validatorTarget: 75,
+        verificationResources: [
+            "IPL Official Scoreboard",
+            "Cricbuzz Player Stats",
+            "FanCode Match Highlights",
+        ],
+        resolvedTrueCount: 28,
+        resolvedFalseCount: 17,
+        rektoPointsWon: 40,
+        usdcRewards: "0.00",
+        wrongDecisionPointsPenalty: 20,
+        wrongDecisionUsdcPenalty: "0.00",
+    }
 ];
 
 // ─── SVG Icons ────────────────────────────────────────────────────────────────
@@ -209,12 +157,6 @@ const XIcon = ({ className }: { className?: string }) => (
     </svg>
 );
 
-const ClockIcon = ({ className }: { className?: string }) => (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <circle cx="12" cy="12" r="10" />
-        <polyline points="12 6 12 12 16 14" />
-    </svg>
-);
 
 const ChevronDownIcon = ({ className }: { className?: string }) => (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -279,175 +221,150 @@ const CoinAvatar = ({ challenge }: { challenge: Challenge }) => {
     );
 };
 
-// ─── Timer Component ──────────────────────────────────────────────────────────
-const ExpiryTimer = ({ expiresIn, isUrgent }: { expiresIn: string; isUrgent: boolean }) => (
-    <div className={`flex items-center gap-1 text-xs font-semibold ${isUrgent ? "text-red-500" : "text-orange-500"}`}>
-        <ClockIcon className="w-3.5 h-3.5" />
-        <span>Expires in {expiresIn}</span>
-    </div>
-);
-
 // ─── Challenge Row Card ───────────────────────────────────────────────────────
 const ChallengeCard = ({
     challenge,
-    onApprove,
-    onDeny,
+    onDecisionClick,
     voted,
 }: {
     challenge: Challenge;
-    onApprove: (id: number) => void;
-    onDeny: (id: number) => void;
+    onDecisionClick: (challenge: Challenge, decision: "approve" | "deny") => void;
     voted: "approve" | "deny" | null;
 }) => {
+    const [expanded, setExpanded] = useState(false);
     const isUrgent = challenge.expiresMs < 30 * 60 * 1000;
+    const validationProgress = Math.min((challenge.validatorCount / challenge.validatorTarget) * 100, 100);
+    const resolutionStatus =
+        voted === "approve" ? "Approved" : voted === "deny" ? "Denied" : "Pending Resolution";
+    const resolutionStatusClasses =
+        voted === "approve"
+            ? "bg-green-50 text-green-700 border-green-200"
+            : voted === "deny"
+                ? "bg-red-50 text-red-700 border-red-200"
+                : "bg-amber-50 text-amber-700 border-amber-200";
 
     return (
-        <div className="bg-white/65 backdrop-blur-sm rounded-2xl border border-white/70 shadow-sm hover:shadow-md transition-all hover:bg-white/75 overflow-hidden">
-            {/* Mobile Layout */}
-            <div className="block sm:hidden p-4">
-                {/* Top row: coin + title + expiry */}
-                <div className="flex items-start gap-3 mb-3">
+        <div className="bg-white/65 backdrop-blur-sm rounded-2xl border border-gray-400 shadow-sm hover:shadow-md transition-all hover:bg-white/75 overflow-hidden">
+            <div className="p-4 lg:p-5">
+                <div className="flex items-start gap-3 sm:gap-4">
                     <CoinAvatar challenge={challenge} />
                     <div className="flex-1 min-w-0">
-                        <span className="inline-block px-2 py-0.5 rounded-full text-xs font-semibold mb-1"
-                            style={{ backgroundColor: "#f3e1d7", color: "#c2410c" }}>
-                            {challenge.category}
-                        </span>
-                        <h3 className="text-sm font-bold text-gray-900 leading-tight">{challenge.title}</h3>
-                        <div className="flex items-center gap-1.5 mt-1">
-                            <div className="w-3.5 h-3.5 rounded-full bg-amber-400 flex items-center justify-center">
-                                <span className="text-white text-[8px] font-bold">R</span>
+                        <div className="flex items-start justify-between gap-3">
+                            <span className="inline-block px-2 py-0.5 rounded-full text-xs font-semibold mb-1"
+                                style={{ backgroundColor: "#f3e1d7", color: "#c2410c" }}>
+                                {challenge.category}
+                            </span>
+                            <div className="text-right flex-shrink-0">
+                                <p className="text-[10px] uppercase tracking-wide text-gray-400 font-semibold">Validation ends in</p>
+                                <p className={`text-xs font-semibold ${isUrgent ? "text-red-500" : "text-orange-500"}`}>{challenge.expiresIn}</p>
                             </div>
-                            <span className="text-xs text-gray-500">{challenge.creator}</span>
-                            <span className="text-gray-300">•</span>
-                            <span className="text-xs text-gray-500">{challenge.mode}</span>
+                        </div>
+                        <h3 className="text-sm sm:text-base font-bold text-gray-900 leading-tight">{challenge.title}</h3>
+                        <p className="text-xs sm:text-sm text-gray-600 mt-1 leading-relaxed">
+                            {challenge.eventDetails}
+                        </p>
+                        <div className="mt-2">
+                            <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ${resolutionStatusClasses}`}>
+                                {resolutionStatus}
+                            </span>
                         </div>
                     </div>
                 </div>
 
-                {/* Event details */}
-                <p className="text-xs text-gray-500 mb-3 leading-relaxed">{challenge.eventDetails}</p>
+                <div className="grid grid-cols-2 gap-2 mt-4">
+                    <button
+                        onClick={() => onDecisionClick(challenge, "approve")}
+                        className={`cursor-pointer flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-semibold transition-all shadow-sm border ${voted === "approve"
+                            ? "bg-green-50 border-green-300 text-green-700"
+                            : "bg-white border-gray-200 text-gray-700 hover:bg-green-50 hover:border-green-300 hover:text-green-700"
+                            }`}
+                    >
+                        <CheckIcon className="w-4 h-4" />
+                        Resolve True
+                    </button>
+                    <button
+                        onClick={() => onDecisionClick(challenge, "deny")}
+                        className={`cursor-pointer flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-semibold transition-all shadow-sm border ${voted === "deny"
+                            ? "bg-red-50 border-red-300 text-red-700"
+                            : "bg-white border-gray-200 text-gray-700 hover:bg-red-50 hover:border-red-300 hover:text-red-600"
+                            }`}
+                    >
+                        <XIcon className="w-4 h-4" />
+                        Resolve False
+                    </button>
+                </div>
 
-                {/* Stats row */}
-                <div className="grid grid-cols-2 gap-2 mb-3">
-                    <div className="bg-white/50 rounded-xl p-2.5">
-                        <p className="text-[10px] text-gray-400 uppercase tracking-wide font-semibold mb-0.5">Pool</p>
-                        <p className="text-base font-bold text-green-600">{challenge.pool}</p>
+                <div className="mt-3 bg-white/50 rounded-xl p-3 border border-gray-200">
+                    <div className="flex items-center justify-between mb-2">
+                        <p className="text-[11px] text-gray-500 uppercase tracking-wide font-semibold">Live Validations</p>
+                        <p className="text-sm font-bold text-gray-800">
+                            {challenge.validatorCount}/{challenge.validatorTarget}
+                        </p>
                     </div>
-                    <div className="bg-white/50 rounded-xl p-2.5">
-                        <p className="text-[10px] text-gray-400 uppercase tracking-wide font-semibold mb-0.5">Participants</p>
-                        <p className="text-base font-bold text-gray-900">{challenge.participants}</p>
-                        <p className="text-[10px] text-gray-400">{challenge.split}</p>
+                    <div className="w-full h-2.5 rounded-full bg-gray-200 overflow-hidden">
+                        <div
+                            className="h-full rounded-full bg-orange-500 transition-all duration-300"
+                            style={{ width: `${validationProgress}%` }}
+                        />
                     </div>
                 </div>
 
-                {/* Expiry + submitted */}
-                <div className="flex items-center justify-between mb-3">
-                    <ExpiryTimer expiresIn={challenge.expiresIn} isUrgent={isUrgent} />
-                    <span className="text-xs text-gray-400">Submitted {challenge.submittedAgo}</span>
-                </div>
+                <button
+                    onClick={() => setExpanded((prev) => !prev)}
+                    className="cursor-pointer mt-3 w-full flex items-center justify-center gap-1.5 py-2 text-xs sm:text-sm font-semibold text-gray-600 hover:text-gray-900 transition-colors"
+                >
+                    {expanded ? "Show less" : "Show more"}
+                    <ChevronDown2 className={`w-4 h-4 transition-transform ${expanded ? "rotate-180" : ""}`} />
+                </button>
 
-                {/* Action buttons */}
-                {voted ? (
-                    <div className={`w-full py-2.5 rounded-xl text-sm font-semibold text-center ${voted === "approve"
-                        ? "bg-green-50 text-green-700 border border-green-200"
-                        : "bg-red-50 text-red-600 border border-red-200"
-                        }`}>
-                        {voted === "approve" ? "✓ Approved" : "✗ Denied"}
-                    </div>
-                ) : (
-                    <div className="grid grid-cols-2 gap-2">
-                        <button
-                            onClick={() => onApprove(challenge.id)}
-                            className="flex items-center justify-center gap-1.5 py-2.5 bg-white hover:bg-green-50 border border-gray-200 hover:border-green-300 rounded-xl text-sm font-semibold text-gray-700 hover:text-green-700 transition-all shadow-sm"
-                        >
-                            <CheckIcon className="w-4 h-4" />
-                            Approve
-                        </button>
-                        <button
-                            onClick={() => onDeny(challenge.id)}
-                            className="flex items-center justify-center gap-1.5 py-2.5 bg-white hover:bg-red-50 border border-gray-200 hover:border-red-300 rounded-xl text-sm font-semibold text-gray-700 hover:text-red-600 transition-all shadow-sm"
-                        >
-                            <XIcon className="w-4 h-4" />
-                            Deny
-                        </button>
+                {expanded && (
+                    <div className="mt-3 pt-3 border-t border-white/70">
+
+                        <div className="mt-2.5 bg-white/50 rounded-xl p-3 border border-gray-300">
+                            <p className="text-[11px] text-gray-500 uppercase tracking-wide font-semibold mb-1.5">
+                                Verify Statement Resources
+                            </p>
+                            <div className="space-y-1.5">
+                                {challenge.verificationResources.map((resource) => (
+                                    <p key={resource} className="text-xs sm:text-sm text-gray-700">
+                                        - {resource}
+                                    </p>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="mt-2.5 grid grid-cols-2 gap-2">
+                            <div className="bg-green-50 border border-green-200 rounded-xl p-3">
+                                <p className="text-[10px] uppercase tracking-wide text-green-700 font-semibold mb-0.5">Resolved True</p>
+                                <p className="text-lg font-bold text-green-800">{challenge.resolvedTrueCount}</p>
+                            </div>
+                            <div className="bg-red-50 border border-red-200 rounded-xl p-3">
+                                <p className="text-[10px] uppercase tracking-wide text-red-700 font-semibold mb-0.5">Resolved False</p>
+                                <p className="text-lg font-bold text-red-800">{challenge.resolvedFalseCount}</p>
+                            </div>
+                        </div>
+
+                        <div className="mt-2.5 bg-white/60 rounded-xl p-3 border border-gray-300">
+                            <p className="text-[11px] text-gray-500 uppercase tracking-wide font-semibold mb-2">Rewards</p>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                <div className="bg-white rounded-lg border border-gray-100 px-3 py-2">
+                                    <p className="text-[10px] uppercase tracking-wide text-gray-400 font-semibold">Rekto Points won</p>
+                                    <p className="text-base font-bold text-gray-900 mt-0.5">{challenge.rektoPointsWon}</p>
+                                </div>
+                                <div className="bg-white rounded-lg border border-gray-100 px-3 py-2">
+                                    <p className="text-[10px] uppercase tracking-wide text-gray-400 font-semibold">USDC rewards Won</p>
+                                    <div className="flex items-center gap-2 mt-0.5">
+                                        <Image src="/Icons/usdc.png" alt="USDC" width={18} height={18} className="w-[18px] h-[18px] object-contain" />
+                                        <p className="text-base font-bold text-gray-900">{challenge.usdcRewards}</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <p className="text-xs text-gray-500 mt-2">
+                                Gets updated when the challenge gets resolved.
+                            </p>
+                        </div>
                     </div>
                 )}
-            </div>
-
-            {/* Desktop Layout */}
-            <div className="hidden sm:flex items-center gap-4 p-4 lg:p-5">
-                {/* Coin Avatar */}
-                <CoinAvatar challenge={challenge} />
-
-                {/* Title + creator */}
-                <div className="w-44 lg:w-52 flex-shrink-0">
-                    <span className="inline-block px-2 py-0.5 rounded-full text-xs font-semibold mb-1"
-                        style={{ backgroundColor: "#f3e1d7", color: "#c2410c" }}>
-                        {challenge.category}
-                    </span>
-                    <h3 className="text-sm lg:text-base font-bold text-gray-900 leading-tight">{challenge.title}</h3>
-                    <div className="flex items-center gap-1.5 mt-1">
-                        <div className="w-3.5 h-3.5 rounded-full bg-amber-400 flex items-center justify-center">
-                            <span className="text-white text-[8px] font-bold">R</span>
-                        </div>
-                        <span className="text-xs text-gray-500">{challenge.creator}</span>
-                        <span className="text-gray-300">•</span>
-                        <span className="text-xs text-gray-500">{challenge.mode}</span>
-                    </div>
-                </div>
-
-                {/* Event Details */}
-                <div className="flex-1 min-w-0 hidden md:block">
-                    <p className="text-[10px] text-gray-400 uppercase tracking-wide font-semibold mb-1">Event Details</p>
-                    <p className="text-xs text-gray-600 leading-relaxed line-clamp-2">{challenge.eventDetails}</p>
-                </div>
-
-                {/* Pool */}
-                <div className="w-20 lg:w-24 flex-shrink-0 text-center hidden lg:block">
-                    <p className="text-[10px] text-gray-400 uppercase tracking-wide font-semibold mb-1">Pool</p>
-                    <p className="text-lg font-bold text-green-600">{challenge.pool}</p>
-                </div>
-
-                {/* Participants */}
-                <div className="w-20 flex-shrink-0 text-center hidden lg:block">
-                    <p className="text-[10px] text-gray-400 uppercase tracking-wide font-semibold mb-1">Participants</p>
-                    <p className="text-lg font-bold text-gray-900">{challenge.participants}</p>
-                    <p className="text-xs text-gray-400">{challenge.split}</p>
-                </div>
-
-                {/* Actions + expiry */}
-                <div className="flex-shrink-0 flex flex-col items-end gap-2 ml-auto">
-                    <ExpiryTimer expiresIn={challenge.expiresIn} isUrgent={isUrgent} />
-
-                    {voted ? (
-                        <div className={`px-5 py-2 rounded-xl text-sm font-semibold ${voted === "approve"
-                            ? "bg-green-50 text-green-700 border border-green-200"
-                            : "bg-red-50 text-red-600 border border-red-200"
-                            }`}>
-                            {voted === "approve" ? "✓ Approved" : "✗ Denied"}
-                        </div>
-                    ) : (
-                        <div className="flex items-center gap-2">
-                            <button
-                                onClick={() => onApprove(challenge.id)}
-                                className="flex items-center gap-1.5 px-3 lg:px-4 py-2 bg-white hover:bg-green-50 border border-gray-200 hover:border-green-300 rounded-xl text-xs lg:text-sm font-semibold text-gray-700 hover:text-green-700 transition-all shadow-sm whitespace-nowrap"
-                            >
-                                <CheckIcon className="w-3.5 h-3.5" />
-                                Approve
-                            </button>
-                            <button
-                                onClick={() => onDeny(challenge.id)}
-                                className="flex items-center gap-1.5 px-3 lg:px-4 py-2 bg-white hover:bg-red-50 border border-gray-200 hover:border-red-300 rounded-xl text-xs lg:text-sm font-semibold text-gray-700 hover:text-red-600 transition-all shadow-sm whitespace-nowrap"
-                            >
-                                <XIcon className="w-3.5 h-3.5" />
-                                Deny
-                            </button>
-                        </div>
-                    )}
-
-                    <span className="text-xs text-gray-400">Submitted {challenge.submittedAgo}</span>
-                </div>
             </div>
         </div>
     );
@@ -538,12 +455,15 @@ const ResolverStatus = () => {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function ResolvePage() {
     const [activeTab, setActiveTab] = useState<"pending" | "resolved" | "myvotes">("pending");
-    const [category, setCategory] = useState("All Categories");
     const [market, setMarket] = useState("All Markets");
     const [sort, setSort] = useState("Newest First");
     const [votes, setVotes] = useState<Record<number, "approve" | "deny">>({});
     const [visibleCount, setVisibleCount] = useState(5);
     const [showSidebar, setShowSidebar] = useState(false);
+    const [pendingDecision, setPendingDecision] = useState<{
+        challenge: Challenge;
+        decision: "approve" | "deny";
+    } | null>(null);
 
     const handleApprove = (id: number) => {
         setVotes((prev) => ({ ...prev, [id]: "approve" }));
@@ -551,6 +471,22 @@ export default function ResolvePage() {
 
     const handleDeny = (id: number) => {
         setVotes((prev) => ({ ...prev, [id]: "deny" }));
+    };
+
+    const handleDecisionClick = (challenge: Challenge, decision: "approve" | "deny") => {
+        setPendingDecision({ challenge, decision });
+    };
+
+    const handleConfirmDecision = () => {
+        if (!pendingDecision) {
+            return;
+        }
+        if (pendingDecision.decision === "approve") {
+            handleApprove(pendingDecision.challenge.id);
+        } else {
+            handleDeny(pendingDecision.challenge.id);
+        }
+        setPendingDecision(null);
     };
 
     const pendingChallenges = challengesData.filter((c) => !votes[c.id] || true);
@@ -606,20 +542,6 @@ export default function ResolvePage() {
 
                     {/* Filters */}
                     <div className="flex items-center gap-2 flex-wrap">
-                        {/* Category */}
-                        <div className="relative">
-                            <select
-                                value={category}
-                                onChange={(e) => setCategory(e.target.value)}
-                                className="appearance-none pl-3 pr-8 py-2 bg-white/80 border border-gray-200 rounded-xl text-xs sm:text-sm text-gray-700 font-medium focus:outline-none focus:ring-2 focus:ring-orange-200 shadow-sm cursor-pointer"
-                            >
-                                <option>All Categories</option>
-                                <option>Cricket - IPL</option>
-                                <option>FIFA World Cup</option>
-                                <option>Global Sports</option>
-                            </select>
-                            <ChevronDownIcon className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
-                        </div>
 
                         {/* Market */}
                         <div className="relative">
@@ -629,10 +551,8 @@ export default function ResolvePage() {
                                 className="appearance-none pl-3 pr-8 py-2 bg-white/80 border border-gray-200 rounded-xl text-xs sm:text-sm text-gray-700 font-medium focus:outline-none focus:ring-2 focus:ring-orange-200 shadow-sm cursor-pointer"
                             >
                                 <option>All Markets</option>
-                                <option>FanDuel</option>
-                                <option>Bet365</option>
-                                <option>BetMGM</option>
-                                <option>Dream11</option>
+                                <option>FIFA 26</option>
+                                <option>IPL 26</option>
                             </select>
                             <ChevronDownIcon className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
                         </div>
@@ -665,8 +585,7 @@ export default function ResolvePage() {
                                     <ChallengeCard
                                         key={challenge.id}
                                         challenge={challenge}
-                                        onApprove={handleApprove}
-                                        onDeny={handleDeny}
+                                        onDecisionClick={handleDecisionClick}
                                         voted={votes[challenge.id] ?? null}
                                     />
                                 ))}
@@ -711,8 +630,7 @@ export default function ResolvePage() {
                                             <ChallengeCard
                                                 key={challenge.id}
                                                 challenge={challenge}
-                                                onApprove={handleApprove}
-                                                onDeny={handleDeny}
+                                                onDecisionClick={handleDecisionClick}
                                                 voted={votes[challenge.id] ?? null}
                                             />
                                         ))
@@ -747,6 +665,73 @@ export default function ResolvePage() {
                     )}
                 </div>
 
+                {pendingDecision && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                        <button
+                            className="absolute inset-0 bg-black/45 backdrop-blur-[1px]"
+                            aria-label="Close modal"
+                            onClick={() => setPendingDecision(null)}
+                        />
+                        <div className="relative w-full max-w-lg bg-white rounded-2xl border border-white/80 shadow-2xl p-5 sm:p-6">
+                            <h3 className="text-lg sm:text-xl font-bold text-gray-900">Confirm Resolution</h3>
+                            <p className="text-sm text-gray-500 mt-1">Final step before you submit your validation.</p>
+
+                            <div className="mt-4 bg-gray-50 border border-gray-100 rounded-xl p-3">
+                                <p className="text-[11px] uppercase tracking-wide text-gray-400 font-semibold mb-1">Challenge</p>
+                                <p className="text-sm sm:text-base font-semibold text-gray-900">{pendingDecision.challenge.title}</p>
+                            </div>
+
+                            <div className="mt-3">
+                                <p className="text-[11px] uppercase tracking-wide text-gray-400 font-semibold mb-1.5">Your Decision</p>
+                                <span className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-semibold border ${pendingDecision.decision === "approve"
+                                    ? "bg-green-50 text-green-700 border-green-200"
+                                    : "bg-red-50 text-red-700 border-red-200"
+                                    }`}>
+                                    {pendingDecision.decision === "approve" ? "Resolve True" : "Resolve False"}
+                                </span>
+                            </div>
+
+                            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                                <div className="bg-green-50 border border-green-200 rounded-xl p-3">
+                                    <p className="text-[11px] uppercase tracking-wide text-green-700 font-semibold mb-1">If Correct, You Win</p>
+                                    <p className="text-sm text-green-900 font-semibold">
+                                        Rekto Points: +{pendingDecision.challenge.rektoPointsWon}
+                                    </p>
+                                    <p className="text-sm text-green-900 font-semibold mt-0.5">
+                                        USDC: +{pendingDecision.challenge.usdcRewards}
+                                    </p>
+                                </div>
+                                <div className="bg-red-50 border border-red-200 rounded-xl p-3">
+                                    <p className="text-[11px] uppercase tracking-wide text-red-700 font-semibold mb-1">If Wrong, Penalty</p>
+                                    <p className="text-sm text-red-900 font-semibold">
+                                        Rekto Points: -{pendingDecision.challenge.wrongDecisionPointsPenalty}
+                                    </p>
+                                    <p className="text-sm text-red-900 font-semibold mt-0.5">
+                                        USDC: -{pendingDecision.challenge.wrongDecisionUsdcPenalty}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="mt-5 flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+                                <button
+                                    onClick={() => setPendingDecision(null)}
+                                    className="cursor-pointer px-4 py-2 rounded-xl border border-gray-200 bg-white text-gray-700 text-sm font-semibold hover:bg-gray-50 transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleConfirmDecision}
+                                    className={`cursor-pointer px-4 py-2 rounded-xl text-sm font-semibold text-white transition-colors ${pendingDecision.decision === "approve"
+                                        ? "bg-green-600 hover:bg-green-700"
+                                        : "bg-red-600 hover:bg-red-700"
+                                        }`}
+                                >
+                                    Confirm {pendingDecision.decision === "approve" ? "True" : "False"}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );

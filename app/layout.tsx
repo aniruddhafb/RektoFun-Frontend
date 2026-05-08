@@ -6,11 +6,11 @@ import Providers from "./providers/PrivyProvider";
 
 export const metadata: Metadata = {
   title: {
-    default: "RektoFun - Win Or Get Rekt!!",
-    template: "%s | RektoFun",
+    default: "RektoFun | The First PvP Battleground For Predictions",
+    template: " | RektoFun",
   },
-  description: "The first PvP battleground for price predictions. Compete other traders, and win rewards. Prediction Markets 2.0 ðŸª„",
-  keywords: ["prediction markets", " PvP trading", " crypto predictions", " price prediction", " solana meme projects", " pump fun alternative", " prediction markets on solana", " Solana", " Bitcoin", " Ethereum"],
+  description: "The first PvP battleground for predictions. Create permissionless prediciton challenges around crypto & sports. Compete other traders, and win rewards. Prediction Markets 2.0",
+  keywords: ["prediction markets", " PvP trading", " crypto predictions", " price prediction", "permissionless prediction markets", " solana meme projects", " pump fun alternative", " prediction markets on solana", "pvp battleground for predictions", " Solana", " Bitcoin", " Ethereum"],
   authors: [{ name: "RektoFun" }],
   creator: "RektoFun",
   publisher: "RektoFun",
@@ -23,8 +23,8 @@ export const metadata: Metadata = {
     locale: "en_US",
     url: "https://rekto.fun",
     siteName: "RektoFun",
-    title: "RektoFun - PvP battleground for price predictions",
-    description: "The first PvP battleground for price predictions. Compete, battle, and win rewards.",
+    title: "RektoFun | The First PvP Battleground For Predictions",
+    description: "The first PvP battleground for predictions. Compete, battle, and win rewards.",
     images: [
       {
         url: "/logos/BG.png",
@@ -36,8 +36,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "RektoFun - PvP battleground for price predictions",
-    description: "The first PvP battleground for price predictions. Compete, battle, and win rewards.",
+    title: "RektoFun | The First PvP Battleground For Predictions",
+    description: "The first PvP battleground for predictions. Compete, battle, and win rewards.",
     images: ["/logos/BG.png"],
     creator: "@rekto_fun",
   },
