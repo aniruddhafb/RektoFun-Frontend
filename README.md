@@ -1,36 +1,218 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ⚔️ Rekto.fun — The PvP Battleground for Predictions
 
-## Getting Started
+> Turn predictions into PvP battles, multiplayer battles, and clan competitions.
 
-First, run the development server:
+Started at the Colosseum Frontier Hackathon 🏁
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+🔗 Live on Solana Devnet: https://rekto.fun
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+---
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+# 🧠 The Problem
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Prediction markets today are:
 
-## Learn More
+* Passive
+* Non-social
+* Not competitive
+* Difficult to engage with emotionally
 
-To learn more about Next.js, take a look at the following resources:
+Users simply trade probabilities and wait for outcomes.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+But crypto users already compete every single day:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+* On Twitter/X
+* In trading communities
+* Through market convictions
+* Through public calls and debates
 
-## Deploy on Vercel
+We believe prediction markets should feel like:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+> ⚔️ battlegrounds, not spreadsheets.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+---
+
+# 🚀 What is Rekto.fun?
+
+Rekto.fun is a social PvP prediction platform built on Solana where users can:
+
+* Create permissionless prediction challenges
+* Compete head-to-head in PvP battles
+* Join multiplayer prediction pools
+* Participate in clan wars
+* Earn rewards through correct predictions
+* Validate outcomes through community governance
+
+We combine:
+
+* Prediction markets
+* SocialFi
+* Gamified finance
+* Multiplayer competition
+
+into one ecosystem.
+
+---
+
+# ⚔️ Core Features
+
+## 🥊 PvP Challenges
+
+Users create prediction battles around:
+
+* Crypto prices
+* Sports outcomes
+* Real-world events
+
+Example:
+
+> BTC Above $120K before July 2026
+
+Another user can directly take the opposite side.
+
+Winner takes the pool.
+
+---
+
+## 🌍 Multiplayer Prediction Pools
+
+Users join the side they believe in.
+
+Winning side shares the rewards.
+
+---
+
+## 👥 Clan Wars
+
+Rekto.fun introduces a strong social layer through:
+
+* Clans
+* Team battles
+* Internal PvP competitions
+* Clan wars
+* Community coordination
+
+Prediction markets become multiplayer experiences.
+
+---
+
+## 🛡️ Community Validation System
+
+Real-world events outcomes are validated by:
+
+> Rekto Masters NFT holders
+
+Validators:
+
+* Resolve challenge outcomes
+* Stake security deposits
+* Earn rewards for fair voting
+* Get penalized for malicious behavior
+
+This creates a decentralized trust layer.
+
+---
+
+# 💰 Revenue Model
+
+We take a 6% fee from challenge pools:
+
+* 2% → Challenge creators
+* 2% → Validators (NFT holders)
+* 2% → Platform revenue
+
+This aligns incentives across the ecosystem.
+
+---
+
+# 🧩 Why Solana?
+
+Solana enables:
+
+* Fast transactions
+* Low fees
+* Real-time interactions
+* Scalable multiplayer experiences
+
+Perfect for:
+
+* Prediction battles
+* Live challenge systems
+* Social competitive products
+
+---
+
+# 🔥 Why Now?
+
+The timing feels perfect because:
+
+* Prediction markets are exploding
+* SocialFi is emerging
+* Gamified finance is growing rapidly
+* Crypto users are becoming increasingly community-driven
+
+We believe the next generation of prediction products will be:
+
+* Multiplayer
+* Social
+* Competitive
+* Community-owned
+
+---
+
+# 🏁 Built During Colosseum Frontier Hackathon
+
+We started building Rekto.fun on:
+
+> April 17th, 2026
+
+In just 27 days we shipped:
+✅ Live Solana Devnet MVP
+✅ PvP challenge system
+✅ Multiplayer prediction pools
+✅ Clan systems
+✅ Community validation mechanics
+✅ Gamified UI/UX
+✅ Full frontend + backend infrastructure
+
+---
+
+# 🧱 Tech Stack
+
+## Frontend
+
+* Next.js
+* TailwindCSS
+* Framer Motion
+
+## Backend
+
+* Python
+* FastAPI
+* Supabase for database
+
+
+## Auth & Infra
+
+* Privy
+* Birdeye APIs
+
+---
+
+# 🌍 Live Links
+
+### 🔗 Website
+
+https://rekto.fun
+
+### 📘 Litepaper
+
+https://rektofun.gitbook.io/rektofun
+
+### 🐦 Twitter
+
+https://x.com/rektofun
+
+---
+
+# ⚔️ The Only Goal Is To Win
