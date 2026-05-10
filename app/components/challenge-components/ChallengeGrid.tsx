@@ -76,8 +76,8 @@ export function ChallengeGrid({
 
         try {
             const isPinnedFilter = activeFilter === "Pinned";
-            const requestLimit = PAGE_SIZE;
-            const requestOffset = currentOffset;
+            const requestLimit = isPinnedFilter ? 100 : PAGE_SIZE;
+            const requestOffset = isPinnedFilter ? 0 : currentOffset;
             const response = await getChallenges(
                 {
                     limit: requestLimit,
@@ -116,7 +116,7 @@ export function ChallengeGrid({
             }
             setChallenges((prev) => (append ? [...prev, ...nextChunk] : nextChunk));
             setHasMore(!isPinnedFilter && nextChunk.length === PAGE_SIZE);
-            setOffset(currentOffset + nextChunk.length);
+            setOffset(isPinnedFilter ? nextChunk.length : currentOffset + nextChunk.length);
         } catch (error) {
             if (requestId !== requestIdRef.current) return;
             console.error('Failed to fetch challenges:', error);
