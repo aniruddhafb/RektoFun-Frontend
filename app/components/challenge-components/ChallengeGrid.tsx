@@ -11,7 +11,6 @@ interface ChallengeGridProps {
     onClick: (challenge: ChallengeListItem) => void;
     onToggleBookmark: (challengeId: string) => void;
     isBookmarked: (challengeId: string) => boolean;
-    bookmarkedChallengeIds: string[];
     onOpenModal: () => void;
     onChallengesLoaded?: (challenges: ChallengeListItem[]) => void;
     isLoading?: boolean;
@@ -26,7 +25,6 @@ export function ChallengeGrid({
     onClick,
     onToggleBookmark,
     isBookmarked,
-    bookmarkedChallengeIds,
     onOpenModal,
     onChallengesLoaded,
     refreshKey = 0,
@@ -55,7 +53,7 @@ export function ChallengeGrid({
     const isLoadingMoreRef = useRef(false);
     const { publicKey } = useSolanaWallet();
 
-    let ownerAddress = publicKey?.toString() || '';
+    const ownerAddress = publicKey?.toString() || '';
 
     const fetchChallenges = useCallback(async (currentOffset: number, append: boolean) => {
         if (append && (isLoadingRef.current || isLoadingMoreRef.current)) {
@@ -78,9 +76,8 @@ export function ChallengeGrid({
 
         try {
             const isPinnedFilter = activeFilter === "Pinned";
-            const shouldFetchWiderForPinnedPriority = !isPinnedFilter && bookmarkedChallengeIds.length > 0;
-            const requestLimit = (isPinnedFilter || shouldFetchWiderForPinnedPriority) ? 100 : PAGE_SIZE;
-            const requestOffset = (isPinnedFilter || shouldFetchWiderForPinnedPriority) ? 0 : currentOffset;
+            const requestLimit = isPinnedFilter ? 100 : PAGE_SIZE;
+            const requestOffset = isPinnedFilter ? 0 : currentOffset;
             const response = await getChallenges(
                 {
                     limit: requestLimit,
@@ -118,8 +115,8 @@ export function ChallengeGrid({
                 });
             }
             setChallenges((prev) => (append ? [...prev, ...nextChunk] : nextChunk));
-            setHasMore(!isPinnedFilter && !shouldFetchWiderForPinnedPriority && nextChunk.length === PAGE_SIZE);
-            setOffset((isPinnedFilter || shouldFetchWiderForPinnedPriority) ? nextChunk.length : currentOffset + nextChunk.length);
+            setHasMore(!isPinnedFilter && nextChunk.length === PAGE_SIZE);
+            setOffset(isPinnedFilter ? nextChunk.length : currentOffset + nextChunk.length);
         } catch (error) {
             if (requestId !== requestIdRef.current) return;
             console.error('Failed to fetch challenges:', error);
@@ -137,7 +134,7 @@ export function ChallengeGrid({
                 isLoadingMoreRef.current = false;
             }
         }
-    }, [PAGE_SIZE, activeAsset, activeFilter, bookmarkedChallengeIds.length, isBookmarked, onChallengesLoaded, ownerAddress, searchQuery]);
+    }, [PAGE_SIZE, activeAsset, activeFilter, isBookmarked, onChallengesLoaded, ownerAddress, searchQuery]);
 
     useEffect(() => {
         requestIdRef.current += 1;

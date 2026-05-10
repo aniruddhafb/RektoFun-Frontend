@@ -342,12 +342,14 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
     const markerDotThemeClass = isDirectionalBelow ? "bg-red-500" : "bg-emerald-500";
     const priceLabelThemeClass = isDirectionalBelow ? "text-red-300" : "text-emerald-300";
 
-    // Calculate price bar position (0-100%)
+    // Calculate target progress (0-100%) based on direction:
+    // above: current/target, below: target/current.
     const getPriceBarPosition = () => {
-        const range = targetPrice - startPrice;
-        if (range === 0) return 50;
-        const position = ((currentPrice - startPrice) / range) * 100;
-        return Math.max(0, Math.min(100, position));
+        if (targetPrice <= 0 || currentPrice <= 0) return 0;
+        const ratio = isDirectionalBelow
+            ? targetPrice / currentPrice
+            : currentPrice / targetPrice;
+        return Math.max(0, Math.min(100, ratio * 100));
     };
     const priceBarPosition = getPriceBarPosition();
     const isCreator = user?.wallet_address === creatorWalletAddress;

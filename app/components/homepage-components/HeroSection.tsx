@@ -105,9 +105,9 @@ export function HeroSection() {
                 </h1>
 
                 <p className="mx-auto mb-8 max-w-xl break-words text-base text-gray-800 min-[380px]:text-lg lg:text-xl">
-                    The First PvP Battleground For Predictions
+                    The PvP Battleground For Predictions {"\u{1FA84}"}
                     <br />
-                    Crypto & Sports {"\u{1FA84}"}
+                    Crypto & Sports 🏀
                 </p>
 
                 <Link

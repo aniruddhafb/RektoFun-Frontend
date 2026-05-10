@@ -3,7 +3,7 @@ import ChallengeCard from "./ClanChallengeCard";
 import ChallengeDetailModal from "../challenge-components/ChallengeDetailModal";
 import { CreateChallengeModal } from "../challenge-components/CreateChallengeModal";
 import { ClanChallenge } from "./types";
-import { getClanMembers } from "@/app/lib/clan-service/clanMembers";
+import type { ClanMember } from "@/app/lib/clan-service/clanMembers";
 import { ChallengeListItem, getChallenges } from "@/app/lib/challenges-service/challenges";
 
 type SortOption = "latest" | "expiring-soon" | "ongoing" | "expired";
@@ -15,6 +15,8 @@ type EnrichedClanChallenge = {
 
 interface ClanChallengesProps {
     clanId: string;
+    clanMembers: ClanMember[];
+    isMember: boolean;
 }
 
 const ASSET_COLORS: Record<string, string> = {
@@ -102,7 +104,7 @@ function mapChallengeToCard(challenge: ChallengeListItem): EnrichedClanChallenge
     };
 }
 
-const ClanChallenges = ({ clanId }: ClanChallengesProps) => {
+const ClanChallenges = ({ clanId, clanMembers, isMember }: ClanChallengesProps) => {
     const [activeTab, setActiveTab] = useState<"friendly" | "wager" | "wars">("wager");
     const [searchQuery, setSearchQuery] = useState("");
     const [sortOption, setSortOption] = useState<SortOption>("latest");
@@ -122,32 +124,50 @@ const ClanChallenges = ({ clanId }: ClanChallengesProps) => {
     useEffect(() => {
         let cancelled = false;
 
-        const loadLeaderChallenges = async () => {
+        const loadClanMemberChallenges = async () => {
             if (!clanId) return;
 
             try {
                 setLoading(true);
 
-                const membersResponse = await getClanMembers(clanId);
-                const leaders = membersResponse.members.filter((member) => member.role === "Leader");
+                const memberIds = Array.from(new Set(clanMembers.map((member) => member.id).filter(Boolean)));
 
-                if (leaders.length === 0) {
+                if (memberIds.length === 0) {
                     if (!cancelled) setItems([]);
                     return;
                 }
 
-                const challengeResponses = await Promise.all(
-                    leaders.map((leader) =>
-                        getChallenges({
-                            created_by: leader.id,
+                const fetchAllChallengesByCreator = async (creatorId: string): Promise<ChallengeListItem[]> => {
+                    const limit = 50;
+                    let offset = 0;
+                    const allChallenges: ChallengeListItem[] = [];
+
+                    while (true) {
+                        const response = await getChallenges({
+                            created_by: creatorId,
                             sort: "latest",
-                            limit: 10,
-                        }),
-                    ),
+                            limit,
+                            offset,
+                        });
+
+                        allChallenges.push(...response.challenges);
+
+                        if (allChallenges.length >= response.count || response.challenges.length < limit) {
+                            break;
+                        }
+
+                        offset += limit;
+                    }
+
+                    return allChallenges;
+                };
+
+                const challengeResponses = await Promise.all(
+                    memberIds.map((memberId) => fetchAllChallengesByCreator(memberId)),
                 );
 
                 const mergedChallenges = challengeResponses
-                    .flatMap((response) => response.challenges)
+                    .flat()
                     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
                 const uniqueById = new Map<string, ChallengeListItem>();
@@ -156,22 +176,22 @@ const ClanChallenges = ({ clanId }: ClanChallengesProps) => {
                 }
 
                 if (!cancelled) {
-                    setItems(Array.from(uniqueById.values()).slice(0, 20).map(mapChallengeToCard));
+                    setItems(Array.from(uniqueById.values()).map(mapChallengeToCard));
                 }
             } catch (error) {
-                console.error("Failed to fetch clan leader challenges:", error);
+                console.error("Failed to fetch clan member challenges:", error);
                 if (!cancelled) setItems([]);
             } finally {
                 if (!cancelled) setLoading(false);
             }
         };
 
-        void loadLeaderChallenges();
+        void loadClanMemberChallenges();
 
         return () => {
             cancelled = true;
         };
-    }, [clanId, refreshKey]);
+    }, [clanId, clanMembers, refreshKey]);
 
     const filteredAndSortedChallenges = useMemo(() => {
         let filtered = [...items];
@@ -315,13 +335,15 @@ const ClanChallenges = ({ clanId }: ClanChallengesProps) => {
                                 <p className="text-gray-600 max-w-md">
                                     Wager challenges will appear here as soon as they are created.
                                 </p>
-                                <button
-                                    type="button"
-                                    onClick={() => setIsCreateModalOpen(true)}
-                                    className="mt-5 px-5 py-2.5 rounded-lg font-bold text-sm text-white bg-gradient-to-r from-green-700 to-green-600 shadow-sm hover:opacity-90 active:scale-95 transition-all"
-                                >
-                                    Create Wager
-                                </button>
+                                {isMember && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsCreateModalOpen(true)}
+                                        className="mt-5 px-5 py-2.5 rounded-lg font-bold text-sm text-white bg-gradient-to-r from-green-700 to-green-600 shadow-sm hover:opacity-90 active:scale-95 transition-all"
+                                    >
+                                        Create Wager
+                                    </button>
+                                )}
                             </div>
                         )
                     ) : activeTab === "friendly" ? (
@@ -351,14 +373,16 @@ const ClanChallenges = ({ clanId }: ClanChallengesProps) => {
                     setSelectedChallenge(null);
                 }}
             />
-            <CreateChallengeModal
-                isOpen={isCreateModalOpen}
-                onClose={() => setIsCreateModalOpen(false)}
-                onCreated={() => {
-                    setIsCreateModalOpen(false);
-                    setRefreshKey((prev) => prev + 1);
-                }}
-            />
+            {isMember && (
+                <CreateChallengeModal
+                    isOpen={isCreateModalOpen}
+                    onClose={() => setIsCreateModalOpen(false)}
+                    onCreated={() => {
+                        setIsCreateModalOpen(false);
+                        setRefreshKey((prev) => prev + 1);
+                    }}
+                />
+            )}
         </>
     );
 };

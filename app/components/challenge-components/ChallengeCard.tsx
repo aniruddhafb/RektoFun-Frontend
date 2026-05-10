@@ -212,7 +212,6 @@ export function ChallengeCard({
     const [betError, setBetError] = React.useState("");
     const [joinSide, setJoinSide] = React.useState<"challenger" | "opponent">("opponent");
     const [currentTime, setCurrentTime] = React.useState(() => Date.now());
-    const [fallbackPoolAmount, setFallbackPoolAmount] = React.useState<number | null>(null);
     const [modalMinAcceptBet, setModalMinAcceptBet] = React.useState<number | undefined>(challenge.min_accept_bet);
     const [modalMaxAcceptBet, setModalMaxAcceptBet] = React.useState<number | undefined>(challenge.max_accept_bet);
     const [escrowAddress, setEscrowAddress] = React.useState<string | undefined>(undefined);
@@ -229,45 +228,6 @@ export function ChallengeCard({
 
         return () => window.clearInterval(interval);
     }, []);
-
-    React.useEffect(() => {
-        let isCancelled = false;
-        const loadFallbackPool = async () => {
-            const totalPoolValue = Number(challenge.total_pool ?? 0);
-
-            if (Number.isFinite(totalPoolValue) && totalPoolValue > 0) {
-                if (!isCancelled) {
-                    setFallbackPoolAmount(totalPoolValue);
-                }
-                return;
-            }
-
-            if (!isCancelled) {
-                setFallbackPoolAmount(null);
-            }
-
-            try {
-                const challengeDetails = await getChallengeById(challenge.id);
-                const initialBetValue = Number(
-                    (challengeDetails as { initial_bet?: number | null }).initial_bet ??
-                    challenge.initial_bet ??
-                    0
-                );
-
-                if (!isCancelled && Number.isFinite(initialBetValue) && initialBetValue > 0) {
-                    setFallbackPoolAmount(initialBetValue);
-                }
-            } catch (error) {
-                console.error("Failed to load fallback pool amount:", error);
-            }
-        };
-
-        loadFallbackPool();
-
-        return () => {
-            isCancelled = true;
-        };
-    }, [challenge.id, challenge.total_pool, challenge.initial_bet]);
 
     const handleClick = (e: React.MouseEvent) => {
         e.stopPropagation();
@@ -544,7 +504,7 @@ export function ChallengeCard({
             return totalPoolValue;
         }
 
-        const fallbackValue = Number(fallbackPoolAmount ?? challenge.initial_bet ?? 0);
+        const fallbackValue = Number(challenge.initial_bet ?? 0);
         if (Number.isFinite(fallbackValue) && fallbackValue > 0) {
             return fallbackValue;
         }

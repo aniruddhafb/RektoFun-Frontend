@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import * as ClanComponents from "@/app/components/clan-slug-components";
 import { useSolanaWallet } from "@/app/lib/useSolanaWallet";
 import type { Tab } from "@/app/components/clan-slug-components";
@@ -40,7 +40,7 @@ export default function ClanDetailPage({ params }: { params: Promise<{ slug: str
     const { publicKey: userWallet } = useSolanaWallet();
     const walletAddress = userWallet?.toBase58() ?? "";
     const [slug, setSlug] = useState<string>("");
-    const [isMember, setIsMember] = useState(false);
+    const [clanMembers, setClanMembers] = useState<ClanMember[]>([]);
     const [membersRefreshKey, setMembersRefreshKey] = useState(0);
     const [activeTab, setActiveTab] = useState<Tab>("Overview");
     const [clanData, setClanData] = useState<ClanData | null>(null);
@@ -106,26 +106,8 @@ export default function ClanDetailPage({ params }: { params: Promise<{ slug: str
 
                 if (isCancelled) return;
                 setClanData(clan);
+                setClanMembers(membersResponse.members);
 
-                // Check if user is a member
-                if (walletAddress) {
-                    try {
-                        // Resolve membership directly from member records to avoid wallet->user lookup races.
-                        const memberExists = membersResponse.members.some((m: ClanMember) =>
-                            (m.wallet_address || "").toLowerCase() === walletAddress.toLowerCase() ||
-                            m.id === walletAddress
-                        );
-                        if (isCancelled) return;
-                        setIsMember(memberExists);
-                    } catch (err) {
-                        console.error("Failed to check membership:", err);
-                        if (isCancelled) return;
-                        setIsMember(false);
-                    }
-                } else {
-                    if (isCancelled) return;
-                    setIsMember(false);
-                }
             } catch (err) {
                 console.error("Failed to fetch clan:", err);
                 if (isCancelled) return;
@@ -144,7 +126,15 @@ export default function ClanDetailPage({ params }: { params: Promise<{ slug: str
                 clearTimeout(refreshTimeoutRef.current);
             }
         };
-    }, [slug, walletAddress]);
+    }, [slug]);
+
+    const isMember = useMemo(() => {
+        if (!walletAddress) return false;
+        const normalizedWallet = walletAddress.toLowerCase();
+        return clanMembers.some(
+            (m) => (m.wallet_address || "").toLowerCase() === normalizedWallet || m.id === walletAddress,
+        );
+    }, [walletAddress, clanMembers]);
 
     const tabs: Tab[] = ["Overview", "Chat"];
 
@@ -161,7 +151,6 @@ export default function ClanDetailPage({ params }: { params: Promise<{ slug: str
                             clanData={clanData}
                             onClanMembershipChange={handleClanMembershipChange}
                             onClanDataUpdate={handleClanDataUpdate}
-                            onMembershipStatusChange={setIsMember}
                         />
 
                         {/* ── Tabs ── */}
@@ -177,7 +166,11 @@ export default function ClanDetailPage({ params }: { params: Promise<{ slug: str
                             <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
                                 {/* Left: Clan Challenges */}
                                 <div className="lg:col-span-2">
-                                    <ClanComponents.ClanChallenges clanId={clanData.slug} />
+                                    <ClanComponents.ClanChallenges
+                                        clanId={clanData.slug}
+                                        clanMembers={clanMembers}
+                                        isMember={isMember}
+                                    />
                                 </div>
 
                                 {/* Right: Members */}
