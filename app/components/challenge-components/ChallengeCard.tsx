@@ -681,13 +681,13 @@ export function ChallengeCard({
             : isBattleOnState
                 ? `max opponents have joined and the battle is live. It resolves in ${endsByCountdown}.`
                 : isChallengeExpiredState
-                    ? "expire time was reached before anyone joined, so this challenge is expired."
+                    ? "expire time was reached before anyone joined, so this challenge has expired."
                     : `no opponents yet. This challenge will expire in ${timeRemaining} if nobody joins.`;
 
     return (
         <>
             <div
-                className="block overflow-hidden rounded-2xl border border-gray-300 bg-[#f8ede7] p-3 shadow-sm transition-shadow hover:shadow-lg sm:p-4"
+                className="block overflow-hidden rounded border border-gray-700 bg-[#f8ede7] p-3 shadow-sm transition-shadow hover:shadow-lg sm:p-4"
             >
                 {/* Header */}
                 <div className="mb-3 flex items-start justify-between gap-2">
@@ -705,6 +705,13 @@ export function ChallengeCard({
                                     <span
                                         onClick={handleClick}
                                         className="block cursor-pointer break-words text-[15px] font-bold tracking-tight sm:text-[16px]"
+                                        style={{
+                                            display: "-webkit-box",
+                                            WebkitLineClamp: 2,
+                                            WebkitBoxOrient: "vertical",
+                                            overflow: "hidden",
+                                            textOverflow: "ellipsis",
+                                        }}
                                     >
                                         {title}
                                     </span>
@@ -712,6 +719,13 @@ export function ChallengeCard({
                                     <span
                                         onClick={handleClick}
                                         className="block cursor-pointer break-words text-[15px] font-bold tracking-tight sm:text-[16px]"
+                                        style={{
+                                            display: "-webkit-box",
+                                            WebkitLineClamp: 2,
+                                            WebkitBoxOrient: "vertical",
+                                            overflow: "hidden",
+                                            textOverflow: "ellipsis",
+                                        }}
                                     >
                                         {title} by {resolveDateByText}
                                     </span>
@@ -720,6 +734,13 @@ export function ChallengeCard({
                                         <span
                                             onClick={handleClick}
                                             className="block cursor-pointer break-words text-[15px] font-bold tracking-tight sm:text-[16px]"
+                                            style={{
+                                                display: "-webkit-box",
+                                                WebkitLineClamp: 1,
+                                                WebkitBoxOrient: "vertical",
+                                                overflow: "hidden",
+                                                textOverflow: "ellipsis",
+                                            }}
                                         >
                                             {title} In
                                         </span>
@@ -728,7 +749,7 @@ export function ChallengeCard({
                                             className="block cursor-pointer break-words text-[15px] font-bold tracking-tight sm:text-[16px]"
                                         >
                                             Next
-                                                <span className="ml-1 inline-flex items-center gap-1 sm:ml-2 sm:gap-1.5">
+                                            <span className="ml-1 inline-flex items-center gap-1 sm:ml-2 sm:gap-1.5">
                                                 <span className="text-sm font-bold text-emerald-900">{endsByCountdown}</span>
                                                 <span className="group relative inline-flex items-center">
                                                     <svg className="w-3.5 h-3.5 text-emerald-600 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">

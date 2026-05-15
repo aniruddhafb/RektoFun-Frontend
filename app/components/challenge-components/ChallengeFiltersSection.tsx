@@ -72,7 +72,7 @@ export function ChallengeFiltersSection({
                         placeholder="Search challenges..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full pl-10 pr-4 py-3 sm:py-2.5 bg-white/60 rounded-2xl sm:rounded-full border border-gray-300 text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-200"
+                        className="w-full pl-10 pr-4 py-3 sm:py-2.5 bg-white/60 rounded-2xl sm:rounded-full border border-gray-700 text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-200"
                     />
                 </div>
 
@@ -82,7 +82,7 @@ export function ChallengeFiltersSection({
                     <div className="relative w-full min-w-0" ref={filterDropdownRef}>
                         <button
                             onClick={() => setIsFilterDropdownOpen(!isFilterDropdownOpen)}
-                            className="w-full border border-gray-300 cursor-pointer flex items-center gap-2 px-4 py-3 sm:py-2.5 bg-white/60 rounded-2xl sm:rounded-full text-sm text-gray-700 hover:bg-white/80 transition-colors justify-between"
+                            className="w-full border border-gray-700 cursor-pointer flex items-center gap-2 px-4 py-3 sm:py-2.5 bg-white/60 rounded-2xl sm:rounded-full text-sm text-gray-700 hover:bg-white/80 transition-colors justify-between"
                         >
                             <div className="flex items-center gap-2 min-w-0">
                                 <span>{getCurrentFilterIcon()}</span>
@@ -117,7 +117,7 @@ export function ChallengeFiltersSection({
                     <div className="relative w-full min-w-0" ref={marketDropdownRef}>
                         <button
                             onClick={() => setIsMarketDropdownOpen(!isMarketDropdownOpen)}
-                            className="w-full border border-gray-300 cursor-pointer flex items-center gap-2 px-4 py-3 sm:py-2.5 bg-white/60 rounded-2xl sm:rounded-full text-sm text-gray-700 hover:bg-white/80 transition-colors justify-between"
+                            className="w-full border border-gray-700 cursor-pointer flex items-center gap-2 px-4 py-3 sm:py-2.5 bg-white/60 rounded-2xl sm:rounded-full text-sm text-gray-700 hover:bg-white/80 transition-colors justify-between"
                         >
                             <div className="flex items-center gap-2 min-w-0">
                                 <span className="truncate">{activeAsset}</span>

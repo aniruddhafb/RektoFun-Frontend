@@ -196,7 +196,7 @@ export function ChallengeGrid({
                     {Array.from({ length: 6 }).map((_, index) => (
                         <div
                             key={index}
-                            className="h-[300px] rounded-2xl border border-white/60 bg-white/50 p-5 animate-pulse"
+                            className="h-[300px] rounded-xl border border-white/60 bg-white/50 p-5 animate-pulse"
                         >
                             <div className="h-6 w-3/4 rounded bg-gray-200" />
                             <div className="mt-3 h-4 w-1/2 rounded bg-gray-200" />
@@ -268,7 +268,7 @@ export function ChallengeGrid({
                     Array.from({ length: PAGE_SIZE }).map((_, index) => (
                         <div
                             key={`loading-more-skeleton-${index}`}
-                            className="h-[300px] rounded-2xl border border-white/60 bg-white/50 p-5 animate-pulse"
+                            className="h-[300px] rounded-xl border border-white/60 bg-white/50 p-5 animate-pulse"
                         >
                             <div className="h-6 w-3/4 rounded bg-gray-200" />
                             <div className="mt-3 h-4 w-1/2 rounded bg-gray-200" />
