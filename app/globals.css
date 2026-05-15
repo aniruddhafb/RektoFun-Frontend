@@ -21,6 +21,128 @@ body {
   overflow-x: hidden;
 }
 
+/* Global pixel-art treatment (subtle and non-destructive to layout) */
+.pixel-shell {
+  position: relative;
+  isolation: isolate;
+}
+
+.pixel-shell::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9998;
+  opacity: 0.18;
+  background-image:
+    linear-gradient(
+      90deg,
+      rgba(0, 0, 0, 0.12) 0,
+      rgba(0, 0, 0, 0.12) 1px,
+      transparent 1px,
+      transparent 3px
+    ),
+    linear-gradient(
+      0deg,
+      rgba(0, 0, 0, 0.1) 0,
+      rgba(0, 0, 0, 0.1) 1px,
+      transparent 1px,
+      transparent 3px
+    );
+  background-size: 3px 3px;
+  mix-blend-mode: multiply;
+}
+
+.pixel-shell::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.08;
+  background-image: repeating-linear-gradient(
+    45deg,
+    rgba(255, 255, 255, 0.2) 0 1px,
+    transparent 1px 4px
+  );
+  mix-blend-mode: soft-light;
+}
+
+.pixel-shell img,
+.pixel-shell canvas {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+/* Pixelate typography and UI chrome (without changing layout structure) */
+.pixel-shell,
+.pixel-shell * {
+  text-rendering: optimizeSpeed;
+  -webkit-font-smoothing: none;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.pixel-shell h1,
+.pixel-shell h2,
+.pixel-shell h3,
+.pixel-shell h4,
+.pixel-shell h5,
+.pixel-shell h6,
+.pixel-shell p,
+.pixel-shell span,
+.pixel-shell label,
+.pixel-shell a,
+.pixel-shell li,
+.pixel-shell strong,
+.pixel-shell small {
+  text-shadow: 0.65px 0 currentColor;
+  letter-spacing: 0.01em;
+}
+
+.pixel-shell button,
+.pixel-shell [role="button"],
+.pixel-shell select,
+.pixel-shell input,
+.pixel-shell textarea,
+.pixel-shell [class*="card"],
+.pixel-shell [class*="Card"] {
+  border-radius: 3px !important;
+  box-shadow:
+    inset -1px -1px 0 rgba(0, 0, 0, 0.2),
+    inset 1px 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+.pixel-shell button,
+.pixel-shell [role="button"],
+.pixel-shell select {
+  image-rendering: pixelated;
+}
+
+/* Challenge card-only border effect */
+.gamified-card {
+  position: relative;
+  border-radius: 0 !important;
+  border: 1px solid #121212 !important;
+  box-shadow:
+    1px 1px 0 #121212,
+    inset 1px 1px 0 rgba(255, 255, 255, 0.2),
+    inset -1px -1px 0 rgba(0, 0, 0, 0.18);
+  clip-path: polygon(
+    0 2px,
+    2px 2px,
+    2px 0,
+    calc(100% - 2px) 0,
+    calc(100% - 2px) 2px,
+    100% 2px,
+    100% calc(100% - 2px),
+    calc(100% - 2px) calc(100% - 2px),
+    calc(100% - 2px) 100%,
+    2px 100%,
+    2px calc(100% - 2px),
+    0 calc(100% - 2px)
+  );
+}
+
 /* Button hover glow */
 .hover\:shadow-glow:hover {
   box-shadow: 0 0 20px rgba(0, 0, 0, 0.3), 0 0 40px rgba(0, 0, 0, 0.2);

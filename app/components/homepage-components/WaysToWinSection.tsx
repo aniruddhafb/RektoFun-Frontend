@@ -1,4 +1,34 @@
 import Link from "next/link";
+import { ReactNode } from "react";
+
+function FlipCard({
+    front,
+    backTitle,
+    backDescription,
+}: {
+    front: ReactNode;
+    backTitle: string;
+    backDescription: string;
+}) {
+    return (
+        <div className="group h-full min-h-[27rem] [perspective:1200px]">
+            <div className="relative h-full min-h-[27rem] [transform-style:preserve-3d] transition-transform duration-700 [transition-timing-function:cubic-bezier(0.22,0.61,0.36,1)] [will-change:transform] group-hover:[transform:rotateY(180deg)]">
+                <div className="relative h-full [backface-visibility:hidden] [-webkit-backface-visibility:hidden] [transform:rotateY(0deg)]">
+                    {front}
+                </div>
+                <div className="absolute inset-0 h-full min-h-[27rem] [backface-visibility:hidden] [-webkit-backface-visibility:hidden] [transform:rotateY(180deg)]">
+                    <div className="bg-[#1f2937] text-white rounded-2xl border border-gray-400 shadow-sm overflow-hidden h-full flex flex-col items-center justify-center p-7 text-center">
+                        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#f9c9b7] mb-3">
+                            RektoFun Edge
+                        </p>
+                        <h3 className="text-2xl font-bold leading-tight mb-3">{backTitle}</h3>
+                        <p className="text-sm text-gray-200 leading-relaxed">{backDescription}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
 
 export function WaysToWinSection() {
     return (
@@ -12,67 +42,77 @@ export function WaysToWinSection() {
                 </div>
 
                 {/* 3-column cards */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-5">
+                <div className="grid grid-cols-1 md:grid-cols-3 items-stretch gap-5 mb-5">
 
                     {/* Card 1 — Crypto & Sports Markets */}
-                    <div className="bg-white/80 rounded-2xl border border-gray-400 shadow-sm overflow-hidden flex flex-col">
+                    <FlipCard
+                        backTitle="Create Fast, Anytime"
+                        backDescription="Launch permissionless predictions in seconds and let the community jump in instantly."
+                        front={
+                            <div className="bg-white/80 rounded-2xl border border-gray-400 shadow-sm overflow-hidden flex flex-col h-full">
                         {/* Image area — peach background */}
-                        <div className="bg-[#fdf0e8] flex items-center justify-center h-56 sm:h-60 p-6">
-                            <svg viewBox="0 0 200 170" className="w-full h-full" fill="none">
+                                <div className="bg-[#fdf0e8] flex items-center justify-center h-56 sm:h-60 p-6">
+                                    <svg viewBox="0 0 200 170" className="w-full h-full" fill="none">
                                 {/* Bitcoin coin */}
-                                <circle cx="68" cy="72" r="38" fill="#F7B731" />
-                                <circle cx="68" cy="72" r="30" fill="#F9C74F" />
-                                <circle cx="68" cy="72" r="24" fill="#F7B731" stroke="#E09B10" strokeWidth="1.5" />
-                                <text x="68" y="80" textAnchor="middle" fontSize="26" fill="white" fontWeight="bold">₿</text>
+                                        <circle cx="68" cy="72" r="38" fill="#F7B731" />
+                                        <circle cx="68" cy="72" r="30" fill="#F9C74F" />
+                                        <circle cx="68" cy="72" r="24" fill="#F7B731" stroke="#E09B10" strokeWidth="1.5" />
+                                        <text x="68" y="80" textAnchor="middle" fontSize="26" fill="white" fontWeight="bold">₿</text>
 
                                 {/* Market stall */}
-                                <rect x="108" y="44" width="68" height="56" rx="4" fill="#1a202c" />
-                                <rect x="108" y="44" width="68" height="18" rx="4" fill="#E53E3E" />
+                                        <rect x="108" y="44" width="68" height="56" rx="4" fill="#1a202c" />
+                                        <rect x="108" y="44" width="68" height="18" rx="4" fill="#E53E3E" />
                                 {/* Awning white stripes */}
-                                <rect x="112" y="44" width="8" height="18" fill="white" opacity="0.45" />
-                                <rect x="126" y="44" width="8" height="18" fill="white" opacity="0.45" />
-                                <rect x="140" y="44" width="8" height="18" fill="white" opacity="0.45" />
-                                <rect x="154" y="44" width="8" height="18" fill="white" opacity="0.45" />
-                                <rect x="168" y="44" width="8" height="18" fill="white" opacity="0.45" />
+                                        <rect x="112" y="44" width="8" height="18" fill="white" opacity="0.45" />
+                                        <rect x="126" y="44" width="8" height="18" fill="white" opacity="0.45" />
+                                        <rect x="140" y="44" width="8" height="18" fill="white" opacity="0.45" />
+                                        <rect x="154" y="44" width="8" height="18" fill="white" opacity="0.45" />
+                                        <rect x="168" y="44" width="8" height="18" fill="white" opacity="0.45" />
                                 {/* Chart bars */}
-                                <rect x="116" y="80" width="9" height="14" rx="1.5" fill="#48BB78" />
-                                <rect x="130" y="72" width="9" height="22" rx="1.5" fill="#48BB78" />
-                                <rect x="144" y="64" width="9" height="30" rx="1.5" fill="#F6AD55" />
-                                <rect x="158" y="56" width="9" height="38" rx="1.5" fill="#48BB78" />
+                                        <rect x="116" y="80" width="9" height="14" rx="1.5" fill="#48BB78" />
+                                        <rect x="130" y="72" width="9" height="22" rx="1.5" fill="#48BB78" />
+                                        <rect x="144" y="64" width="9" height="30" rx="1.5" fill="#F6AD55" />
+                                        <rect x="158" y="56" width="9" height="38" rx="1.5" fill="#48BB78" />
                                 {/* Trend arrow */}
-                                <path d="M116 88 L130 78 L144 68 L162 56" stroke="#68D391" strokeWidth="2.5" strokeLinecap="round" />
-                                <path d="M156 52 L164 56 L160 64" stroke="#68D391" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                        <path d="M116 88 L130 78 L144 68 L162 56" stroke="#68D391" strokeWidth="2.5" strokeLinecap="round" />
+                                        <path d="M156 52 L164 56 L160 64" stroke="#68D391" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
 
                                 {/* Soccer ball */}
-                                <circle cx="96" cy="122" r="30" fill="white" stroke="#222" strokeWidth="2" />
+                                        <circle cx="96" cy="122" r="30" fill="white" stroke="#222" strokeWidth="2" />
                                 {/* Pentagon patches */}
-                                <path d="M96 92 L104 104 L96 110 L88 104 Z" fill="#222" />
-                                <path d="M66 112 L76 106 L82 116 L74 126 L64 124 Z" fill="#222" />
-                                <path d="M126 112 L116 106 L110 116 L118 126 L128 124 Z" fill="#222" />
-                                <path d="M80 148 L88 138 L104 138 L112 148 L96 154 Z" fill="#222" />
+                                        <path d="M96 92 L104 104 L96 110 L88 104 Z" fill="#222" />
+                                        <path d="M66 112 L76 106 L82 116 L74 126 L64 124 Z" fill="#222" />
+                                        <path d="M126 112 L116 106 L110 116 L118 126 L128 124 Z" fill="#222" />
+                                        <path d="M80 148 L88 138 L104 138 L112 148 L96 154 Z" fill="#222" />
                                 {/* Shadow */}
-                                <ellipse cx="96" cy="155" rx="24" ry="5" fill="#00000018" />
-                            </svg>
-                        </div>
+                                        <ellipse cx="96" cy="155" rx="24" ry="5" fill="#00000018" />
+                                    </svg>
+                                </div>
                         {/* Text */}
-                        <div className="p-5 flex flex-col flex-1">
-                            <h3 className="text-xl font-bold text-black mb-3 leading-snug">
-                                Create Permissionless Predictions
-                            </h3>
-                            <p className="text-gray-500 text-sm leading-relaxed">
-                                Create permissionless prediction challenges around crypto and sports at anytime, on anything.
-                            </p>
-                        </div>
-                    </div>
+                                <div className="p-5 flex flex-col flex-1">
+                                    <h3 className="text-xl font-bold text-black mb-3 leading-snug">
+                                        Create Permissionless Predictions
+                                    </h3>
+                                    <p className="text-gray-500 text-sm leading-relaxed">
+                                        Create permissionless prediction challenges around crypto and sports at anytime, on anything.
+                                    </p>
+                                </div>
+                            </div>
+                        }
+                    />
 
                     {/* Card 2 — PVP Battles */}
-                    <div className="bg-white/80 rounded-2xl border border-gray-400 shadow-sm overflow-hidden flex flex-col">
+                    <FlipCard
+                        backTitle="Head-To-Head Pressure"
+                        backDescription="Outpredict your rivals, climb faster, and prove your edge in live battle-style challenges."
+                        front={
+                            <div className="bg-white/80 rounded-2xl border border-gray-400 shadow-sm overflow-hidden flex flex-col h-full">
                         {/* Image area — lavender background */}
-                        <div className="bg-[#ede9fe] flex items-center justify-center h-56 sm:h-60 p-6">
-                            <svg viewBox="0 0 200 170" className="w-full h-full" fill="none">
+                                <div className="bg-[#ede9fe] flex items-center justify-center h-56 sm:h-60 p-6">
+                                    <svg viewBox="0 0 200 170" className="w-full h-full" fill="none">
                                 {/* LIVE badge */}
-                                <rect x="72" y="8" width="56" height="26" rx="6" fill="#E53E3E" />
-                                <text x="100" y="26" textAnchor="middle" fontSize="14" fill="white" fontWeight="bold">LIVE</text>
+                                        <rect x="72" y="8" width="56" height="26" rx="6" fill="#E53E3E" />
+                                        <text x="100" y="26" textAnchor="middle" fontSize="14" fill="white" fontWeight="bold">LIVE</text>
 
                                 {/* Burst lines */}
                                 <line x1="100" y1="50" x2="100" y2="36" stroke="#F6E05E" strokeWidth="2.5" strokeLinecap="round" />
@@ -106,21 +146,27 @@ export function WaysToWinSection() {
                                 {/* PVP badge (pentagon/shield shape) */}
                                 <path d="M100 118 L122 126 L122 148 L100 156 L78 148 L78 126 Z" fill="#1a202c" />
                                 <text x="100" y="142" textAnchor="middle" fontSize="14" fill="white" fontWeight="bold">PVP</text>
-                            </svg>
-                        </div>
+                                    </svg>
+                                </div>
                         {/* Text */}
-                        <div className="p-5 flex flex-col flex-1">
-                            <h3 className="text-xl font-bold text-black mb-3 leading-snug">
-                                PvP Prediction Battles
-                            </h3>
-                            <p className="text-gray-500 text-sm leading-relaxed">
-                                Join challenges, compete in prediction battles and test your knowledge, go head-to-head, and prove you&apos;re the best.
-                            </p>
-                        </div>
-                    </div>
+                                <div className="p-5 flex flex-col flex-1">
+                                    <h3 className="text-xl font-bold text-black mb-3 leading-snug">
+                                        PvP Prediction Battles
+                                    </h3>
+                                    <p className="text-gray-500 text-sm leading-relaxed">
+                                        Join challenges, compete in prediction battles and test your knowledge, go head-to-head, and prove you&apos;re the best.
+                                    </p>
+                                </div>
+                            </div>
+                        }
+                    />
 
                     {/* Card 3 — REKTO Points */}
-                    <div className="bg-white/80 rounded-2xl border border-gray-400 shadow-sm overflow-hidden flex flex-col">
+                    <FlipCard
+                        backTitle="Community-Powered Fairness"
+                        backDescription="Transparent voting keeps outcomes trusted, disputes clear, and competition honest."
+                        front={
+                            <div className="bg-white/80 rounded-2xl border border-gray-400 shadow-sm overflow-hidden flex flex-col h-full">
                         {/* Image area — cream/beige background */}
                         <div className="bg-[#fdf6e8] flex items-center justify-center h-56 sm:h-60 p-6">
                             <svg viewBox="0 0 200 170" className="w-full h-full" fill="none">
@@ -167,17 +213,19 @@ export function WaysToWinSection() {
                                 <path d="M139 162 C139 158 151 158 151 162" fill="white" />
                                 <path d="M153 150 L153 156 M150 153 L156 153" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
                             </svg>
-                        </div>
+                                </div>
                         {/* Text */}
-                        <div className="p-5 flex flex-col flex-1">
-                            <h3 className="text-xl font-bold text-black mb-3 leading-snug">
-                                Community Verified Outcomes
-                            </h3>
-                            <p className="text-gray-500 text-sm leading-relaxed">
-                                Challenge outcomes and disputes are resolved by the NFT holders community through a transparent voting process.
-                            </p>
-                        </div>
-                    </div>
+                                <div className="p-5 flex flex-col flex-1">
+                                    <h3 className="text-xl font-bold text-black mb-3 leading-snug">
+                                        Community Verified Outcomes
+                                    </h3>
+                                    <p className="text-gray-500 text-sm leading-relaxed">
+                                        Challenge outcomes and disputes are resolved by the NFT holders community through a transparent voting process.
+                                    </p>
+                                </div>
+                            </div>
+                        }
+                    />
                 </div>
 
                 {/* Bottom CTA */}
@@ -211,6 +259,7 @@ export function WaysToWinSection() {
                     </Link>
                 </div>
             </div>
+
         </section>
     );
 }

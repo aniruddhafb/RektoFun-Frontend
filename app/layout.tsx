@@ -87,11 +87,13 @@ export default function RootLayout({
       </head>
       <body className="min-h-full flex flex-col">
         <Providers>
-          <Suspense fallback={<div />}>
-            <Navbar />
-          </Suspense>
-          <main className="flex-1 mt-12 md:mt-8">{children}</main>
-          <Footer />
+          <div className="pixel-shell min-h-full flex flex-col">
+            <Suspense fallback={<div />}>
+              <Navbar />
+            </Suspense>
+            <main className="flex-1 mt-12 md:mt-8">{children}</main>
+            <Footer />
+          </div>
         </Providers>
       </body>
     </html>

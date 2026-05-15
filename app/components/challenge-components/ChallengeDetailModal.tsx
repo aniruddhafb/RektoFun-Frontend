@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef } from "react";
 import Image from "next/image";
-import { X, Clock, User, Calendar, AlertCircle } from "lucide-react";
+import { X, Clock, User, Calendar, AlertCircle, ChevronDown, ChevronUp } from "lucide-react";
 import { AcceptChallengeModal } from "./AcceptChallengeModal";
 import { ChallengeListItem, getChallengeById, joinChallenge } from "@/app/lib/challenges-service/challenges";
 import { useRouter } from "next/navigation";
@@ -34,8 +34,8 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
     const [modalMinAcceptBet, setModalMinAcceptBet] = React.useState<number | undefined>(undefined);
     const [modalMaxAcceptBet, setModalMaxAcceptBet] = React.useState<number | undefined>(undefined);
     const [escrowAddress, setEscrowAddress] = React.useState<string | undefined>(undefined);
-    const [isDescriptionExpanded, setIsDescriptionExpanded] = React.useState(false);
-    const [isTitleExpanded, setIsTitleExpanded] = React.useState(false);
+    const [isDescriptionExpanded, setIsDescriptionExpanded] = React.useState(true);
+    const [isTitleExpanded, setIsTitleExpanded] = React.useState(true);
 
     const formatEndsByCountdown = (timestamp: number | null, nowMs: number): string => {
         if (!timestamp) return "unknown";
@@ -177,7 +177,8 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
 
     useEffect(() => {
         if (!isOpen) return;
-        setIsDescriptionExpanded(false);
+        setIsDescriptionExpanded(true);
+        setIsTitleExpanded(true);
     }, [isOpen, challenge?.id]);
 
     useEffect(() => {
@@ -397,7 +398,7 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
     const hasResolveTimePassed = Boolean(resolveTimestamp && resolveTimestamp <= currentTime);
 
     const showResolvesBox = !isExpireTimeAchieved || hasOpponents;
-    const hideExpiresBox = hasOpponents && isExpireTimeAchieved;
+    const hideExpiresBox = !isPoolMode && hasOpponentInfo;
     const timelineColumns = (!hideExpiresBox ? 1 : 0) + 2 + (showResolvesBox ? 1 : 0);
     const resolvesInText = hasResolveTimePassed
         ? isResolutionResolved
@@ -711,7 +712,7 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
                                                 <button
                                                     type="button"
                                                     onClick={() => setIsTitleExpanded((prev) => !prev)}
-                                                    className="mr-1 inline-flex h-5 w-5 align-middle items-center justify-center rounded-full border border-[#d4a574]/50 text-[#246044] hover:bg-white/60 transition-colors"
+                                                    className="cursor-pointer ml-1.5 inline-flex h-6 w-6 align-middle items-center justify-center rounded-full border border-[#d4a574]/60 bg-white/70 text-[#1d6b48] shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-[#246044]/50 hover:bg-white hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#246044]/30"
                                                     aria-label={isTitleExpanded ? "Collapse title" : "Expand title"}
                                                     title={isTitleExpanded ? "Collapse title" : "Expand title"}
                                                 >
@@ -732,7 +733,7 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
                                                 <button
                                                     type="button"
                                                     onClick={() => setIsTitleExpanded((prev) => !prev)}
-                                                    className="mr-2 inline-flex h-6 w-6 align-middle items-center justify-center rounded-full border border-[#d4a574]/50 text-[#246044] hover:bg-white/60 transition-colors"
+                                                    className="cursor-pointer ml-2 inline-flex h-7 w-7 align-middle items-center justify-center rounded-full border border-[#d4a574]/60 bg-white/70 text-[#1d6b48] shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-[#246044]/50 hover:bg-white hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#246044]/30"
                                                     aria-label={isTitleExpanded ? "Collapse title" : "Expand title"}
                                                     title={isTitleExpanded ? "Collapse title" : "Expand title"}
                                                 >
@@ -756,7 +757,7 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
                                                 <button
                                                     type="button"
                                                     onClick={() => setIsTitleExpanded((prev) => !prev)}
-                                                    className="mr-1 inline-flex h-5 w-5 align-middle items-center justify-center rounded-full border border-[#d4a574]/50 text-[#246044] hover:bg-white/60 transition-colors"
+                                                    className="cursor-pointer ml-1.5 inline-flex h-6 w-6 align-middle items-center justify-center rounded-full border border-[#d4a574]/60 bg-white/70 text-[#1d6b48] shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-[#246044]/50 hover:bg-white hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#246044]/30"
                                                     aria-label={isTitleExpanded ? "Collapse title" : "Expand title"}
                                                     title={isTitleExpanded ? "Collapse title" : "Expand title"}
                                                 >
@@ -777,7 +778,7 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
                                                 <button
                                                     type="button"
                                                     onClick={() => setIsTitleExpanded((prev) => !prev)}
-                                                    className="mr-2 inline-flex h-6 w-6 align-middle items-center justify-center rounded-full border border-[#d4a574]/50 text-[#246044] hover:bg-white/60 transition-colors"
+                                                    className="cursor-pointer ml-2 inline-flex h-7 w-7 align-middle items-center justify-center rounded-full border border-[#d4a574]/60 bg-white/70 text-[#1d6b48] shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-[#246044]/50 hover:bg-white hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#246044]/30"
                                                     aria-label={isTitleExpanded ? "Collapse title" : "Expand title"}
                                                     title={isTitleExpanded ? "Collapse title" : "Expand title"}
                                                 >
@@ -800,7 +801,7 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
                                                 <button
                                                     type="button"
                                                     onClick={() => setIsTitleExpanded((prev) => !prev)}
-                                                    className="mr-1 inline-flex h-5 w-5 align-middle items-center justify-center rounded-full border border-[#d4a574]/50 text-[#246044] hover:bg-white/60 transition-colors"
+                                                    className="cursor-pointer ml-1.5 inline-flex h-6 w-6 align-middle items-center justify-center rounded-full border border-[#d4a574]/60 bg-white/70 text-[#1d6b48] shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-[#246044]/50 hover:bg-white hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#246044]/30"
                                                     aria-label={isTitleExpanded ? "Collapse title" : "Expand title"}
                                                     title={isTitleExpanded ? "Collapse title" : "Expand title"}
                                                 >
@@ -835,7 +836,7 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
                                                 <button
                                                     type="button"
                                                     onClick={() => setIsTitleExpanded((prev) => !prev)}
-                                                    className="inline-flex h-6 w-6 align-middle items-center justify-center rounded-full border border-[#d4a574]/50 text-[#246044] hover:bg-white/60 transition-colors"
+                                                    className="cursor-pointer inline-flex h-7 w-7 align-middle items-center justify-center rounded-full border border-[#d4a574]/60 bg-white/70 text-[#1d6b48] shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-[#246044]/50 hover:bg-white hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#246044]/30"
                                                     aria-label={isTitleExpanded ? "Collapse title" : "Expand title"}
                                                     title={isTitleExpanded ? "Collapse title" : "Expand title"}
                                                 >
@@ -874,13 +875,17 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
                                         {displayedDescriptionText}
                                     </p>
                                     {isDescriptionTruncatable && (
-                                        <button
-                                            type="button"
+                                        <div
                                             onClick={() => setIsDescriptionExpanded((prev) => !prev)}
-                                            className={`text-[12px] max-[350px]:text-[11px] sm:text-sm font-semibold text-[#246044] hover:text-[#2d6f4a] transition-colors cursor-pointer whitespace-nowrap mt-0.5 ${isDescriptionExpanded ? "block w-full text-center sm:inline sm:w-auto sm:text-left" : "max-[350px]:self-start"}`}
+                                            className={`group inline-flex items-center gap-1 text-[12px] max-[350px]:text-[11px] sm:text-sm font-semibold text-[#246044] decoration-[#246044]/35 decoration-1 transition-all duration-200 hover:text-[#1d6b48] hover:decoration-[#1d6b48]/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#246044]/20 rounded-sm cursor-pointer whitespace-nowrap mt-0.5 ${isDescriptionExpanded ? "block w-full text-center sm:inline-flex sm:w-auto sm:text-left justify-center sm:justify-start" : "max-[350px]:self-start"}`}
                                         >
                                             {isDescriptionExpanded ? "Show less" : "Show more"}
-                                        </button>
+                                            {isDescriptionExpanded ? (
+                                                <ChevronUp className="h-3.5 w-3.5 transition-transform duration-200 group-hover:-translate-y-0.5" />
+                                            ) : (
+                                                <ChevronDown className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-y-0.5" />
+                                            )}
+                                        </div>
                                     )}
                                 </div>
                             ) : (
@@ -889,13 +894,17 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
                                         {displayedManualDescriptionText}
                                     </p>
                                     {isManualDescriptionTruncatable && (
-                                        <button
-                                            type="button"
+                                        <div
                                             onClick={() => setIsDescriptionExpanded((prev) => !prev)}
-                                            className={`text-[12px] max-[350px]:text-[11px] sm:text-sm font-semibold text-[#246044] hover:text-[#2d6f4a] transition-colors cursor-pointer whitespace-nowrap mt-0.5 ${isDescriptionExpanded ? "block w-full text-center sm:inline sm:w-auto sm:text-left" : "max-[350px]:self-start"}`}
+                                            className={`group inline-flex items-center gap-1 text-[12px] max-[350px]:text-[11px] sm:text-sm font-semibold text-[#246044] decoration-[#246044]/35 decoration-1 transition-all duration-200 hover:text-[#1d6b48] hover:decoration-[#1d6b48]/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#246044]/20 rounded-sm cursor-pointer whitespace-nowrap mt-0.5 ${isDescriptionExpanded ? "block w-full text-center sm:inline-flex sm:w-auto sm:text-left justify-center sm:justify-start" : "max-[350px]:self-start"}`}
                                         >
                                             {isDescriptionExpanded ? "Show less" : "Show more"}
-                                        </button>
+                                            {isDescriptionExpanded ? (
+                                                <ChevronUp className="h-3.5 w-3.5 transition-transform duration-200 group-hover:-translate-y-0.5" />
+                                            ) : (
+                                                <ChevronDown className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-y-0.5" />
+                                            )}
+                                        </div>
                                     )}
                                 </div>
                             )}
