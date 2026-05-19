@@ -69,8 +69,8 @@ export default function CategoryPage() {
                 {/* Header Section */}
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6 sm:mb-8">
                     <div>
-                        <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-2">Explore Markets</h1>
-                        <p className="text-gray-600 text-base sm:text-lg">Predict trends and earn big on top challenge markets</p>
+                        <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-2">Explore Arenas</h1>
+                        <p className="text-gray-600 text-base sm:text-lg">Predict trends and earn big on top challenge arenas</p>
                     </div>
                 </div>
 
@@ -114,7 +114,7 @@ export default function CategoryPage() {
                                 <div>
                                     <p className="text-[10px] font-bold text-[#be8240] uppercase tracking-widest">Category</p>
                                     <h2 className="text-xl sm:text-2xl font-black text-[#1a1a1a] leading-tight">
-                                        Crypto <span className="text-[#d09040]">Markets</span>
+                                        Crypto <span className="text-[#d09040]">Arena</span>
                                     </h2>
                                 </div>
                             </div>
@@ -210,14 +210,14 @@ export default function CategoryPage() {
                         {/* CTA */}
                         <div className="px-5 pb-4">
                             <Link
-                                href="/markets/crypto"
+                                href="/arenas/crypto"
                                 className="group/btn border border-[#8c5a2a] flex items-center justify-between w-full px-5 py-3.5 rounded-2xl text-white font-bold text-sm sm:text-base transition-all duration-300 hover:opacity-95 hover:scale-[1.01] active:scale-[0.98]"
                                 style={{
                                     background: "linear-gradient(135deg, #e8a050 0%, #d09040 100%)",
                                     boxShadow: "0 4px 16px rgba(220,150,60,0.3), inset 0 1px 0 rgba(255,255,255,0.15)",
                                 }}
                             >
-                                <span>Explore Crypto Markets</span>
+                                <span>Explore Crypto Arena</span>
                                 <span className="flex items-center justify-center w-7 h-7 rounded-lg bg-white/20 transition-transform duration-300 group-hover/btn:translate-x-1">
                                     <ArrowRightIcon />
                                 </span>
@@ -261,7 +261,7 @@ export default function CategoryPage() {
                                 <div>
                                     <p className="text-[10px] font-bold text-[#6f8a79] uppercase tracking-widest">Category</p>
                                     <h2 className="text-xl sm:text-2xl font-black text-[#1a1a1a] leading-tight">
-                                        Sports <span className="text-[#587160]">Markets</span>
+                                        Sports <span className="text-[#587160]">Arena</span>
                                     </h2>
                                 </div>
                             </div>
@@ -348,14 +348,14 @@ export default function CategoryPage() {
                         {/* CTA */}
                         <div className="px-5 pb-4">
                             <Link
-                                href="/markets/sports"
+                                href="/arenas/sports"
                                 className="group/btn border border-[#4f6657] flex items-center justify-between w-full px-5 py-3.5 rounded-2xl text-white font-bold text-sm sm:text-base transition-all duration-300 hover:opacity-95 hover:scale-[1.01] active:scale-[0.98]"
                                 style={{
                                     background: "linear-gradient(135deg, #729282 0%, #587160 100%)",
                                     boxShadow: "0 4px 16px rgba(87,113,96,0.34), inset 0 1px 0 rgba(255,255,255,0.15)",
                                 }}
                             >
-                                <span>Explore Sports Markets</span>
+                                <span>Explore Sports Arena</span>
                                 <span className="flex items-center justify-center w-7 h-7 rounded-lg bg-white/20 transition-transform duration-300 group-hover/btn:translate-x-1">
                                     <ArrowRightIcon />
                                 </span>

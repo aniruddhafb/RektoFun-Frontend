@@ -5,7 +5,7 @@ export const PROFILE_SVGS = Array.from(
 
 export const NAV_LINKS = [
     { href: "/challenges", label: "Live Challenges" },
-    { href: "/markets", label: "Explore Markets" },
+    { href: "/arenas", label: "Explore Arenas" },
     { href: "/clans", label: "Explore Clans" },
     { href: "/activity", label: "Live Activity" },
 ];
