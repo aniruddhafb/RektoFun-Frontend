@@ -22,8 +22,7 @@ export function NavbarMobileBottomNav({
             <div className="flex items-center justify-around h-14">
                 <Link
                     href="/"
-                    className={`flex flex-col items-center justify-center gap-0.5 min-w-0 flex-1 ${
-                        isActive("/") &&
+                    className={`flex flex-col items-center justify-center gap-0.5 min-w-0 flex-1 ${isActive("/") &&
                         !isActive("/challenges") &&
                         !isActive("/markets") &&
                         !isActive("/leaderboard") &&
@@ -31,9 +30,9 @@ export function NavbarMobileBottomNav({
                         !isActive("/activity") &&
                         !isActive("/roadmap") &&
                         !isActive("/profile")
-                            ? "text-black"
-                            : "text-gray-500"
-                    }`}
+                        ? "text-black"
+                        : "text-gray-500"
+                        }`}
                 >
                     <svg
                         className="w-5 h-5 flex-shrink-0"
@@ -52,19 +51,18 @@ export function NavbarMobileBottomNav({
                 </Link>
 
                 <Link
-                    href="/markets"
-                    className={`flex flex-col items-center justify-center gap-0.5 min-w-0 flex-1 ${
-                        isActive("/markets") ? "text-black" : "text-gray-500"
-                    }`}
+                    href="/Arenas"
+                    className={`flex flex-col items-center justify-center gap-0.5 min-w-0 flex-1 ${isActive("/arenas") ? "text-black" : "text-gray-500"
+                        }`}
                 >
                     <Image
                         src="/Icons/discover.png"
-                        alt="Markets"
+                        alt="Arenas"
                         width={20}
                         height={20}
                         className="w-5 h-5 flex-shrink-0"
                     />
-                    <span className="text-[10px] font-medium truncate">Markets</span>
+                    <span className="text-[10px] font-medium truncate">Arenas</span>
                 </Link>
 
                 <button
@@ -90,9 +88,8 @@ export function NavbarMobileBottomNav({
 
                 <Link
                     href="/leaderboard"
-                    className={`flex flex-col items-center justify-center gap-0.5 min-w-0 flex-1 ${
-                        isActive("/leaderboard") ? "text-black" : "text-gray-500"
-                    }`}
+                    className={`flex flex-col items-center justify-center gap-0.5 min-w-0 flex-1 ${isActive("/leaderboard") ? "text-black" : "text-gray-500"
+                        }`}
                 >
                     <svg
                         className="w-5 h-5 flex-shrink-0"
@@ -114,9 +111,8 @@ export function NavbarMobileBottomNav({
 
                 <Link
                     href={profileHref}
-                    className={`flex flex-col items-center justify-center gap-0.5 min-w-0 flex-1 ${
-                        isActive("/profile") ? "text-black" : "text-gray-500"
-                    }`}
+                    className={`flex flex-col items-center justify-center gap-0.5 min-w-0 flex-1 ${isActive("/profile") ? "text-black" : "text-gray-500"
+                        }`}
                 >
                     <svg
                         className="w-5 h-5 flex-shrink-0"

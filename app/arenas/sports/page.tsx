@@ -47,7 +47,7 @@ export default function SportsPage() {
                 {/* Header */}
                 <div className="text-center mb-10 sm:mb-14">
                     <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 mb-3">
-                        Sports Markets
+                        Sports Arenas
                     </h1>
                     <p className="text-gray-600 text-base sm:text-lg max-w-2xl mx-auto">
                         Predict outcomes, trade with others, and earn rewards on the biggest sporting
@@ -59,7 +59,7 @@ export default function SportsPage() {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 max-w-5xl mx-auto">
                     {sports.map((sport) => (
                         <Link
-                            href={`/markets/sports/${sport.slug}`}
+                            href={`/arenas/sports/${sport.slug}`}
                             key={sport.id}
                             className="bg-[#f8ede7] rounded-2xl p-5 shadow-sm border border-gray-400 hover:shadow-lg transition-all duration-300"
                         >
