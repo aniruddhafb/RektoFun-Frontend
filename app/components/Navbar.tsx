@@ -556,6 +556,7 @@ export default function Navbar() {
                 isActive={isActive}
                 profileHref={profileHref}
                 onSearchClick={() => setIsSearchModalOpen(true)}
+                isSearchOpen={isSearchModalOpen}
             />
         </>
     );

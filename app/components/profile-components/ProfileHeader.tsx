@@ -22,6 +22,7 @@ interface ProfileHeaderProps {
         totalChallenges: number;
         winRatio: number;
     };
+    twitterUsername?: string | null;
 }
 
 export function ProfileHeader({
@@ -32,6 +33,7 @@ export function ProfileHeader({
     joinedDate,
     balance,
     stats,
+    twitterUsername,
 }: ProfileHeaderProps) {
     const [walletCopied, setWalletCopied] = React.useState(false);
     const [profileCopied, setProfileCopied] = React.useState(false);
@@ -69,8 +71,8 @@ export function ProfileHeader({
             <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 lg:gap-8 flex-1 min-w-0">
                 {/* Avatar with glow effect */}
                 <div className="relative flex-shrink-0 mx-auto sm:mx-0">
-                    <div className="absolute inset-0 rounded-full blur-xl"></div>
-                    <div className="relative w-24 h-24 sm:w-32 sm:h-32 rounded-full ring-4 ring-orange-200 overflow-hidden">
+                    <div className="absolute inset-0 rounded-full blur-xl pointer-events-none"></div>
+                    <div className="relative z-10 w-24 h-24 sm:w-32 sm:h-32 rounded-full ring-4 ring-orange-200 overflow-hidden">
                         <Image
                             src={avatar}
                             alt={username}
@@ -79,6 +81,23 @@ export function ProfileHeader({
                             className="w-full h-full object-cover"
                         />
                     </div>
+                    {twitterUsername && (
+                        <a
+                            href={`https://x.com/${twitterUsername}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            aria-label={`${username} on Twitter/X`}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                window.open(`https://x.com/${twitterUsername}`, "_blank", "noopener,noreferrer");
+                            }}
+                            className="relative z-10 mt-3 mx-auto flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full bg-black text-white hover:bg-gray-800 transition-colors"
+                        >
+                            <svg className="w-3 h-3 sm:w-3.5 sm:h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M18.244 2H21.5l-7.1 8.114L22.75 22h-6.542l-5.122-6.65L5.27 22H2l7.592-8.682L1.75 2h6.708l4.63 6.08L18.244 2zm-1.146 18.06h1.804L7.48 3.84H5.55l11.548 16.22z" />
+                            </svg>
+                        </a>
+                    )}
                 </div>
 
                 {/* User Info */}

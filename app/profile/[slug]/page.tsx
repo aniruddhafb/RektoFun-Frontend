@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
+import { usePrivy } from "@privy-io/react-auth";
 import ChallengeDetailModal from "@/app/components/challenge-components/ChallengeDetailModal";
 import {
     ProfileHeader,
@@ -24,6 +25,7 @@ type TabType = "challenges" | "activity";
 export default function ProfilePage() {
     const BOOKMARKS_STORAGE_KEY = "rektofun:challenge-bookmarks";
     const params = useParams();
+    const { user: privyUser } = usePrivy();
     const slug = params.slug as string;
     const { solBalance, usdcBalance, solanaWallet } = useSolanaWallet();
     const [activeTab, setActiveTab] = useState<TabType>("challenges");
@@ -49,6 +51,13 @@ export default function ProfilePage() {
     });
 
     const walletFromSlug = decodeURIComponent(slug || "");
+    const linkedTwitter = privyUser?.linkedAccounts?.find((acc) => acc.type === "twitter_oauth");
+    const isOwnProfile = !!(
+        solanaWallet?.address &&
+        user?.wallet_address &&
+        solanaWallet.address === user.wallet_address
+    );
+    const twitterUsername = isOwnProfile ? linkedTwitter?.username ?? null : null;
 
     useEffect(() => {
         try {
@@ -156,6 +165,7 @@ export default function ProfilePage() {
                             avatar="/scribbles/pepe.png"
                             walletAddress={formatWalletAddress(slug)}
                             bio="No bio yet"
+                            twitterUsername={null}
                             joinedDate={new Date().toISOString()}
                             balance={{
                                 sol: 0,
@@ -184,6 +194,7 @@ export default function ProfilePage() {
                             avatar={user.profile_image || "/scribbles/pepe.png"}
                             walletAddress={formatWalletAddress(user.wallet_address)}
                             bio={user.description || "No bio yet"}
+                            twitterUsername={twitterUsername}
                             joinedDate={user.created_at}
                             balance={{
                                 sol: solBalance ?? user.earnings ?? 0,
