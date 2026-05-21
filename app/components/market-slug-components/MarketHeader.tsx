@@ -1,7 +1,6 @@
 "use client";
 
 import Image from "next/image";
-import { ChevronLeftIcon } from "../clan-slug-components";
 import Link from "next/link";
 
 interface MarketHeaderProps {
@@ -25,7 +24,7 @@ export function MarketHeader({
                     className="group flex items-center gap-2 text-sm font-semibold text-gray-600 hover:text-gray-900 transition-all duration-300"
                 >
                     <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-white/60 border border-gray-200/60 group-hover:bg-white/80 group-hover:border-gray-300/80 transition-all duration-300 shadow-sm">
-                        <ChevronLeftIcon className="w-4 h-4" />
+                        ←
                     </div>
                     <span className="sm:inline">Back to Markets</span>
                 </Link>
