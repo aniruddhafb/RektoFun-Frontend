@@ -3,28 +3,13 @@ import { ReactNode } from "react";
 
 function FlipCard({
     front,
-    backTitle,
-    backDescription,
 }: {
     front: ReactNode;
-    backTitle: string;
-    backDescription: string;
 }) {
     return (
-        <div className="group h-full min-h-[27rem] [perspective:1200px]">
-            <div className="relative h-full min-h-[27rem] [transform-style:preserve-3d] transition-transform duration-700 [transition-timing-function:cubic-bezier(0.22,0.61,0.36,1)] [will-change:transform] group-hover:[transform:rotateY(180deg)]">
-                <div className="relative h-full [backface-visibility:hidden] [-webkit-backface-visibility:hidden] [transform:rotateY(0deg)]">
-                    {front}
-                </div>
-                <div className="absolute inset-0 h-full min-h-[27rem] [backface-visibility:hidden] [-webkit-backface-visibility:hidden] [transform:rotateY(180deg)]">
-                    <div className="bg-[#1f2937] text-white rounded-2xl border border-gray-400 shadow-sm overflow-hidden h-full flex flex-col items-center justify-center p-7 text-center">
-                        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#f9c9b7] mb-3">
-                            RektoFun Edge
-                        </p>
-                        <h3 className="text-2xl font-bold leading-tight mb-3">{backTitle}</h3>
-                        <p className="text-sm text-gray-200 leading-relaxed">{backDescription}</p>
-                    </div>
-                </div>
+        <div className="group h-full min-h-[27rem] transition-all duration-300 hover:-translate-y-1">
+            <div className="h-full min-h-[27rem] rounded-2xl border border-transparent group-hover:border-[#e85a2d]/40 group-hover:bg-[#fff8f4] transition-colors duration-300">
+                {front}
             </div>
         </div>
     );
@@ -46,8 +31,6 @@ export function WaysToWinSection() {
 
                     {/* Card 1 — Crypto & Sports Markets */}
                     <FlipCard
-                        backTitle="Create Fast, Anytime"
-                        backDescription="Launch permissionless predictions in seconds and let the community jump in instantly."
                         front={
                             <div className="bg-white/80 rounded-2xl border border-gray-400 shadow-sm overflow-hidden flex flex-col h-full">
                         {/* Image area — peach background */}
@@ -103,8 +86,6 @@ export function WaysToWinSection() {
 
                     {/* Card 2 — PVP Battles */}
                     <FlipCard
-                        backTitle="Head-To-Head Pressure"
-                        backDescription="Outpredict your rivals, climb faster, and prove your edge in live battle-style challenges."
                         front={
                             <div className="bg-white/80 rounded-2xl border border-gray-400 shadow-sm overflow-hidden flex flex-col h-full">
                         {/* Image area — lavender background */}
@@ -163,8 +144,6 @@ export function WaysToWinSection() {
 
                     {/* Card 3 — REKTO Points */}
                     <FlipCard
-                        backTitle="Community-Powered Fairness"
-                        backDescription="Transparent voting keeps outcomes trusted, disputes clear, and competition honest."
                         front={
                             <div className="bg-white/80 rounded-2xl border border-gray-400 shadow-sm overflow-hidden flex flex-col h-full">
                         {/* Image area — cream/beige background */}

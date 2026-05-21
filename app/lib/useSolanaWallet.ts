@@ -24,6 +24,74 @@ type SharedBalanceEntry = {
 
 const sharedBalanceCache = new Map<string, SharedBalanceEntry>();
 
+async function fetchBalancesByWalletAddress(
+    walletAddress: string,
+    options?: { force?: boolean }
+): Promise<SharedBalanceSnapshot> {
+    const now = Date.now();
+    const cached = sharedBalanceCache.get(walletAddress);
+
+    if (!options?.force && cached?.value && cached.fetchedAt && now - cached.fetchedAt < BALANCE_CACHE_TTL_MS) {
+        return cached.value;
+    }
+
+    if (cached?.inFlight) {
+        return cached.inFlight;
+    }
+
+    const inFlight = (async () => {
+        const connection = getReadonlyConnection();
+        const walletPublicKey = new PublicKey(walletAddress);
+
+        const [tokenAccounts, solLamports] = await Promise.all([
+            connection.getParsedTokenAccountsByOwner(walletPublicKey, { mint: USDC_MINT }),
+            connection.getBalance(walletPublicKey),
+        ]);
+
+        const nextValue: SharedBalanceSnapshot = {
+            usdcBalance:
+                tokenAccounts.value.length > 0
+                    ? Number(tokenAccounts.value[0].account.data.parsed.info.tokenAmount.uiAmount ?? 0)
+                    : 0,
+            solBalance: solLamports / 1e9,
+        };
+
+        sharedBalanceCache.set(walletAddress, {
+            value: nextValue,
+            fetchedAt: Date.now(),
+        });
+
+        return nextValue;
+    })();
+
+    sharedBalanceCache.set(walletAddress, {
+        ...cached,
+        inFlight,
+    });
+
+    try {
+        return await inFlight;
+    } finally {
+        const latest = sharedBalanceCache.get(walletAddress);
+        if (latest?.inFlight === inFlight) {
+            sharedBalanceCache.set(walletAddress, {
+                value: latest.value,
+                fetchedAt: latest.fetchedAt,
+            });
+        }
+    }
+}
+
+export async function getWalletBalancesByAddress(
+    walletAddress: string,
+    options?: { force?: boolean }
+): Promise<SharedBalanceSnapshot> {
+    if (!isValidBase58Address(walletAddress)) {
+        throw new Error("Invalid Solana wallet address");
+    }
+    return fetchBalancesByWalletAddress(walletAddress, options);
+}
+
 /**
  * Validates if a string is a valid base58 Solana address.
  */
@@ -96,58 +164,7 @@ export function useSolanaWallet() {
     const publicKeyBase58 = adapter?.publicKey?.toBase58() ?? null;
 
     const fetchSharedBalances = useCallback(async (walletAddress: string, options?: { force?: boolean }): Promise<SharedBalanceSnapshot> => {
-        const now = Date.now();
-        const cached = sharedBalanceCache.get(walletAddress);
-
-        if (!options?.force && cached?.value && cached.fetchedAt && now - cached.fetchedAt < BALANCE_CACHE_TTL_MS) {
-            return cached.value;
-        }
-
-        if (cached?.inFlight) {
-            return cached.inFlight;
-        }
-
-        const inFlight = (async () => {
-            const connection = getReadonlyConnection();
-            const walletPublicKey = new PublicKey(walletAddress);
-
-            const [tokenAccounts, solLamports] = await Promise.all([
-                connection.getParsedTokenAccountsByOwner(walletPublicKey, { mint: USDC_MINT }),
-                connection.getBalance(walletPublicKey),
-            ]);
-
-            const nextValue: SharedBalanceSnapshot = {
-                usdcBalance:
-                    tokenAccounts.value.length > 0
-                        ? Number(tokenAccounts.value[0].account.data.parsed.info.tokenAmount.uiAmount ?? 0)
-                        : 0,
-                solBalance: solLamports / 1e9,
-            };
-
-            sharedBalanceCache.set(walletAddress, {
-                value: nextValue,
-                fetchedAt: Date.now(),
-            });
-
-            return nextValue;
-        })();
-
-        sharedBalanceCache.set(walletAddress, {
-            ...cached,
-            inFlight,
-        });
-
-        try {
-            return await inFlight;
-        } finally {
-            const latest = sharedBalanceCache.get(walletAddress);
-            if (latest?.inFlight === inFlight) {
-                sharedBalanceCache.set(walletAddress, {
-                    value: latest.value,
-                    fetchedAt: latest.fetchedAt,
-                });
-            }
-        }
+        return fetchBalancesByWalletAddress(walletAddress, options);
     }, []);
 
     const refreshBalances = useCallback(async () => {

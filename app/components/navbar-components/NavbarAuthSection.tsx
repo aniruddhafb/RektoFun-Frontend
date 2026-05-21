@@ -16,6 +16,7 @@ type NavbarAuthSectionProps = {
     onMouseLeaveDropdown: () => void;
     onToggleDropdown: () => void;
     onOpenDeposit: () => void;
+    onOpenWithdraw: () => void;
     profileHref: string;
     isMobileViewport: boolean;
 };
@@ -34,6 +35,7 @@ export function NavbarAuthSection({
     onMouseLeaveDropdown,
     onToggleDropdown,
     onOpenDeposit,
+    onOpenWithdraw,
     profileHref,
     isMobileViewport,
 }: NavbarAuthSectionProps) {
@@ -69,6 +71,7 @@ export function NavbarAuthSection({
                         onToggle={onToggleDropdown}
                         onLogout={onLogout}
                         onOpenDeposit={onOpenDeposit}
+                        onOpenWithdraw={onOpenWithdraw}
                         profileHref={profileHref}
                         isMobileViewport={isMobileViewport}
                     />

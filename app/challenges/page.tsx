@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic';
 
-import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ChallengeHeader } from "../components/challenge-components/ChallengeHeader";
 import { ChallengeFiltersSection } from "../components/challenge-components/ChallengeFiltersSection";
 import { FeedbackBanner } from "../components/challenge-components/FeedbackBanner";
@@ -11,7 +11,7 @@ import { RektLoadingOverlay } from "../components/RektLoadingOverlay";
 import { CreateChallengeModal } from "../components/challenge-components/CreateChallengeModal";
 import { ChallengeListItem } from "../lib/challenges-service/challenges";
 import ChallengeDetailModal from "../components/challenge-components/ChallengeDetailModal";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { getMarkets } from "../lib/markets-service/market";
 
 function ChallengesContent() {
@@ -47,7 +47,6 @@ function ChallengesContent() {
       return [];
     }
   });
-  const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
   const lastClosedDeepLinkIdRef = useRef<string | null>(null);
@@ -84,12 +83,18 @@ function ChallengesContent() {
   const closeDetailModal = () => {
     setIgnoreDeepLink(true);
 
-    const activeDeepLinkId = searchParams.get("challengeId");
+    const activeDeepLinkId =
+      typeof window !== "undefined"
+        ? new URLSearchParams(window.location.search).get("challengeId")
+        : null;
     if (activeDeepLinkId) {
       lastClosedDeepLinkIdRef.current = activeDeepLinkId;
     }
 
-    const nextParams = new URLSearchParams(searchParams.toString());
+    const nextParams =
+      typeof window !== "undefined"
+        ? new URLSearchParams(window.location.search)
+        : new URLSearchParams();
     nextParams.delete("challengeId");
     const nextQuery = nextParams.toString();
     const nextUrl = nextQuery ? `${pathname}?${nextQuery}` : pathname;
@@ -109,7 +114,8 @@ function ChallengesContent() {
     // If we are intentionally ignoring deep link handling (e.g., during manual close), skip.
     if (ignoreDeepLink) return;
 
-    const deepLinkChallengeId = searchParams.get("challengeId");
+    if (typeof window === "undefined") return;
+    const deepLinkChallengeId = new URLSearchParams(window.location.search).get("challengeId");
     if (!deepLinkChallengeId) {
       lastClosedDeepLinkIdRef.current = null;
       return;
@@ -123,7 +129,7 @@ function ChallengesContent() {
 
     setSelectedChallenge(matchedChallenge);
     setIsDetailModalOpen(true);
-  }, [challenges, isDetailModalOpen, searchParams, selectedChallenge?.id, ignoreDeepLink]);
+  }, [challenges, isDetailModalOpen, pathname, selectedChallenge?.id, ignoreDeepLink]);
 
   async function handleRekt(challenge: ChallengeListItem) {
     setRektTarget(challenge);
@@ -264,10 +270,6 @@ function ChallengesContent() {
 }
 
 export default function ChallengesPage() {
-  return (
-    <Suspense fallback={<div />}>
-      <ChallengesContent />
-    </Suspense>
-  );
+  return <ChallengesContent />;
 }
 

@@ -28,21 +28,10 @@ interface ChallengeCardProps {
 }
 
 // Helper types for metadata structure
-interface UIMetadata {
-    title?: string;
-    subtitle?: string;
-}
-
 interface AssetMetadata {
     symbol?: string;
     name?: string;
     icon?: string;
-}
-
-interface BetMetadata {
-    amount?: number;
-    currency?: string;
-    display?: string;
 }
 
 interface ModeMetadata {
@@ -57,10 +46,6 @@ interface LabelsMetadata {
     no?: string;
 }
 
-interface PoolMetadata {
-    currency?: string;
-    display?: string;
-}
 
 function parseDateValue(value: string | number | null | undefined): number | null {
     if (typeof value === "number") {
@@ -195,7 +180,6 @@ function formatExactCountdownDetails(timestamp: number | null, nowMs: number): {
     };
 }
 
-// Helper types for resolution_details
 export function ChallengeCard({
     challenge,
     onClick,
@@ -348,9 +332,6 @@ export function ChallengeCard({
             setBetError("");
             setIsLoading(true);
 
-            // ── 1. Load the challenge from the centralized DB.
-            //      The on-chain PDA was persisted in metadata at creation time,
-            //      so we don't need to scan every on-chain account.
             const challengeDetails = await getChallengeById(challenge.id);
 
             const onchainMeta =
@@ -378,19 +359,12 @@ export function ChallengeCard({
             const challengePDA = new PublicKey(challengePdaStr);
             const creatorPubkey = new PublicKey(creatorWalletStr);
 
-            // ── 2. Verify the on-chain account is still joinable.
-            //      Single fetch by PDA — O(1), no full-table scan.
             const onChainChallenge = await fetchChallenge(program, challengePDA);
             if (!onChainChallenge) {
                 throw new Error(
                     "On-chain challenge account not found. It may have been cancelled or settled."
                 );
             }
-            // if (onChainChallenge.status !== "Open") {
-            //     throw new Error(
-            //         `Challenge is no longer open (status: ${onChainChallenge.status}).`
-            //     );
-            // }
             if (Date.now() / 1000 >= onChainChallenge.expiresAt) {
                 throw new Error("Challenge has already expired.");
             }
@@ -398,21 +372,9 @@ export function ChallengeCard({
                 throw new Error("You cannot accept your own challenge.");
             }
 
-            // ── 3. The on-chain `accept_challenge` instruction transfers exactly
-            //      `challenge.bet_amount` USDC micro-units from the challenger to
-            //      the same vault PDA the creator funded. To keep amounts in sync,
-            //      we lock the opponent's bet to that exact amount.
             const requiredBetUsdc =
                 Number(onChainChallenge.betAmount) / 1_000_000;
 
-            // if (Math.abs(parsedBetAmount - requiredBetUsdc) > 1e-9) {
-            //     throw new Error(
-            //         `This challenge requires an exact ${requiredBetUsdc} ${betCurrency} match (the creator's bet). Your USDC will be locked into the same on-chain vault.`
-            //     );
-            // }
-
-            // ── 4. Build, sign and send the accept_challenge tx.
-            //      sendTransaction internally confirms before returning.
             const tx = await buildAcceptChallengeTx(
                 program,
                 publicKey,
@@ -423,7 +385,6 @@ export function ChallengeCard({
             const signature = await sendTransaction(tx);
             await refreshBalances();
 
-            // ── 5. Tell the backend the user joined (off-chain bookkeeping).
             await joinChallenge({
                 challenge_id: challenge.id,
                 user_id: user.id,
@@ -478,18 +439,11 @@ export function ChallengeCard({
         onToggleBookmark?.(challenge.id);
     };
 
-    // ChallengeListItem doesn't have metadata or resolution_details in the same way as Challenge
-    // We use the flattened properties provided by ChallengeListItem
-    const uiMeta: UIMetadata = {};
     const market = challenge.market ?? null;
     const assetMeta: AssetMetadata = {
         symbol: market?.name,
         name: market?.name,
         icon: market?.icon,
-    };
-    const betMeta: BetMetadata = {
-        amount: challenge.initial_bet,
-        currency: "USDC",
     };
     const modeMeta: ModeMetadata = {
         type: challenge.mode === "pool" ? "multi" : "pvp",
@@ -512,28 +466,15 @@ export function ChallengeCard({
         return 0;
     })();
 
-    const poolMeta: PoolMetadata = {
-        display: `$${resolvedPoolAmount}`,
-    };
-
-    // Determine mode: pvp or multi (mapped from pvp/pool)
     const challengeMode: "pvp" | "multi" = modeMeta.type || "pvp";
+    const hasWon = challenge.status === "resolved" && challenge.result && (challenge.result as Record<string, unknown>).winner === "current_user_id";
+    const hasLost = challenge.status === "resolved" && challenge.result && (challenge.result as Record<string, unknown>).winner !== "current_user_id";
 
-    // Helper values derived from metadata
-    const isAccepted = challenge.status === "locked" || challenge.status === "resolved";
-
-    // ChallengeListItem doesn't have created_by, but we can check result if available
-    // Since we don't have created_by in ChallengeListItem, we might need to adjust this logic
-    // For now, let's assume we can't determine win/loss without the creator's ID
-    const hasWon = challenge.status === "resolved" && challenge.result && (challenge.result as Record<string, unknown>).winner === "current_user_id"; // Placeholder
-    const hasLost = challenge.status === "resolved" && challenge.result && (challenge.result as Record<string, unknown>).winner !== "current_user_id"; // Placeholder
-
-    // Get asset info
     const assetSymbol = assetMeta.symbol || assetMeta.name || "BTC";
     const assetIcon = assetMeta.icon || "/scribbles/btc.png";
     const assetName = assetMeta.name || assetSymbol;
     const creatorName = labelsMeta.creator || creator.username || "Creator";
-    const creatorDisplayName = truncateProfileName(creatorName, 6);
+    const creatorDisplayName = truncateProfileName(creatorName, 10);
     const creatorWalletDisplay = formatWalletAddress(creator.wallet_address);
     const creatorProfileImage = creator.profile_image || assetIcon;
     const opponentInfo = challenge.opponent_info ?? null;
@@ -542,27 +483,21 @@ export function ChallengeCard({
     const opponentDisplayName = opponentInfo?.username || "Opponent";
     const opponentWalletDisplay = formatWalletAddress(opponentInfo?.wallet_address);
 
-    // Get title
-    const title = uiMeta.title || challenge.title || `Bet on ${assetSymbol}`;
+    const title = challenge.title || `Bet on ${assetSymbol}`;
 
-    // Get bet amount
-    const betAmount = betMeta.amount || 0;
-    const betCurrency = betMeta.currency || "USDC";
+    const betAmount = challenge.initial_bet || 0;
+    const betCurrency = "USDC";
 
-    // Get pool display
-    const poolDisplay = poolMeta.display || "$0 USDC";
+    const poolDisplay = `$${resolvedPoolAmount}` || "$0 USDC";
 
-    // Calculate time remaining from expire_time
     const expiryTimestamp = parseDateValue(challenge.expire_time);
     const timeRemaining = formatExpiryCountdown(expiryTimestamp, currentTime);
-    const hasChallengeExpired = Boolean(expiryTimestamp && expiryTimestamp <= currentTime && !isAccepted);
     const isExpiryUnderOneHour = Boolean(
         expiryTimestamp &&
         expiryTimestamp > currentTime &&
         (expiryTimestamp - currentTime) < 60 * 60 * 1000
     );
 
-    // Get resolution condition value for display
     const createdTimeText = formatCreatedTimeAgo(parseDateValue(challenge.created_at));
     const resolveTimestamp = parseDateValue(challenge.resolve_time);
     const challengeEndTimeText = formatUtcDateTime(resolveTimestamp);
@@ -660,7 +595,6 @@ export function ChallengeCard({
     const isOngoingCta = ctaLabel.startsWith("ONGOING");
     const showCreatorCtaHoverHint = isCreator && ctaLabel === "COUNTER";
     const isBattleOnState = !isResolveTimeAchieved && hasOpponents;
-    const isChallengeExpiredState = isExpireTimeAchieved && !hasOpponents;
     const isResolvingState = isResolveTimeAchieved && hasOpponents && isResolutionPending;
     const isCompletedState = isResolveTimeAchieved && hasOpponents && isResolutionResolved;
     const isExpiresInState = !isExpireTimeAchieved && !hasOpponents;
@@ -671,23 +605,23 @@ export function ChallengeCard({
             ? "Challenge is resolving"
             : isBattleOnState
                 ? "The battle is on"
-                : isChallengeExpiredState
+                : isExpireTimeAchieved && !hasOpponents
                     ? "Challenge expired"
-                    : "Challenge expires in";
+                    : "Expires in";
     const expiryTooltipText = isCompletedState
         ? "this challenge has been resolved and marked completed."
         : isResolvingState
             ? "resolve time has been reached and this challenge is currently resolving."
             : isBattleOnState
                 ? `max opponents have joined and the battle is live. It resolves in ${endsByCountdown}.`
-                : isChallengeExpiredState
+                : isExpireTimeAchieved && !hasOpponents
                     ? "expire time was reached before anyone joined, so this challenge has expired."
                     : `no opponents yet. This challenge will expire in ${timeRemaining} if nobody joins.`;
 
     return (
         <>
             <div
-                className="block overflow-hidden rounded border border-gray-700 bg-[#f8ede7] p-3 shadow-sm transition-shadow hover:shadow-lg sm:p-4"
+                className="block overflow-hidden rounded border border-gray-400 bg-[#f8ede7] p-3 shadow-sm transition-shadow hover:shadow-lg sm:p-4"
             >
                 {/* Header */}
                 <div className="mb-3 flex items-start justify-between gap-2">
@@ -859,7 +793,7 @@ export function ChallengeCard({
                                 <div className="mt-2 w-full text-center">
                                     <p className="break-words font-bold text-[#2d1f1a] text-xs">{creatorDisplayName}</p>
                                     <p className="mt-0.5 break-all text-[10px] text-[#8b7355]">
-                                        {hasWon ? "Won!" : hasLost ? "Lost" : creatorWalletDisplay}
+                                        {hasWon ? "Won!" : hasLost ? "Lost" : ""}
                                     </p>
                                 </div>
                             </div>
@@ -884,7 +818,10 @@ export function ChallengeCard({
                         {/* VS Badge or Pending Badge */}
                         <div className="flex flex-col items-center justify-center px-1 sm:px-2">
                             <>
-                                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-[#2d1f1a] to-[#4a3830] shadow-lg sm:h-12 sm:w-12">
+                                {/* VS BADGE  */}
+                                <div
+                                    className={`flex h-10 w-10 items-center sm:h-12 sm:w-12 justify-center ${isOngoingCta ? "rounded-full bg-gradient-to-br from-[#2d1f1a] to-[#4a3830] shadow-lg" : ""}`}
+                                >
                                     {isOngoingCta ? (
                                         <video
                                             src="/animations/Sword%20Battle.webm"
@@ -895,24 +832,30 @@ export function ChallengeCard({
                                             className="h-8 w-8 object-contain sm:h-10 sm:w-10"
                                         />
                                     ) : (
-                                        <span className="text-base font-black text-[#f3e1d7] sm:text-lg">VS</span>
+                                        <Image
+                                            src="/animations/versus.png"
+                                            alt="Versus"
+                                            width={60}
+                                            height={60}
+                                            className="h-14 w-14 object-contain sm:h-14 sm:w-14"
+                                        />
                                     )}
                                 </div>
+
                                 {/* Pool Display */}
-                                <div className="mt-2 rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-1 text-center sm:px-3 sm:py-1.5">
-                                    <div className="flex items-center justify-center gap-1">
-                                        <span className="text-[9px] text-emerald-600 font-medium">Pool</span>
+                                <div className="mt-2 text-center">
+                                    <div className="flex items-center justify-center">
                                         <div className="group relative">
-                                            <svg className="w-3 h-3 text-emerald-500 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                            </svg>
+                                            <span className="inline-flex rounded-full border border-emerald-300 bg-white/70 px-2 py-0.5 text-[9px] text-emerald-600 font-medium cursor-help">
+                                                Total Pool
+                                            </span>
                                             <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 text-center">
                                                 the total money locked in the escrow contract
                                                 <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
                                             </div>
                                         </div>
                                     </div>
-                                    <p className="text-xs font-bold text-emerald-600 sm:text-sm">{poolDisplay}</p>
+                                    <p className="text-[14px] font-extrabold text-emerald-600 sm:text-[20px]">{poolDisplay}</p>
                                 </div>
                             </>
                         </div>
@@ -962,7 +905,7 @@ export function ChallengeCard({
                                     <div className="mt-2 w-full text-center">
                                         <p className="break-words font-bold text-[#2d1f1a] text-xs">{opponentDisplayName}</p>
                                         <p className="mt-0.5 break-all text-[10px] text-[#8b7355]">
-                                            {hasLost ? "Won!" : hasWon ? "Lost" : opponentWalletDisplay}
+                                            {hasLost ? "Won!" : hasWon ? "Lost" : ""}
                                         </p>
                                     </div>
                                 </div>
@@ -995,12 +938,11 @@ export function ChallengeCard({
                                     </div>
                                     {isExpireTimeAchieved && !hasOpponents ? (
                                         <div className="mt-2 text-center">
-                                            <p className="text-[10px] text-[#8b7355] mt-0.5">No one joined, challenge expired!</p>
+                                            <p className="font-bold text-[#8b7355] text-xs">No one yet!</p>
                                         </div>
                                     ) :
                                         (<div className="mt-2 text-center">
-                                            <p className="font-semibold text-[#8b7355] text-xs">No one yet!</p>
-                                            <p className="text-[10px] text-[#8b7355] mt-0.5">Be the first to join!</p>
+                                            <p className="font-bold text-[#8b7355] text-xs">No one yet!</p>
                                         </div>)}
                                     {!isExpireTimeAchieved && !isCreator && isPoolMode && (
                                         <button
@@ -1073,38 +1015,40 @@ export function ChallengeCard({
                 />
 
                 {/* Challenge Expiry */}
-                <div className="mt-1.5 flex flex-wrap items-center justify-center gap-1.5 text-center text-xs text-gray-600">
-                    {isExpiresInState ? (
-                        <>
-                            <span>{expiryStatusText}</span>
-                            <span className={`font-medium ${isExpiryUnderOneHour ? "text-red-600" : "text-gray-900"}`}>
-                                {timeRemaining}
+                {!isExpireTimeAchieved && (
+                    <div className="mt-1.5 flex flex-wrap items-center justify-center gap-1.5 text-center text-xs text-gray-600">
+                        {isExpiresInState ? (
+                            <>
+                                <span>{expiryStatusText}</span>
+                                <span className={`font-medium ${isExpiryUnderOneHour ? "text-red-600" : "text-gray-900"}`}>
+                                    {timeRemaining}
+                                </span>
+                            </>
+                        ) : (
+                            <span
+                                className={`font-semibold ${isCompletedState
+                                    ? "text-gray-700"
+                                    : isResolvingState
+                                        ? "text-amber-700"
+                                        : isBattleOnState
+                                            ? "text-[#008080]"
+                                            : "text-red-600"
+                                    }`}
+                            >
+                                {expiryStatusText}
                             </span>
-                        </>
-                    ) : (
-                        <span
-                            className={`font-semibold ${isCompletedState
-                                ? "text-gray-700"
-                                : isResolvingState
-                                    ? "text-amber-700"
-                                    : isBattleOnState
-                                        ? "text-[#008080]"
-                                        : "text-red-600"
-                                }`}
-                        >
-                            {expiryStatusText}
-                        </span>
-                    )}
-                    <div className="group relative">
-                        <svg className="w-3.5 h-3.5 text-gray-400 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10">
-                            {expiryTooltipText}
-                            <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
+                        )}
+                        <div className="group relative">
+                            <svg className="w-3.5 h-3.5 text-gray-400 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10">
+                                {expiryTooltipText}
+                                <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
+                            </div>
                         </div>
                     </div>
-                </div>
+                )}
 
                 {/* Divider */}
                 <div className="border-t border-gray-200 my-2"></div>
@@ -1115,7 +1059,7 @@ export function ChallengeCard({
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
-                        <span className="min-w-0 break-words text-xs sm:text-sm">Created <span className="font-semibold text-gray-900">{createdTimeText}</span></span>
+                        <span className="min-w-0 break-words text-xs sm:text-sm"><span className="font-semibold text-gray-900">{createdTimeText}</span></span>
                         <div className="group relative">
                             <svg className="w-3.5 h-3.5 text-gray-400 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -1127,8 +1071,7 @@ export function ChallengeCard({
                         </div>
                     </div>
                     <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-3">
-                        <button
-                            type="button"
+                        <div
                             onClick={handleShareChallenge}
                             className="flex flex-col items-center p-2 rounded-lg transition-colors cursor-pointer"
                             title="Share challenge link"
@@ -1137,7 +1080,7 @@ export function ChallengeCard({
                             <svg className="w-5 h-5 text-gray-500 hover:text-gray-900 " fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
                             </svg>
-                        </button>
+                        </div>
                         {/* Eye Icon */}
                         <div className="flex items-center gap-1">
                             <span className="font-semibold text-gray-900">0</span>

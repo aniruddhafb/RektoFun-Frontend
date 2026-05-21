@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
+import { usePrivy } from "@privy-io/react-auth";
 import ChallengeDetailModal from "@/app/components/challenge-components/ChallengeDetailModal";
 import {
     ProfileHeader,
@@ -10,8 +11,9 @@ import {
     ProfileActivity,
 } from "@/app/components/profile-components";
 import { LoadingPage } from "@/app/components/LoadingPage";
-import { getUserByWallet, User } from "@/app/lib/users-service/users";
-import { useSolanaWallet } from "@/app/lib/useSolanaWallet";
+import { followUser, getUserByWallet, unfollowUser, User } from "@/app/lib/users-service/users";
+import { getWalletBalancesByAddress, useSolanaWallet } from "@/app/lib/useSolanaWallet";
+import { useUserStore } from "@/app/store/useUserStore";
 import {
     ChallengeListItem,
     getChallenges,
@@ -24,8 +26,10 @@ type TabType = "challenges" | "activity";
 export default function ProfilePage() {
     const BOOKMARKS_STORAGE_KEY = "rektofun:challenge-bookmarks";
     const params = useParams();
+    const { user: privyUser } = usePrivy();
+    const { user: currentUser } = useUserStore();
     const slug = params.slug as string;
-    const { solBalance, usdcBalance, solanaWallet } = useSolanaWallet();
+    const { solanaWallet } = useSolanaWallet();
     const [activeTab, setActiveTab] = useState<TabType>("challenges");
     const [selectedChallenge, setSelectedChallenge] = useState<ChallengeListItem | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -34,6 +38,9 @@ export default function ProfilePage() {
     const [error, setError] = useState<string | null>(null);
     const [userChallenges, setUserChallenges] = useState<ChallengeListItem[]>([]);
     const [challengesLoading, setChallengesLoading] = useState(false);
+    const [profileSolBalance, setProfileSolBalance] = useState<number | null>(null);
+    const [profileUsdcBalance, setProfileUsdcBalance] = useState<number | null>(null);
+    const [isFollowActionLoading, setIsFollowActionLoading] = useState(false);
     const [bookmarkedChallengeIds, setBookmarkedChallengeIds] = useState<string[]>(() => {
         if (typeof window === "undefined") return [];
         try {
@@ -49,6 +56,16 @@ export default function ProfilePage() {
     });
 
     const walletFromSlug = decodeURIComponent(slug || "");
+    const linkedTwitter = privyUser?.linkedAccounts?.find((acc) => acc.type === "twitter_oauth");
+    const isOwnProfile = !!(
+        solanaWallet?.address &&
+        user?.wallet_address &&
+        solanaWallet.address === user.wallet_address
+    );
+    const twitterUsername = isOwnProfile ? linkedTwitter?.username ?? null : null;
+    const viewerWalletAddress = solanaWallet?.address ?? null;
+    const viewerUserId = currentUser?.id ?? null;
+    const isFollowing = !!(viewerUserId && user?.followers?.includes(viewerUserId));
 
     useEffect(() => {
         try {
@@ -119,6 +136,29 @@ export default function ProfilePage() {
         fetchUserChallenges();
     }, [user?.id]);
 
+    // Fetch balances for the profile wallet (slug user), not the connected viewer wallet.
+    useEffect(() => {
+        async function fetchProfileBalances() {
+            if (!user?.wallet_address) {
+                setProfileSolBalance(null);
+                setProfileUsdcBalance(null);
+                return;
+            }
+
+            try {
+                const snapshot = await getWalletBalancesByAddress(user.wallet_address);
+                setProfileSolBalance(snapshot.solBalance);
+                setProfileUsdcBalance(snapshot.usdcBalance);
+            } catch (balanceError) {
+                console.error("Failed to fetch profile wallet balances:", balanceError);
+                setProfileSolBalance(null);
+                setProfileUsdcBalance(null);
+            }
+        }
+
+        fetchProfileBalances();
+    }, [user?.wallet_address]);
+
     // Handle challenge card click
     const handleChallengeClick = (challenge: ChallengeListItem) => {
         setSelectedChallenge(challenge);
@@ -131,13 +171,21 @@ export default function ProfilePage() {
         setTimeout(() => setSelectedChallenge(null), 300);
     };
 
-    // Format wallet address for display (shorten it)
-    const formatWalletAddress = (address: string) => {
-        if (address.length > 10) {
-            return `${address.slice(0, 6)}...${address.slice(-4)}`;
+    const handleToggleFollow = useCallback(async () => {
+        if (!viewerWalletAddress || !user?.wallet_address || isOwnProfile) return;
+
+        try {
+            setIsFollowActionLoading(true);
+            const updatedTarget = isFollowing
+                ? await unfollowUser(user.wallet_address, viewerWalletAddress)
+                : await followUser(user.wallet_address, viewerWalletAddress);
+            setUser(updatedTarget);
+        } catch (followError) {
+            console.error("Failed to toggle follow:", followError);
+        } finally {
+            setIsFollowActionLoading(false);
         }
-        return address;
-    };
+    }, [viewerWalletAddress, isOwnProfile, isFollowing, user]);
 
     if (loading) {
         return <LoadingPage variant="simple" message="Loading profile..." />;
@@ -154,8 +202,9 @@ export default function ProfilePage() {
                         <ProfileHeader
                             username={slug}
                             avatar="/scribbles/pepe.png"
-                            walletAddress={formatWalletAddress(slug)}
+                            walletAddress={slug}
                             bio="No bio yet"
+                            twitterUsername={null}
                             joinedDate={new Date().toISOString()}
                             balance={{
                                 sol: 0,
@@ -182,14 +231,21 @@ export default function ProfilePage() {
                         <ProfileHeader
                             username={user.username}
                             avatar={user.profile_image || "/scribbles/pepe.png"}
-                            walletAddress={formatWalletAddress(user.wallet_address)}
+                            walletAddress={user.wallet_address}
                             bio={user.description || "No bio yet"}
+                            twitterUsername={twitterUsername}
+                            isOwnProfile={isOwnProfile}
+                            isFollowing={isFollowing}
+                            followersCount={user.followers?.length ?? 0}
+                            followingCount={user.following?.length ?? 0}
+                            onToggleFollow={handleToggleFollow}
+                            isFollowActionLoading={isFollowActionLoading}
                             joinedDate={user.created_at}
                             balance={{
-                                sol: solBalance ?? user.earnings ?? 0,
-                                solUsd: (solBalance ?? user.earnings ?? 0) * 165, // Approximate SOL to USD
-                                usdc: usdcBalance ?? 0,
-                                usdcUsd: usdcBalance ?? 0, // USDC is 1:1 with USD
+                                sol: profileSolBalance ?? user.earnings ?? 0,
+                                solUsd: (profileSolBalance ?? user.earnings ?? 0) * 165, // Approximate SOL to USD
+                                usdc: profileUsdcBalance ?? 0,
+                                usdcUsd: profileUsdcBalance ?? 0, // USDC is 1:1 with USD
                             }}
                             stats={{
                                 wins: userChallenges.filter((c) => c.status === "resolved").length,

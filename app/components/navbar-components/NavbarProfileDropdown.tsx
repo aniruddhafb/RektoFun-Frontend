@@ -17,6 +17,7 @@ type NavbarProfileDropdownProps = {
     onToggle: () => void;
     onLogout: () => void;
     onOpenDeposit: () => void;
+    onOpenWithdraw: () => void;
     profileHref: string;
     isMobileViewport: boolean;
 };
@@ -44,7 +45,7 @@ function MenuAction(props: MenuActionProps) {
     );
 
     const className =
-        "flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:text-black transition-colors cursor-pointer";
+        "flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:text-black no-underline transition-colors cursor-pointer";
 
     if ("href" in props && props.href) {
         return (
@@ -58,7 +59,7 @@ function MenuAction(props: MenuActionProps) {
         <button
             type="button"
             onClick={props.onClick}
-            className={`w-full ${className}`}
+            className={`w-full text-left bg-transparent border-0 ${className}`}
         >
             {content}
         </button>
@@ -77,6 +78,7 @@ export function NavbarProfileDropdown({
     onToggle,
     onLogout,
     onOpenDeposit,
+    onOpenWithdraw,
     profileHref,
     isMobileViewport,
 }: NavbarProfileDropdownProps) {
@@ -93,7 +95,7 @@ export function NavbarProfileDropdown({
             <button
                 type="button"
                 onClick={isMobileViewport ? onToggle : undefined}
-                className="flex items-center gap-2 p-1 pr-3 rounded-full bg-white/50 border border-gray-400 hover:bg-white/80 transition-all cursor-pointer"
+                className="flex items-center gap-2 px-[4px] py-[2px] pr-3 rounded-full bg-white/50 border border-gray-400 hover:bg-white/80 transition-all cursor-pointer"
             >
                 {displayProfileImage ? (
                     <Image
@@ -172,34 +174,60 @@ export function NavbarProfileDropdown({
                             {/* User Balance Display */}
                             <div className="px-4 py-3 mx-2 mb-1 rounded-xl bg-gradient-to-r from-gray-50 to-gray-100 border border-gray-200">
                                 <p className="text-xs text-gray-500 mb-1.5">Your USDC Balance</p>
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center justify-between gap-2">
                                     <span className="text-base font-semibold text-gray-900">{balanceDisplay}</span>
+                                    <div className="flex items-center gap-1.5">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                onClose();
+                                                onOpenWithdraw();
+                                            }}
+                                            className="w-7 h-7 rounded-full bg-white border border-gray-200 text-gray-700 hover:bg-gray-100 hover:text-black transition-colors flex items-center justify-center cursor-pointer"
+                                            aria-label="Withdraw funds"
+                                            title="Withdraw funds"
+                                        >
+                                            <svg
+                                                className="w-4 h-4"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                viewBox="0 0 24 24"
+                                            >
+                                                <path
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                    strokeWidth={2}
+                                                    d="M17 8l4 4m0 0l-4 4m4-4H3"
+                                                />
+                                            </svg>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                onClose();
+                                                onOpenDeposit();
+                                            }}
+                                            className="w-7 h-7 rounded-full bg-white border border-gray-200 text-gray-700 hover:bg-gray-100 hover:text-black transition-colors flex items-center justify-center cursor-pointer"
+                                            aria-label="Deposit funds"
+                                            title="Deposit funds"
+                                        >
+                                            <svg
+                                                className="w-4 h-4"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                viewBox="0 0 24 24"
+                                            >
+                                                <path
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                    strokeWidth={2}
+                                                    d="M12 5v14m-7-7h14"
+                                                />
+                                            </svg>
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
-
-                            <MenuAction
-                                onClick={() => {
-                                    onClose();
-                                    onOpenDeposit();
-                                }}
-                                icon={
-                                    <svg
-                                        className="w-5 h-5 text-gray-500"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        viewBox="0 0 24 24"
-                                    >
-                                        <path
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            strokeWidth={2}
-                                            d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                                        />
-                                    </svg>
-                                }
-                            >
-                                Deposit Funds
-                            </MenuAction>
 
                             <MenuAction
                                 href="/referral"
@@ -377,8 +405,7 @@ export function NavbarProfileDropdown({
 
                             <div className="my-2 border-t border-gray-200" />
 
-                            <button
-                                type="button"
+                            <div
                                 onClick={() => {
                                     onClose();
                                     onLogout();
@@ -399,7 +426,7 @@ export function NavbarProfileDropdown({
                                     />
                                 </svg>
                                 Logout
-                            </button>
+                            </div>
                         </div>
                     </div>
                 </div>

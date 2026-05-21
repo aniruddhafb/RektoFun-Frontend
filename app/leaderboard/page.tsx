@@ -2,7 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { getLeaderboard, type LeaderboardUser } from "../lib/users-service/users";
+import { LoadingPage } from "../components/LoadingPage";
 
 const SparkleIcon = ({ className }: { className?: string }) => (
     <svg className={className} width="12" height="12" viewBox="0 0 12 12" fill="none">
@@ -63,6 +65,7 @@ const ChevronIcon = ({ direction }: { direction: "up" | "down" }) => (
 
 type LeaderboardRow = {
     id: string;
+    walletAddress: string;
     rank: number;
     username: string;
     avatar: string;
@@ -71,6 +74,14 @@ type LeaderboardRow = {
     challenges: number;
     winRate: string;
     earnings: string;
+};
+
+type SortField = "rank" | "wins" | "rekts" | "challenges" | "earnings";
+type SortOrder = "desc" | "asc";
+
+const SortIndicator = ({ active, order }: { active: boolean; order: SortOrder }) => {
+    if (!active) return <span className="text-gray-300">↕</span>;
+    return <ChevronIcon direction={order === "asc" ? "up" : "down"} />;
 };
 
 function mapUserToRow(user: LeaderboardUser, rank: number): LeaderboardRow {
@@ -82,6 +93,7 @@ function mapUserToRow(user: LeaderboardUser, rank: number): LeaderboardRow {
 
     return {
         id: user.id,
+        walletAddress: user.wallet_address,
         rank,
         username: user.username || `user-${user.wallet_address.slice(0, 6)}`,
         avatar: user.profile_image || "/scribbles/pepe.png",
@@ -110,7 +122,10 @@ async function fetchAllLeaderboardUsers(): Promise<LeaderboardUser[]> {
 }
 
 export default function LeaderboardPage() {
+    const router = useRouter();
     const [searchQuery, setSearchQuery] = useState("");
+    const [sortField, setSortField] = useState<SortField>("rank");
+    const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
     const [currentPage, setCurrentPage] = useState(1);
     const [rows, setRows] = useState<LeaderboardRow[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -140,9 +155,19 @@ export default function LeaderboardPage() {
         [rows, searchQuery]
     );
 
-    const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+    const sortedData = useMemo(() => {
+        const sorted = [...filteredData];
+        sorted.sort((a, b) => {
+            const direction = sortOrder === "asc" ? 1 : -1;
+            if (sortField === "earnings") return (Number(a.earnings) - Number(b.earnings)) * direction;
+            return ((a[sortField] as number) - (b[sortField] as number)) * direction;
+        });
+        return sorted;
+    }, [filteredData, sortField, sortOrder]);
+
+    const totalPages = Math.ceil(sortedData.length / itemsPerPage);
     const startIndex = (currentPage - 1) * itemsPerPage;
-    const paginatedData = filteredData.slice(startIndex, startIndex + itemsPerPage);
+    const paginatedData = sortedData.slice(startIndex, startIndex + itemsPerPage);
     const totalEarned = rows.reduce((sum, row) => sum + Number(row.earnings), 0);
 
     const handlePageChange = (page: number) => {
@@ -150,6 +175,20 @@ export default function LeaderboardPage() {
             setCurrentPage(page);
         }
     };
+
+    const handleSort = (field: SortField) => {
+        setCurrentPage(1);
+        if (sortField === field) {
+            setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
+            return;
+        }
+        setSortField(field);
+        setSortOrder("desc");
+    };
+
+    if (isLoading) {
+        return <LoadingPage variant="simple" message="Loading leaderboard..." />;
+    }
 
     return (
         <div className="min-h-screen" style={{ backgroundColor: "#f3e1d7" }}>
@@ -203,9 +242,9 @@ export default function LeaderboardPage() {
                     </div>
                 </div>
 
-                <div className="mb-6">
-                    <div className="relative max-w-md">
-                        <div className="absolute left-4 top-1/2 -translate-y-1/2">
+                <div className="mb-6 flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
+                    <div className="relative max-w-md w-full">
+                        <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none">
                             <SearchIcon />
                         </div>
                         <input
@@ -225,24 +264,37 @@ export default function LeaderboardPage() {
                     <div className="overflow-x-auto">
                         <div className="min-w-[800px]">
                             <div className="grid grid-cols-12 gap-4 px-6 py-4 border-b border-white/50 text-sm font-medium text-gray-600">
-                                <div className="col-span-1">Rank</div>
+                                <div onClick={() => handleSort("rank")} className="cursor-pointer col-span-1 text-left flex items-center gap-1 hover:text-gray-800 bg-transparent border-0 p-0 m-0 font-medium text-gray-600">
+                                    Rank <SortIndicator active={sortField === "rank"} order={sortOrder} />
+                                </div>
                                 <div className="col-span-3">Trader</div>
-                                <div className="col-span-2 flex items-center gap-1">Wins <ChevronIcon direction="up" /></div>
-                                <div className="col-span-1 flex items-center gap-1">Rekts <ChevronIcon direction="down" /></div>
-                                <div className="col-span-2 flex items-center gap-1">Challenges <ChevronIcon direction="up" /></div>
+                                <div onClick={() => handleSort("wins")} className="cursor-pointer col-span-2 text-left flex items-center gap-1 hover:text-gray-800 bg-transparent border-0 p-0 m-0 font-medium text-gray-600">
+                                    Wins <SortIndicator active={sortField === "wins"} order={sortOrder} />
+                                </div>
+                                <div onClick={() => handleSort("rekts")} className="cursor-pointer col-span-1 text-left flex items-center gap-1 hover:text-gray-800 bg-transparent border-0 p-0 m-0 font-medium text-gray-600">
+                                    Rekts <SortIndicator active={sortField === "rekts"} order={sortOrder} />
+                                </div>
+                                <div onClick={() => handleSort("challenges")} className="cursor-pointer col-span-2 text-left flex items-center gap-1 hover:text-gray-800 bg-transparent border-0 p-0 m-0 font-medium text-gray-600">
+                                    Challenges <SortIndicator active={sortField === "challenges"} order={sortOrder} />
+                                </div>
                                 <div className="col-span-1 flex items-center gap-1">Win% <ChevronIcon direction="up" /></div>
-                                <div className="col-span-2 flex items-center gap-1 justify-end">Earnings <ChevronIcon direction="up" /></div>
+                                <div onClick={() => handleSort("earnings")} className="cursor-pointer col-span-2 text-right flex items-center gap-1 justify-end hover:text-gray-800 bg-transparent border-0 p-0 m-0 font-medium text-gray-600">
+                                    Earnings <SortIndicator active={sortField === "earnings"} order={sortOrder} />
+                                </div>
                             </div>
 
                             <div className="divide-y divide-white/30">
-                                {isLoading && <div className="px-6 py-8 text-gray-600">Loading users...</div>}
-                                {!isLoading && error && <div className="px-6 py-8 text-red-600">{error}</div>}
-                                {!isLoading && !error && paginatedData.length === 0 && (
+                                {error && <div className="px-6 py-8 text-red-600">{error}</div>}
+                                {!error && paginatedData.length === 0 && (
                                     <div className="px-6 py-8 text-gray-600">No users found.</div>
                                 )}
 
-                                {!isLoading && !error && paginatedData.map((user) => (
-                                    <div key={user.id} className="grid grid-cols-12 gap-4 px-6 py-4 items-center hover:bg-white/30 transition-colors">
+                                {!error && paginatedData.map((user) => (
+                                    <div
+                                        key={user.id}
+                                        className="grid grid-cols-12 gap-4 px-6 py-4 items-center hover:bg-white/30 transition-colors cursor-pointer"
+                                        onClick={() => router.push(`/profile/${user.walletAddress}`)}
+                                    >
                                         <div className="col-span-1 flex items-center gap-2">
                                             <span className="text-lg font-semibold text-gray-700 w-4">{user.rank}</span>
                                             {user.rank === 1 ? <StarBadge /> : <DiamondIcon />}
@@ -283,10 +335,10 @@ export default function LeaderboardPage() {
                         </div>
                     </div>
 
-                    {!isLoading && !error && totalPages > 1 && (
+                    {!error && totalPages > 1 && (
                         <div className="flex items-center justify-between px-6 py-4 border-t border-white/50">
-                            <div className="text-sm text-gray-600">
-                                Showing {startIndex + 1}-{Math.min(startIndex + itemsPerPage, filteredData.length)} of {filteredData.length} traders
+                            <div className="hidden sm:block text-sm text-gray-600">
+                                Showing {startIndex + 1}-{Math.min(startIndex + itemsPerPage, sortedData.length)} of {sortedData.length} traders
                             </div>
                             <div className="flex items-center gap-2">
                                 <button

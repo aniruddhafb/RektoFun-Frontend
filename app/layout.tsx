@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import { Suspense } from "react";
 import "./globals.css";
-import { Navbar, Footer } from "./components";
+import Navbar from "./components/Navbar";
+import Footer from "./components/Footer";
 import { Analytics } from "@vercel/analytics/next";
 import Providers from "./providers/PrivyProvider";
 
@@ -88,9 +88,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col">
         <Providers>
           <div className="pixel-shell min-h-full flex flex-col">
-            <Suspense fallback={<div />}>
-              <Navbar />
-            </Suspense>
+            <Navbar />
             <main className="flex-1 mt-12 md:mt-8">{children}</main>
             <Footer />
           </div>

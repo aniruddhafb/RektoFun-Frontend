@@ -22,6 +22,13 @@ interface ProfileHeaderProps {
         totalChallenges: number;
         winRatio: number;
     };
+    twitterUsername?: string | null;
+    isOwnProfile?: boolean;
+    isFollowing?: boolean;
+    followersCount?: number;
+    followingCount?: number;
+    onToggleFollow?: () => void;
+    isFollowActionLoading?: boolean;
 }
 
 export function ProfileHeader({
@@ -32,6 +39,13 @@ export function ProfileHeader({
     joinedDate,
     balance,
     stats,
+    twitterUsername,
+    isOwnProfile = false,
+    isFollowing = false,
+    followersCount = 0,
+    followingCount = 0,
+    onToggleFollow,
+    isFollowActionLoading = false,
 }: ProfileHeaderProps) {
     const [walletCopied, setWalletCopied] = React.useState(false);
     const [profileCopied, setProfileCopied] = React.useState(false);
@@ -66,11 +80,12 @@ export function ProfileHeader({
     return (
         <div className="flex flex-col lg:flex-row lg:items-stretch gap-4 sm:gap-6 lg:gap-8 p-4 sm:p-6 bg-white/40 backdrop-blur-xl rounded-2xl sm:rounded-3xl border border-gray-400 shadow-lg items-start">
             {/* Left: Avatar and Info */}
-            <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 lg:gap-8 flex-1 min-w-0">
+            <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 lg:gap-8 flex-1 min-w-0 items-center sm:items-start">
                 {/* Avatar with glow effect */}
                 <div className="relative flex-shrink-0 mx-auto sm:mx-0">
-                    <div className="absolute inset-0 rounded-full blur-xl"></div>
-                    <div className="relative w-24 h-24 sm:w-32 sm:h-32 rounded-full ring-4 ring-orange-200 overflow-hidden">
+                    <div className="absolute inset-0 rounded-full blur-xl pointer-events-none"></div>
+                    {/* Image container  */}
+                    <div className="relative z-10 w-24 h-24 sm:w-32 sm:h-32 rounded-full ring-4 ring-orange-200 ">
                         <Image
                             src={avatar}
                             alt={username}
@@ -78,20 +93,72 @@ export function ProfileHeader({
                             height={128}
                             className="w-full h-full object-cover"
                         />
+                        {twitterUsername && (
+                            <a
+                                href={`https://x.com/${twitterUsername}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                aria-label={`${username} on Twitter/X`}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    window.open(`https://x.com/${twitterUsername}`, "_blank", "noopener,noreferrer");
+                                }}
+                                className="absolute bottom-0 right-0 z-20 flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full bg-black text-white ring-2 ring-white hover:bg-gray-800 transition-colors"
+                            >
+                                <svg className="w-3 h-3 sm:w-3.5 sm:h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M18.244 2H21.5l-7.1 8.114L22.75 22h-6.542l-5.122-6.65L5.27 22H2l7.592-8.682L1.75 2h6.708l4.63 6.08L18.244 2zm-1.146 18.06h1.804L7.48 3.84H5.55l11.548 16.22z" />
+                                </svg>
+                            </a>
+                        )}
+                    </div>
+                    <div className="mt-3 flex w-full min-w-[180px] max-w-[220px] flex-col items-center gap-2">
+                        <div className="grid w-full grid-cols-2 gap-2 rounded-xl border border-orange-200/60 bg-orange-50/70 p-2 text-center">
+                            <div>
+                                <p className="text-sm font-bold text-gray-900">{followingCount}</p>
+                                <p className="text-[11px] text-gray-600">Following</p>
+                            </div>
+                            <div>
+                                <p className="text-sm font-bold text-gray-900">{followersCount}</p>
+                                <p className="text-[11px] text-gray-600">Followers</p>
+                            </div>
+                        </div>
+                        {!isOwnProfile && onToggleFollow ? (
+                            <button
+                                className={`w-full px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-200 border ${isFollowing
+                                    ? "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                                    : "bg-gray-900 text-white border-gray-900 hover:bg-black"
+                                    }`}
+                                onClick={onToggleFollow}
+                                disabled={isFollowActionLoading}
+                            >
+                                {isFollowActionLoading ? "Please wait..." : isFollowing ? "Unfollow" : "Follow"}
+                            </button>
+                        ) : null}
                     </div>
                 </div>
 
                 {/* User Info */}
-                <div className="flex flex-col gap-3 justify-center min-w-0">
+                <div className="flex flex-col gap-3 justify-center min-w-0 items-center sm:items-start text-center sm:text-left">
                     {/* Username with gradient */}
-                    <div className="flex items-center gap-2 min-w-0">
+                    <div className="flex items-center justify-center sm:justify-start gap-2 min-w-0">
                         <h1 className="text-xl sm:text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent break-words sm:break-normal">
                             {username}
                         </h1>
+                        {twitterUsername ? (
+                            <span
+                                className="inline-flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center rounded-full bg-blue-500 text-white flex-shrink-0 shadow-sm"
+                                title="Verified on X"
+                                aria-label="Verified on X"
+                            >
+                                <svg className="h-3 w-3 sm:h-3.5 sm:w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                                </svg>
+                            </span>
+                        ) : null}
                     </div>
 
                     {/* Wallet Address - Improved with copy feedback */}
-                    <div className="group flex flex-wrap items-center gap-2 min-w-0">
+                    <div className="group flex flex-wrap items-center justify-center sm:justify-start gap-2 min-w-0">
                         <div className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100/80 rounded-lg border border-gray-200/50 min-w-0">
                             <span className="text-sm">🌙</span>
                             <span className="text-xs sm:text-sm text-gray-600 font-mono break-all sm:break-normal sm:whitespace-nowrap">{truncatedAddress}</span>
@@ -119,7 +186,7 @@ export function ProfileHeader({
                     </p>
 
                     {/* Action Buttons - Redesigned */}
-                    <div className="flex flex-wrap items-stretch gap-2 sm:gap-3 mt-1">
+                    <div className="flex flex-wrap items-stretch justify-center sm:justify-start gap-2 sm:gap-3 mt-1">
                         {/* Joined Badge */}
                         <div className="w-full sm:w-auto px-3 sm:px-4 py-2 bg-gradient-to-r from-orange-100 to-amber-100 rounded-xl text-xs sm:text-sm font-medium text-orange-700 border border-orange-200/50 flex items-center justify-center sm:justify-start gap-2">
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

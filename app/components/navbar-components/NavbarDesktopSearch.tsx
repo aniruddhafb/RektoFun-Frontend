@@ -6,18 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { getChallenges, type ChallengeListItem } from "@/app/lib/challenges-service/challenges";
 import { getLeaderboard, type LeaderboardUser } from "@/app/lib/users-service/users";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-
-type SearchTab = "all" | "challenges" | "users" | "clans";
-
-type SearchClan = {
-    id: string;
-    clan_name: string;
-    clan_status: "public" | "invite_only";
-    clan_members: string[];
-    max_members: number;
-    clan_image: string | null;
-};
+type SearchTab = "all" | "challenges" | "users";
 
 type NavbarDesktopSearchProps = {
     searchQuery: string;
@@ -79,7 +68,6 @@ export function NavbarDesktopSearch({
     const [error, setError] = useState<string | null>(null);
     const [challengeResults, setChallengeResults] = useState<ChallengeListItem[]>([]);
     const [userResults, setUserResults] = useState<LeaderboardUser[]>([]);
-    const [clanResults, setClanResults] = useState<SearchClan[]>([]);
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const requestIdRef = useRef(0);
     const hasInitializedOpenStateRef = useRef(false);
@@ -100,37 +88,23 @@ export function NavbarDesktopSearch({
         }
     };
 
-    async function fetchClans(): Promise<SearchClan[]> {
-        const response = await fetch(`${API_BASE_URL}/clans?limit=100&offset=0`, {
-            method: "GET",
-            headers: { accept: "application/json" },
-        });
-        if (!response.ok) {
-            throw new Error("Failed to fetch clans");
-        }
-        const data = (await response.json()) as { clans: SearchClan[] };
-        return data.clans ?? [];
-    }
-
     async function loadInitialResults() {
         const reqId = ++requestIdRef.current;
         setIsLoading(true);
         setError(null);
 
         try {
-            const [challengesRes, usersRes, clans] = await Promise.all([
+            const [challengesRes, usersRes] = await Promise.all([
                 getChallenges({ limit: 3, sort: "latest" }).catch(() => null),
                 getLeaderboard(5, 0).catch(() => null),
-                fetchClans().catch(() => null),
             ]);
 
             if (requestIdRef.current !== reqId) return;
 
             setChallengeResults((challengesRes?.challenges ?? []).slice(0, 3));
             setUserResults((usersRes?.users ?? []).slice(0, 5));
-            setClanResults((clans ?? []).slice(0, 5));
 
-            if (!challengesRes && !usersRes && !clans) {
+            if (!challengesRes && !usersRes) {
                 setError("Could not load search results.");
             }
         } catch {
@@ -157,23 +131,17 @@ export function NavbarDesktopSearch({
         setError(null);
 
         try {
-            const [challengesRes, usersRes, clans] = await Promise.all([
+            const [challengesRes, usersRes] = await Promise.all([
                 getChallenges({ search: nextQuery, limit: 3, sort: "latest" }).catch(() => null),
                 getLeaderboard(5, 0, nextQuery).catch(() => null),
-                fetchClans().catch(() => null),
             ]);
 
             if (requestIdRef.current !== reqId) return;
 
-            const filteredClans = (clans ?? [])
-                .filter((clan) => clan.clan_name.toLowerCase().includes(nextQuery.toLowerCase()))
-                .slice(0, 5);
-
             setChallengeResults((challengesRes?.challenges ?? []).slice(0, 3));
             setUserResults((usersRes?.users ?? []).slice(0, 5));
-            setClanResults(filteredClans);
 
-            if (!challengesRes && !usersRes && !clans) {
+            if (!challengesRes && !usersRes) {
                 setError("Could not fetch search results. Please try again.");
             }
         } catch {
@@ -181,7 +149,6 @@ export function NavbarDesktopSearch({
             setError("Could not fetch search results. Please try again.");
             setChallengeResults([]);
             setUserResults([]);
-            setClanResults([]);
         } finally {
             if (requestIdRef.current === reqId) {
                 setIsLoading(false);
@@ -228,17 +195,15 @@ export function NavbarDesktopSearch({
 
     const showChallenges = activeTab === "all" || activeTab === "challenges";
     const showUsers = activeTab === "all" || activeTab === "users";
-    const showClans = activeTab === "all" || activeTab === "clans";
 
     const emptyState = useMemo(() => {
         if (isLoading || error) return false;
-        return challengeResults.length === 0 && userResults.length === 0 && clanResults.length === 0;
-    }, [challengeResults.length, clanResults.length, error, isLoading, userResults.length]);
+        return challengeResults.length === 0 && userResults.length === 0;
+    }, [challengeResults.length, error, isLoading, userResults.length]);
 
     const tabs: { key: SearchTab; label: string }[] = [
         { key: "challenges", label: "Challenges" },
         { key: "users", label: "Users" },
-        { key: "clans", label: "Clans" },
     ];
 
     const challengeSkeletons = Array.from({ length: 3 });
@@ -267,7 +232,7 @@ export function NavbarDesktopSearch({
                         onClick={onOpenModal}
                         className="w-full text-left px-4 py-2.5 pl-10 bg-white/50 border border-gray-300 rounded-full text-sm text-gray-700 hover:bg-white/70 focus:outline-none focus:ring-2 focus:ring-black/20 transition-all cursor-pointer"
                     >
-                        Search challenges, users, clans...
+                        Search challenges, users...
                     </button>
                     <svg
                         className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500"
@@ -304,7 +269,7 @@ export function NavbarDesktopSearch({
                                     <input
                                         autoFocus
                                         type="text"
-                                        placeholder="Search challenges, users, clans..."
+                                        placeholder="Search challenges, users..."
                                         value={query}
                                         onChange={(event) => handleQueryChange(event.target.value)}
                                         className="w-full rounded-[12px] md:rounded-[14px] border border-[#e8ddd3] bg-white px-9 md:px-10 py-2.5 text-base md:text-[18px] leading-none text-[#1e293b] placeholder:text-[#94a3b8] focus:outline-none focus:ring-2 focus:ring-[#f59e0b]/20"
@@ -381,25 +346,6 @@ export function NavbarDesktopSearch({
                                         </section>
                                     )}
 
-                                    {showClans && (
-                                        <section className="px-4 md:px-6 py-4 animate-pulse">
-                                            <div className="mb-4 h-7 w-20 rounded bg-[#efe4db]" />
-                                            <div className="grid grid-cols-1 lg:grid-cols-5 gap-2.5">
-                                                {cardSkeletons.map((_, index) => (
-                                                    <div key={`clan-skeleton-${index}`} className="rounded-xl border border-[#eadfd6] bg-white p-3">
-                                                        <div className="flex items-center gap-3">
-                                                            <div className="h-10 w-10 rounded-full bg-[#f3f4f6]" />
-                                                            <div className="min-w-0 w-full space-y-2">
-                                                                <div className="h-3.5 w-4/5 rounded bg-[#f1ece6]" />
-                                                                <div className="h-3 w-2/5 rounded bg-[#f1ece6]" />
-                                                                <div className="h-3 w-1/2 rounded bg-[#f1ece6]" />
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </section>
-                                    )}
                                 </>
                             )}
                             {!isLoading && error && (
@@ -419,7 +365,7 @@ export function NavbarDesktopSearch({
                                     <div className="mx-auto max-w-md rounded-2xl border border-[#f0dfd2] bg-white/80 px-6 py-10 text-center">
                                         <p className="text-base font-semibold text-[#334155]">No results found</p>
                                         <p className="mt-2 text-sm text-[#64748b]">
-                                            Try a different keyword, username, or clan name.
+                                            Try a different keyword or username.
                                         </p>
                                     </div>
                                 </div>
@@ -501,35 +447,6 @@ export function NavbarDesktopSearch({
                                 </section>
                             )}
 
-                            {!isLoading && showClans && clanResults.length > 0 && (
-                                <section className="px-4 md:px-6 py-4">
-                                    <div className="mb-4 flex items-center justify-between">
-                                        <h3 className="text-lg md:text-xl font-semibold text-[#1e293b]">Clans</h3>
-                                        <Link href="/clans" onClick={closeModal} className="text-[#f97316] text-xs md:text-sm font-medium">View all clans →</Link>
-                                    </div>
-                                    <div className="grid grid-cols-1 lg:grid-cols-5 gap-2.5">
-                                        {clanResults.map((clan) => (
-                                            <Link
-                                                key={clan.id}
-                                                href={`/clan/${clan.id}`}
-                                                onClick={closeModal}
-                                                className="rounded-xl border border-[#eadfd6] bg-white p-3 hover:bg-[#fffbf8]"
-                                            >
-                                                <div className="flex items-center gap-3">
-                                                    <div className="h-10 w-10 rounded-full bg-[#f3f4f6] overflow-hidden">
-                                                        {clan.clan_image ? <img src={clan.clan_image} alt={clan.clan_name} className="h-full w-full object-cover" /> : null}
-                                                    </div>
-                                                    <div className="min-w-0">
-                                                        <p className="truncate text-sm font-semibold text-[#0f172a]">{clan.clan_name}</p>
-                                                        <p className="text-sm text-[#64748b]">Members: {(clan.clan_members?.length ?? 0)}</p>
-                                                        <p className="text-xs text-[#64748b]">{clan.clan_status === "public" ? "Open" : "Invite Only"}</p>
-                                                    </div>
-                                                </div>
-                                            </Link>
-                                        ))}
-                                    </div>
-                                </section>
-                            )}
                         </div>
                     </div>
                 </div>

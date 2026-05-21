@@ -116,7 +116,7 @@ export default function ActivityPage() {
                     </h1>
                 </div>
                 <p className="text-[#5c4a42] text-sm sm:text-base">
-                    View the latest challenges and bets made across Rekto.fun.
+                    View the latest challenges and bets made across the platform
                 </p>
             </div>
 

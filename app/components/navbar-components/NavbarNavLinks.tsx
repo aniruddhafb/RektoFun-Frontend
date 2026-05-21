@@ -13,8 +13,8 @@ export function NavbarNavLinks({ isActive }: NavbarNavLinksProps) {
     const [isMoreOpen, setIsMoreOpen] = useState(false);
     const navIconByHref = {
         "/challenges": Sword,
-        "/arenas": Search,
-        "/clans": Shield,
+        "/masters": Search,
+        "/leaderboard": Shield,
         "/activity": Zap,
     } as const;
 
@@ -25,8 +25,8 @@ export function NavbarNavLinks({ isActive }: NavbarNavLinksProps) {
 
         const iconClassByHref = {
             "/challenges": "text-[#cb8a22]",
-            "/arenas": "text-[#2e9ec3]",
-            "/clans": "text-[#4b6fd1]",
+            "/leaderboard": "text-[#2e9ec3]",
+            "/masters": "text-[#4b6fd1]",
             "/activity": "text-[#d9a31b]",
         } as const;
 

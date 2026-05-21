@@ -8,6 +8,8 @@ export interface User {
   referral_code: string;
   referred_by: string;
   referrals: string[];
+  followers: string[];
+  following: string[];
   created_at: string;
   updated_at: string;
   earnings: number;
@@ -141,6 +143,8 @@ export interface LeaderboardUser {
   username: string | null;
   profile_image: string | null;
   referrals: string[];
+  followers?: string[];
+  following?: string[];
   created_at: string | null;
   earnings: number | null;
 }
@@ -169,6 +173,58 @@ export async function getLeaderboard(
 
   if (!response.ok) {
     throw new Error(`Failed to fetch leaderboard: ${response.statusText}`);
+  }
+
+  return response.json();
+}
+
+export async function followUser(targetWalletAddress: string, followerWalletAddress: string): Promise<User> {
+  const response = await fetch(`${API_BASE_URL}/users/wallet/${encodeURIComponent(targetWalletAddress)}/follow`, {
+    method: "POST",
+    headers: {
+      accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ follower_wallet_address: followerWalletAddress }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to follow user: ${response.statusText}`);
+  }
+
+  return response.json();
+}
+
+export async function unfollowUser(targetWalletAddress: string, followerWalletAddress: string): Promise<User> {
+  const response = await fetch(`${API_BASE_URL}/users/wallet/${encodeURIComponent(targetWalletAddress)}/unfollow`, {
+    method: "POST",
+    headers: {
+      accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ follower_wallet_address: followerWalletAddress }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to unfollow user: ${response.statusText}`);
+  }
+
+  return response.json();
+}
+
+export async function getFollowStatus(targetWalletAddress: string, followerWalletAddress: string): Promise<{ is_following: boolean }> {
+  const response = await fetch(
+    `${API_BASE_URL}/users/wallet/${encodeURIComponent(targetWalletAddress)}/follow-status?follower_wallet_address=${encodeURIComponent(followerWalletAddress)}`,
+    {
+      method: "GET",
+      headers: {
+        accept: "application/json",
+      },
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch follow status: ${response.statusText}`);
   }
 
   return response.json();

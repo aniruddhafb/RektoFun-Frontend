@@ -12,7 +12,7 @@ import { useUserStore } from "@/app/store/useUserStore";
 const PROFILE_SVGS = Array.from({ length: 31 }, (_, i) => `/profiles/${i + 1}.svg`);
 
 export default function SettingsPage() {
-    const { user, authenticated, logout, login, linkWallet, linkTwitter, linkGoogle } = usePrivy();
+    const { user, authenticated, logout, login, linkWallet, linkTwitter, linkGoogle, unlinkTwitter, unlinkGoogle } = usePrivy();
     const { setUser: setStoreUser } = useUserStore();
 
     // Profile state
@@ -28,6 +28,7 @@ export default function SettingsPage() {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [isLoadingProfile, setIsLoadingProfile] = useState(true);
     const [isSavingProfile, setIsSavingProfile] = useState(false);
+    const [disconnectingProvider, setDisconnectingProvider] = useState<"twitter" | "google" | null>(null);
 
     const { publicKey } = useSolanaWallet();
     const walletAddress = publicKey?.toBase58() ?? null;
@@ -80,6 +81,32 @@ export default function SettingsPage() {
         return "email";
     };
     const currentLoginMethod = getLoginMethod();
+
+    const handleDisconnectTwitter = async () => {
+        if (currentLoginMethod === "twitter") return;
+        if (!linkedTwitter?.subject) return;
+        try {
+            setDisconnectingProvider("twitter");
+            await unlinkTwitter(linkedTwitter.subject);
+        } catch (error) {
+            console.error("[Settings] Failed to disconnect Twitter:", error);
+        } finally {
+            setDisconnectingProvider(null);
+        }
+    };
+
+    const handleDisconnectGoogle = async () => {
+        if (currentLoginMethod === "google") return;
+        if (!linkedGoogle?.subject) return;
+        try {
+            setDisconnectingProvider("google");
+            await unlinkGoogle(linkedGoogle.subject);
+        } catch (error) {
+            console.error("[Settings] Failed to disconnect Google:", error);
+        } finally {
+            setDisconnectingProvider(null);
+        }
+    };
 
     // Handle photo upload
     const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -326,7 +353,7 @@ export default function SettingsPage() {
 
                     <div className="space-y-3">
                         {/* Twitter */}
-                        {/* <div className={`flex items-center justify-between p-4 rounded-xl border-2 transition-all ${linkedTwitter
+                        <div className={`flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-4 rounded-xl border-2 transition-all ${linkedTwitter
                             ? "bg-blue-50/50 border-blue-300"
                             : "bg-white/50 border-gray-300 hover:border-gray-400"
                             }`}>
@@ -345,31 +372,40 @@ export default function SettingsPage() {
                                     </p>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
                                 {currentLoginMethod === "twitter" && (
                                     <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full">
                                         Current Login
                                     </span>
                                 )}
                                 {linkedTwitter ? (
-                                    <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center">
-                                        <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                        </svg>
-                                    </div>
+                                    <>
+                                        <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center">
+                                            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                            </svg>
+                                        </div>
+                                        <button
+                                            onClick={handleDisconnectTwitter}
+                                            disabled={currentLoginMethod === "twitter" || disconnectingProvider === "twitter"}
+                                            className="min-h-[42px] flex-1 sm:flex-none px-4 py-2 bg-white border border-gray-300 text-sm font-medium text-gray-700 rounded-full hover:bg-gray-50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            {disconnectingProvider === "twitter" ? "Disconnecting..." : "Disconnect"}
+                                        </button>
+                                    </>
                                 ) : (
                                     <button
                                         onClick={() => linkTwitter()}
-                                        className="px-4 py-2 bg-black text-white text-sm font-medium rounded-full hover:bg-gray-800 transition-colors cursor-pointer"
+                                        className="min-h-[42px] w-full sm:w-auto px-4 py-2 bg-black text-white text-sm font-medium rounded-full hover:bg-gray-800 transition-colors cursor-pointer"
                                     >
                                         Connect
                                     </button>
                                 )}
                             </div>
-                        </div> */}
+                        </div>
 
                         {/* Google */}
-                        {/* <div className={`flex items-center justify-between p-4 rounded-xl border-2 transition-all ${linkedGoogle
+                        <div className={`flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-4 rounded-xl border-2 transition-all ${linkedGoogle
                             ? "bg-red-50/50 border-red-300"
                             : "bg-white/50 border-gray-300 hover:border-gray-400"
                             }`}>
@@ -391,28 +427,37 @@ export default function SettingsPage() {
                                     </p>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
                                 {currentLoginMethod === "google" && (
                                     <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full">
                                         Current Login
                                     </span>
                                 )}
                                 {linkedGoogle ? (
-                                    <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center">
-                                        <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                        </svg>
-                                    </div>
+                                    <>
+                                        <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center">
+                                            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                            </svg>
+                                        </div>
+                                        <button
+                                            onClick={handleDisconnectGoogle}
+                                            disabled={currentLoginMethod === "google" || disconnectingProvider === "google"}
+                                            className="min-h-[42px] flex-1 sm:flex-none px-4 py-2 bg-white border border-gray-300 text-sm font-medium text-gray-700 rounded-full hover:bg-gray-50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            {disconnectingProvider === "google" ? "Disconnecting..." : "Disconnect"}
+                                        </button>
+                                    </>
                                 ) : (
                                     <button
                                         onClick={() => linkGoogle()}
-                                        className="px-4 py-2 bg-black text-white text-sm font-medium rounded-full hover:bg-gray-800 transition-colors cursor-pointer"
+                                        className="min-h-[42px] w-full sm:w-auto px-4 py-2 bg-black text-white text-sm font-medium rounded-full hover:bg-gray-800 transition-colors cursor-pointer"
                                     >
                                         Connect
                                     </button>
                                 )}
                             </div>
-                        </div> */}
+                        </div>
 
                         {/* Wallet Login Indicator */}
                         {currentLoginMethod === "wallet" && (
