@@ -4,6 +4,7 @@ import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 import { Analytics } from "@vercel/analytics/next";
 import Providers from "./providers/PrivyProvider";
+import { WelcomeTutorialModal } from "./components/homepage-components";
 
 export const metadata: Metadata = {
   title: {
@@ -88,6 +89,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col">
         <Providers>
           <div className="pixel-shell min-h-full flex flex-col">
+            <WelcomeTutorialModal />
             <Navbar />
             <main className="flex-1 mt-12 md:mt-8">{children}</main>
             <Footer />
