@@ -202,7 +202,7 @@ export default function SettingsPage() {
             <div className="max-w-4xl mx-auto">
                 {/* Header */}
                 <div className="mb-8">
-                    <h1 className="text-3xl font-black text-gray-900 drop-shadow-[3px_3px_0_rgba(232,90,45,0.25)]">Settings</h1>
+                    <h1 className="text-3xl font-black text-gray-900">Settings</h1>
                     <p className="text-gray-600 mt-1">Manage your profile, wallet, and connected accounts</p>
                 </div>
 
@@ -221,7 +221,7 @@ export default function SettingsPage() {
                         {/* Profile Photo Section */}
                         <div className="flex flex-col items-center">
                             <div className="relative">
-                                <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-white shadow-lg">
+                                <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-white">
                                     {profilePhoto ? (
                                         <Image src={profilePhoto} alt="Profile" width={96} height={96} className="w-full h-full object-cover" />
                                     ) : (
@@ -234,7 +234,7 @@ export default function SettingsPage() {
                                 </div>
                                 {/* <button
                                     onClick={() => fileInputRef.current?.click()}
-                                    className="absolute -bottom-1 -right-1 w-8 h-8 bg-black text-white rounded-full flex items-center justify-center hover:bg-gray-800 transition-colors shadow-md cursor-pointer"
+                                    className="absolute -bottom-1 -right-1 w-8 h-8 bg-black text-white rounded-full flex items-center justify-center hover:bg-gray-800 transition-colors cursor-pointer"
                                 >
                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
@@ -525,7 +525,7 @@ export default function SettingsPage() {
             {/* Export Wallet Modal */}
             {showExportModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-                    <div className="rekto-modal-panel rounded-2xl border border-gray-300 p-6 max-w-md w-full shadow-2xl">
+                    <div className="rekto-modal-panel rounded-2xl border border-gray-300 p-6 max-w-md w-full">
                         <div className="flex items-center justify-between mb-4">
                             <h3 className="text-xl font-bold text-gray-900">Export Wallet</h3>
                             <button

@@ -155,12 +155,12 @@ export function ProfileActivity({ userId, username, avatar, isOwnProfile = false
                 {!isLoading && !error && activities.map((item) => (
                     <div
                         key={item.id}
-                        className="group bg-[#f8ede7] hover:bg-white/50 rounded-2xl p-4 transition-all duration-200 border border-[#e8d5c8] hover:border-[#d4b8a8] hover:shadow-lg"
+                        className="group bg-[#f8ede7] hover:bg-white/50 rounded-2xl p-4 transition-all duration-200 border border-[#e8d5c8] hover:border-[#d4b8a8]"
                     >
                         <div className="flex items-start gap-4">
                             {/* Avatar with status */}
                             <div className="relative flex-shrink-0">
-                                <div className={`w-12 h-12 rounded-full overflow-hidden border-2 border-[#d4b8a8] shadow-md bg-white`}>
+                                <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-[#d4b8a8] bg-white">
                                     <Image
                                         src={item.creator.profile_image || avatar || "/scribbles/btc.png"}
                                         alt={item.creator.username || username}
@@ -192,7 +192,7 @@ export function ProfileActivity({ userId, username, avatar, isOwnProfile = false
 
                             {/* Action Button */}
                             <div
-                                className="flex-shrink-0 w-8 h-8 rounded-full bg-[#f3e1d7]/50 hover:bg-[#2d1f1a] text-[#5c4a42] hover:text-[#f3e1d7] transition-all duration-200 flex items-center justify-center group-hover:shadow-md"
+                                className="flex-shrink-0 w-8 h-8 rounded-full bg-[#f3e1d7]/50 hover:bg-[#2d1f1a] text-[#5c4a42] hover:text-[#f3e1d7] transition-all duration-200 flex items-center justify-center"
                             >
                                 <svg
                                     className="w-4 h-4"

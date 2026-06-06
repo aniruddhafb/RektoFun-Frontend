@@ -703,7 +703,7 @@ body {
 .pixel-shell :is(.rounded-xl, .rounded-2xl, .rounded-3xl)[class*="bg-[#fffaf6]"] {
   border: 2px solid #111 !important;
   border-radius: 3px !important;
-  box-shadow: 4px 4px 0 #111 !important;
+  box-shadow: none !important;
 }
 
 .rekto-modal-panel {
@@ -715,14 +715,13 @@ body {
 .pixel-shell :is(.rounded-xl, .rounded-2xl, .rounded-3xl)[class*="bg-white"] {
   transition:
     transform 180ms ease,
-    box-shadow 180ms ease,
     background-color 180ms ease;
 }
 
 .rekto-card-hover:hover,
 .pixel-shell :is(.rounded-xl, .rounded-2xl, .rounded-3xl)[class*="bg-white"]:hover {
   transform: translateY(-2px);
-  box-shadow: 5px 5px 0 #111 !important;
+  box-shadow: none !important;
 }
 
 .pixel-shell .challenge-card-shell.challenge-card-shell {
@@ -754,11 +753,10 @@ body {
 .pixel-shell a[class*="bg-black"] {
   border: 2px solid #111 !important;
   border-radius: 3px !important;
-  box-shadow: 3px 3px 0 #e85a2d !important;
+  box-shadow: none !important;
   font-weight: 900 !important;
   transition:
     transform 160ms ease,
-    box-shadow 160ms ease,
     background-color 160ms ease;
 }
 
@@ -766,7 +764,7 @@ body {
 .pixel-shell button[class*="bg-black"]:hover,
 .pixel-shell a[class*="bg-black"]:hover {
   transform: translateY(-2px);
-  box-shadow: 4px 4px 0 #e85a2d !important;
+  box-shadow: none !important;
 }
 
 .rekto-secondary-button,
@@ -798,7 +796,7 @@ body {
 .pixel-shell textarea:focus,
 .pixel-shell select:focus {
   outline: none !important;
-  box-shadow: 0 0 0 4px rgba(232, 90, 45, 0.18) !important;
+  box-shadow: none !important;
 }
 
 .rekto-badge {
@@ -813,7 +811,7 @@ body {
   font-weight: 900;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  box-shadow: 2px 2px 0 #111;
+  box-shadow: none;
 }
 
 /* Hide scrollbar for filter tabs */
