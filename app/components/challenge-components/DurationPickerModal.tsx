@@ -43,8 +43,8 @@ export function DurationPickerModal({
     return (
         <div className="fixed inset-0 z-[60] flex items-center justify-center">
             <div className="absolute inset-0 bg-black/20" onClick={onClose} />
-            <div className="relative bg-[#f3e1d7] rounded-2xl p-6 shadow-2xl w-full max-w-sm">
-                <h3 className="text-lg font-bold text-gray-900 mb-4 text-center">Challenge Duration</h3>
+            <div className="rekto-modal-panel relative rounded-2xl p-6 shadow-2xl w-full max-w-sm">
+                <h3 className="text-lg font-black text-gray-900 mb-4 text-center">Challenge Duration</h3>
                 <p className="text-sm text-gray-600 text-center mb-6">Set any duration in hours and minutes</p>
                 <div className="bg-[#faf0eb] rounded-xl p-4 mb-6 text-center">
                     <span className="text-2xl font-bold text-gray-900">{formatDuration()}</span>
@@ -74,7 +74,7 @@ export function DurationPickerModal({
                 </div>
                 <div className="flex gap-3">
                     <button onClick={onClose} className="flex-1 py-3 bg-[#e8d5c8] rounded-xl text-gray-700 font-medium hover:bg-[#dcc9bc] transition-colors">Cancel</button>
-                    <button onClick={() => { onSelectDuration({ hours, minutes }); onClose(); }} className="flex-1 py-3 bg-emerald-500 rounded-xl text-white font-medium hover:bg-emerald-600 transition-colors">Confirm</button>
+                    <button onClick={() => { onSelectDuration({ hours, minutes }); onClose(); }} className="rekto-button flex-1 py-3 bg-emerald-500 rounded-xl text-white font-medium hover:bg-emerald-600 transition-colors">Confirm</button>
                 </div>
             </div>
         </div>

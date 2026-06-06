@@ -38,7 +38,7 @@ export function NavbarNavLinks({ isActive }: NavbarNavLinksProps) {
     };
 
     return (
-        <div className="bg-[#f3e1d7]/60 border-b border-gray-200/50 mt-[-12px]">
+        <div className="bg-[#f3e1d7]/80 border-black mt-[-6px]">
             <div className="max-w-7xl mx-auto px-6 lg:px-8">
                 {/* Desktop Nav */}
                 <div className="hidden md:flex items-center justify-center gap-8 h-12">
@@ -46,9 +46,9 @@ export function NavbarNavLinks({ isActive }: NavbarNavLinksProps) {
                         <Link
                             key={link.href}
                             href={link.href}
-                            className={`text-sm font-medium transition-colors cursor-pointer flex items-center gap-2 ${isActive(link.href)
-                                ? "text-black font-semibold"
-                                : "text-gray-700 hover:text-black"
+                            className={`px-3 py-1.5 text-sm font-black uppercase tracking-[0.06em] transition-colors cursor-pointer flex items-center gap-2 ${isActive(link.href)
+                                ? "text-[#e85a2d]"
+                                : "text-gray-700 hover:text-[#e85a2d]"
                                 }`}
                         >
                             {renderNavIcon(link.href)}
@@ -63,7 +63,7 @@ export function NavbarNavLinks({ isActive }: NavbarNavLinksProps) {
                         onMouseLeave={() => setIsMoreOpen(false)}
                     >
                         <div
-                            className="text-sm font-medium text-gray-700 hover:text-black transition-colors cursor-pointer flex items-center gap-1"
+                            className="px-3 py-1.5 text-sm font-black uppercase tracking-[0.06em] text-gray-700 hover:text-[#e85a2d] transition-colors cursor-pointer flex items-center gap-1"
                         >
                             More
                             <svg
@@ -78,16 +78,16 @@ export function NavbarNavLinks({ isActive }: NavbarNavLinksProps) {
 
                         {isMoreOpen && (
                             <div className="absolute right-0 top-full pt-2 w-48 z-40">
-                                <div className="bg-white rounded-xl shadow-lg border border-gray-200 py-2">
+                                <div className="bg-white shadow-[4px_4px_0_#111] border-2 border-black py-2">
                                     {MORE_LINKS.map((link) => (
                                         <Link
                                             key={link.href}
                                             href={link.href}
                                             target={link.href.startsWith("http") ? "_blank" : undefined}
                                             rel={link.href.startsWith("http") ? "noreferrer" : undefined}
-                                            className={`flex items-center gap-2 px-4 py-2 text-sm transition-colors ${isActive(link.href)
-                                                ? "text-black font-semibold bg-gray-100"
-                                                : "text-gray-700 hover:text-black hover:bg-gray-50"
+                                            className={`flex items-center gap-2 px-4 py-2 text-sm font-bold transition-colors ${isActive(link.href)
+                                                ? "text-[#e85a2d] font-black"
+                                                : "text-gray-700 hover:text-[#e85a2d]"
                                                 }`}
                                         >
                                             {link.label}
@@ -115,9 +115,9 @@ export function NavbarNavLinks({ isActive }: NavbarNavLinksProps) {
                             href={link.href}
                             target={link.href.startsWith("http") ? "_blank" : undefined}
                             rel={link.href.startsWith("http") ? "noreferrer" : undefined}
-                            className={`flex items-center gap-2 text-sm font-medium transition-colors cursor-pointer flex-shrink-0 ${isActive(link.href)
-                                ? "text-black font-semibold"
-                                : "text-gray-700 hover:text-black"
+                            className={`flex items-center gap-2 px-2 py-1 text-sm font-black transition-colors cursor-pointer flex-shrink-0 ${isActive(link.href)
+                                ? "text-[#e85a2d]"
+                                : "text-gray-700 hover:text-[#e85a2d]"
                                 }`}
                         >
                             {renderNavIcon(link.href)}

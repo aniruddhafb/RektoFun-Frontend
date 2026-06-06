@@ -533,19 +533,19 @@ export function ChallengeCard({
     let ctaDisabled = false;
     let ctaClassName = "";
     const ctaBaseClassName =
-        "w-full h-11 px-4 rounded-xl font-bold text-sm flex items-center justify-center gap-2";
+        "w-full h-11 px-4 border-2 border-black font-black text-sm flex items-center justify-center gap-2 uppercase tracking-[0.06em]";
     const activeCtaClassName =
-        `${ctaBaseClassName} cursor-pointer bg-[#246044] hover:bg-[#2b7351] text-white shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all disabled:opacity-70 disabled:cursor-not-allowed`;
+        `${ctaBaseClassName} cursor-pointer bg-[#246044] hover:bg-[#2b7351] text-white hover:-translate-y-1 hover:shadow-[3px_3px_0_#111] transition-all disabled:opacity-70 disabled:cursor-not-allowed`;
     const activePvpCtaClassName =
-        `${ctaBaseClassName} cursor-pointer bg-[#0c9d63] opacity-80 hover:bg-[#0a7d4f] border border-gray-500 text-white shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all disabled:opacity-70 disabled:cursor-not-allowed`;
+        `${ctaBaseClassName} cursor-pointer bg-[#0c9d63] opacity-90 hover:bg-[#0a7d4f] text-white hover:-translate-y-1 hover:shadow-[3px_3px_0_#111] transition-all disabled:opacity-70 disabled:cursor-not-allowed`;
     const ongoingCtaClassName =
-        `${ctaBaseClassName} cursor-not-allowed bg-[#008080] opacity-70 border border-gray-500 text-white shadow-lg`;
+        `${ctaBaseClassName} cursor-not-allowed bg-[#008080] opacity-80 text-white hover:shadow-[2px_2px_0_#111]`;
     const expiredCtaClassName =
-        `${ctaBaseClassName} bg-red-100 border border-red-300 text-red-700 shadow-sm cursor-not-allowed`;
+        `${ctaBaseClassName} bg-red-100 text-red-700 hover:shadow-[2px_2px_0_#111] cursor-not-allowed`;
     const resolvingCtaClassName =
-        `${ctaBaseClassName} bg-amber-100 border border-amber-300 text-amber-700 shadow-sm cursor-not-allowed`;
+        `${ctaBaseClassName} bg-amber-100 text-amber-700 hover:shadow-[2px_2px_0_#111] cursor-not-allowed`;
     const completedCtaClassName =
-        `${ctaBaseClassName} bg-gray-200 border border-gray-300 text-gray-700 shadow-sm cursor-not-allowed`;
+        `${ctaBaseClassName} bg-gray-200 text-gray-700 hover:shadow-[2px_2px_0_#111] cursor-not-allowed`;
 
     if (isPvpMode) {
         if (isResolveTimeAchieved && hasOpponents && isResolutionResolved) {
@@ -621,7 +621,7 @@ export function ChallengeCard({
     return (
         <>
             <div
-                className="block overflow-hidden rounded border border-gray-400 bg-[#f8ede7] p-3 shadow-sm transition-shadow hover:shadow-lg sm:p-4"
+                className="challenge-card-shell group/card block overflow-hidden rounded-xl border border-gray-200 bg-[#fffaf6] p-3 transition-all duration-300 hover:-translate-y-0.5 hover:border-gray-300 hover:shadow-md sm:p-4"
             >
                 {/* Header */}
                 <div className="mb-3 flex items-start justify-between gap-2">
@@ -638,7 +638,7 @@ export function ChallengeCard({
                                 {isManualResolution ? (
                                     <span
                                         onClick={handleClick}
-                                        className="block cursor-pointer break-words text-[15px] font-bold tracking-tight sm:text-[16px]"
+                                        className="block cursor-pointer break-words text-[15px] font-black tracking-tight text-black transition-colors  sm:text-[16px]"
                                         style={{
                                             display: "-webkit-box",
                                             WebkitLineClamp: 2,
@@ -652,7 +652,7 @@ export function ChallengeCard({
                                 ) : isResolveTimeAchieved ? (
                                     <span
                                         onClick={handleClick}
-                                        className="block cursor-pointer break-words text-[15px] font-bold tracking-tight sm:text-[16px]"
+                                        className="block cursor-pointer break-words text-[15px] font-black tracking-tight text-black transition-colors sm:text-[16px]"
                                         style={{
                                             display: "-webkit-box",
                                             WebkitLineClamp: 2,
@@ -667,7 +667,7 @@ export function ChallengeCard({
                                     <>
                                         <span
                                             onClick={handleClick}
-                                            className="block cursor-pointer break-words text-[15px] font-bold tracking-tight sm:text-[16px]"
+                                            className="block cursor-pointer break-words text-[15px] font-black tracking-tight text-black transition-colors sm:text-[16px]"
                                             style={{
                                                 display: "-webkit-box",
                                                 WebkitLineClamp: 1,
@@ -680,7 +680,7 @@ export function ChallengeCard({
                                         </span>
                                         <span
                                             onClick={handleClick}
-                                            className="block cursor-pointer break-words text-[15px] font-bold tracking-tight sm:text-[16px]"
+                                            className="block cursor-pointer break-words text-[15px] font-black tracking-tight text-black transition-colors sm:text-[16px]"
                                         >
                                             Next
                                             <span className="ml-1 inline-flex items-center gap-1 sm:ml-2 sm:gap-1.5">
@@ -709,7 +709,7 @@ export function ChallengeCard({
                         onClick={handleBookmarkClick}
                         aria-label={isBookmarked ? "Remove Pin" : "Pin this"}
                         title={isBookmarked ? "Remove pin" : "Pin this"}
-                        className="shrink-0 cursor-pointer rounded-lg border border-gray-400 bg-white/50 p-2 transition-colors hover:bg-white/20 hover:text-gray-500"
+                        className="shrink-0 cursor-pointer border-2 border-black bg-white p-2 transition-all hover:-translate-y-0.5 hover:bg-[#f5d547] hover:text-black hover:shadow-[2px_2px_0_#111]"
                     >
                         <svg className="w-5 h-5 text-black rotate-45" stroke="currentColor" viewBox="0 0 24 24" fill={isBookmarked ? "currentColor" : "none"}>
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 17v4" />
@@ -722,26 +722,11 @@ export function ChallengeCard({
                 <div className="border-t border-gray-200 my-3"></div>
 
                 {/* Challenge Mode Info */}
-                <div onClick={handleClick} className="flex items-center justify-center gap-2 mb-4 cursor-pointer">
-                    <h2 className="text-sm font-medium text-black">
-                        {modeMeta.display || (challengeMode === "pvp" ? "PVP Mode" : "Multi Mode")}
-                    </h2>
-
-                    <div className="relative group inline-flex ml-[-4px]">
-                        <svg
-                            className="w-4 h-4 text-black cursor-help"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                            />
-                        </svg>
-
+                <div onClick={handleClick} className="mb-4 flex items-center justify-center">
+                    <div className="group relative inline-flex cursor-pointer">
+                        <h2 className="border border-black bg-[#f5d547] px-3 py-1 text-xs font-black uppercase tracking-[0.12em] text-black hover:shadow-[2px_2px_0_#111]">
+                            {modeMeta.display || (challengeMode === "pvp" ? "PVP Mode" : "Multi Mode")}
+                        </h2>
                         <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 text-center pointer-events-none">
                             {challengeMode === "pvp"
                                 ? "The creator has set this challenge to PVP mode, meaning it's a 1v1 challenge only."
@@ -760,7 +745,7 @@ export function ChallengeCard({
                             onClick={(e) => openProfile(e, creator.wallet_address)}
                             className="relative group flex flex-col items-center cursor-pointer"
                         >
-                            <div className={`flex h-[132px] w-[98px] max-w-full flex-col items-center justify-center rounded-xl p-2 transition-all duration-300 sm:h-[140px] sm:w-[120px] sm:p-3 ${hasWon
+                            <div className={`challenge-card-profile-tile flex h-[132px] w-[98px] max-w-full flex-col items-center justify-center rounded-xl p-2 transition-all duration-300 sm:h-[140px] sm:w-[120px] sm:p-3 ${hasWon
                                 ? "bg-gradient-to-br from-amber-100 to-yellow-50 border-2 border-amber-400"
                                 : hasLost
                                     ? "bg-gradient-to-br from-red-100 to-rose-50 border-2 border-red-300"
@@ -768,14 +753,14 @@ export function ChallengeCard({
                                 }`}>
                                 {/* Winner Crown */}
                                 {hasWon && (
-                                    <div className="text-2xl animate-bounce">
+                                    <div className="text-2xl">
                                         👑
                                     </div>
                                 )}
 
                                 {/* Avatar */}
                                 <div className={`h-11 w-11 overflow-hidden rounded-full border-2 sm:h-14 sm:w-14 ${hasWon ? "border-amber-400" : "border-[#d4a574]"
-                                    } shadow-md`}>
+                                    } hover:shadow-md`}>
                                     <Image
                                         src={creatorProfileImage}
                                         alt={creatorName}
@@ -801,7 +786,7 @@ export function ChallengeCard({
                                 <button
                                     type="button"
                                     onClick={(e) => openBetForm(e)}
-                                    className={`absolute -bottom-4.5 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border-2 text-[28px] font-black leading-none shadow-md transition hover:scale-105 ${hasWon
+                                    className={`absolute -bottom-4.5 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border-2 text-[28px] font-black leading-none transition hover:scale-105 hover:shadow-md ${hasWon
                                         ? "border-amber-400 bg-gradient-to-br from-amber-100 to-yellow-50 text-amber-700 hover:from-amber-200 hover:to-yellow-100"
                                         : hasLost
                                             ? "border-red-300 bg-gradient-to-br from-red-100 to-rose-50 text-red-700 hover:from-red-200 hover:to-rose-100"
@@ -820,7 +805,7 @@ export function ChallengeCard({
                             <>
                                 {/* VS BADGE  */}
                                 <div
-                                    className={`flex h-10 w-10 items-center sm:h-12 sm:w-12 justify-center ${isOngoingCta ? "rounded-full bg-gradient-to-br from-[#2d1f1a] to-[#4a3830] shadow-lg" : ""}`}
+                                    className={`flex h-10 w-10 items-center sm:h-12 sm:w-12 justify-center ${isOngoingCta ? "rounded-full bg-gradient-to-br from-[#2d1f1a] to-[#4a3830] hover:shadow-lg" : ""}`}
                                 >
                                     {isOngoingCta ? (
                                         <video
@@ -866,7 +851,7 @@ export function ChallengeCard({
                                 onClick={(e) => openProfile(e, opponentInfo?.wallet_address)}
                                 className="relative group flex flex-col items-center cursor-pointer"
                             >
-                                <div className={`flex h-[132px] w-[98px] max-w-full flex-col items-center justify-center rounded-xl p-2 transition-all duration-300 sm:h-[140px] sm:w-[120px] sm:p-3 ${hasLost
+                                <div className={`challenge-card-profile-tile flex h-[132px] w-[98px] max-w-full flex-col items-center justify-center rounded-xl p-2 transition-all duration-300 sm:h-[140px] sm:w-[120px] sm:p-3 ${hasLost
                                     ? "bg-gradient-to-br from-amber-100 to-yellow-50 border-2 border-amber-400"
                                     : hasWon
                                         ? "bg-gradient-to-br from-red-100 to-rose-50 border-2 border-red-300"
@@ -874,14 +859,14 @@ export function ChallengeCard({
                                     }`}>
                                     {/* Winner Crown */}
                                     {hasLost && (
-                                        <div className="text-2xl animate-bounce">
+                                        <div className="text-2xl">
                                             👑
                                         </div>
                                     )}
 
                                     {/* Avatar */}
                                     <div className={`h-11 w-11 overflow-hidden rounded-full border-2 sm:h-14 sm:w-14 ${hasLost ? "border-amber-400" : "border-[#d4a574]"
-                                        } shadow-md`}>
+                                        } hover:shadow-md`}>
                                         <Image
                                             src={opponentProfileImage}
                                             alt={opponentDisplayName}
@@ -913,7 +898,7 @@ export function ChallengeCard({
                                     <button
                                         type="button"
                                         onClick={(e) => openBetForm(e)}
-                                        className={`absolute -bottom-4.5 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border-2 text-[28px] font-black leading-none shadow-md transition hover:scale-105 ${hasLost
+                                        className={`absolute -bottom-4.5 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border-2 text-[28px] font-black leading-none transition hover:scale-105 hover:shadow-md ${hasLost
                                             ? "border-amber-400 bg-gradient-to-br from-amber-100 to-yellow-50 text-amber-700 hover:from-amber-200 hover:to-yellow-100"
                                             : hasWon
                                                 ? "border-red-300 bg-gradient-to-br from-red-100 to-rose-50 text-red-700 hover:from-red-200 hover:to-rose-100"
@@ -929,7 +914,7 @@ export function ChallengeCard({
                         ) : (
                             /* Placeholder for pending state */
                             <div className="flex flex-col items-center">
-                                <div className="relative flex h-[132px] w-[98px] max-w-full flex-col items-center justify-center rounded-xl border-2 border-dashed border-[#d4a574]/30 p-2 opponent-placeholder-bg sm:h-[140px] sm:w-[120px] sm:p-3">
+                                <div className="challenge-card-profile-tile relative flex h-[132px] w-[98px] max-w-full flex-col items-center justify-center rounded-xl border-2 border-dashed border-[#d4a574]/30 p-2 opponent-placeholder-bg sm:h-[140px] sm:w-[120px] sm:p-3">
                                     <div className="opponent-placeholder-icon flex h-11 w-11 items-center justify-center rounded-full border-2 border-[#d4a574]/50 bg-gradient-to-br from-gray-200 to-gray-300 sm:h-14 sm:w-14">
                                         <span className="text-xl">❓</span>
                                     </div>
@@ -948,7 +933,7 @@ export function ChallengeCard({
                                         <button
                                             type="button"
                                             onClick={(e) => openBetForm(e)}
-                                            className={`absolute -bottom-4.5 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border-2 text-[28px] font-black leading-none shadow-md transition hover:scale-105 ${hasWon
+                                            className={`absolute -bottom-4.5 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border-2 text-[28px] font-black leading-none transition hover:scale-105 hover:shadow-md ${hasWon
                                                 ? "border-amber-400 bg-gradient-to-br from-amber-100 to-yellow-50 text-amber-700 hover:from-amber-200 hover:to-yellow-100"
                                                 : hasLost
                                                     ? "border-red-300 bg-gradient-to-br from-red-100 to-rose-50 text-red-700 hover:from-red-200 hover:to-rose-100"

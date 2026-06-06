@@ -74,7 +74,7 @@ export function DatePickerModal({
     return (
         <div className="fixed inset-0 z-[60] flex items-center justify-center">
             <div className="absolute inset-0 bg-black/20" onClick={onClose} />
-            <div className="relative bg-[#f3e1d7] rounded-2xl p-6 shadow-2xl w-full max-w-sm">
+            <div className="rekto-modal-panel relative rounded-2xl p-6 shadow-2xl w-full max-w-sm">
                 <div className="flex items-center justify-between mb-4">
                     <button
                         onClick={() => {
@@ -154,7 +154,7 @@ export function DatePickerModal({
 
                 <div className="flex justify-between mt-4 pt-4 border-t border-[#e8d5c8]">
                     <button onClick={() => { onSelectDate(new Date()); onClose(); }} className="text-sm text-emerald-600 font-medium hover:text-emerald-700">Today</button>
-                    <button onClick={handleConfirm} className="px-4 py-2 bg-emerald-500 text-white rounded-lg text-sm font-medium hover:bg-emerald-600 transition-colors">Confirm</button>
+                    <button onClick={handleConfirm} className="rekto-button px-4 py-2 bg-emerald-500 text-white rounded-lg text-sm font-medium hover:bg-emerald-600 transition-colors">Confirm</button>
                 </div>
             </div>
         </div>

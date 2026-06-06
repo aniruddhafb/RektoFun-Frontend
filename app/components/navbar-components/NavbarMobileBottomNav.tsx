@@ -19,13 +19,13 @@ export function NavbarMobileBottomNav({
     isSearchOpen,
 }: NavbarMobileBottomNavProps) {
     const itemBase =
-        "relative flex flex-col items-center justify-center gap-0.5 min-w-0 flex-1 py-1.5 transition-colors";
+        "relative flex flex-col items-center justify-center gap-0.5 min-w-0 flex-1 py-1.5 transition-colors hover:text-black";
 
-    const labelBase = "text-[10px] font-medium truncate";
+    const labelBase = "text-[10px] font-black truncate";
 
     return (
         <div
-            className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#f3e1d7]/95 backdrop-blur-md border-t border-gray-200/50"
+            className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#f3e1d7]/95 backdrop-blur-md border-black shadow-[0_-2px_0_#111]"
             style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
         >
             <div className="flex items-center justify-around h-14">

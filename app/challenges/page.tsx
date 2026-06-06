@@ -211,24 +211,26 @@ function ChallengesContent() {
   }, [pathname, router, searchParams]);
 
   return (
-    <div className="min-h-full">
+    <div className="relative min-h-full overflow-hidden bg-[#f3e1d7]">
+      <div className="pointer-events-none absolute left-0 top-24 h-80 w-80 rounded-full bg-[#5ba8d8]/15 blur-3xl" />
+      <div className="pointer-events-none absolute right-0 top-64 h-80 w-80 rounded-full bg-[#e85a2d]/15 blur-3xl" />
       {showCreateSuccessToast && (
-        <div className="fixed right-4 top-40 sm:top-40 z-[60] w-[min(92vw,24rem)] overflow-hidden rounded-xl border border-green-300 bg-green-600 text-white shadow-2xl">
+        <div className="fixed right-4 top-40 sm:top-40 z-[60] w-[min(92vw,24rem)] overflow-hidden rounded-xl border border-[#8fbd46] bg-[#a8d85b] text-black shadow-xl">
           <button
             type="button"
             onClick={() => setShowCreateSuccessToast(false)}
-            className="absolute right-3 top-2 text-lg leading-none text-green-100 transition hover:text-white"
+            className="absolute right-3 top-2 text-lg font-black leading-none text-black transition hover:text-[#e85a2d]"
             aria-label="Close success notification"
           >
             ×
           </button>
           <div className="px-5 pb-4 pt-4 pr-10">
-            <p className="text-base font-semibold">Challenge created successfully</p>
-            <p className="mt-1 text-sm text-green-100">Your challenge is now live and visible to everyone.</p>
+            <p className="text-base font-black">Challenge created successfully</p>
+            <p className="mt-1 text-sm font-semibold text-black/75">Your challenge is now live and visible to everyone.</p>
           </div>
-          <div className="h-1.5 w-full bg-green-500/60">
+          <div className="h-1.5 w-full bg-black/20">
             <div
-              className="h-full bg-white/90 transition-[width] duration-75 ease-linear"
+              className="h-full bg-black transition-[width] duration-75 ease-linear"
               style={{ width: `${createToastProgress}%` }}
             />
           </div>

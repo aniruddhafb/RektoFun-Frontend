@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Search, ChevronDown, Clock, TrendingUp, Eye, Bookmark, PinIcon } from "lucide-react";
+import { Search, ChevronDown, Clock, TrendingUp, Eye, Bookmark, PinIcon, Shapes } from "lucide-react";
 import { useBodyScrollLock } from "@/app/lib/useBodyScrollLock";
 
 interface ChallengeFiltersSectionProps {
@@ -65,48 +65,51 @@ export function ChallengeFiltersSection({
     };
 
     return (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8">
-            <div className="flex flex-col lg:flex-row gap-3 sm:gap-4 items-stretch lg:items-center">
+        <div className="mx-auto max-w-7xl px-4 pb-8 sm:px-6 lg:px-8">
+            <div className="flex flex-col items-stretch gap-3 sm:gap-3 lg:flex-row lg:items-center">
                 {/* Search Input */}
-                <div className="relative hidden sm:block w-full lg:flex-1 lg:max-w-md">
-                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <div className="relative hidden w-full sm:block lg:max-w-md lg:flex-1">
+                    <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                     <input
                         type="text"
                         placeholder="Search challenges..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full pl-10 pr-4 py-3 sm:py-2.5 bg-white/60 rounded-2xl sm:rounded-full border border-gray-300 text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-200"
+                        className="w-full rounded-full border border-black/15 bg-white/70 py-2.5 pl-10 pr-4 text-sm text-gray-800 shadow-[2px_2px_0_rgba(0,0,0,0.16)] placeholder:text-gray-400 outline-none transition hover:shadow-[3px_3px_0_rgba(0,0,0,0.18)] focus:border-black/25 focus:bg-white focus:ring-4 focus:ring-gray-900/[0.04]"
                     />
                 </div>
 
                 <button
                     type="button"
                     onClick={() => setIsMobileFiltersOpen(true)}
-                    className="sm:hidden w-full border border-gray-300 cursor-pointer flex items-center justify-between px-4 py-3 bg-white/60 rounded-2xl text-sm text-gray-700 hover:bg-white/80 transition-colors"
+                    className="flex w-full cursor-pointer items-center justify-between rounded-2xl border border-black/15 bg-white/75 px-4 py-3 text-sm font-medium text-gray-800 !shadow-none transition hover:border-black/25 hover:bg-white hover:!shadow-none active:!shadow-none sm:hidden"
                 >
                     <span>Filters</span>
-                    <span className="text-xs text-gray-500 truncate max-w-[65%] text-right">
+                    <span className="max-w-[65%] truncate text-right text-xs text-gray-500">
                         {activeFilter} • {activeAsset}
                     </span>
                 </button>
 
                 {/* Desktop Dropdowns */}
-                <div className="hidden sm:grid sm:grid-cols-2 gap-3 items-stretch w-full lg:w-auto">
+                <div className="hidden w-full items-stretch gap-3 sm:grid sm:grid-cols-2 lg:w-auto">
                     {/* First Dropdown - Filter Options */}
                     <div className="relative w-full min-w-0" ref={filterDropdownRef}>
                         <button
                             onClick={() => setIsFilterDropdownOpen(!isFilterDropdownOpen)}
-                            className="w-full border border-gray-300 cursor-pointer flex items-center gap-2 px-4 py-3 sm:py-2.5 bg-white/60 rounded-2xl sm:rounded-full text-sm text-gray-700 hover:bg-white/80 transition-colors justify-between"
+                            className={`flex w-full cursor-pointer items-center justify-between gap-2 rounded-full border px-4 py-2.5 text-sm font-medium transition ${isFilterDropdownOpen
+                                ? "border-black/25 bg-white text-gray-950 shadow-[3px_3px_0_rgba(0,0,0,0.2)] ring-4 ring-gray-900/[0.04]"
+                                : "border-black/15 bg-white/70 text-gray-700 hover:border-black/25 hover:bg-white hover:shadow-[3px_3px_0_rgba(0,0,0,0.18)]"
+                                }`}
                         >
-                            <div className="flex items-center gap-2 min-w-0">
-                                <span>{getCurrentFilterIcon()}</span>
+                            <div className="flex min-w-0 items-center gap-2">
+                                <span className="text-gray-500">{getCurrentFilterIcon()}</span>
                                 <span className="truncate">{activeFilter}</span>
                             </div>
-                            <ChevronDown className={`w-4 h-4 shrink-0 transition-transform ${isFilterDropdownOpen ? "rotate-180" : ""}`} />
+                            <ChevronDown className={`h-4 w-4 shrink-0 text-gray-400 transition-transform ${isFilterDropdownOpen ? "rotate-180 text-gray-700" : ""}`} />
                         </button>
 
                         {isFilterDropdownOpen && (
-                            <div className="absolute left-0 top-full mt-2 w-full sm:min-w-[14rem] sm:w-auto bg-white rounded-xl shadow-lg border border-gray-100 py-2 z-20 max-h-64 overflow-y-auto">
+                            <div className="absolute left-0 top-full z-20 mt-2 max-h-64 w-full overflow-y-auto rounded-2xl border border-black/15 bg-white p-1.5 sm:w-auto sm:min-w-[14rem]">
                                 {filterOptions.map((option) => (
                                     <button
                                         key={option.label}
@@ -114,13 +117,13 @@ export function ChallengeFiltersSection({
                                             setActiveFilter(option.label);
                                             setIsFilterDropdownOpen(false);
                                         }}
-                                        className={`w-full cursor-pointer flex items-center gap-3 px-4 py-3 text-sm text-left transition-colors ${activeFilter === option.label
-                                            ? "text-black font-semibold"
-                                            : "text-gray-700 hover:bg-gray-50"
+                                        className={`flex w-full cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition ${activeFilter === option.label
+                                            ? "bg-gray-950 font-semibold text-white"
+                                            : "text-gray-700 hover:bg-gray-50 hover:text-gray-950"
                                             }`}
                                     >
-                                        {option.icon}
-                                        {option.label}
+                                        <span className={activeFilter === option.label ? "text-white" : "text-gray-500"}>{option.icon}</span>
+                                        <span>{option.label}</span>
                                     </button>
                                 ))}
                             </div>
@@ -131,16 +134,20 @@ export function ChallengeFiltersSection({
                     <div className="relative w-full min-w-0" ref={marketDropdownRef}>
                         <button
                             onClick={() => setIsMarketDropdownOpen(!isMarketDropdownOpen)}
-                            className="w-full border border-gray-300 cursor-pointer flex items-center gap-2 px-4 py-3 sm:py-2.5 bg-white/60 rounded-2xl sm:rounded-full text-sm text-gray-700 hover:bg-white/80 transition-colors justify-between"
+                            className={`flex w-full cursor-pointer items-center justify-between gap-2 rounded-full border px-4 py-2.5 text-sm font-medium transition ${isMarketDropdownOpen
+                                ? "border-black/25 bg-white text-gray-950 shadow-[3px_3px_0_rgba(0,0,0,0.2)] ring-4 ring-gray-900/[0.04]"
+                                : "border-black/15 bg-white/70 text-gray-700 hover:border-black/25 hover:bg-white hover:shadow-[3px_3px_0_rgba(0,0,0,0.18)]"
+                                }`}
                         >
-                            <div className="flex items-center gap-2 min-w-0">
+                            <div className="flex min-w-0 items-center gap-2">
+                                <Shapes className="h-4 w-4 text-gray-500" />
                                 <span className="truncate">{activeAsset}</span>
                             </div>
-                            <ChevronDown className={`w-4 h-4 shrink-0 transition-transform ${isMarketDropdownOpen ? "rotate-180" : ""}`} />
+                            <ChevronDown className={`h-4 w-4 shrink-0 text-gray-400 transition-transform ${isMarketDropdownOpen ? "rotate-180 text-gray-700" : ""}`} />
                         </button>
 
                         {isMarketDropdownOpen && (
-                            <div className="absolute left-0 top-full mt-2 w-full sm:min-w-[14rem] sm:w-auto bg-white rounded-xl shadow-lg border border-gray-100 py-2 z-20 max-h-64 overflow-y-auto">
+                            <div className="absolute left-0 top-full z-20 mt-2 max-h-64 w-full overflow-y-auto rounded-2xl border border-black/15 bg-white p-1.5 sm:w-auto sm:min-w-[14rem]">
                                 {marketOptions.map((option) => (
                                     <button
                                         key={option}
@@ -148,11 +155,12 @@ export function ChallengeFiltersSection({
                                             setActiveAsset(option);
                                             setIsMarketDropdownOpen(false);
                                         }}
-                                        className={`w-full cursor-pointer flex items-center gap-3 px-4 py-3 text-sm text-left transition-colors ${activeAsset === option
-                                            ? "text-black font-semibold"
-                                            : "text-gray-700 hover:bg-gray-50"
+                                        className={`flex w-full cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition ${activeAsset === option
+                                            ? "bg-gray-950 font-semibold text-white"
+                                            : "text-gray-700 hover:bg-gray-50 hover:text-gray-950"
                                             }`}
                                     >
+                                        <Shapes className={`h-4 w-4 ${activeAsset === option ? "text-white" : "text-gray-500"}`} />
                                         <span className="truncate">{option}</span>
                                     </button>
                                 ))}
@@ -171,7 +179,7 @@ export function ChallengeFiltersSection({
                         className="absolute inset-0 bg-black/40"
                     />
 
-                    <div className="absolute inset-x-0 bottom-0 rounded-t-3xl bg-white p-4 pb-6 shadow-2xl max-h-[80vh] overflow-y-auto">
+                    <div className="absolute inset-x-0 bottom-0 max-h-[82vh] overflow-y-auto rounded-t-3xl border border-b-0 border-black/[0.06] bg-white p-4 pb-6">
                         <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-gray-300" />
 
                         <div className="flex items-center justify-between">
@@ -179,7 +187,7 @@ export function ChallengeFiltersSection({
                             <button
                                 type="button"
                                 onClick={() => setIsMobileFiltersOpen(false)}
-                                className="text-sm font-medium text-gray-500 px-2 py-1"
+                                className="px-2 py-1 text-sm font-medium text-gray-500 transition hover:text-gray-900"
                             >
                                 Close
                             </button>
@@ -194,7 +202,7 @@ export function ChallengeFiltersSection({
                                     placeholder="Search challenges..."
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-200"
+                                    className="w-full rounded-xl border border-black/[0.07] py-3 pl-10 pr-4 text-sm text-gray-700 placeholder-gray-400 outline-none transition focus:border-gray-300 focus:ring-4 focus:ring-gray-900/[0.04]"
                                 />
                             </div>
                         </div>
@@ -209,9 +217,9 @@ export function ChallengeFiltersSection({
                                             setActiveFilter(option.label);
                                             setIsMobileFiltersOpen(false);
                                         }}
-                                        className={`w-full rounded-xl border px-3 py-3 text-left text-sm flex items-center gap-2 ${activeFilter === option.label
-                                            ? "border-gray-900 bg-gray-100 text-gray-900 font-semibold"
-                                            : "border-gray-200 text-gray-700"
+                                        className={`flex w-full items-center gap-2 rounded-xl border px-3 py-3 text-left text-sm transition ${activeFilter === option.label
+                                            ? "border-gray-950 bg-gray-950 font-semibold text-white"
+                                            : "border-black/[0.07] text-gray-700 hover:bg-gray-50"
                                             }`}
                                     >
                                         {option.icon}
@@ -231,11 +239,12 @@ export function ChallengeFiltersSection({
                                             setActiveAsset(option);
                                             setIsMobileFiltersOpen(false);
                                         }}
-                                        className={`w-full rounded-xl border px-3 py-3 text-left text-sm ${activeAsset === option
-                                            ? "border-gray-900 bg-gray-100 text-gray-900 font-semibold"
-                                            : "border-gray-200 text-gray-700"
+                                        className={`flex w-full items-center gap-2 rounded-xl border px-3 py-3 text-left text-sm transition ${activeAsset === option
+                                            ? "border-gray-950 bg-gray-950 font-semibold text-white"
+                                            : "border-black/[0.07] text-gray-700 hover:bg-gray-50"
                                             }`}
                                     >
+                                        <Shapes className="h-4 w-4" />
                                         <span className="truncate block">{option}</span>
                                     </button>
                                 ))}

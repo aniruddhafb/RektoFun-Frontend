@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePrivy } from "@privy-io/react-auth";
 import { usePathname, useRouter } from "next/navigation";
 import { DepositModal } from "./DepositModal";
-import { WithdrawModal } from "./WithdrawModal";
 import { useSolanaWallet } from "@/app/lib/useSolanaWallet";
 import * as components from "./navbar-components";
 import { ensureUserByWallet, updateUser, getUserByWallet, acceptReferral, User } from "@/app/lib/users-service/users";
@@ -20,7 +19,7 @@ export default function Navbar() {
     const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
-    const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
+    const [fundsModalMode, setFundsModalMode] = useState<"deposit" | "withdraw">("deposit");
     const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
     const [isMobileViewport, setIsMobileViewport] = useState(false);
     const [editUsername, setEditUsername] = useState("");
@@ -384,7 +383,7 @@ export default function Navbar() {
     return (
         <>
             {/* Development Mode Banner */}
-            <div className="fixed top-0 left-0 right-0 z-[30] bg-amber-100 border-b border-amber-300">
+            <div className="fixed top-0 left-0 right-0 z-[30] border-b-2 border-black bg-[#f5d547]">
                 <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-center gap-2">
                     <svg
                         className="w-4 h-4 text-amber-700 flex-shrink-0"
@@ -399,18 +398,18 @@ export default function Navbar() {
                             d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
                         />
                     </svg>
-                    <p className="text-sm text-amber-900 font-medium text-center hidden md:block">
+                    <p className="text-sm text-black font-black text-center hidden md:block">
                         Devnet Mode — We Are Currently Operating On Solana Devnet
                     </p>
-                    <p className="text-sm text-amber-900 font-medium text-center md:hidden">
+                    <p className="text-sm text-black font-black text-center md:hidden">
                         Currently In Devnet Mode
                     </p>
                 </div>
             </div>
 
             {/* Main Navbar - Sticky at top */}
-            <nav className="fixed top-8 left-0 right-0 z-[40] bg-[#f3e1d7] border-b border-white-100">
-                <div className="max-w-7xl mx-auto px-6 lg:px-8">
+            <nav className="fixed top-8 left-0 right-0 z-[40] bg-[#f3e1d7]/95 shadow-[0_2px_0_#111] backdrop-blur-md">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex items-center justify-between h-20">
                         {/* Brand / Logo */}
                         <components.NavbarBrand />
@@ -438,8 +437,14 @@ export default function Navbar() {
                             onMouseEnterDropdown={() => setIsDropdownOpen(true)}
                             onMouseLeaveDropdown={() => setIsDropdownOpen(false)}
                             onToggleDropdown={() => setIsDropdownOpen((prev) => !prev)}
-                            onOpenDeposit={() => setIsDepositModalOpen(true)}
-                            onOpenWithdraw={() => setIsWithdrawModalOpen(true)}
+                            onOpenDeposit={() => {
+                                setFundsModalMode("deposit");
+                                setIsDepositModalOpen(true);
+                            }}
+                            onOpenWithdraw={() => {
+                                setFundsModalMode("withdraw");
+                                setIsDepositModalOpen(true);
+                            }}
                             profileHref={profileHref}
                             isMobileViewport={isMobileViewport}
                         />
@@ -483,14 +488,13 @@ export default function Navbar() {
             />
 
             {/* Deposit Modal */}
-            <DepositModal
-                isOpen={isDepositModalOpen}
-                onClose={() => setIsDepositModalOpen(false)}
-            />
-            <WithdrawModal
-                isOpen={isWithdrawModalOpen}
-                onClose={() => setIsWithdrawModalOpen(false)}
-            />
+            {isDepositModalOpen && (
+                <DepositModal
+                    isOpen={isDepositModalOpen}
+                    onClose={() => setIsDepositModalOpen(false)}
+                    initialMode={fundsModalMode}
+                />
+            )}
 
             {/* Mobile Bottom Navigation - Fixed at bottom */}
             <components.NavbarMobileBottomNav

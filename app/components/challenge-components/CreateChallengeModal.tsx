@@ -26,6 +26,7 @@ interface CreateChallengeModalProps {
 
 
 type TxStatus = "idle" | "building" | "signing" | "confirming" | "success" | "error";
+type CreateChallengeStep = "mode" | "category" | "details";
 
 export function CreateChallengeModal({
     isOpen,
@@ -36,7 +37,6 @@ export function CreateChallengeModal({
     const [markets, setMarkets] = useState<Market[]>([]);
     const [selectedMarket, setSelectedMarket] = useState<Market | null>(null);
     const [marketsLoading, setMarketsLoading] = useState(true);
-    const [isMarketDropdownOpen, setIsMarketDropdownOpen] = useState(false);
     const [childMarkets, setChildMarkets] = useState<Market[]>([]);
     const [childMarketsLoading, setChildMarketsLoading] = useState(false);
     const [selectedChildMarket, setChildMarket] = useState<Market | null>(null);
@@ -51,10 +51,12 @@ export function CreateChallengeModal({
     const [isDirectionDropdownOpen, setIsDirectionDropdownOpen] = useState(false);
     const [predictionPrice, setPredictionPrice] = useState("66500");
     const [basePredictionPrice, setBasePredictionPrice] = useState<number | null>(null);
-    const [selectedDate, setSelectedDate] = useState(new Date(Date.now() + 24 * 60 * 60 * 1000));
+    const [selectedDate, setSelectedDate] = useState(() => new Date(Date.now() + 24 * 60 * 60 * 1000));
+    const [currentTimeMs] = useState(() => Date.now());
     const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
     const [duration, setDuration] = useState({ hours: 4, minutes: 0 });
     const [isDurationPickerOpen, setIsDurationPickerOpen] = useState(false);
+    const [currentStep, setCurrentStep] = useState<CreateChallengeStep>("mode");
     const [challengeMode, setChallengeMode] = useState<"pvp" | "multi">("pvp");
     const [challengeStatement, setChallengeStatement] = useState("");
     const [challengeStatementError, setChallengeStatementError] = useState<string | null>(null);
@@ -73,7 +75,6 @@ export function CreateChallengeModal({
     const [txError, setTxError] = useState<string | null>(null);
     const [txSignature, setTxSignature] = useState<string | null>(null);
 
-    const marketDropdownRef = useRef<HTMLDivElement>(null);
     const coinDropdownRef = useRef<HTMLDivElement>(null);
     const sportsEventMarketDropdownRef = useRef<HTMLDivElement>(null);
     const directionDropdownRef = useRef<HTMLDivElement>(null);
@@ -224,9 +225,6 @@ export function CreateChallengeModal({
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
-            if (marketDropdownRef.current && !marketDropdownRef.current.contains(event.target as Node)) {
-                setIsMarketDropdownOpen(false);
-            }
             if (coinDropdownRef.current && !coinDropdownRef.current.contains(event.target as Node)) {
                 setIsCoinDropdownOpen(false);
             }
@@ -267,7 +265,6 @@ export function CreateChallengeModal({
     }, [isOpen, selectedMarket, selectedChildMarket, isSportsSelected]);
 
     const closeAllDropdowns = () => {
-        setIsMarketDropdownOpen(false);
         setIsCoinDropdownOpen(false);
         setIsSportsEventMarketDropdownOpen(false);
         setIsDirectionDropdownOpen(false);
@@ -279,7 +276,6 @@ export function CreateChallengeModal({
         setChildMarket(null);
         setSportsEventMarkets([]);
         setSelectedSportsEventMarket(null);
-        setIsMarketDropdownOpen(false);
         setIsCoinDropdownOpen(false);
         setIsSportsEventMarketDropdownOpen(false);
         setIsDirectionDropdownOpen(false);
@@ -292,6 +288,7 @@ export function CreateChallengeModal({
         setIsDatePickerOpen(false);
         setDuration({ hours: 4, minutes: 0 });
         setIsDurationPickerOpen(false);
+        setCurrentStep("mode");
         setChallengeMode("pvp");
         setChallengeStatement("");
         setChallengeStatementError(null);
@@ -366,7 +363,7 @@ export function CreateChallengeModal({
     };
 
     const getTimeRemainingParts = (targetDate: Date) => {
-        const diffMs = Math.max(0, targetDate.getTime() - Date.now());
+        const diffMs = Math.max(0, targetDate.getTime() - currentTimeMs);
         const totalMinutes = Math.floor(diffMs / (1000 * 60));
         const days = Math.floor(totalMinutes / (60 * 24));
         const hours = Math.floor((totalMinutes % (60 * 24)) / 60);
@@ -472,7 +469,12 @@ export function CreateChallengeModal({
             const [counterPDA] = deriveCreatorCounter(creatorPubkey);
             let challengeId = 0;
             try {
-                const counter = await (program.account as any).creatorCounter.fetch(counterPDA);
+                const accountNamespace = program.account as {
+                    creatorCounter: {
+                        fetch: (address: typeof counterPDA) => Promise<{ count: number | bigint | string }>;
+                    };
+                };
+                const counter = await accountNamespace.creatorCounter.fetch(counterPDA);
                 // After creation, count is incremented — so current challenge_id = count - 1
                 challengeId = Number(counter.count) - 1;
             } catch {
@@ -531,12 +533,13 @@ export function CreateChallengeModal({
 
             setTxStatus("success");
             onCreated();
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error("Create challenge error:", err);
+            const errorMessage = err instanceof Error ? err.message : "";
             const msg =
-                err?.message?.includes("User rejected")
+                errorMessage.includes("User rejected")
                     ? "Transaction cancelled by user."
-                    : err?.message || "Transaction failed. Please try again.";
+                    : errorMessage || "Transaction failed. Please try again.";
             setTxError(msg);
             setTxStatus("error");
         }
@@ -546,6 +549,29 @@ export function CreateChallengeModal({
     const hasChallengeStatement = challengeStatement.trim().length > 0;
     const hasValidationSuggestions = validateSuggestions.length > 0;
     const isSportsSelectionComplete = Boolean(selectedValidationSuggestion);
+    const stepOrder: CreateChallengeStep[] = ["mode", "category", "details"];
+    const currentStepIndex = stepOrder.indexOf(currentStep);
+    const isModeStep = currentStep === "mode";
+    const isCategoryStep = currentStep === "category";
+    const isDetailsStep = currentStep === "details";
+    const stepTitle = isModeStep ? "Choose challenge mode" : isCategoryStep ? "Pick a category" : "Set the terms";
+    const stepSubtitle = isModeStep
+        ? "Start with how players can join your challenge."
+        : isCategoryStep
+            ? "Choose the market and asset or event."
+            : "Add the bet, prediction, timing, and review the payout.";
+
+    const goToNextStep = () => {
+        const nextStep = stepOrder[Math.min(currentStepIndex + 1, stepOrder.length - 1)];
+        setCurrentStep(nextStep);
+        closeAllDropdowns();
+    };
+
+    const goToPreviousStep = () => {
+        const previousStep = stepOrder[Math.max(currentStepIndex - 1, 0)];
+        setCurrentStep(previousStep);
+        closeAllDropdowns();
+    };
 
     const getButtonLabel = () => {
         if (!authenticated) return "Connect Wallet to Create";
@@ -559,11 +585,11 @@ export function CreateChallengeModal({
     };
 
     const getButtonStyle = () => {
-        if (!authenticated) return "cursor-pointer w-full py-3 sm:py-4 bg-gray-900 hover:bg-gray-700 text-white rounded-full font-bold text-base sm:text-lg transition-colors";
-        if (isLoading || (isSportsSelected && (!transformValid || !isSportsSelectionComplete))) return "cursor-pointer w-full py-3 sm:py-4 bg-gray-400 text-white rounded-full font-bold text-base sm:text-lg cursor-not-allowed";
-        if (txStatus === "success") return "cursor-pointer w-full py-3 sm:py-4 bg-green-500 text-white rounded-full font-bold text-base sm:text-lg cursor-not-allowed";
-        if (txStatus === "error") return "cursor-pointer w-full py-3 sm:py-4 bg-red-500 hover:bg-red-600 text-white rounded-full font-bold text-base sm:text-lg transition-colors";
-        return "cursor-pointer w-full py-3 sm:py-4 bg-gray-900 hover:bg-gray-700 text-white rounded-full font-bold text-base sm:text-lg transition-colors";
+        if (!authenticated) return "rekto-button cursor-pointer w-full py-3 sm:py-4 bg-gray-900 hover:bg-gray-700 text-white font-black text-base sm:text-lg transition-colors";
+        if (isLoading || (isSportsSelected && (!transformValid || !isSportsSelectionComplete))) return "cursor-pointer w-full py-3 sm:py-4 border-2 border-black bg-gray-400 text-white font-black text-base sm:text-lg cursor-not-allowed shadow-[3px_3px_0_#111]";
+        if (txStatus === "success") return "cursor-pointer w-full py-3 sm:py-4 border-2 border-black bg-green-500 text-white font-black text-base sm:text-lg cursor-not-allowed shadow-[1px_1px_0_#111]";
+        if (txStatus === "error") return "cursor-pointer w-full py-3 sm:py-4 border-2 border-black bg-red-500 hover:bg-red-600 text-white font-black text-base sm:text-lg transition-colors shadow-[1px_1px_0_#111]";
+        return "rekto-button cursor-pointer w-full py-3 sm:py-4 bg-gray-900 hover:bg-gray-700 text-white font-black text-base sm:text-lg transition-colors";
     };
 
     const endTimeRemaining = getTimeRemainingParts(selectedDate);
@@ -571,23 +597,42 @@ export function CreateChallengeModal({
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
             <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={handleModalClose} />
-            <div className="relative bg-[#f3e1d7] rounded-2xl sm:rounded-3xl w-full max-w-md md:max-w-2xl max-h-[94vh] sm:max-h-[90vh] overflow-hidden shadow-2xl flex flex-col">
-                <div className="bg-[#f3e1d7] rounded-t-2xl sm:rounded-t-3xl px-4 sm:px-6 pt-4 sm:pt-6 pb-3 sm:pb-4 border-b border-[#e8d5c8]">
+            <div className="rekto-modal-panel relative w-full max-w-md md:max-w-2xl max-h-[94vh] sm:max-h-[90vh] overflow-hidden flex flex-col">
+                <div className="bg-[#f3e1d7] px-4 sm:px-6 pt-4 sm:pt-6 pb-3 sm:pb-4 border-b-2 border-black">
                     <div className="flex items-center justify-between">
                         <div className="w-8" />
-                        <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 text-center">Create Challenge</h2>
-                        <button onClick={handleModalClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-[#e8d5c8] hover:bg-[#dcc9bc] transition-colors">
+                        <h2 className="text-lg sm:text-xl md:text-2xl font-black text-gray-900 text-center drop-shadow-[2px_2px_0_#f5d547]">Create Challenge</h2>
+                        <button onClick={handleModalClose} className="w-8 h-8 flex items-center justify-center border-2 border-black bg-white shadow-[2px_2px_0_#111] hover:bg-[#f5d547] transition-colors">
                             <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                             </svg>
                         </button>
                     </div>
-                    <p className="text-center text-gray-600 text-xs sm:text-sm mt-2">Set your terms and invite degenerates to challenge you.</p>
+                    <p className="text-center text-gray-600 text-xs sm:text-sm mt-2">Create a challenge in a few quick choices.</p>
                 </div>
 
                 <div className="px-4 sm:px-6 py-3 sm:py-4 space-y-4 overflow-y-auto">
+                    <div className="space-y-3">
+                        <div className="flex items-center gap-2">
+                            {stepOrder.map((step, index) => (
+                                <button
+                                    key={step}
+                                    type="button"
+                                    onClick={() => setCurrentStep(step)}
+                                    className={`h-2 flex-1 rounded-full transition-colors ${index <= currentStepIndex ? "bg-gray-900" : "bg-[#e8d5c8]"}`}
+                                    aria-label={`Go to step ${index + 1}`}
+                                />
+                            ))}
+                        </div>
+                        <div>
+                            <p className="text-xs font-bold uppercase tracking-wide text-gray-500">Step {currentStepIndex + 1} of {stepOrder.length}</p>
+                            <h3 className="text-xl font-black text-gray-900">{stepTitle}</h3>
+                            <p className="text-sm text-gray-600">{stepSubtitle}</p>
+                        </div>
+                    </div>
 
                     {/* challenge market  */}
+                    {isCategoryStep && (
                     <div className="space-y-2">
                         <label className="text-sm font-medium text-gray-700">Challenge Market</label>
                         <div className="flex items-center gap-2 p-1 bg-[#faf0eb] border border-[#e8d5c8] rounded-xl">
@@ -611,39 +656,43 @@ export function CreateChallengeModal({
                             )}
                         </div>
                     </div>
+                    )}
 
                     {/* challenge mode selection (pvp vs multi) */}
+                    {isModeStep && (
                     <div className="space-y-2">
                         <label className="text-sm font-medium text-gray-700">Challenge Mode</label>
-                        <div className="flex items-center gap-2 p-1 bg-[#faf0eb] border border-[#e8d5c8] rounded-xl">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <button
                                 onClick={() => setChallengeMode("pvp")}
-                                className={`flex-1 py-2 px-4 rounded-lg text-sm font-semibold transition-colors ${challengeMode === "pvp"
-                                    ? "bg-gray-900 text-white"
-                                    : "bg-transparent text-gray-600 hover:bg-[#f3e1d7]"
+                                className={`min-h-28 rounded-xl border px-4 py-4 text-left transition-colors ${challengeMode === "pvp"
+                                    ? "border-gray-900 bg-gray-900 text-white shadow-[3px_3px_0_#f5d547]"
+                                    : "border-[#e8d5c8] bg-[#faf0eb] text-gray-700 hover:border-[#d4b8a8]"
                                     }`}
                             >
-                                PVP
+                                <span className="block text-base font-black">PVP</span>
+                                <span className={`mt-1 block text-sm ${challengeMode === "pvp" ? "text-white/80" : "text-gray-500"}`}>One opponent accepts your exact bet.</span>
                             </button>
-                            <div className="relative flex-1 group">
-                                <button
-                                    type="button"
-                                    disabled
-                                    className="w-full py-2 px-4 rounded-lg text-sm font-semibold bg-transparent text-gray-400 cursor-not-allowed border border-dashed border-[#d4b8a8]"
-                                >
-                                    Multi (Coming Soon)
-                                </button>
-                                <span className="pointer-events-none absolute left-1/2 top-full z-20 mt-2 w-max max-w-[260px] -translate-x-1/2 rounded-lg bg-gray-800 px-3 py-2 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100">
-                                    Multiple people can compete against you or join you on your challenge
-                                </span>
-                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setChallengeMode("multi")}
+                                className={`min-h-28 rounded-xl border px-4 py-4 text-left transition-colors ${challengeMode === "multi"
+                                    ? "border-gray-900 bg-gray-900 text-white shadow-[3px_3px_0_#f5d547]"
+                                    : "border-[#e8d5c8] bg-[#faf0eb] text-gray-700 hover:border-[#d4b8a8]"
+                                    }`}
+                            >
+                                <span className="block text-base font-black">Multi</span>
+                                <span className={`mt-1 block text-sm ${challengeMode === "multi" ? "text-white/80" : "text-gray-500"}`}>Multiple players can join the same challenge.</span>
+                            </button>
                         </div>
                         <p className="text-xs text-gray-500">
-                            One opponent competes against your challenge.
+                            You can change this before moving forward.
                         </p>
                     </div>
+                    )}
 
                     {/* select token  */}
+                    {isCategoryStep && (
                     <div className="space-y-2">
                         {isSportsSelected ? (
                             <label className="text-sm font-medium text-gray-700">Select Sport Event</label>
@@ -740,8 +789,10 @@ export function CreateChallengeModal({
                             </div>
                         )}
                     </div>
+                    )}
 
                     {/* bet amount section  */}
+                    {isDetailsStep && (
                     <div className="space-y-2">
                         <label className="text-sm font-medium text-gray-700">Bet Amount</label>
                         <div className="flex items-center gap-2">
@@ -785,9 +836,10 @@ export function CreateChallengeModal({
                             <p className="text-red-500 text-sm mt-1">{betAmountError}</p>
                         )}
                     </div>
+                    )}
 
                     {/* challenge statement (for sports market) */}
-                    {isSportsSelected && (
+                    {isDetailsStep && isSportsSelected && (
                         <div className="space-y-3">
                             <div className="flex items-center gap-2">
                                 <label className="text-sm font-medium text-gray-700">Challenge Statement</label>
@@ -908,7 +960,7 @@ export function CreateChallengeModal({
                     )}
 
                     {/* predict price and direction section (non-sports markets) */}
-                    {!isSportsSelected && (
+                    {isDetailsStep && !isSportsSelected && (
                         <div className="space-y-2">
                             <label className="text-sm font-medium text-gray-700">Predict Price Movement</label>
                             <div className="flex flex-col min-[380px]:flex-row gap-2">
@@ -938,6 +990,7 @@ export function CreateChallengeModal({
                     )}
 
                     {/* challenge expires in  */}
+                    {isDetailsStep && (
                     <div className="space-y-2">
                         <div className="flex items-center gap-2">
                             <label className="text-sm font-medium text-gray-700">Challenge Expires In</label>
@@ -957,9 +1010,10 @@ export function CreateChallengeModal({
                             </svg>
                         </button>
                     </div>
+                    )}
 
                     {/* challenge end date (non-sports markets) */}
-                    {!isSportsSelected ? (
+                    {isDetailsStep && (!isSportsSelected ? (
                         <div className="space-y-2">
                             <div className="flex items-center gap-2">
                                 <label className="text-sm font-medium text-gray-700">Challenge End Date</label>
@@ -1003,9 +1057,10 @@ export function CreateChallengeModal({
                                 <p className="text-red-500 text-sm mt-1">{sportsResolutionConsentError}</p>
                             )}
                         </div>
-                    )}
+                    ))}
 
                     {/* summary section - adapts to sports vs non-sports */}
+                    {isDetailsStep && (
                     <div className="text-center py-2 px-1 sm:px-2">
                         {isSportsSelected ? (
                             <p className="text-sm sm:text-base text-gray-700 break-words">
@@ -1018,16 +1073,17 @@ export function CreateChallengeModal({
                         )}
                         <p className="text-xs text-gray-500 mt-1">6% platform fee applies</p>
                     </div>
+                    )}
 
                     {/* Error message */}
-                    {txStatus === "error" && txError && (
+                    {isDetailsStep && txStatus === "error" && txError && (
                         <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
                             ⚠️ {txError}
                         </div>
                     )}
 
                     {/* Success message */}
-                    {txStatus === "success" && txSignature && (
+                    {isDetailsStep && txStatus === "success" && txSignature && (
                         <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 text-sm text-green-700">
                             <p className="font-semibold">✅ Challenge created on-chain!</p>
                             <a
@@ -1042,7 +1098,7 @@ export function CreateChallengeModal({
                     )}
 
                     {/* Loading status indicator */}
-                    {isLoading && (
+                    {isDetailsStep && isLoading && (
                         <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-sm text-blue-700 flex items-center gap-2">
                             <svg className="animate-spin w-4 h-4 text-blue-500 flex-shrink-0" fill="none" viewBox="0 0 24 24">
                                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -1056,13 +1112,36 @@ export function CreateChallengeModal({
                         </div>
                     )}
 
-                    <button
-                        onClick={handleCreateChallenge}
-                        disabled={isLoading || txStatus === "success" || (isSportsSelected && (!transformValid || !isSportsSelectionComplete))}
-                        className={getButtonStyle()}
-                    >
-                        {getButtonLabel()}
-                    </button>
+                    <div className="flex flex-col sm:flex-row gap-3 pt-1">
+                        {!isModeStep && (
+                            <button
+                                type="button"
+                                onClick={goToPreviousStep}
+                                disabled={isLoading}
+                                className="w-full sm:w-32 py-3 border-2 border-black bg-white text-gray-900 font-black text-base shadow-[2px_2px_0_#111] hover:bg-[#f3e1d7] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                            >
+                                Back
+                            </button>
+                        )}
+                        {!isDetailsStep ? (
+                            <button
+                                type="button"
+                                onClick={goToNextStep}
+                                disabled={marketsLoading && isCategoryStep}
+                                className="rekto-button cursor-pointer w-full py-3 sm:py-4 bg-gray-900 hover:bg-gray-700 text-white font-black text-base sm:text-lg transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+                            >
+                                Continue
+                            </button>
+                        ) : (
+                            <button
+                                onClick={handleCreateChallenge}
+                                disabled={isLoading || txStatus === "success" || (isSportsSelected && (!transformValid || !isSportsSelectionComplete))}
+                                className={getButtonStyle()}
+                            >
+                                {getButtonLabel()}
+                            </button>
+                        )}
+                    </div>
                 </div>
             </div>
 

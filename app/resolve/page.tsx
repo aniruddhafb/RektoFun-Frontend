@@ -203,7 +203,7 @@ const CoinAvatar = ({ challenge }: { challenge: Challenge }) => {
     if (imgSrc) {
         return (
             <div
-                className="w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden border-2 border-white/30 shadow-md"
+                className="w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden border-2 border-white/30"
                 style={{ backgroundColor: challenge.coinBg }}
             >
                 <Image src={imgSrc} alt={challenge.coin} width={48} height={48} className="w-full h-full object-cover" />
@@ -213,7 +213,7 @@ const CoinAvatar = ({ challenge }: { challenge: Challenge }) => {
 
     return (
         <div
-            className="w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center flex-shrink-0 border-2 border-white/30 shadow-md text-white font-bold text-lg"
+            className="w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center flex-shrink-0 border-2 border-white/30 text-white font-bold text-lg"
             style={{ backgroundColor: challenge.coinBg }}
         >
             {challenge.coinIcon}
@@ -244,7 +244,7 @@ const ChallengeCard = ({
                 : "bg-amber-50 text-amber-700 border-amber-200";
 
     return (
-        <div className="bg-white/65 backdrop-blur-sm rounded-2xl border border-gray-400 shadow-sm hover:shadow-md transition-all hover:bg-white/75 overflow-hidden">
+        <div className="bg-white/65 backdrop-blur-sm rounded-2xl border border-gray-400 transition-all hover:bg-white/75 overflow-hidden">
             <div className="p-4 lg:p-5">
                 <div className="flex items-start gap-3 sm:gap-4">
                     <CoinAvatar challenge={challenge} />
@@ -274,7 +274,7 @@ const ChallengeCard = ({
                 <div className="grid grid-cols-2 gap-2 mt-4">
                     <button
                         onClick={() => onDecisionClick(challenge, "approve")}
-                        className={`cursor-pointer flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-semibold transition-all shadow-sm border ${voted === "approve"
+                        className={`cursor-pointer flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-semibold transition-all border ${voted === "approve"
                             ? "bg-green-50 border-green-300 text-green-700"
                             : "bg-white border-gray-200 text-gray-700 hover:bg-green-50 hover:border-green-300 hover:text-green-700"
                             }`}
@@ -284,7 +284,7 @@ const ChallengeCard = ({
                     </button>
                     <button
                         onClick={() => onDecisionClick(challenge, "deny")}
-                        className={`cursor-pointer flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-semibold transition-all shadow-sm border ${voted === "deny"
+                        className={`cursor-pointer flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-semibold transition-all border ${voted === "deny"
                             ? "bg-red-50 border-red-300 text-red-700"
                             : "bg-white border-gray-200 text-gray-700 hover:bg-red-50 hover:border-red-300 hover:text-red-600"
                             }`}
@@ -379,7 +379,7 @@ const ResolverStatus = () => {
     return (
         <div className="space-y-4">
             {/* Status Card */}
-            <div className="bg-white/65 backdrop-blur-sm rounded-2xl border border-white/70 shadow-sm p-5">
+            <div className="bg-white/65 backdrop-blur-sm rounded-2xl border border-white/70 p-5">
                 <h3 className="text-base font-bold text-gray-900 mb-4">Your Resolver Status</h3>
 
                 {/* Stats */}
@@ -403,7 +403,7 @@ const ResolverStatus = () => {
             </div>
 
             {/* How It Works */}
-            <div className="bg-white/65 backdrop-blur-sm rounded-2xl border border-white/70 shadow-sm p-5">
+            <div className="bg-white/65 backdrop-blur-sm rounded-2xl border border-white/70 p-5">
                 <h3 className="text-base font-bold text-gray-900 mb-4">How It Works</h3>
                 <div className="space-y-4">
                     {[
@@ -494,14 +494,14 @@ export default function ResolvePage() {
     const pendingCount = challengesData.length;
 
     return (
-        <div className="min-h-screen" style={{ backgroundColor: "#f3e1d7" }}>
+        <div className="rekto-page min-h-screen">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
 
                 {/* ── Header ── */}
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6">
                     <div>
                         <div className="flex items-center gap-2.5">
-                            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900">Resolve Challenges</h1>
+                            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-gray-900">Resolve Challenges</h1>
                         </div>
                         <p className="text-gray-500 mt-1 text-sm sm:text-base">
                             Review real-world event challenges and help the community reach a fair resolution.
@@ -510,7 +510,7 @@ export default function ResolvePage() {
                 </div>
 
                 {/* ── Tabs + Filters ── */}
-                <div className="bg-white/65 backdrop-blur-sm rounded-2xl border border-white/70 shadow-sm px-4 sm:px-5 py-3 mb-5 flex flex-col sm:flex-row sm:items-center gap-3">
+                <div className="bg-white/65 backdrop-blur-sm rounded-2xl border border-white/70 px-4 sm:px-5 py-3 mb-5 flex flex-col sm:flex-row sm:items-center gap-3">
                     {/* Tabs */}
                     <div className="flex items-center gap-1 overflow-x-auto scrollbar-hide flex-shrink-0">
                         {[
@@ -548,7 +548,7 @@ export default function ResolvePage() {
                             <select
                                 value={market}
                                 onChange={(e) => setMarket(e.target.value)}
-                                className="appearance-none pl-3 pr-8 py-2 bg-white/80 border border-gray-200 rounded-xl text-xs sm:text-sm text-gray-700 font-medium focus:outline-none focus:ring-2 focus:ring-orange-200 shadow-sm cursor-pointer"
+                                className="appearance-none pl-3 pr-8 py-2 bg-white/80 border border-gray-200 rounded-xl text-xs sm:text-sm text-gray-700 font-medium focus:outline-none focus:ring-2 focus:ring-orange-200 cursor-pointer"
                             >
                                 <option>All Markets</option>
                                 <option>FIFA 26</option>
@@ -559,7 +559,7 @@ export default function ResolvePage() {
 
                         {/* Sort */}
                         <div className="relative">
-                            <div className="flex items-center gap-1.5 pl-3 pr-8 py-2 bg-white/80 border border-gray-200 rounded-xl text-xs sm:text-sm text-gray-700 font-medium shadow-sm cursor-pointer"
+                            <div className="flex items-center gap-1.5 pl-3 pr-8 py-2 bg-white/80 border border-gray-200 rounded-xl text-xs sm:text-sm text-gray-700 font-medium cursor-pointer"
                                 onClick={() => setSort(sort === "Newest First" ? "Oldest First" : "Newest First")}>
                                 <FilterIcon className="w-3.5 h-3.5 text-gray-500" />
                                 <span>{sort}</span>
@@ -649,7 +649,7 @@ export default function ResolvePage() {
                 <div className="lg:hidden mt-5">
                     <button
                         onClick={() => setShowSidebar(!showSidebar)}
-                        className="w-full flex items-center justify-between px-4 py-3 bg-white/65 backdrop-blur-sm rounded-2xl border border-white/70 shadow-sm text-sm font-semibold text-gray-800"
+                        className="w-full flex items-center justify-between px-4 py-3 bg-white/65 backdrop-blur-sm rounded-2xl border border-white/70 text-sm font-semibold text-gray-800"
                     >
                         <div className="flex items-center gap-2">
                             <ShieldIcon className="w-4 h-4 text-orange-500" />
@@ -672,7 +672,7 @@ export default function ResolvePage() {
                             aria-label="Close modal"
                             onClick={() => setPendingDecision(null)}
                         />
-                        <div className="relative w-full max-w-lg bg-white rounded-2xl border border-white/80 shadow-2xl p-5 sm:p-6">
+                        <div className="rekto-modal-panel relative w-full max-w-lg rounded-2xl border border-white/80 p-5 sm:p-6">
                             <h3 className="text-lg sm:text-xl font-bold text-gray-900">Confirm Resolution</h3>
                             <p className="text-sm text-gray-500 mt-1">Final step before you submit your validation.</p>
 

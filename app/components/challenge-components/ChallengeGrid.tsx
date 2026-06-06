@@ -192,11 +192,11 @@ export function ChallengeGrid({
                         <div className="h-full w-1/2 animate-pulse rounded-full bg-gray-700/70" />
                     </div>
                 </div> */}
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
                     {Array.from({ length: 6 }).map((_, index) => (
                         <div
                             key={index}
-                            className="h-[300px] rounded-xl border border-white/60 bg-white/50 p-5 animate-pulse"
+                            className="h-[300px] border-2 border-black bg-white/70 p-5 animate-pulse"
                         >
                             <div className="h-6 w-3/4 rounded bg-gray-200" />
                             <div className="mt-3 h-4 w-1/2 rounded bg-gray-200" />
@@ -213,18 +213,18 @@ export function ChallengeGrid({
     if (loadError) {
         return (
             <div className="max-w-7xl mx-auto px-6 lg:px-8 pb-16">
-                <div className="text-center py-16">
-                    <p className="text-red-600 text-base mb-4">{loadError}</p>
+                <div className="mx-auto max-w-xl border-2 border-black bg-white p-8 text-center shadow-[5px_5px_0_#111]">
+                    <p className="text-red-600 text-base font-bold mb-4">{loadError}</p>
                     <div className="flex items-center justify-center gap-3">
                         <button
                             onClick={() => setRetryNonce((n) => n + 1)}
-                            className="cursor-pointer inline-flex items-center justify-center px-6 py-3 bg-white/50 border border-gray-400 hover:bg-white/80 text-black text-sm font-medium rounded-full transition-colors"
+                            className="cursor-pointer inline-flex items-center justify-center border-2 border-black bg-[#f5d547] px-6 py-3 text-sm font-black text-black shadow-[2px_2px_0_#111] transition-all hover:-translate-y-0.5"
                         >
                             Retry
                         </button>
                         <button
                             onClick={onOpenModal}
-                            className="cursor-pointer inline-flex items-center justify-center px-6 py-3 bg-white/20 border border-gray-300 hover:bg-white/40 text-black text-sm font-medium rounded-full transition-colors"
+                            className="cursor-pointer inline-flex items-center justify-center border-2 border-black bg-black px-6 py-3 text-sm font-black text-white shadow-[3px_3px_0_#e85a2d] transition-all hover:-translate-y-0.5"
                         >
                             Create a challenge
                         </button>
@@ -237,11 +237,11 @@ export function ChallengeGrid({
     if (challenges.length === 0) {
         return (
             <div className="max-w-7xl mx-auto px-6 lg:px-8 pb-16">
-                <div className="text-center py-16">
-                    <p className="text-gray-500 text-lg mb-4">No challenges found yet.</p>
+                <div className="mx-auto max-w-xl border-2 border-black bg-white p-8 text-center shadow-[5px_5px_0_#111] animate-pop-in">
+                    <p className="text-gray-800 text-lg font-black mb-4">No challenges found yet.</p>
                     <button
                         onClick={onOpenModal}
-                        className="cursor-pointer inline-flex items-center justify-center px-6 py-3 bg-white/50 border border-gray-400 hover:bg-white/80 text-black text-sm font-medium rounded-full hover:bg-gray-800 transition-colors"
+                        className="cursor-pointer inline-flex items-center justify-center border-2 border-black bg-black px-6 py-3 text-sm font-black uppercase tracking-[0.08em] text-white shadow-[4px_4px_0_#e85a2d] transition-all hover:-translate-y-1 hover:shadow-[6px_6px_0_#e85a2d]"
                     >
                         Be the first to create one!
                     </button>
@@ -252,7 +252,7 @@ export function ChallengeGrid({
 
     return (
         <div className="max-w-7xl mx-auto px-6 lg:px-8 pb-16">
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
                 {challenges.map((challenge) => (
                     <ChallengeCard
                         key={challenge.id}
@@ -268,7 +268,7 @@ export function ChallengeGrid({
                     Array.from({ length: PAGE_SIZE }).map((_, index) => (
                         <div
                             key={`loading-more-skeleton-${index}`}
-                            className="h-[300px] rounded-xl border border-white/60 bg-white/50 p-5 animate-pulse"
+                            className="h-[300px] border-2 border-black bg-white/70 p-5 animate-pulse"
                         >
                             <div className="h-6 w-3/4 rounded bg-gray-200" />
                             <div className="mt-3 h-4 w-1/2 rounded bg-gray-200" />
@@ -281,7 +281,7 @@ export function ChallengeGrid({
             {hasMore && (
                 <div ref={loadMoreRef} className="flex justify-center py-8">
                     {!isLoadingMore ? (
-                        <span className="text-sm text-gray-400">Scroll to load more</span>
+                        <span className="border border-black bg-white px-3 py-2 text-xs font-black uppercase tracking-[0.12em] text-gray-700 shadow-[2px_2px_0_#111]">Scroll to load more</span>
                     ) : (
                         <span className="sr-only">Loading more challenges</span>
                     )}

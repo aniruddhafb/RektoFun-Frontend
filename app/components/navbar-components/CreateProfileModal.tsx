@@ -34,11 +34,11 @@ export function CreateProfileModal({
     return (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
-            <div className="relative z-10 w-full max-w-md bg-[#f3e1d7] rounded-3xl shadow-2xl overflow-hidden">
+            <div className="rekto-modal-panel relative z-10 w-full max-w-md rounded-3xl shadow-2xl overflow-hidden">
                 <div className="p-6">
                     <div className="flex items-center justify-between mb-6">
                         <div>
-                            <h2 className="text-xl font-bold text-gray-900">
+                            <h2 className="text-2xl font-black text-gray-900">
                                 Create Profile*
                             </h2>
                             <p className="text-sm text-gray-600">
@@ -53,7 +53,7 @@ export function CreateProfileModal({
                                 Profile Character
                             </label>
                             <div className="flex items-center gap-4">
-                                <div className="w-20 h-20 rounded-full overflow-hidden border-4 border-white shadow-lg">
+                                <div className="w-20 h-20 rounded-full overflow-hidden border-4 border-black shadow-lg">
                                     <img
                                         src={`https://earningrecords.com/assets/rektofun/profiles/${editProfileIndex + 1}.svg`}
                                         alt="Profile"
@@ -76,7 +76,7 @@ export function CreateProfileModal({
                                 <button
                                     type="button"
                                     onClick={onRandomizeUsername}
-                                    className="px-3 py-1.5 bg-white/80 border border-gray-300 rounded-lg text-xs font-semibold text-gray-700 hover:bg-white transition-colors"
+                                    className="px-3 py-1.5 bg-white/80 border border-gray-800 rounded-lg text-xs font-semibold text-gray-700 hover:bg-white transition-colors"
                                 >
                                     Randomize
                                 </button>
@@ -125,7 +125,7 @@ export function CreateProfileModal({
                         <button
                             onClick={onSubmit}
                             disabled={!editUsername.trim()}
-                            className="cursor-pointer w-full py-3 bg-gray-900 hover:bg-gray-800 text-white font-medium rounded-xl transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+                            className="rekto-button cursor-pointer w-full py-3 bg-gray-900 hover:bg-gray-800 text-white font-medium rounded-xl transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
                         >
                             Continue
                         </button>

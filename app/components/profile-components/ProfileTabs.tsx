@@ -23,7 +23,7 @@ export function ProfileTabs({ activeTab, onTabChange }: ProfileTabsProps) {
                         key={tab.id}
                         onClick={() => onTabChange(tab.id)}
                         className={`px-4 sm:px-6 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${activeTab === tab.id
-                                ? "bg-white text-gray-900 shadow-sm"
+                                ? "bg-white text-gray-900"
                                 : "text-gray-600 hover:text-gray-900 hover:bg-white/50"
                             }`}
                     >

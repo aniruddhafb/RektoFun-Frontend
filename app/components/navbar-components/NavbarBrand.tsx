@@ -20,7 +20,7 @@ export function NavbarBrand() {
                 </div>
             </div> */}
 
-            <Link href="/" className="hover:opacity-80 transition-opacity">
+            <Link href="/" className="border-2 border-transparent px-2 py-1 transition-all hover:border-black hover:bg-white hover:shadow-[2px_2px_0_#111]">
                 <Image
                     src="/logos/mainlogo.png"
                     alt="REKTO"

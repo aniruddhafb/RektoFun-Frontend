@@ -85,7 +85,7 @@ export function HeroSection() {
                 </svg>
             </div>
 
-            <div className="pointer-events-none relative z-10 mx-auto w-full max-w-3xl px-2 text-center sm:px-6">
+            <div className="pointer-events-none relative z-10 mx-auto w-full max-w-4xl px-2 text-center sm:px-6">
                 {/* <div className="absolute -top-12 right-[5%] md:right-[2%]">
                     <div className="relative w-16 h-16 md:w-20 md:h-20">
                         <svg viewBox="0 0 80 80" className="w-full h-full rotate-12">
@@ -100,11 +100,28 @@ export function HeroSection() {
                     </div>
                 </div> */}
 
-                <h1 className="mb-4 break-words text-4xl font-bold tracking-tight text-black min-[380px]:text-5xl md:text-6xl lg:text-8xl">
+                {/* <div className="mx-auto mb-5 inline-flex items-center gap-2 border border-black bg-white px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-black shadow-[3px_3px_0_#111] animate-pop-in">
+                    <span className="h-2 w-2 bg-[#e85a2d]" />
+                    PvP Prediction Arena
+                </div> */}
+
+                <div className="mb-10 flex flex-wrap items-center justify-center gap-3 text-[11px] font-black uppercase tracking-[0.14em] text-black">
+                    <span className="border border-black bg-[#a8d85b] px-3 py-2 shadow-[2px_2px_0_#111] animate-float-gentle">
+                        Permissionless
+                    </span>
+                    <span className="border border-black bg-[#e85a2d] px-3 py-2 text-white shadow-[2px_2px_0_#111] animate-float-diagonal">
+                        PvP Battles
+                    </span>
+                    <span className="border border-black bg-[#f5d547] px-3 py-2 shadow-[2px_2px_0_#111] animate-float-updown">
+                        On Solana
+                    </span>
+                </div>
+
+                <h1 className="mb-4 break-words text-4xl font-black tracking-tight text-black drop-shadow-[4px_4px_0_#f5d547] animate-airdrop min-[380px]:text-5xl md:text-6xl lg:text-8xl">
                     REKTO.FUN
                 </h1>
 
-                <p className="mx-auto mb-8 max-w-xl break-words text-base text-gray-800 min-[380px]:text-lg lg:text-xl">
+                <p className="mx-auto mb-8 max-w-xl break-words text-base font-semibold text-gray-800 min-[380px]:text-lg lg:text-xl">
                     The PvP Battleground For Predictions {"\u{1FA84}"}
                     <br />
                     Crypto & Sports 🏀
@@ -112,10 +129,11 @@ export function HeroSection() {
 
                 <Link
                     href="/challenges"
-                    className="pointer-events-auto inline-flex max-w-full items-center justify-center rounded-lg bg-black px-6 py-3 text-sm font-semibold text-white shadow-lg transition-all hover:scale-105 hover:bg-gray-800 hover:shadow-glow min-[380px]:px-8 min-[380px]:text-base sm:px-10 sm:py-4 cursor-pointer"
+                    className="pointer-events-auto inline-flex max-w-full items-center justify-center border-2 border-black bg-black px-5 py-2.5 text-xs font-black uppercase tracking-[0.08em] text-white shadow-[4px_4px_0_#e85a2d] transition-all hover:-translate-y-1 hover:shadow-[6px_6px_0_#e85a2d] active:translate-y-0 active:shadow-[2px_2px_0_#e85a2d] min-[380px]:px-7 min-[380px]:text-sm sm:px-8 sm:py-3 cursor-pointer"
                 >
                     View Challenges {"\u279D"}
                 </Link>
+
             </div>
 
             <div className="absolute bottom-12 left-1/2 -translate-x-1/2 w-32 h-14 opacity-35 blur-[0.2px] animate-float-gentle sm:bottom-16 sm:w-40 sm:h-16 sm:opacity-45 md:bottom-14 md:w-40 md:h-16 md:opacity-45 lg:bottom-16 lg:w-44 lg:h-[4.5rem] lg:opacity-60 xl:bottom-20 xl:w-48 xl:h-20 xl:opacity-100 md:blur-0">

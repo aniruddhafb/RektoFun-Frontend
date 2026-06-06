@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Copy, Share2, Gift, CheckCircle, Loader2 } from "lucide-react";
+import { CheckCircle, Copy, Gift, Link2, Loader2, Share2 } from "lucide-react";
 import { useSolanaWallet } from "@/app/lib/useSolanaWallet";
 import { acceptReferral } from "@/app/lib/users-service/users";
 
@@ -55,9 +55,9 @@ export function ReferralLinkSection({
                 setShowSuccess(false);
                 if (onRedeemSuccess) onRedeemSuccess();
             }, 3000);
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('[ReferralLinkSection] Failed to redeem referral:', error);
-            setRedeemError(error.message || "Failed to redeem referral code");
+            setRedeemError(error instanceof Error ? error.message : "Failed to redeem referral code");
         } finally {
             setIsRedeeming(false);
         }
@@ -76,45 +76,50 @@ export function ReferralLinkSection({
     };
 
     return (
-        <div className="bg-white/40 backdrop-blur-sm rounded-2xl p-4 sm:p-6 border border-white/50">
-            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
-                {/* Link Input */}
-                <div className="flex-1 flex items-center gap-2 bg-white rounded-xl px-4 py-3 border border-gray-200 shadow-sm w-full">
-                    <span className="text-gray-600 font-medium text-sm sm:text-base truncate">{referralLink}</span>
-                    <button
-                        onClick={handleCopy}
-                        className="ml-auto px-4 py-1.5 bg-gray-800 hover:bg-gray-700 text-white rounded-lg font-medium text-sm transition-colors flex-shrink-0"
-                    >
-                        {copied ? "Copied!" : "Copy"}
-                    </button>
+        <div className="referral-hover-shadow rounded-lg border border-black/10 bg-white/80 p-4 shadow-none backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-black sm:p-5">
+            <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                    <div className="mb-2 flex items-center gap-2 text-sm font-black uppercase tracking-wide text-gray-500">
+                        <Link2 className="h-4 w-4" />
+                        Your invite link
+                    </div>
+                    <h2 className="text-xl font-black text-gray-950">Share this link to start earning</h2>
+                    <p className="mt-1 text-sm font-medium text-gray-600">
+                        Anyone who joins with this link is counted toward your referral rewards.
+                    </p>
+                </div>
+                <div className="rounded-full bg-gray-950 px-3 py-1 text-xs font-black uppercase tracking-wide text-white">
+                    Code: {referralCode || "..."}
                 </div>
             </div>
 
-            {/* Share Referral Code Section */}
-            <div className="mt-4 bg-white/60 rounded-xl p-4 border border-white/50">
-                <div className="flex items-center gap-2 mb-3">
-                    <Share2 className="w-5 h-5 text-gray-600" />
-                    <span className="font-semibold text-gray-900">Share Your Referral Code</span>
+            <div className="flex flex-col gap-3 sm:flex-row">
+                <div className="referral-hover-shadow flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-black/10 bg-[#fffaf6] px-4 py-3 shadow-none transition-all duration-200 hover:border-black">
+                    <span className="truncate text-sm font-semibold text-gray-700 sm:text-base">{referralLink}</span>
+                    <button
+                        onClick={handleCopy}
+                        className="ml-auto inline-flex h-9 flex-shrink-0 items-center gap-2 rounded-lg bg-gray-950 px-3 text-sm font-black text-white transition-colors hover:bg-gray-800"
+                    >
+                        {copied ? <CheckCircle className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                        {copied ? "Copied" : "Copy"}
+                    </button>
                 </div>
-                <p className="text-sm text-gray-600 mb-3">
-                    Get <span className="font-semibold text-gray-900">100 REKTO points</span> for each friend who signs up using your link!
-                </p>
                 <button
                     onClick={handleShare}
-                    className="w-full px-6 py-2.5 bg-gray-800 hover:bg-gray-700 text-white font-semibold rounded-lg shadow-sm transition-all active:scale-95 flex items-center justify-center gap-2"
+                    className="inline-flex h-12 items-center justify-center gap-2 rounded-lg border border-black bg-white px-5 text-sm font-black text-gray-950 transition-all hover:bg-gray-950 hover:text-white active:scale-95"
                 >
-                    <Copy className="w-4 h-4" />
-                    Share Referral Link
+                    <Share2 className="h-4 w-4" />
+                    Share
                 </button>
             </div>
 
             {/* Share Popup */}
             {showSharePopup && (
-                <div className="mt-3 p-3 bg-gray-100 border border-gray-300 rounded-lg flex items-start gap-2 animate-pulse">
-                    <CheckCircle className="w-4 h-4 text-gray-600 mt-0.5 flex-shrink-0" />
+                <div className="mt-3 flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+                    <CheckCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-emerald-700" />
                     <div>
-                        <p className="text-sm font-medium text-gray-800">Referral link copied!</p>
-                        <p className="text-xs text-gray-600 mt-0.5">Share it with your friends and get REKTO points!</p>
+                        <p className="text-sm font-black text-emerald-900">Referral link copied</p>
+                        <p className="mt-0.5 text-xs font-medium text-emerald-800">Paste it wherever you want to invite friends.</p>
                     </div>
                 </div>
             )}
@@ -122,27 +127,32 @@ export function ReferralLinkSection({
             {/* Redeem Referral Code Section - Only show if not already referred */}
             <div className="mt-4">
                 {referredBy ? (
-                    <div className="bg-white/60 rounded-xl p-4 border border-white/50">
+                    <div className="referral-hover-shadow rounded-lg border border-black/10 bg-[#fffaf6] p-4 shadow-none transition-all duration-200 hover:border-black">
                         <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center">
-                                <CheckCircle className="w-5 h-5 text-gray-600" />
+                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
+                                <CheckCircle className="h-5 w-5" />
                             </div>
                             <div>
-                                <p className="font-semibold text-gray-900">Referral Code Already Redeemed!</p>
+                                <p className="font-black text-gray-950">Referral code already redeemed</p>
                                 {/* <p className="text-sm text-gray-600">
                                     You used referral code: <span className="font-mono font-medium text-gray-900">{referralCode}</span>
                                 </p> */}
                             </div>
                         </div>
-                        <div className="mt-3 p-2 bg-white/60 rounded-lg">
-                            <p className="text-xs text-gray-400">This code was applied when you signed up.</p>
+                        <div className="mt-3 rounded-lg bg-white p-2">
+                            <p className="text-xs font-medium text-gray-500">This reward was applied when you signed up.</p>
                         </div>
                     </div>
                 ) : (
-                    <div className="bg-white/60 rounded-xl p-4 border border-white/50">
-                        <div className="flex items-center gap-2 mb-3">
-                            <Gift className="w-5 h-5 text-gray-600" />
-                            <span className="font-semibold text-gray-900">Redeem Referral Code</span>
+                    <div className="referral-hover-shadow rounded-lg border border-black/10 bg-[#fffaf6] p-4 shadow-none transition-all duration-200 hover:border-black">
+                        <div className="mb-3 flex items-start gap-3">
+                            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-white text-amber-700 ring-1 ring-black/10">
+                                <Gift className="h-5 w-5" />
+                            </div>
+                            <div>
+                                <p className="font-black text-gray-950">Have a friend&apos;s code?</p>
+                                <p className="mt-1 text-sm font-medium text-gray-600">Redeem it here before your friend&apos;s referral is applied.</p>
+                            </div>
                         </div>
                         {/* <p className="text-sm text-gray-600 mb-3">
                             Get <span className="font-semibold text-gray-900">50 REKTO points</span> for using a referral code!
@@ -156,13 +166,13 @@ export function ReferralLinkSection({
                                     setRedeemCode(e.target.value);
                                     setRedeemError("");
                                 }}
-                                className="flex-1 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300 focus:border-transparent"
+                                className="h-11 flex-1 rounded-lg border border-black/10 bg-white px-4 text-sm font-semibold uppercase text-gray-900 placeholder:normal-case placeholder:font-medium placeholder:text-gray-400 focus:border-gray-950 focus:outline-none focus:ring-4 focus:ring-amber-500/15"
                                 maxLength={10}
                             />
                             <button
                                 onClick={handleRedeem}
                                 disabled={isRedeeming}
-                                className="px-6 py-2 bg-gray-800 hover:bg-gray-700 text-white font-semibold rounded-lg shadow-sm transition-all active:scale-95 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center gap-2 min-w-[100px]"
+                                className="inline-flex h-11 min-w-[112px] items-center justify-center gap-2 rounded-lg bg-gray-950 px-5 text-sm font-black text-white shadow-none transition-all hover:bg-gray-800 active:scale-95 disabled:cursor-not-allowed disabled:bg-gray-400"
                             >
                                 {isRedeeming ? (
                                     <>
@@ -175,14 +185,14 @@ export function ReferralLinkSection({
                             </button>
                         </div>
                         {redeemError && (
-                            <p className="text-red-500 text-xs mt-2">{redeemError}</p>
+                            <p className="mt-2 text-xs font-semibold text-red-600">{redeemError}</p>
                         )}
                     </div>
                 )}
                 {showSuccess && (
-                    <div className="mt-3 p-3 bg-gray-100 border border-gray-300 rounded-lg flex items-center gap-2 animate-pulse">
-                        <CheckCircle className="w-4 h-4 text-gray-600" />
-                        <span className="text-sm font-medium text-gray-800">Successfully redeemed! Referral code accepted!</span>
+                    <div className="mt-3 flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+                        <CheckCircle className="h-4 w-4 text-emerald-700" />
+                        <span className="text-sm font-black text-emerald-900">Referral code accepted.</span>
                     </div>
                 )}
             </div>

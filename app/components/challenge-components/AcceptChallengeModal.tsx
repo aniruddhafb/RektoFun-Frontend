@@ -121,7 +121,7 @@ export function AcceptChallengeModal({
         >
             <div
                 onClick={(e) => e.stopPropagation()}
-                className="w-full max-w-3xl max-h-[92vh] overflow-y-auto rounded-3xl border border-[#e8d5c8] bg-[#f8ede7] shadow-2xl"
+                className="rekto-modal-panel w-full max-w-3xl max-h-[92vh] overflow-y-auto rounded-3xl border border-[#e8d5c8] bg-[#f8ede7] shadow-2xl"
             >
                 <div className="relative overflow-hidden bg-gradient-to-r from-[#f6efe9] via-[#f8ede7] to-[#f4ebe3] px-4 py-4 md:px-8 md:py-5">
                     <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(255,255,255,0.8),transparent_45%)]" />
@@ -193,7 +193,7 @@ export function AcceptChallengeModal({
                             type="button"
                             onClick={onClose}
                             disabled={isLoading}
-                            className="group h-9 w-9 shrink-0 cursor-pointer rounded-full border border-[#e7d9ce] bg-white text-base font-semibold text-[#6f6a63] shadow-sm transition-all hover:-translate-y-0.5 hover:border-[#d9c6b8] hover:bg-[#fffaf7] hover:text-[#2d1f1a] hover:shadow disabled:cursor-not-allowed disabled:opacity-60 sm:h-10 sm:w-10 sm:text-lg"
+                            className="group h-9 w-9 shrink-0 cursor-pointer rounded-full border-2 border-black bg-white text-base font-black text-[#6f6a63] shadow-[2px_2px_0_#111] transition-all hover:-translate-y-0.5 hover:border-black hover:bg-[#fffaf7] hover:text-[#2d1f1a] hover:shadow-[2px_2px_0_#111] disabled:cursor-not-allowed disabled:opacity-60 sm:h-10 sm:w-10 sm:text-lg"
                             aria-label="Close"
                         >
                             <span className="leading-none">×</span>
@@ -331,7 +331,7 @@ export function AcceptChallengeModal({
                     <button
                         type="submit"
                         disabled={isLoading || Boolean(liveValidationError)}
-                        className="cursor-pointer w-full rounded-2xl bg-[#11895a] px-5 py-3.5 text-lg font-black text-white shadow-lg transition hover:bg-[#0f7b50] disabled:cursor-not-allowed disabled:opacity-70"
+                        className="rekto-button cursor-pointer w-full rounded-2xl bg-[#11895a] px-5 py-3.5 text-lg font-black text-white shadow-lg transition hover:bg-[#0f7b50] disabled:cursor-not-allowed disabled:opacity-70"
                     >
                         {isLoading ? "PROCESSING..." : "ACCEPT & PROCEED"}
                     </button>

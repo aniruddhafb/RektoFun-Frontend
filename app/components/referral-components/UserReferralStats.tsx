@@ -9,50 +9,58 @@ interface UserReferralStatsProps {
 
 export function UserReferralStats({ referralsCount, referralPoints }: UserReferralStatsProps) {
     return (
-        <div className="xl:w-80 flex flex-col gap-4">
+        <aside className="flex flex-col gap-4 xl:sticky xl:top-24">
             {/* User Stats Card */}
-            <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-5 sm:p-6 border border-white/50 shadow-sm">
-                <h3 className="font-semibold text-gray-900 mb-4">Your Referral Stats</h3>
+            <div className="referral-hover-shadow rounded-lg border border-black/10 bg-white/80 p-5 shadow-none backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-black sm:p-6">
+                <div className="mb-5 flex items-start justify-between gap-3">
+                    <div>
+                        <h3 className="text-lg font-black text-gray-950">Your progress</h3>
+                        <p className="mt-1 text-sm font-medium text-gray-600">Track referral rewards from your invite link.</p>
+                    </div>
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-50 text-amber-700 ring-1 ring-amber-200">
+                        <Sparkles className="h-5 w-5" />
+                    </div>
+                </div>
 
                 {/* Total Referrals */}
-                <div className="mb-4 p-4 bg-white/40 rounded-xl">
-                    <div className="flex items-center gap-3 mb-2">
-                        <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center">
-                            <Users className="w-5 h-5 text-gray-600" />
+                <div className="mb-3 rounded-lg border border-black/10 bg-[#fffaf6] p-4">
+                    <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white text-sky-700 ring-1 ring-black/10">
+                            <Users className="h-5 w-5" />
                         </div>
                         <div>
-                            <p className="text-sm text-gray-500">Friends Referred</p>
-                            <p className="text-2xl font-bold text-gray-900">{referralsCount}</p>
+                            <p className="text-xs font-black uppercase tracking-wide text-gray-500">Friends referred</p>
+                            <p className="text-3xl font-black text-gray-950">{referralsCount}</p>
                         </div>
                     </div>
                 </div>
 
                 {/* Total Points */}
-                <div className="p-4 bg-white/40 rounded-xl">
-                    <div className="flex items-center gap-3 mb-2">
-                        <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center">
-                            <Coins className="w-5 h-5 text-gray-600" />
+                <div className="rounded-lg border border-black/10 bg-[#fffaf6] p-4">
+                    <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white text-emerald-700 ring-1 ring-black/10">
+                            <Coins className="h-5 w-5" />
                         </div>
                         <div>
-                            <p className="text-sm text-gray-500">Your REKTO points</p>
-                            <p className="text-2xl font-bold text-gray-900">{referralPoints.toLocaleString()}</p>
+                            <p className="text-xs font-black uppercase tracking-wide text-gray-500">REKTO points</p>
+                            <p className="text-3xl font-black text-gray-950">{referralPoints.toLocaleString()}</p>
                         </div>
                     </div>
                 </div>
             </div>
 
             {/* Quick Tip Card */}
-            <div className="bg-white/40 backdrop-blur-sm rounded-2xl p-4 sm:p-5 border border-white/50">
+            <div className="referral-hover-shadow rounded-lg border border-amber-200 bg-amber-50 p-4 shadow-none transition-all duration-200 hover:-translate-y-0.5 hover:border-black sm:p-5">
                 <div className="flex items-start gap-3">
-                    <Sparkles className="w-5 h-5 text-gray-600 mt-0.5 flex-shrink-0" />
+                    <Sparkles className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-700" />
                     <div>
-                        <p className="font-medium text-gray-900 text-sm">Pro Tip</p>
-                        <p className="text-xs text-gray-600 mt-1">
-                            Share your referral link on social media to maximize your earnings. Each friend brings you 100 points!
+                        <p className="text-sm font-black text-amber-950">Best results</p>
+                        <p className="mt-1 text-xs font-medium leading-5 text-amber-900">
+                            Share your link with traders who are likely to join and make their first prediction. Each successful signup adds 100 points.
                         </p>
                     </div>
                 </div>
             </div>
-        </div>
+        </aside>
     );
 }

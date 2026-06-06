@@ -104,11 +104,11 @@ export function WelcomeTutorialModal() {
 
     return (
         <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/65 px-3 py-5 backdrop-blur-[3px] sm:px-6">
-            <div className="relative w-full max-w-[38rem] overflow-hidden rounded-[24px] border-2 border-black bg-[#eedcd2] shadow-[0_20px_60px_rgba(0,0,0,0.35)]">
+            <div className="rekto-modal-panel relative w-full max-w-[38rem] overflow-hidden rounded-[24px] border-2 border-black bg-[#eedcd2] shadow-[0_20px_60px_rgba(0,0,0,0.35)]">
                 <button
                     type="button"
                     onClick={() => setIsDismissedForSession(true)}
-                    className="absolute right-3 top-3 z-20 rounded-full border border-[#eedcd2]/80 bg-black/80 px-4 py-1.5 text-sm font-bold text-[#eedcd2] shadow-[0_8px_20px_rgba(0,0,0,0.35)] transition hover:bg-black hover:text-white cursor-pointer"
+                    className="rekto-button absolute right-3 top-3 z-20 rounded-full border border-[#eedcd2]/80 bg-black/80 px-4 py-1.5 text-sm font-bold text-[#eedcd2] shadow-[0_8px_20px_rgba(0,0,0,0.35)] transition hover:bg-black hover:text-white cursor-pointer"
                     aria-label="Close tutorial"
                 >
                     → Skip
@@ -154,7 +154,7 @@ export function WelcomeTutorialModal() {
                         <button
                             type="button"
                             onClick={() => (isLastSlide ? handleFinishTutorial() : setActiveSlide((prev) => prev + 1))}
-                            className="min-h-11 flex-[1.45] rounded-xl bg-black px-5 py-2.5 text-sm font-semibold text-[#eedcd2] transition hover:bg-[#111] cursor-pointer sm:text-base"
+                            className="rekto-button min-h-11 flex-[1.45] rounded-xl bg-black px-5 py-2.5 text-sm font-semibold text-[#eedcd2] transition hover:bg-[#111] cursor-pointer sm:text-base"
                         >
                             {currentSlide.cta}
                         </button>

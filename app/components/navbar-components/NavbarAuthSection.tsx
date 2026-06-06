@@ -51,7 +51,7 @@ export function NavbarAuthSection({
                     <button
                         type="button"
                         onClick={onOpenDeposit}
-                        className="flex items-center gap-2 px-4 py-2 bg-white/50 border border-gray-400 hover:bg-white/80 text-black text-sm font-medium rounded-full transition-colors cursor-pointer"
+                        className="flex items-center gap-2 border-2 border-black bg-white px-4 py-2 text-sm font-black text-black shadow-[2px_2px_0_#111] transition-all hover:-translate-y-0.5 hover:bg-[#a8d85b] cursor-pointer"
                     >
                         <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -81,14 +81,14 @@ export function NavbarAuthSection({
                     <button
                         type="button"
                         onClick={onAuth}
-                        className="px-4 sm:px-6 py-2 text-sm font-medium text-gray-700 hover:text-black transition-colors cursor-pointer border border-gray-700 rounded-full"
+                        className="border-2 border-black bg-white px-4 py-2 text-sm font-black text-gray-800 shadow-[2px_2px_0_#111] transition-all hover:-translate-y-0.5 hover:bg-[#f5d547] cursor-pointer sm:px-6"
                     >
                         Log In
                     </button>
                     <button
                         type="button"
                         onClick={onAuth}
-                        className="px-4 sm:px-6 py-2 bg-black text-white text-sm font-medium rounded-full hover:bg-gray-800 transition-colors cursor-pointer"
+                        className="border-2 border-black bg-black px-4 py-2 text-sm font-black text-white shadow-[3px_3px_0_#e85a2d] transition-all hover:-translate-y-0.5 hover:shadow-[4px_4px_0_#e85a2d] cursor-pointer sm:px-6"
                     >
                         Sign Up
                     </button>

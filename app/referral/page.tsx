@@ -57,16 +57,15 @@ export default function ReferralPage() {
     const referralPoints = referralsCount * REFERRAL_POINTS_PER_USER;
 
     return (
-        <div className="min-h-full" style={{ backgroundColor: "#f3e1d7" }}>
+        <div className="rekto-page referral-page min-h-full">
             {/* Top Section - Refer & Earn */}
-            <section className="px-4 sm:px-6 lg:px-8 xl:px-12 py-8 sm:py-12">
-                <div className="max-w-7xl mx-auto">
-                    {/* Header */}
+            <section className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+                <div className="max-w-6xl mx-auto space-y-6">
                     <ReferralHeader />
 
-                    <div className="flex flex-col xl:flex-row gap-6">
+                    <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] gap-5 lg:gap-6 items-start">
                         {/* Left Side - Cards and Referral Link */}
-                        <div className="flex-1 space-y-6">
+                        <div className="min-w-0 space-y-5">
                             {/* Three Info Cards */}
                             <ReferralInfoCards />
 
@@ -83,20 +82,35 @@ export default function ReferralPage() {
                         </div>
 
                         {/* Right Side - User Referral Stats */}
-                        <UserReferralStats
-                            referralsCount={referralsCount}
-                            referralPoints={referralPoints}
-                        />
+                        <UserReferralStats referralsCount={referralsCount} referralPoints={referralPoints} />
                     </div>
                 </div>
             </section>
 
             {/* Below Section - Leaderboard Table */}
-            <section className="px-4 sm:px-6 lg:px-8 xl:px-12 pb-12">
-                <div className="max-w-7xl mx-auto">
+            <section className="px-4 sm:px-6 lg:px-8 pb-12">
+                <div className="max-w-6xl mx-auto">
                     <LeaderboardTable />
                 </div>
             </section>
+            <style jsx global>{`
+                .pixel-shell .referral-hover-shadow.referral-hover-shadow {
+                    box-shadow: none !important;
+                }
+
+                .pixel-shell .referral-hover-shadow.referral-hover-shadow:hover,
+                .pixel-shell .referral-hover-shadow.referral-hover-shadow:focus {
+                    box-shadow: 4px 4px 0 #111 !important;
+                }
+
+                .pixel-shell .referral-table-shell.referral-table-shell,
+                .pixel-shell .referral-table-shell.referral-table-shell:hover,
+                .pixel-shell .referral-pagination-button.referral-pagination-button,
+                .pixel-shell .referral-pagination-button.referral-pagination-button:hover {
+                    box-shadow: none !important;
+                    transform: none !important;
+                }
+            `}</style>
         </div>
     );
 }

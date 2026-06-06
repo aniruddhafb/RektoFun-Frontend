@@ -35,20 +35,16 @@ body {
   z-index: 9998;
   opacity: 0.18;
   background-image:
-    linear-gradient(
-      90deg,
+    linear-gradient(90deg,
       rgba(0, 0, 0, 0.12) 0,
       rgba(0, 0, 0, 0.12) 1px,
       transparent 1px,
-      transparent 3px
-    ),
-    linear-gradient(
-      0deg,
+      transparent 3px),
+    linear-gradient(0deg,
       rgba(0, 0, 0, 0.1) 0,
       rgba(0, 0, 0, 0.1) 1px,
       transparent 1px,
-      transparent 3px
-    );
+      transparent 3px);
   background-size: 3px 3px;
   mix-blend-mode: multiply;
 }
@@ -60,11 +56,9 @@ body {
   pointer-events: none;
   z-index: 9999;
   opacity: 0.08;
-  background-image: repeating-linear-gradient(
-    45deg,
-    rgba(255, 255, 255, 0.2) 0 1px,
-    transparent 1px 4px
-  );
+  background-image: repeating-linear-gradient(45deg,
+      rgba(255, 255, 255, 0.2) 0 1px,
+      transparent 1px 4px);
   mix-blend-mode: soft-light;
 }
 
@@ -108,7 +102,7 @@ body {
 .pixel-shell [class*="Card"] {
   border-radius: 3px !important;
   box-shadow:
-    inset -1px -1px 0 rgba(0, 0, 0, 0.2),
+    inset -1px -1px 0 rgba(0, 0, 0, 0.12),
     inset 1px 1px 0 rgba(255, 255, 255, 0.25);
 }
 
@@ -127,25 +121,23 @@ body {
     1px 1px 0 #121212,
     inset 1px 1px 0 rgba(255, 255, 255, 0.2),
     inset -1px -1px 0 rgba(0, 0, 0, 0.18);
-  clip-path: polygon(
-    0 2px,
-    2px 2px,
-    2px 0,
-    calc(100% - 2px) 0,
-    calc(100% - 2px) 2px,
-    100% 2px,
-    100% calc(100% - 2px),
-    calc(100% - 2px) calc(100% - 2px),
-    calc(100% - 2px) 100%,
-    2px 100%,
-    2px calc(100% - 2px),
-    0 calc(100% - 2px)
-  );
+  clip-path: polygon(0 2px,
+      2px 2px,
+      2px 0,
+      calc(100% - 2px) 0,
+      calc(100% - 2px) 2px,
+      100% 2px,
+      100% calc(100% - 2px),
+      calc(100% - 2px) calc(100% - 2px),
+      calc(100% - 2px) 100%,
+      2px 100%,
+      2px calc(100% - 2px),
+      0 calc(100% - 2px));
 }
 
 /* Button hover glow */
 .hover\:shadow-glow:hover {
-  box-shadow: 0 0 20px rgba(0, 0, 0, 0.3), 0 0 40px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 0 14px rgba(0, 0, 0, 0.18), 0 0 28px rgba(0, 0, 0, 0.12);
 }
 
 /* ============================================
@@ -652,11 +644,174 @@ body {
   pointer-events: none;
   z-index: 100;
   animation: bubble-pop 0.7s ease-out forwards;
-  box-shadow: 
-    inset -3px -3px 6px rgba(0, 0, 0, 0.2),
+  box-shadow:
+    inset -2px -2px 4px rgba(0, 0, 0, 0.12),
     inset 3px 3px 6px rgba(255, 255, 255, 0.5),
     0 0 15px rgba(255, 255, 255, 0.6);
   border: 2px solid rgba(255, 255, 255, 0.8);
+}
+
+/* ============================================
+   REKTO ARCADE SURFACE SYSTEM
+   Shared chunky card/button/modal treatment used across app pages.
+   ============================================ */
+
+.rekto-page {
+  position: relative;
+  min-height: 100%;
+  overflow-x: hidden;
+  background: #f3e1d7;
+}
+
+.rekto-page::before,
+.rekto-page::after {
+  content: "";
+  position: fixed;
+  pointer-events: none;
+  z-index: 0;
+  border-radius: 999px;
+  filter: blur(64px);
+}
+
+.rekto-page::before {
+  left: -7rem;
+  top: 9rem;
+  width: 20rem;
+  height: 20rem;
+  background: rgba(91, 168, 216, 0.16);
+}
+
+.rekto-page::after {
+  right: -8rem;
+  top: 22rem;
+  width: 22rem;
+  height: 22rem;
+  background: rgba(232, 90, 45, 0.16);
+}
+
+.rekto-page>* {
+  position: relative;
+  z-index: 1;
+}
+
+.rekto-surface,
+.rekto-modal-panel,
+.pixel-shell :is(.rounded-xl, .rounded-2xl, .rounded-3xl)[class*="bg-white"],
+.pixel-shell :is(.rounded-xl, .rounded-2xl, .rounded-3xl)[class*="bg-[#f8ede7]"],
+.pixel-shell :is(.rounded-xl, .rounded-2xl, .rounded-3xl)[class*="bg-[#faf0eb]"],
+.pixel-shell :is(.rounded-xl, .rounded-2xl, .rounded-3xl)[class*="bg-[#fff8f4]"],
+.pixel-shell :is(.rounded-xl, .rounded-2xl, .rounded-3xl)[class*="bg-[#fffaf6]"] {
+  border: 2px solid #111 !important;
+  border-radius: 3px !important;
+  box-shadow: none !important;
+}
+
+.rekto-modal-panel {
+  background: #f3e1d7;
+  animation: pop-in-spring 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.rekto-card-hover,
+.pixel-shell :is(.rounded-xl, .rounded-2xl, .rounded-3xl)[class*="bg-white"] {
+  transition:
+    transform 180ms ease,
+    background-color 180ms ease;
+}
+
+.rekto-card-hover:hover,
+.pixel-shell :is(.rounded-xl, .rounded-2xl, .rounded-3xl)[class*="bg-white"]:hover {
+  transform: translateY(-2px);
+  box-shadow: none !important;
+}
+
+.pixel-shell .challenge-card-shell.challenge-card-shell {
+  box-shadow: none !important;
+}
+
+.pixel-shell .challenge-card-shell.challenge-card-shell:hover {
+  box-shadow: 4px 4px 0 #111 !important;
+}
+
+.pixel-shell .challenge-card-shell .challenge-card-profile-tile.challenge-card-profile-tile {
+  box-shadow: none !important;
+}
+
+.pixel-shell .challenge-card-shell .challenge-card-profile-tile.challenge-card-profile-tile:hover {
+  box-shadow: 4px 4px 0 #111 !important;
+}
+
+.pixel-shell .master-card-shell.master-card-shell {
+  box-shadow: none !important;
+}
+
+.pixel-shell .master-card-shell.master-card-shell:hover {
+  box-shadow: 4px 4px 0 #111 !important;
+}
+
+.rekto-button,
+.pixel-shell button[class*="bg-black"],
+.pixel-shell a[class*="bg-black"] {
+  border: 2px solid #111 !important;
+  border-radius: 3px !important;
+  box-shadow: none !important;
+  font-weight: 900 !important;
+  transition:
+    transform 160ms ease,
+    background-color 160ms ease;
+}
+
+.rekto-button:hover,
+.pixel-shell button[class*="bg-black"]:hover,
+.pixel-shell a[class*="bg-black"]:hover {
+  transform: translateY(-2px);
+  box-shadow: none !important;
+}
+
+.rekto-secondary-button,
+.pixel-shell button[class*="bg-white"],
+.pixel-shell a[class*="bg-white"] {
+  border-radius: 3px !important;
+}
+
+.pixel-shell .master-card-shell .master-card-button.master-card-button {
+  box-shadow: none !important;
+}
+
+.pixel-shell .master-card-shell .master-card-button.master-card-button:hover {
+  box-shadow: none !important;
+}
+
+.rekto-input,
+.pixel-shell input,
+.pixel-shell textarea,
+.pixel-shell select {
+  border: 2px solid #111 !important;
+  border-radius: 3px !important;
+  background: #fffaf6 !important;
+  font-weight: 600;
+}
+
+.rekto-input:focus,
+.pixel-shell input:focus,
+.pixel-shell textarea:focus,
+.pixel-shell select:focus {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.rekto-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1px solid #111;
+  background: #fff;
+  padding: 0.4rem 0.75rem;
+  color: #111;
+  font-size: 0.7rem;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  box-shadow: none;
 }
 
 /* Hide scrollbar for filter tabs */

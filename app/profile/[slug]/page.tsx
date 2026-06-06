@@ -194,7 +194,7 @@ export default function ProfilePage() {
     const userNotFound = error || !user;
 
     return (
-        <div className="min-h-screen bg-[#f3e1d7] pb-8">
+        <div className="rekto-page min-h-screen pb-8">
             {/* Profile Header Section */}
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
                 {userNotFound ? (
@@ -220,7 +220,7 @@ export default function ProfilePage() {
                             }}
                         />
                         {/* User Not Found Message */}
-                        <div className="mt-6 p-4 bg-orange-100/50 backdrop-blur-sm rounded-2xl border border-orange-200/50 text-center">
+                        <div className="rekto-surface mt-6 p-4 bg-orange-100/50 backdrop-blur-sm rounded-2xl border border-orange-200/50 text-center">
                             <p className="text-gray-700 text-lg font-medium">
                                 This user is not registered on RektoFun yet!
                             </p>

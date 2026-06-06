@@ -114,23 +114,23 @@ export function CreateMarketModal({ isOpen, onClose, onCreated }: CreateMarketMo
     };
 
     const getButtonStyle = () => {
-        if (txStatus === "creating") return "w-full py-4 bg-gray-400 text-white rounded-full font-bold text-lg cursor-not-allowed";
-        if (txStatus === "success") return "w-full py-4 bg-green-500 text-white rounded-full font-bold text-lg cursor-not-allowed";
-        if (txStatus === "error") return "w-full py-4 bg-red-500 hover:bg-red-600 text-white rounded-full font-bold text-lg transition-colors";
-        return "w-full py-4 bg-gray-900 hover:bg-gray-700 text-white rounded-full font-bold text-lg transition-colors";
+        if (txStatus === "creating") return "rekto-button w-full py-4 bg-gray-400 text-white rounded-full font-bold text-lg cursor-not-allowed";
+        if (txStatus === "success") return "rekto-button w-full py-4 bg-green-500 text-white rounded-full font-bold text-lg cursor-not-allowed";
+        if (txStatus === "error") return "rekto-button w-full py-4 bg-red-500 hover:bg-red-600 text-white rounded-full font-bold text-lg transition-colors";
+        return "rekto-button w-full py-4 bg-gray-900 hover:bg-gray-700 text-white rounded-full font-bold text-lg transition-colors";
     };
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative bg-[#f3e1d7] rounded-3xl w-full max-w-md md:max-w-lg max-h-[90vh] overflow-hidden shadow-2xl flex flex-col">
-                <div className="bg-[#f3e1d7] rounded-t-3xl px-6 pt-6 pb-4 border-b border-[#e8d5c8]">
+            <div className="rekto-modal-panel relative rounded-3xl w-full max-w-md md:max-w-lg max-h-[90vh] overflow-hidden shadow-2xl flex flex-col">
+                <div className="bg-[#f3e1d7] rounded-t-3xl px-6 pt-6 pb-4 border-b-2 border-black">
                     <div className="flex items-center justify-between">
                         <div className="w-8" />
-                        <h2 className="text-xl md:text-2xl font-bold text-gray-900 text-center">Create Market</h2>
+                        <h2 className="text-xl md:text-2xl font-black text-gray-900 text-center drop-shadow-[2px_2px_0_rgba(232,90,45,0.22)]">Create Market</h2>
                         <button
                             onClick={onClose}
-                            className="w-8 h-8 flex items-center justify-center rounded-full bg-[#e8d5c8] hover:bg-[#dcc9bc] transition-colors"
+                            className="w-8 h-8 flex items-center justify-center rounded-full border-2 border-black bg-white shadow-[2px_2px_0_#111] hover:bg-[#dcc9bc] transition-colors"
                         >
                             <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />

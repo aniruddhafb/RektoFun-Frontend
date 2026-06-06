@@ -56,13 +56,13 @@ export function NavbarProfileModal({
                 onClick={onClose}
             />
 
-            <div className="relative w-full max-w-md bg-[#f3e1d7] rounded-2xl shadow-2xl border border-gray-300 overflow-hidden">
-                <div className="flex items-center justify-between p-4 border-b border-gray-300">
-                    <h2 className="text-lg font-semibold text-gray-900">Edit Profile</h2>
+            <div className="rekto-modal-panel relative w-full max-w-md rounded-2xl shadow-2xl border border-gray-300 overflow-hidden">
+                <div className="flex items-center justify-between p-4 border-b-2 border-black">
+                    <h2 className="text-lg font-black text-gray-900 drop-shadow-[2px_2px_0_rgba(232,90,45,0.22)]">Edit Profile</h2>
                     <button
                         type="button"
                         onClick={onClose}
-                        className="p-2 rounded-full hover:bg-gray-200 transition-colors"
+                        className="p-2 rounded-full border-2 border-black bg-white shadow-[2px_2px_0_#111] hover:bg-gray-200 transition-colors"
                     >
                         <svg
                             className="w-5 h-5 text-gray-500"
@@ -158,7 +158,7 @@ export function NavbarProfileModal({
                         type="button"
                         onClick={handleSave}
                         disabled={!!moderationError}
-                        className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-black rounded-full hover:bg-gray-800 transition-colors"
+                        className="rekto-button flex-1 px-4 py-2.5 text-sm font-medium text-white bg-black rounded-full hover:bg-gray-800 transition-colors"
                     >
                         Save Changes
                     </button>

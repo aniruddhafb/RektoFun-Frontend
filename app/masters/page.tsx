@@ -3,23 +3,24 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getLeaderboard, type LeaderboardUser } from "@/app/lib/users-service/users";
-import { LoadingPage } from "@/app/components/LoadingPage";
 import { followUser, unfollowUser } from "@/app/lib/users-service/users";
 import { useSolanaWallet } from "@/app/lib/useSolanaWallet";
 import { useUserStore } from "@/app/store/useUserStore";
 import {
-    buildPagination,
     CATEGORY_OPTIONS,
     mapUserToMaster,
     MastersFiltersBar,
     MastersGrid,
     MastersMobileFiltersSheet,
     MastersPageHeader,
-    MastersPagination,
     type CategoryFilter,
     type Master,
     type VerificationFilter,
 } from "@/app/components/master-components";
+
+const INITIAL_VISIBLE_MASTERS = 12;
+const LOAD_MORE_MASTERS = 12;
+const PLACEHOLDER_CARD_COUNT = 6;
 
 async function fetchAllUsers(): Promise<LeaderboardUser[]> {
     const pageSize = 100;
@@ -45,8 +46,8 @@ export default function MastersPage() {
     const [search, setSearch] = useState("");
     const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>(CATEGORY_OPTIONS[0]);
     const [verificationFilter, setVerificationFilter] = useState<VerificationFilter>("All Masters");
-    const [currentPage, setCurrentPage] = useState(1);
-    const [itemsPerPage, setItemsPerPage] = useState(12);
+    const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_MASTERS);
+    const [isAppending, setIsAppending] = useState(false);
     const [isCategoryOpen, setIsCategoryOpen] = useState(false);
     const [isVerificationOpen, setIsVerificationOpen] = useState(false);
     const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false);
@@ -57,6 +58,7 @@ export default function MastersPage() {
 
     const categoryRef = useRef<HTMLDivElement>(null);
     const verificationRef = useRef<HTMLDivElement>(null);
+    const loadMoreRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         function handleClickOutside(event: MouseEvent) {
@@ -138,26 +140,42 @@ export default function MastersPage() {
         });
     }, [masters, search, categoryFilter, verificationFilter]);
 
-    const totalPages = Math.max(1, Math.ceil(filteredMasters.length / itemsPerPage));
-    const safeCurrentPage = Math.min(currentPage, totalPages);
+    const visibleMasters = useMemo(() => filteredMasters.slice(0, visibleCount), [filteredMasters, visibleCount]);
+    const hasMoreMasters = visibleCount < filteredMasters.length;
 
-    const pagedMasters = useMemo(() => {
-        const startIndex = (safeCurrentPage - 1) * itemsPerPage;
-        return filteredMasters.slice(startIndex, startIndex + itemsPerPage);
-    }, [filteredMasters, itemsPerPage, safeCurrentPage]);
+    const resetVisibleCards = () => {
+        setVisibleCount(INITIAL_VISIBLE_MASTERS);
+        setIsAppending(false);
+    };
 
-    const pageButtons = useMemo(() => buildPagination(safeCurrentPage, totalPages), [safeCurrentPage, totalPages]);
-    const currentStart = filteredMasters.length === 0 ? 0 : (safeCurrentPage - 1) * itemsPerPage + 1;
-    const currentEnd = Math.min(safeCurrentPage * itemsPerPage, filteredMasters.length);
+    useEffect(() => {
+        setVisibleCount((count) => Math.min(Math.max(count, INITIAL_VISIBLE_MASTERS), Math.max(filteredMasters.length, INITIAL_VISIBLE_MASTERS)));
+    }, [filteredMasters.length]);
 
-    const resetToFirstPage = () => setCurrentPage(1);
+    useEffect(() => {
+        const loadMoreElement = loadMoreRef.current;
+        if (!loadMoreElement || !hasMoreMasters || isLoading || isAppending) return;
 
-    if (isLoading) {
-        return <LoadingPage variant="simple" message="Loading masters..." />;
-    }
+        const observer = new IntersectionObserver(
+            ([entry]) => {
+                if (!entry.isIntersecting) return;
+
+                setIsAppending(true);
+                window.setTimeout(() => {
+                    setVisibleCount((count) => Math.min(count + LOAD_MORE_MASTERS, filteredMasters.length));
+                    setIsAppending(false);
+                }, 350);
+            },
+            { rootMargin: "600px 0px" },
+        );
+
+        observer.observe(loadMoreElement);
+
+        return () => observer.disconnect();
+    }, [filteredMasters.length, hasMoreMasters, isAppending, isLoading]);
 
     return (
-        <div className="min-h-screen" style={{ backgroundColor: "#f3e1d7" }}>
+        <div className="rekto-page min-h-screen">
             <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
                 <MastersPageHeader />
 
@@ -171,18 +189,24 @@ export default function MastersPage() {
                     verificationRef={verificationRef}
                     onSearchChange={(value) => {
                         setSearch(value);
-                        resetToFirstPage();
+                        resetVisibleCards();
                     }}
-                    onCategoryToggle={() => setIsCategoryOpen((prev) => !prev)}
-                    onVerificationToggle={() => setIsVerificationOpen((prev) => !prev)}
+                    onCategoryToggle={() => {
+                        setIsCategoryOpen((prev) => !prev);
+                        setIsVerificationOpen(false);
+                    }}
+                    onVerificationToggle={() => {
+                        setIsVerificationOpen((prev) => !prev);
+                        setIsCategoryOpen(false);
+                    }}
                     onCategorySelect={(value) => {
                         setCategoryFilter(value);
-                        resetToFirstPage();
+                        resetVisibleCards();
                         setIsCategoryOpen(false);
                     }}
                     onVerificationSelect={(value) => {
                         setVerificationFilter(value);
-                        resetToFirstPage();
+                        resetVisibleCards();
                         setIsVerificationOpen(false);
                     }}
                     onOpenMobileFilters={() => setIsMobileFiltersOpen(true)}
@@ -196,27 +220,29 @@ export default function MastersPage() {
                     onClose={() => setIsMobileFiltersOpen(false)}
                     onSearchChange={(value) => {
                         setSearch(value);
-                        resetToFirstPage();
+                        resetVisibleCards();
                     }}
                     onCategorySelect={(value) => {
                         setCategoryFilter(value);
-                        resetToFirstPage();
+                        resetVisibleCards();
                         setIsMobileFiltersOpen(false);
                     }}
                     onVerificationSelect={(value) => {
                         setVerificationFilter(value);
-                        resetToFirstPage();
+                        resetVisibleCards();
                         setIsMobileFiltersOpen(false);
                     }}
                 />
 
                 {error ? (
-                    <div className="mb-8 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+                    <div className="rekto-surface mb-8 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
                 ) : null}
 
                 <MastersGrid
-                    masters={pagedMasters}
+                    masters={visibleMasters}
                     error={error}
+                    showPlaceholders={isLoading || isAppending}
+                    placeholderCount={isLoading ? INITIAL_VISIBLE_MASTERS : PLACEHOLDER_CARD_COUNT}
                     canFollow={Boolean(currentUser?.id && solanaWallet?.address)}
                     getIsOwnCard={(master) => master.walletAddress === solanaWallet?.address}
                     getIsFollowing={(master) => (currentUser?.id ? master.followers.includes(currentUser.id) : false)}
@@ -225,20 +251,7 @@ export default function MastersPage() {
                     onToggleFollow={toggleFollow}
                 />
 
-                <MastersPagination
-                    currentStart={currentStart}
-                    currentEnd={currentEnd}
-                    totalItems={filteredMasters.length}
-                    safeCurrentPage={safeCurrentPage}
-                    totalPages={totalPages}
-                    pageButtons={pageButtons}
-                    itemsPerPage={itemsPerPage}
-                    onPageChange={setCurrentPage}
-                    onItemsPerPageChange={(size) => {
-                        setItemsPerPage(size);
-                        resetToFirstPage();
-                    }}
-                />
+                {hasMoreMasters ? <div ref={loadMoreRef} className="h-12" aria-hidden="true" /> : null}
             </div>
         </div>
     );

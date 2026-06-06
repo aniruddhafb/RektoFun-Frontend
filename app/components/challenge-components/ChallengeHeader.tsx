@@ -4,20 +4,21 @@ interface ChallengeHeaderProps {
 
 export function ChallengeHeader({ onOpenModal }: ChallengeHeaderProps) {
     return (
-        <div className="max-w-7xl mx-auto px-6 lg:px-8 pt-8 pb-6 select-none">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="relative mx-auto max-w-7xl px-4 pt-8 sm:px-6 lg:px-8">
+            <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                    <h1 className="text-3xl font-bold text-gray-900">Challenges</h1>
-                    <p className="text-gray-600 mt-1">Battle other traders in PvP prediction markets</p>
+                    <h1 className="text-3xl font-bold text-gray-900 sm:text-4xl">Challenges</h1>
+                    <p className="mt-1 text-base text-gray-500">Battle other traders in PvP prediction markets</p>
                 </div>
                 <button
+                    type="button"
                     onClick={(event) => {
                         event.currentTarget.blur();
                         onOpenModal();
                     }}
-                    className="cursor-pointer hidden md:inline-flex items-center justify-center px-6 py-3 bg-white/50 border border-gray-900 hover:bg-white/80 text-black text-sm font-medium rounded-full transition-colors focus:outline-none"
+                    className="hidden cursor-pointer items-center justify-center rounded-lg border border-gray-950 bg-gray-950 px-4 py-2 text-xs font-bold uppercase tracking-[0.08em] text-white shadow-sm transition-all hover:-translate-y-0.5 hover:bg-black hover:shadow-md active:translate-y-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#e85a2d]/30 md:inline-flex"
                 >
-                    <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                     </svg>
                     Create Challenge

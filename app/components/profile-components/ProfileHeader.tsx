@@ -81,7 +81,7 @@ export function ProfileHeader({
         : walletAddress;
 
     return (
-        <div className="flex flex-col lg:flex-row lg:items-stretch gap-4 sm:gap-6 lg:gap-8 p-4 sm:p-6 bg-white/40 backdrop-blur-xl rounded-2xl sm:rounded-3xl border border-gray-400 shadow-lg items-center sm:items-start">
+        <div className="flex flex-col lg:flex-row lg:items-stretch gap-4 sm:gap-6 lg:gap-8 p-4 sm:p-6 bg-white/40 backdrop-blur-xl rounded-2xl sm:rounded-3xl border border-gray-400 items-center sm:items-start">
             {/* Left: Avatar and Info */}
             <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 lg:gap-8 flex-1 min-w-0 items-center sm:items-start w-full">
                 {/* Avatar with glow effect */}
@@ -149,7 +149,7 @@ export function ProfileHeader({
                         </h1>
                         {twitterUsername ? (
                             <span
-                                className="inline-flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center rounded-full bg-blue-500 text-white flex-shrink-0 shadow-sm"
+                                className="inline-flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center rounded-full bg-blue-500 text-white flex-shrink-0"
                                 title="Verified on X"
                                 aria-label="Verified on X"
                             >
@@ -218,7 +218,7 @@ export function ProfileHeader({
 
                         {/* Share Button */}
                         <button
-                            className="w-full sm:w-auto cursor-pointer group px-3 sm:px-4 py-2.5 sm:py-2 bg-orange-400 rounded-xl text-sm sm:text-sm font-semibold text-white shadow-lg hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 flex items-center justify-center gap-2"
+                            className="w-full sm:w-auto cursor-pointer group px-3 sm:px-4 py-2.5 sm:py-2 bg-orange-400 rounded-xl text-sm sm:text-sm font-semibold text-white hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 flex items-center justify-center gap-2"
                             onClick={shareProfile}
                         >
                             {profileCopied ? (
@@ -242,7 +242,7 @@ export function ProfileHeader({
             </div>
 
             {/* Right: Balance & Stats Card */}
-            <div className="flex flex-col bg-white/20 backdrop-blur-lg rounded-2xl p-3 sm:p-5 border border-gray-200/40 shadow-lg gap-3 sm:gap-4 w-full lg:w-[480px]">
+            <div className="flex flex-col bg-white/20 backdrop-blur-lg rounded-2xl p-3 sm:p-5 border border-gray-200/40 gap-3 sm:gap-4 w-full lg:w-[480px]">
                 {/* Balance Section */}
                 <div className="grid grid-cols-2 sm:grid-cols-[1fr_auto_1fr] items-stretch sm:items-center gap-2 sm:gap-4 p-3 bg-gradient-to-r from-gray-50 to-gray-100/50 rounded-xl">
                     {/* SOL Balance */}
@@ -286,7 +286,7 @@ export function ProfileHeader({
                 <div className="grid grid-cols-3 sm:grid-cols-3 gap-2 p-3 bg-gradient-to-r from-orange-50/50 to-amber-50/50 rounded-xl border border-orange-100/30">
                     {/* Wins */}
                     <div className="flex items-center justify-start gap-2 px-2 sm:px-3 py-1.5 min-w-0 w-fit mx-auto sm:w-auto sm:mx-0">
-                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-400 to-emerald-500 flex items-center justify-center shadow-sm">
+                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-400 to-emerald-500 flex items-center justify-center">
                             <span className="text-white text-sm">🏆</span>
                         </div>
                         <div>
@@ -297,7 +297,7 @@ export function ProfileHeader({
 
                     {/* Rekts */}
                     <div className="flex items-center justify-start gap-2 px-2 sm:px-3 py-1.5 min-w-0 w-fit mx-auto sm:w-auto sm:mx-0">
-                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-red-400 to-red-500 flex items-center justify-center shadow-sm">
+                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-red-400 to-red-500 flex items-center justify-center">
                             <span className="text-white text-sm">💀</span>
                         </div>
                         <div>
@@ -308,7 +308,7 @@ export function ProfileHeader({
 
                     {/* Win Rate */}
                     <div className="flex items-center justify-start gap-2 px-2 sm:px-3 py-1.5 min-w-0 w-fit mx-auto sm:w-auto sm:mx-0">
-                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-400 to-amber-500 flex items-center justify-center shadow-sm">
+                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-400 to-amber-500 flex items-center justify-center">
                             <span className="text-white text-sm">📊</span>
                         </div>
                         <div>

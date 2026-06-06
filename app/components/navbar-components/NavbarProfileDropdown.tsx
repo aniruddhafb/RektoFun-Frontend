@@ -45,7 +45,7 @@ function MenuAction(props: MenuActionProps) {
     );
 
     const className =
-        "flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:text-black no-underline transition-colors cursor-pointer";
+        "flex items-center gap-3 px-4 py-2.5 text-sm font-bold text-gray-700 hover:bg-[#fffaf6] hover:text-black no-underline transition-colors cursor-pointer";
 
     if ("href" in props && props.href) {
         return (
@@ -95,7 +95,7 @@ export function NavbarProfileDropdown({
             <button
                 type="button"
                 onClick={isMobileViewport ? onToggle : undefined}
-                className="flex items-center gap-2 px-[4px] py-[2px] pr-3 rounded-full bg-white/50 border border-gray-400 hover:bg-white/80 transition-all cursor-pointer"
+                className="flex items-center gap-2 border-2 border-black bg-white px-[4px] py-[2px] pr-3 shadow-[2px_2px_0_#111] transition-all hover:-translate-y-0.5 hover:bg-[#fffaf6] cursor-pointer"
             >
                 {displayProfileImage ? (
                     <Image
@@ -134,8 +134,8 @@ export function NavbarProfileDropdown({
 
             {isOpen && (
                 <div className="absolute right-0 top-full pt-2 w-72 z-50">
-                    <div className="bg-white rounded-2xl shadow-xl border border-gray-300 overflow-hidden">
-                        <div className="p-4 bg-white from-gray-50 to-gray-100 border-b border-gray-300">
+                    <div className="bg-white border-2 border-black overflow-hidden">
+                        <div className="p-4 bg-[#fffaf6] border-b-2 border-black">
                             <Link
                                 href={profileHref}
                                 onClick={onClose}
@@ -159,7 +159,7 @@ export function NavbarProfileDropdown({
                                     />
                                 )}
                                 <div className="min-w-0">
-                                    <p className="font-semibold text-gray-900">
+                                    <p className="font-black text-gray-900 truncate">
                                         {displayUsername}
                                     </p>
                                     <p className="text-xs text-gray-500 font-mono truncate">
@@ -172,10 +172,10 @@ export function NavbarProfileDropdown({
                         <div className="py-2">
 
                             {/* User Balance Display */}
-                            <div className="px-4 py-3 mx-2 mb-1 rounded-xl bg-gradient-to-r from-gray-50 to-gray-100 border border-gray-200">
-                                <p className="text-xs text-gray-500 mb-1.5">Your USDC Balance</p>
+                            <div className="px-4 py-3 mx-2 mb-1 bg-[#f5d547] border-2 border-black">
+                                <p className="text-xs font-black uppercase tracking-[0.12em] text-gray-700 mb-1.5">Your USDC Balance</p>
                                 <div className="flex items-center justify-between gap-2">
-                                    <span className="text-base font-semibold text-gray-900">{balanceDisplay}</span>
+                                    <span className="text-base font-black text-gray-900">{balanceDisplay}</span>
                                     <div className="flex items-center gap-1.5">
                                         <button
                                             type="button"
@@ -183,7 +183,7 @@ export function NavbarProfileDropdown({
                                                 onClose();
                                                 onOpenWithdraw();
                                             }}
-                                            className="w-7 h-7 rounded-full bg-white border border-gray-200 text-gray-700 hover:bg-gray-100 hover:text-black transition-colors flex items-center justify-center cursor-pointer"
+                                            className="w-7 h-7 bg-white border-2 border-black text-gray-700 hover:bg-[#fffaf6] hover:text-black transition-colors flex items-center justify-center cursor-pointer"
                                             aria-label="Withdraw funds"
                                             title="Withdraw funds"
                                         >
@@ -207,7 +207,7 @@ export function NavbarProfileDropdown({
                                                 onClose();
                                                 onOpenDeposit();
                                             }}
-                                            className="w-7 h-7 rounded-full bg-white border border-gray-200 text-gray-700 hover:bg-gray-100 hover:text-black transition-colors flex items-center justify-center cursor-pointer"
+                                            className="w-7 h-7 bg-white border-2 border-black text-gray-700 hover:bg-[#fffaf6] hover:text-black transition-colors flex items-center justify-center cursor-pointer"
                                             aria-label="Deposit funds"
                                             title="Deposit funds"
                                         >
@@ -279,7 +279,7 @@ export function NavbarProfileDropdown({
                                 Settings
                             </MenuAction>
 
-                            <div className="my-2 border-t border-gray-300" />
+                            <div className="my-2 border-t-2 border-black" />
 
                             <MenuAction
                                 href="/terms"
@@ -348,17 +348,17 @@ export function NavbarProfileDropdown({
                                 Docs
                             </a>
 
-                            <div className="my-2 border-t border-gray-300" />
+                            <div className="my-2 border-t-2 border-black" />
 
                             <div className="px-4 py-2">
-                                <p className="text-xs text-gray-500 mb-2">Follow Us</p>
+                                <p className="text-xs text-gray-500 mb-2">Our Socials</p>
                                 <div className="flex gap-3">
                                     <a
                                         href="https://x.com/Rektofun"
                                         target="_blank"
                                         rel="noreferrer"
                                         onClick={onClose}
-                                        className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 hover:bg-black hover:text-white transition-colors cursor-pointer"
+                                        className="w-8 h-8 border-2 border-black bg-gray-100 flex items-center justify-center text-gray-600 hover:bg-black hover:text-white transition-colors cursor-pointer !shadow-none"
                                         aria-label="Twitter"
                                     >
                                         <svg
@@ -389,7 +389,7 @@ export function NavbarProfileDropdown({
                                         target="_blank"
                                         rel="noreferrer"
                                         onClick={onClose}
-                                        className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 hover:bg-[#5865F2] hover:text-white transition-colors cursor-pointer"
+                                        className="w-8 h-8 border-2 border-black bg-gray-100 flex items-center justify-center text-gray-600 hover:bg-[#5865F2] hover:text-white transition-colors cursor-pointer"
                                         aria-label="Discord"
                                     >
                                         <svg
@@ -403,14 +403,14 @@ export function NavbarProfileDropdown({
                                 </div>
                             </div>
 
-                            <div className="my-2 border-t border-gray-200" />
+                            <div className="my-2 border-t-2 border-black" />
 
                             <div
                                 onClick={() => {
                                     onClose();
                                     onLogout();
                                 }}
-                                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-bold text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
                             >
                                 <svg
                                     className="w-5 h-5"

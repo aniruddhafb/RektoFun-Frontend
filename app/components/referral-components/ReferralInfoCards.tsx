@@ -1,50 +1,55 @@
 "use client";
 
-import { HandHeart, Trophy, Skull } from "lucide-react";
+import { Link2, Send, Trophy } from "lucide-react";
+
+const referralSteps = [
+    {
+        icon: Link2,
+        title: "Copy your link",
+        description: "Your unique referral code is attached automatically, so every invite is tracked.",
+    },
+    {
+        icon: Send,
+        title: "Share it anywhere",
+        description: "Send it to friends, communities, group chats, or your social audience.",
+    },
+    {
+        icon: Trophy,
+        title: "Earn points",
+        description: "Receive 100 REKTO points for every friend who signs up with your link.",
+    },
+];
 
 export function ReferralInfoCards() {
     return (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {/* Refer Friends Card */}
-            <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-5 sm:p-6 border border-white/50 shadow-sm">
-                <div className="flex items-center gap-3 mb-3">
-                    <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center">
-                        <HandHeart className="w-5 h-5 text-gray-600" />
-                    </div>
-                    <h3 className="font-semibold text-gray-900">Refer Friends</h3>
+        <div className="rounded-lg border border-black/10 bg-[#fffaf6]/80 p-4 backdrop-blur-sm sm:p-5">
+            <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                    <h2 className="text-lg font-black text-gray-950">How referrals work</h2>
+                    <p className="text-sm font-medium text-gray-600">A simple three-step loop from invite to reward.</p>
                 </div>
-                <p className="text-gray-600 text-sm leading-relaxed">
-                    Get <span className="font-semibold text-gray-900">100 REKTO points</span> for every
-                    friend you invite when they sign
-                </p>
+                <div className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-black uppercase tracking-wide text-emerald-800">
+                    100 points per signup
+                </div>
             </div>
 
-            {/* Win Challenges Card */}
-            <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-5 sm:p-6 border border-white/50 shadow-sm">
-                <div className="flex items-center gap-3 mb-3">
-                    <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center">
-                        <Trophy className="w-5 h-5 text-gray-600" />
-                    </div>
-                    <h3 className="font-semibold text-gray-900">Win Challenges</h3>
-                </div>
-                <p className="text-gray-600 text-sm leading-relaxed">
-                    Earn <span className="font-semibold text-gray-900">20 REKTO points</span> for every
-                    challenge you win.
-                </p>
-            </div>
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                {referralSteps.map((step, index) => {
+                    const Icon = step.icon;
 
-            {/* Get Rekt Card */}
-            <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-5 sm:p-6 border border-white/50 shadow-sm">
-                <div className="flex items-center gap-3 mb-3">
-                    <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center">
-                        <Skull className="w-5 h-5 text-gray-600" />
-                    </div>
-                    <h3 className="font-semibold text-gray-900">Get Rekt!</h3>
-                </div>
-                <p className="text-gray-600 text-sm leading-relaxed">
-                    Even if you lose, you still receive{" "}
-                    <span className="font-semibold text-gray-900">10 REKTO points</span>.
-                </p>
+                    return (
+                        <div key={step.title} className="referral-hover-shadow rounded-lg border border-black/10 bg-white px-4 py-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-black">
+                            <div className="mb-4 flex items-center justify-between">
+                                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gray-100 text-gray-700">
+                                    <Icon className="h-5 w-5" />
+                                </div>
+                                <span className="text-xs font-black uppercase tracking-wide text-gray-400">Step {index + 1}</span>
+                            </div>
+                            <h3 className="font-black text-gray-950">{step.title}</h3>
+                            <p className="mt-2 text-sm font-medium leading-6 text-gray-600">{step.description}</p>
+                        </div>
+                    );
+                })}
             </div>
         </div>
     );

@@ -2,9 +2,9 @@ import Link from "next/link";
 
 export default function Footer() {
     return (
-        <footer className="flex-shrink-0 py-4 px-6 lg:px-8 bg-[#f3e1d7]">
+        <footer className="flex-shrink-0 bg-[#f3e1d7] px-6 py-4 lg:px-8 mb-6">
             <div className="max-w-7xl mx-auto">
-                <div className="pt-4 border-gray-200 flex flex-col md:flex-row justify-between items-center gap-4">
+                <div className="border-t border-black/10 pt-4 flex flex-col md:flex-row justify-between items-center gap-4">
                     <p className="text-sm text-gray-600 flex flex-wrap items-center justify-center md:justify-start gap-2">
                         <span>©2026 RektoFun</span>
                         <span className="hidden md:inline">•</span>

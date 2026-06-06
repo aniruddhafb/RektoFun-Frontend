@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
-import { Sparkles, Search, ChevronLeft, ChevronRight, Crown, Gem, Loader2 } from "lucide-react";
+import { Sparkles, Search, ChevronLeft, ChevronRight, Loader2, Star } from "lucide-react";
 import { getLeaderboard, LeaderboardUser } from "@/app/lib/users-service/users";
 import Link from "next/link";
 
@@ -26,6 +26,12 @@ function formatDate(dateString: string | null): string {
     return `${day} ${month} ${year}`;
 }
 
+function getRankBadgeClass(rank: number): string {
+    if (rank === 1) return "border-amber-300 bg-amber-100 text-amber-800";
+    if (rank === 2) return "border-slate-300 bg-slate-100 text-slate-700";
+    if (rank === 3) return "border-orange-300 bg-orange-100 text-orange-800";
+    return "border-gray-200 bg-white text-gray-700";
+}
 
 interface LeaderboardRowProps {
     entry: LeaderboardEntry;
@@ -54,15 +60,18 @@ function LeaderboardRow({ entry }: LeaderboardRowProps) {
     }
 
     return (
-        <div className="grid grid-cols-12 gap-4 px-4 lg:px-6 py-4 items-center hover:bg-white/30 transition-colors">
+        <div className="grid grid-cols-12 gap-4 px-6 py-4 items-center transition-all duration-200 hover:bg-white">
             {/* Rank */}
             <div className="col-span-1 flex items-center gap-2">
-                {rank}
+                <span className={`flex h-8 min-w-8 items-center justify-center rounded-full border px-2 text-sm font-black ${getRankBadgeClass(rank)}`}>
+                    {rank}
+                </span>
+                {rank === 1 && <Star className="h-4 w-4 fill-amber-500 text-amber-600" />}
             </div>
 
             {/* Player */}
             <Link href={profileHref} className="col-span-3 flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-gray-100 overflow-hidden border-2 border-white shadow-sm flex-shrink-0">
+                <div className="relative w-10 h-10 rounded-full bg-gray-100 overflow-hidden border-2 border-white shadow-none flex-shrink-0">
                     <Image
                         src={profileImage}
                         alt={username}
@@ -71,22 +80,25 @@ function LeaderboardRow({ entry }: LeaderboardRowProps) {
                         className="w-full h-full object-cover"
                     />
                 </div>
-                <div className="flex items-center gap-2 min-w-0">
-                    <span className="font-medium text-gray-900 truncate">{username}</span>
+                <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="font-semibold text-gray-900 truncate">{username}</span>
                 </div>
             </Link>
 
             {/* Joined */}
-            <div className="col-span-2 text-gray-600 text-sm">{formatDate(user.created_at)}</div>
+            <div className="col-span-2 text-sm font-semibold text-gray-700">{formatDate(user.created_at)}</div>
 
             {/* Referrals */}
-            <div className="col-span-2 text-gray-900 font-medium text-sm">{referralCount}</div>
+            <div className="col-span-2 text-sm font-black text-gray-900">{referralCount}</div>
 
             {/* REKTO points */}
-            <div className="col-span-2 text-gray-900 font-medium text-sm">{points}</div>
+            <div className="col-span-2 flex items-center gap-2 text-sm font-black text-gray-900">
+                <Sparkles className="h-4 w-4 text-amber-500" />
+                {points}
+            </div>
 
             {/* Earnings */}
-            <div className="col-span-2 text-gray-900 font-medium text-sm">
+            <div className="col-span-2 text-right text-sm font-black text-gray-900">
                 {user.earnings !== null ? `$${user.earnings.toFixed(1)}` : "$0.0"}
             </div>
         </div >
@@ -165,109 +177,113 @@ export function LeaderboardTable() {
 
     return (
         <>
-            {/* Leaderboard Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-                <div className="flex items-center gap-3">
-                    <Sparkles className="w-6 h-6 text-gray-600" />
-                    <h2 className="text-xl font-bold text-gray-900">Referral Leaderboard</h2>
+            <div className="mb-6 flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
+                <div className="relative max-w-md w-full">
+                    <Search className="pointer-events-none absolute left-4 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                    <input
+                        type="text"
+                        placeholder="Search traders"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="referral-hover-shadow pl-11 pr-4 py-3 bg-white/80 border border-black/10 rounded-xl text-base text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-4 focus:ring-amber-500/20 focus:border-amber-500 w-full"
+                    />
                 </div>
-
-                <div className="flex items-center gap-3 w-full sm:w-auto">
-                    {/* Search - Bigger */}
-                    <div className="relative flex-1 sm:flex-none">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                        <input
-                            type="text"
-                            placeholder="Search traders..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="pl-10 pr-4 py-2.5 bg-white/60 border border-white/50 rounded-lg text-base text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-300 w-full sm:w-64"
-                        />
-                    </div>
+                <div className="rounded-full border border-black/10 bg-white/60 px-4 py-2 text-sm font-semibold text-gray-600">
+                    {totalCount} {totalCount === 1 ? "user" : "users"} ranked
                 </div>
             </div>
 
-            {/* Leaderboard Table - Horizontally Scrollable */}
-            <div className="bg-white/40 backdrop-blur-sm rounded-2xl border border-white/50 overflow-hidden">
-                <div className="overflow-x-auto">
-                    {/* Table Header */}
-                    <div className="min-w-[700px] grid grid-cols-12 gap-4 px-4 lg:px-6 py-4 border-b border-white/50 text-sm font-medium text-gray-500">
-                        <div className="col-span-1">Rank</div>
-                        <div className="col-span-3">Player</div>
-                        <div className="col-span-2 flex items-center gap-1 cursor-pointer hover:text-gray-700">
-                            Joined
-                            <ChevronLeft className="w-3 h-3 rotate-[-90deg]" />
-                        </div>
-                        <div className="col-span-2 flex items-center gap-1 cursor-pointer hover:text-gray-700">
-                            Referrals
-                            <ChevronLeft className="w-3 h-3 rotate-[-90deg]" />
-                        </div>
-                        <div className="col-span-2 flex items-center gap-1 cursor-pointer hover:text-gray-700">
-                            Points
-                            <ChevronLeft className="w-3 h-3 rotate-[-90deg]" />
-                        </div>
-                        <div className="col-span-2 flex items-center gap-1 cursor-pointer hover:text-gray-700">
-                            Earnings
-                            <ChevronLeft className="w-3 h-3 rotate-[-90deg]" />
-                        </div>
+            <div className="referral-table-shell bg-[#fffaf6]/80 backdrop-blur-sm rounded-2xl border border-black/10 overflow-hidden transition-all duration-200 hover:border-black">
+                <div className="flex flex-col gap-1 border-b border-black/10 bg-white/80 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <h2 className="text-lg font-black text-gray-900">Referral Leaderboard</h2>
+                        <p className="text-sm font-medium text-gray-500">Ranked by referrals and REKTO points</p>
                     </div>
-
-                    {/* Table Body */}
-                    <div className="min-w-[700px] divide-y divide-white/50">
-                        {isLoading ? (
-                            <div className="flex items-center justify-center py-12">
-                                <Loader2 className="w-8 h-8 text-gray-400 animate-spin" />
-                            </div>
-                        ) : error ? (
-                            <div className="flex items-center justify-center py-12 text-red-500">
-                                {error}
-                            </div>
-                        ) : leaderboardData.length === 0 ? (
-                            <div className="flex items-center justify-center py-12 text-gray-500">
-                                No users found
-                            </div>
-                        ) : (
-                            leaderboardData.map((entry) => (
-                                <LeaderboardRow key={entry.user.id} entry={entry} />
-                            ))
-                        )}
+                    <div className="text-sm font-semibold text-gray-600">
+                        Page {currentPage} of {totalPages || 1}
                     </div>
                 </div>
 
-                {/* Pagination */}
-                <div className="flex items-center justify-between p-4">
-                    <div className="text-sm text-gray-500">
+                <div className="overflow-x-auto">
+                    <div className="min-w-[800px]">
+                        <div className="grid grid-cols-12 gap-4 border-b border-black/10 bg-[#fff8f4] px-6 py-3 text-xs font-black uppercase tracking-wide text-gray-500">
+                            <div className="col-span-1">Rank</div>
+                            <div className="col-span-3">Player</div>
+                            <div className="col-span-2 flex items-center gap-1 cursor-pointer transition hover:text-gray-900">
+                            Joined
+                                <ChevronLeft className="w-3 h-3 rotate-[-90deg]" />
+                            </div>
+                            <div className="col-span-2 flex items-center gap-1 cursor-pointer transition hover:text-gray-900">
+                            Referrals
+                                <ChevronLeft className="w-3 h-3 rotate-[-90deg]" />
+                            </div>
+                            <div className="col-span-2 flex items-center gap-1 cursor-pointer transition hover:text-gray-900">
+                            Points
+                                <ChevronLeft className="w-3 h-3 rotate-[-90deg]" />
+                            </div>
+                            <div className="col-span-2 flex items-center justify-end gap-1 cursor-pointer transition hover:text-gray-900">
+                            Earnings
+                                <ChevronLeft className="w-3 h-3 rotate-[-90deg]" />
+                            </div>
+                        </div>
+
+                        <div className="divide-y divide-black/5 bg-white/55">
+                            {isLoading ? (
+                                <div className="flex items-center justify-center py-12">
+                                    <Loader2 className="w-8 h-8 text-gray-400 animate-spin" />
+                                </div>
+                            ) : error ? (
+                                <div className="flex items-center justify-center py-12 font-semibold text-red-600">
+                                    {error}
+                                </div>
+                            ) : leaderboardData.length === 0 ? (
+                                <div className="flex items-center justify-center py-12 font-semibold text-gray-600">
+                                    No users found
+                                </div>
+                            ) : (
+                                leaderboardData.map((entry) => (
+                                    <LeaderboardRow key={entry.user.id} entry={entry} />
+                                ))
+                            )}
+                        </div>
+                    </div>
+                </div>
+
+                <div className="flex flex-col gap-4 border-t border-black/10 bg-white/80 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="text-sm font-semibold text-gray-600">
                         {totalCount > 0 ? (
                             <>
-                                Showing {offset + 1} to {Math.min(offset + ITEMS_PER_PAGE, totalCount)} of {totalCount} users
+                                Showing {offset + 1}-{Math.min(offset + ITEMS_PER_PAGE, totalCount)} of {totalCount} users
                             </>
                         ) : (
                             "No users"
                         )}
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                         <button
                             onClick={handlePreviousPage}
                             disabled={currentPage === 1 || isLoading}
-                            className={`p-2 rounded-lg transition-colors ${currentPage === 1 || isLoading
-                                ? "text-gray-300 cursor-not-allowed"
-                                : "text-gray-400 hover:text-gray-600 hover:bg-white/50"
+                            className={`referral-pagination-button inline-flex h-9 items-center gap-1 rounded-lg px-3 text-sm font-black transition-all ${currentPage === 1 || isLoading
+                                ? "cursor-not-allowed border border-gray-200 bg-gray-100 text-gray-400"
+                                : "border border-black/10 bg-white text-gray-700 hover:border-black hover:bg-[#fff8f4] hover:text-gray-900"
                                 }`}
                         >
-                            <ChevronLeft className="w-5 h-5" />
+                            <ChevronLeft className="w-4 h-4" />
+                            Previous
                         </button>
-                        <span className="text-sm text-gray-600 px-2">
+                        <span className="flex h-9 items-center rounded-lg border border-black/10 bg-white px-3 text-sm font-black text-gray-700">
                             Page {currentPage} of {totalPages || 1}
                         </span>
                         <button
                             onClick={handleNextPage}
                             disabled={currentPage >= totalPages || isLoading}
-                            className={`p-2 rounded-lg transition-colors ${currentPage >= totalPages || isLoading
-                                ? "text-gray-300 cursor-not-allowed"
-                                : "text-gray-400 hover:text-gray-600 hover:bg-white/50"
+                            className={`referral-pagination-button inline-flex h-9 items-center gap-1 rounded-lg px-3 text-sm font-black transition-all ${currentPage >= totalPages || isLoading
+                                ? "cursor-not-allowed border border-gray-200 bg-gray-100 text-gray-400"
+                                : "border border-black/10 bg-white text-gray-700 hover:border-black hover:bg-[#fff8f4] hover:text-gray-900"
                                 }`}
                         >
-                            <ChevronRight className="w-5 h-5" />
+                            Next
+                            <ChevronRight className="w-4 h-4" />
                         </button>
                     </div>
                 </div>

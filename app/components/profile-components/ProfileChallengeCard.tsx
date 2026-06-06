@@ -101,7 +101,7 @@ export function ProfileChallengeCard({ challenge, onClick }: ProfileChallengeCar
     return (
         <div
             onClick={handleClick}
-            className="bg-white rounded-2xl border border-[#e8d5c8] shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer overflow-hidden"
+            className="bg-white rounded-2xl border border-[#e8d5c8] transition-all duration-200 cursor-pointer overflow-hidden"
         >
             <div className="flex items-center justify-between px-4 pt-4 pb-2">
                 <div className="flex items-center gap-2">
