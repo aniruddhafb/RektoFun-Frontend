@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
-import { usePrivy } from "@privy-io/react-auth";
 import ChallengeDetailModal from "@/app/components/challenge-components/ChallengeDetailModal";
 import {
     ProfileHeader,
@@ -12,7 +11,6 @@ import {
 } from "@/app/components/profile-components";
 import { LoadingPage } from "@/app/components/LoadingPage";
 import { followUser, getUserByWallet, unfollowUser, User } from "@/app/lib/users-service/users";
-import { getWalletBalancesByAddress, useSolanaWallet } from "@/app/lib/useSolanaWallet";
 import { useUserStore } from "@/app/store/useUserStore";
 import {
     ChallengeListItem,
@@ -26,10 +24,10 @@ type TabType = "challenges" | "activity";
 export default function ProfilePage() {
     const BOOKMARKS_STORAGE_KEY = "rektofun:challenge-bookmarks";
     const params = useParams();
-    const { user: privyUser } = usePrivy();
+
     const { user: currentUser } = useUserStore();
     const slug = params.slug as string;
-    const { solanaWallet } = useSolanaWallet();
+
     const [activeTab, setActiveTab] = useState<TabType>("challenges");
     const [selectedChallenge, setSelectedChallenge] = useState<ChallengeListItem | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);

@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getLeaderboard, type LeaderboardUser } from "@/app/lib/users-service/users";
 import { followUser, unfollowUser } from "@/app/lib/users-service/users";
-import { useSolanaWallet } from "@/app/lib/useSolanaWallet";
 import { useUserStore } from "@/app/store/useUserStore";
 import {
     CATEGORY_OPTIONS,
@@ -40,7 +39,7 @@ async function fetchAllUsers(): Promise<LeaderboardUser[]> {
 
 export default function MastersPage() {
     const router = useRouter();
-    const { solanaWallet } = useSolanaWallet();
+
     const { user: currentUser } = useUserStore();
 
     const [search, setSearch] = useState("");

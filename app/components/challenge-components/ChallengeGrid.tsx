@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ChallengeCard } from "./ChallengeCard";
 import { getChallenges } from "../../lib/challenges-service/challenges";
-import { useSolanaWallet } from '@/app/lib/useSolanaWallet';
 import { ChallengeListItem } from '../../lib/challenges-service/challenges';
 
 interface ChallengeGridProps {
@@ -51,8 +50,8 @@ export function ChallengeGrid({
     const requestIdRef = useRef(0);
     const isLoadingRef = useRef(false);
     const isLoadingMoreRef = useRef(false);
-    const { publicKey } = useSolanaWallet();
 
+    
     const ownerAddress = publicKey?.toString() || '';
 
     const fetchChallenges = useCallback(async (currentOffset: number, append: boolean) => {

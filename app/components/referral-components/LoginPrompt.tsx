@@ -1,7 +1,6 @@
 "use client";
 
 import { Lock, LogIn } from "lucide-react";
-import { usePrivy } from "@privy-io/react-auth";
 
 export function LoginPrompt() {
     const { login } = usePrivy();

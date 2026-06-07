@@ -4,7 +4,6 @@ import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import { DatePickerModal } from "./DatePickerModal";
 import { DurationPickerModal } from "./DurationPickerModal";
-import { useSolanaWallet } from "@/app/lib/useSolanaWallet";
 import {
     buildCreateChallengeTx,
     deriveChallengePDA,
@@ -80,7 +79,7 @@ export function CreateChallengeModal({
     const directionDropdownRef = useRef<HTMLDivElement>(null);
 
     // Privy wallet hook
-    const { authenticated, login, program, sendTransaction, publicKey, refreshBalances } = useSolanaWallet();
+
     const isSportsSelected = selectedMarket?.symbol?.toLowerCase() === 'sports' || selectedMarket?.name?.toLowerCase() === 'sports';
 
     useBodyScrollLock(isOpen);

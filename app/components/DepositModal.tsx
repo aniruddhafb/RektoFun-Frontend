@@ -9,7 +9,6 @@ import {
   getAssociatedTokenAddress,
 } from "@solana/spl-token";
 import { ArrowDownToLine, ArrowUpFromLine, Check, Copy, ExternalLink, X } from "lucide-react";
-import { useSolanaWallet } from "@/app/lib/useSolanaWallet";
 import { USDC_MINT, USDC_MULTIPLIER, getReadonlyConnection } from "@/app/lib/rektofun-program";
 import { useBodyScrollLock } from "@/app/lib/useBodyScrollLock";
 
@@ -22,7 +21,7 @@ interface DepositModalProps {
 }
 
 export function DepositModal({ isOpen, onClose, initialMode = "deposit" }: DepositModalProps) {
-  const { publicKey, usdcBalance, sendTransaction, refreshBalances } = useSolanaWallet();
+
   const walletAddress = publicKey?.toBase58() ?? null;
   const [mode, setMode] = useState<FundsMode>(initialMode);
   const [copied, setCopied] = useState(false);

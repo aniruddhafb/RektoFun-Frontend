@@ -10,7 +10,6 @@ import {
     joinChallenge,
 } from "@/app/lib/challenges-service/challenges";
 import { useUserStore } from "@/app/store/useUserStore";
-import { useSolanaWallet } from "@/app/lib/useSolanaWallet";
 import {
     buildAcceptChallengeTx,
     fetchChallenge,
@@ -189,7 +188,7 @@ export function ChallengeCard({
 }: ChallengeCardProps) {
     const router = useRouter();
     const { user } = useUserStore();
-    const { authenticated, login, program, publicKey, sendTransaction, usdcBalance, refreshBalances } = useSolanaWallet();
+
     const [isLoading, setIsLoading] = React.useState(false);
     const [isBetFormOpen, setIsBetFormOpen] = React.useState(false);
     const [betInput, setBetInput] = React.useState(String(challenge.initial_bet ?? ""));

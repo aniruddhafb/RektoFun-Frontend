@@ -1,9 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { usePrivy } from "@privy-io/react-auth";
 import Image from "next/image";
-import { useSolanaWallet } from "@/app/lib/useSolanaWallet";
 import { getUserByWallet, updateUser } from "@/app/lib/users-service/users";
 import { blockedContentError, hasBlockedContent } from "@/app/lib/content-moderation";
 import { useUserStore } from "@/app/store/useUserStore";
@@ -12,7 +10,7 @@ import { useUserStore } from "@/app/store/useUserStore";
 const PROFILE_SVGS = Array.from({ length: 31 }, (_, i) => `/profiles/${i + 1}.svg`);
 
 export default function SettingsPage() {
-    const { user, authenticated, logout, login, linkWallet, linkTwitter, linkGoogle, unlinkTwitter, unlinkGoogle } = usePrivy();
+
     const { setUser: setStoreUser } = useUserStore();
 
     // Profile state
@@ -30,9 +28,9 @@ export default function SettingsPage() {
     const [isSavingProfile, setIsSavingProfile] = useState(false);
     const [disconnectingProvider, setDisconnectingProvider] = useState<"twitter" | "google" | null>(null);
 
-    const { publicKey } = useSolanaWallet();
-    const walletAddress = publicKey?.toBase58() ?? null;
 
+
+    
     // Fetch user data on mount
     useEffect(() => {
         const fetchUserData = async () => {

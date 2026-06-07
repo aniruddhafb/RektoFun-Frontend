@@ -9,7 +9,6 @@ import {
   getAssociatedTokenAddress,
 } from "@solana/spl-token";
 import { ArrowUpFromLine, X } from "lucide-react";
-import { useSolanaWallet } from "@/app/lib/useSolanaWallet";
 import { USDC_MINT, USDC_MULTIPLIER, getReadonlyConnection } from "@/app/lib/rektofun-program";
 import { useBodyScrollLock } from "@/app/lib/useBodyScrollLock";
 
@@ -19,8 +18,8 @@ interface WithdrawModalProps {
 }
 
 export function WithdrawModal({ isOpen, onClose }: WithdrawModalProps) {
-  const { publicKey, usdcBalance, sendTransaction, refreshBalances } = useSolanaWallet();
-  const walletAddress = publicKey?.toBase58() ?? null;
+
+
   const [recipientAddress, setRecipientAddress] = useState("");
   const [amountInput, setAmountInput] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);

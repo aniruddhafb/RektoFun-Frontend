@@ -1,8 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { usePrivy } from "@privy-io/react-auth";
-import { useSolanaWallet } from "@/app/lib/useSolanaWallet";
 import { getUserByWallet } from "@/app/lib/users-service/users";
 import {
     ReferralHeader,
@@ -16,8 +14,7 @@ import {
 const REFERRAL_POINTS_PER_USER = 100;
 
 export default function ReferralPage() {
-    const { authenticated } = usePrivy();
-    const { publicKey } = useSolanaWallet();
+
     const [userData, setUserData] = useState<{
         referral_code: string;
         referred_by: string | null;

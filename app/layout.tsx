@@ -3,7 +3,8 @@ import "./globals.css";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 import { Analytics } from "@vercel/analytics/next";
-import Providers from "./providers/PrivyProvider";
+import ReownProvider from "./providers/reown-provider";
+
 import { WelcomeTutorialModal } from "./components/homepage-components";
 
 export const metadata: Metadata = {
@@ -87,14 +88,14 @@ export default function RootLayout({
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
       </head>
       <body className="min-h-full flex flex-col">
-        <Providers>
+        <ReownProvider>
           <div className="pixel-shell min-h-full flex flex-col">
             <WelcomeTutorialModal />
             <Navbar />
             <main className="flex-1 mt-12 md:mt-8">{children}</main>
             <Footer />
           </div>
-        </Providers>
+        </ReownProvider>
       </body>
     </html>
   );

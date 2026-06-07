@@ -8,7 +8,6 @@ import { AcceptChallengeModal } from "./AcceptChallengeModal";
 import { ChallengeListItem, getChallengeById, joinChallenge } from "@/app/lib/challenges-service/challenges";
 import { useRouter } from "next/navigation";
 import { useUserStore } from "@/app/store/useUserStore";
-import { useSolanaWallet } from "@/app/lib/useSolanaWallet";
 import { buildAcceptChallengeTx, fetchChallenge } from "@/app/lib/rektofun-program";
 import { PublicKey } from "@solana/web3.js";
 import { useBodyScrollLock } from "@/app/lib/useBodyScrollLock";
@@ -24,7 +23,7 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
     const modalRef = useRef<HTMLDivElement>(null);
     const router = useRouter();
     const { user } = useUserStore();
-    const { authenticated, login, program, publicKey, sendTransaction, usdcBalance } = useSolanaWallet();
+
     const [currentTime, setCurrentTime] = React.useState(() => Date.now());
     const [shareFeedback, setShareFeedback] = React.useState<string | null>(null);
     const [liveSolPrice, setLiveSolPrice] = React.useState<number | null>(null);
