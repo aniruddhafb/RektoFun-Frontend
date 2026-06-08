@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useAppKitAccount } from "@reown/appkit/react";
 import { CheckCircle, Copy, Gift, Link2, Loader2, Share2 } from "lucide-react";
 import { acceptReferral } from "@/app/lib/users-service/users";
 
@@ -24,8 +25,7 @@ export function ReferralLinkSection({
     const [showSharePopup, setShowSharePopup] = useState(false);
     const [isRedeeming, setIsRedeeming] = useState(false);
 
-
-    const walletAddress = publicKey?.toBase58() ?? null;
+    const { address: walletAddress, isConnected } = useAppKitAccount();
 
     const handleRedeem = async () => {
         if (!redeemCode.trim()) {
