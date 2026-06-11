@@ -14,17 +14,17 @@ createAppKit({
   networks: [solana, solanaTestnet, solanaDevnet],
   projectId,
   metadata: {
-    name: 'My Solana dApp',
-    description: 'Next.js Solana dApp',
-    url: 'https://mydapp.com',
-    icons: ['https://mydapp.com/icon.png']
+    name: 'RektoFun',
+    description: 'PvP Battleground For Predictions',
+    url: 'https://rekto.fun',
+    icons: ['https://earningrecords.com/assets/1.png']
   },
   features: {
     analytics: true
   }
 })
 
-const ReownProvider = ({children}: {children: ReactNode}) => {
+const ReownProvider = ({ children }: { children: ReactNode }) => {
   return <>{children}</>
 }
 
