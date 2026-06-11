@@ -1,9 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useAppKitAccount } from '@reown/appkit/react';
 import { ChallengeCard } from "./ChallengeCard";
 import { getChallenges } from "../../lib/challenges-service/challenges";
-import { useSolanaWallet } from '@/app/lib/useSolanaWallet';
 import { ChallengeListItem } from '../../lib/challenges-service/challenges';
 
 interface ChallengeGridProps {
@@ -13,12 +13,13 @@ interface ChallengeGridProps {
     isBookmarked: (challengeId: string) => boolean;
     onOpenModal: () => void;
     onChallengesLoaded?: (challenges: ChallengeListItem[]) => void;
-    isLoading?: boolean;
     refreshKey?: number;
     activeFilter: string;
     activeAsset: string;
     searchQuery: string;
 }
+
+const PAGE_SIZE = 6;
 
 export function ChallengeGrid({
     onRekt,
@@ -32,13 +33,9 @@ export function ChallengeGrid({
     activeAsset,
     searchQuery,
 }: ChallengeGridProps) {
-    const PAGE_SIZE = 6;
-    const LOADING_MESSAGES = [
-        "Scanning live markets...",
-        "Calculating risk and odds...",
-        "Finding fresh challenges for you...",
-        "Almost there, sharpening the feed...",
-    ];
+    const { address } = useAppKitAccount();
+    const ownerAddress = address || '';
+
     const [challenges, setChallenges] = useState<ChallengeListItem[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [loadError, setLoadError] = useState<string | null>(null);
@@ -46,31 +43,15 @@ export function ChallengeGrid({
     const [offset, setOffset] = useState(0);
     const [hasMore, setHasMore] = useState(true);
     const [isLoadingMore, setIsLoadingMore] = useState(false);
-    const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
     const loadMoreRef = useRef<HTMLDivElement | null>(null);
-    const requestIdRef = useRef(0);
-    const isLoadingRef = useRef(false);
-    const isLoadingMoreRef = useRef(false);
-    const { publicKey } = useSolanaWallet();
-
-    const ownerAddress = publicKey?.toString() || '';
 
     const fetchChallenges = useCallback(async (currentOffset: number, append: boolean) => {
-        if (append && (isLoadingRef.current || isLoadingMoreRef.current)) {
-            return;
-        }
+        if (append && isLoadingMore) return;
 
-        const requestId = ++requestIdRef.current;
         if (!append) {
             setIsLoading(true);
-            isLoadingRef.current = true;
-            if (isLoadingMoreRef.current) {
-                setIsLoadingMore(false);
-                isLoadingMoreRef.current = false;
-            }
         } else {
             setIsLoadingMore(true);
-            isLoadingMoreRef.current = true;
         }
         setLoadError(null);
 
@@ -78,24 +59,18 @@ export function ChallengeGrid({
             const isPinnedFilter = activeFilter === "Pinned";
             const requestLimit = isPinnedFilter ? 100 : PAGE_SIZE;
             const requestOffset = isPinnedFilter ? 0 : currentOffset;
-            const response = await getChallenges(
-                {
-                    limit: requestLimit,
-                    offset: requestOffset,
-                    category: activeAsset !== "All Markets" ? activeAsset : undefined,
-                    search: searchQuery.trim() || undefined,
-                    sort: activeFilter === "Expiring Soon" ? "expiring_soon" : "latest",
-                    created_by: activeFilter === "Created By Me" ? ownerAddress || undefined : undefined,
-                },
-                {
-                    timeoutMs: 10000,
-                    retries: 2,
-                    cacheTtlMs: 20000,
-                    bypassCache: currentOffset === 0 ? false : true,
-                },
-            );
-            if (requestId !== requestIdRef.current) return;
+
+            const response = await getChallenges({
+                limit: requestLimit,
+                offset: requestOffset,
+                category: activeAsset !== "All Markets" ? activeAsset : undefined,
+                search: searchQuery.trim() || undefined,
+                sort: activeFilter === "Expiring Soon" ? "expiring_soon" : "latest",
+                created_by: activeFilter === "Created By Me" ? ownerAddress || undefined : undefined,
+            });
+
             let nextChunk = response.challenges ?? [];
+
             if (isPinnedFilter) {
                 nextChunk = nextChunk.filter((challenge) => isBookmarked(challenge.id));
             } else {
@@ -106,6 +81,7 @@ export function ChallengeGrid({
                     return aBookmarked ? -1 : 1;
                 });
             }
+
             if (activeFilter === "My Bets" && ownerAddress) {
                 nextChunk = nextChunk.filter((challenge) => {
                     const creatorWallet = challenge.creator?.wallet_address?.toLowerCase();
@@ -114,38 +90,32 @@ export function ChallengeGrid({
                     return creatorWallet === currentUser || opponentWallet === currentUser;
                 });
             }
+
             setChallenges((prev) => (append ? [...prev, ...nextChunk] : nextChunk));
             setHasMore(!isPinnedFilter && nextChunk.length === PAGE_SIZE);
             setOffset(isPinnedFilter ? nextChunk.length : currentOffset + nextChunk.length);
         } catch (error) {
-            if (requestId !== requestIdRef.current) return;
             console.error('Failed to fetch challenges:', error);
             if (!append) {
                 setChallenges([]);
             }
             setLoadError('Could not load challenges. Please try again.');
         } finally {
-            if (requestId !== requestIdRef.current) return;
             if (!append) {
                 setIsLoading(false);
-                isLoadingRef.current = false;
             } else {
                 setIsLoadingMore(false);
-                isLoadingMoreRef.current = false;
             }
         }
-    }, [PAGE_SIZE, activeAsset, activeFilter, isBookmarked, onChallengesLoaded, ownerAddress, searchQuery]);
+    }, [activeAsset, activeFilter, isBookmarked, ownerAddress, searchQuery, isLoadingMore]);
 
     useEffect(() => {
-        requestIdRef.current += 1;
-        isLoadingRef.current = false;
-        isLoadingMoreRef.current = false;
         setIsLoadingMore(false);
         setChallenges([]);
         setOffset(0);
         setHasMore(true);
         fetchChallenges(0, false);
-    }, [fetchChallenges, refreshKey, retryNonce, activeAsset, activeFilter, searchQuery]);
+    }, [refreshKey, retryNonce, activeAsset, activeFilter, searchQuery]);
 
     useEffect(() => {
         if (!hasMore || isLoading || isLoadingMore) return;
@@ -168,15 +138,7 @@ export function ChallengeGrid({
 
         observer.observe(node);
         return () => observer.disconnect();
-    }, [fetchChallenges, hasMore, isLoading, isLoadingMore, offset]);
-
-    useEffect(() => {
-        if (!isLoading) return;
-        const timer = window.setInterval(() => {
-            setLoadingMessageIndex((prev) => (prev + 1) % LOADING_MESSAGES.length);
-        }, 1400);
-        return () => window.clearInterval(timer);
-    }, [isLoading]);
+    }, [hasMore, isLoading, isLoadingMore, offset]);
 
     useEffect(() => {
         onChallengesLoaded?.(challenges);

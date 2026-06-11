@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic';
 
-import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ChallengeHeader } from "../components/challenge-components/ChallengeHeader";
 import { ChallengeFiltersSection } from "../components/challenge-components/ChallengeFiltersSection";
 import { FeedbackBanner } from "../components/challenge-components/FeedbackBanner";
@@ -14,7 +14,8 @@ import ChallengeDetailModal from "../components/challenge-components/ChallengeDe
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { getMarkets } from "../lib/markets-service/market";
 
-function ChallengesContent() {
+export default function ChallengesPage() {
+
   const CREATE_TOAST_DURATION_MS = 3000;
   const BOOKMARKS_STORAGE_KEY = "rektofun:challenge-bookmarks";
   const [activeFilter, setActiveFilter] = useState("Latest");
@@ -24,7 +25,6 @@ function ChallengesContent() {
   const [selectedChallenge, setSelectedChallenge] = useState<ChallengeListItem | null>(null);
   const [challenges, setChallenges] = useState<ChallengeListItem[]>([]);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
   const [rektTarget, setRektTarget] = useState<ChallengeListItem | null>(null);
   const [rektTxSig, setRektTxSig] = useState<string | null>(null);
   const [rektError, setRektError] = useState<string | null>(null);
@@ -58,20 +58,19 @@ function ChallengesContent() {
     } catch (error) {
       console.error("Failed to persist challenge bookmarks to localStorage:", error);
     }
-  }, [bookmarkedChallengeIds]);
+  }, []);
 
-  const toggleBookmark = useCallback((challengeId: string) => {
+  const toggleBookmark = (challengeId: string) => {
     setBookmarkedChallengeIds((prev) =>
       prev.includes(challengeId)
         ? prev.filter((id) => id !== challengeId)
         : [...prev, challengeId]
     );
-  }, []);
+  }
 
-  const isChallengeBookmarked = useCallback(
-    (challengeId: string) => bookmarkedChallengeIds.includes(challengeId),
-    [bookmarkedChallengeIds]
-  );
+  const isChallengeBookmarked = 
+    (challengeId: string) => bookmarkedChallengeIds.includes(challengeId)
+
 
   // Handle challenge card click
   const handleChallengeClick = (challenge: ChallengeListItem) => {
@@ -107,9 +106,9 @@ function ChallengesContent() {
     window.setTimeout(() => setIgnoreDeepLink(false), 200);
   };
 
-  const handleChallengesLoaded = useCallback((loadedChallenges: ChallengeListItem[]) => {
+  const handleChallengesLoaded = (loadedChallenges: ChallengeListItem[]) => {
     setChallenges(loadedChallenges);
-  }, []);
+  }
 
   useEffect(() => {
     // If we are intentionally ignoring deep link handling (e.g., during manual close), skip.
@@ -130,7 +129,7 @@ function ChallengesContent() {
 
     setSelectedChallenge(matchedChallenge);
     setIsDetailModalOpen(true);
-  }, [challenges, isDetailModalOpen, pathname, selectedChallenge?.id, ignoreDeepLink]);
+  }, []);
 
   async function handleRekt(challenge: ChallengeListItem) {
     setRektTarget(challenge);
@@ -195,7 +194,7 @@ function ChallengesContent() {
       window.clearInterval(interval);
       window.clearTimeout(timeout);
     };
-  }, [showCreateSuccessToast]);
+  }, []);
 
   useEffect(() => {
     const shouldOpenCreateModal = searchParams.get("create") === "1";
@@ -208,7 +207,7 @@ function ChallengesContent() {
     const nextQuery = params.toString();
     const nextUrl = nextQuery ? `${pathname}?${nextQuery}` : pathname;
     router.replace(nextUrl, { scroll: false });
-  }, [pathname, router, searchParams]);
+  }, []);
 
   return (
     <div className="relative min-h-full overflow-hidden bg-[#f3e1d7]">
@@ -285,11 +284,4 @@ function ChallengesContent() {
   );
 }
 
-export default function ChallengesPage() {
-  return (
-    <Suspense fallback={null}>
-      <ChallengesContent />
-    </Suspense>
-  );
-}
 

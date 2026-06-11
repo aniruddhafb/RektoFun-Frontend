@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { usePrivy } from "@privy-io/react-auth";
-import { useSolanaWallet } from "@/app/lib/useSolanaWallet";
+import { useAppKitAccount } from "@reown/appkit/react";
 import { getUserByWallet } from "@/app/lib/users-service/users";
 import {
     ReferralHeader,
@@ -16,8 +15,6 @@ import {
 const REFERRAL_POINTS_PER_USER = 100;
 
 export default function ReferralPage() {
-    const { authenticated } = usePrivy();
-    const { publicKey } = useSolanaWallet();
     const [userData, setUserData] = useState<{
         referral_code: string;
         referred_by: string | null;
@@ -25,18 +22,18 @@ export default function ReferralPage() {
     } | null>(null);
     const [referralLink, setReferralLink] = useState<string>("https://rekto.fun/");
 
-    const walletAddress = publicKey?.toBase58() ?? null;
+    const { address, isConnected } = useAppKitAccount();
 
     useEffect(() => {
         const fetchUserData = async () => {
-            if (!authenticated || !walletAddress) {
+            if (!isConnected || !address) {
                 setUserData(null);
                 setReferralLink("https://rekto.fun/");
                 return;
             }
 
             try {
-                const user = await getUserByWallet(walletAddress);
+                const user = await getUserByWallet(address);
                 setUserData({
                     referral_code: user.referral_code,
                     referred_by: user.referred_by || null,
@@ -51,7 +48,7 @@ export default function ReferralPage() {
         };
 
         fetchUserData();
-    }, [authenticated, walletAddress]);
+    }, [isConnected, address]);
 
     const referralsCount = userData?.referrals?.length || 0;
     const referralPoints = referralsCount * REFERRAL_POINTS_PER_USER;
@@ -69,8 +66,8 @@ export default function ReferralPage() {
                             {/* Three Info Cards */}
                             <ReferralInfoCards />
 
-                            {/* Referral Link Section - Only for authenticated users */}
-                            {authenticated ? (
+                            {/* Referral Link Section - Only for connected users */}
+                            {isConnected ? (
                                 <ReferralLinkSection
                                     referralLink={referralLink}
                                     referralCode={userData?.referral_code || ""}

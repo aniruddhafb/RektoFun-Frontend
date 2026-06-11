@@ -19,7 +19,7 @@ interface AcceptChallengeModalProps {
     isPoolMode: boolean;
     joinSide: "challenger" | "opponent";
     onClose: () => void;
-    onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
+    onSubmit: (event: React.SubmitEvent<HTMLFormElement>) => void;
     onBetInputChange: (value: string) => void;
     onJoinSideChange: (side: "challenger" | "opponent") => void;
 }

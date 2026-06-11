@@ -2,9 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getLeaderboard, type LeaderboardUser } from "@/app/lib/users-service/users";
-import { followUser, unfollowUser } from "@/app/lib/users-service/users";
-import { useSolanaWallet } from "@/app/lib/useSolanaWallet";
+import { useAppKitAccount } from "@reown/appkit/react";
+import { getLeaderboard, type LeaderboardUser, followUser, unfollowUser } from "@/app/lib/users-service/users";
 import { useUserStore } from "@/app/store/useUserStore";
 import {
     CATEGORY_OPTIONS,
@@ -40,7 +39,7 @@ async function fetchAllUsers(): Promise<LeaderboardUser[]> {
 
 export default function MastersPage() {
     const router = useRouter();
-    const { solanaWallet } = useSolanaWallet();
+    const { address } = useAppKitAccount();
     const { user: currentUser } = useUserStore();
 
     const [search, setSearch] = useState("");
@@ -60,20 +59,7 @@ export default function MastersPage() {
     const verificationRef = useRef<HTMLDivElement>(null);
     const loadMoreRef = useRef<HTMLDivElement>(null);
 
-    useEffect(() => {
-        function handleClickOutside(event: MouseEvent) {
-            if (categoryRef.current && !categoryRef.current.contains(event.target as Node)) {
-                setIsCategoryOpen(false);
-            }
-            if (verificationRef.current && !verificationRef.current.contains(event.target as Node)) {
-                setIsVerificationOpen(false);
-            }
-        }
-
-        document.addEventListener("mousedown", handleClickOutside);
-        return () => document.removeEventListener("mousedown", handleClickOutside);
-    }, []);
-
+    // Load users on mount
     useEffect(() => {
         const loadUsers = async () => {
             try {
@@ -91,27 +77,39 @@ export default function MastersPage() {
         loadUsers();
     }, []);
 
+    // Close dropdowns when clicking outside
+    useEffect(() => {
+        function handleClickOutside(event: MouseEvent) {
+            if (categoryRef.current && !categoryRef.current.contains(event.target as Node)) {
+                setIsCategoryOpen(false);
+            }
+            if (verificationRef.current && !verificationRef.current.contains(event.target as Node)) {
+                setIsVerificationOpen(false);
+            }
+        }
+
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+
     const toggleFollow = async (targetWalletAddress: string) => {
-        if (!solanaWallet?.address || !currentUser?.id) return;
+        if (!address || !currentUser?.id) return;
 
         const targetMaster = masters.find((m) => m.walletAddress === targetWalletAddress);
-        if (!targetMaster || targetMaster.walletAddress === solanaWallet.address) return;
+        if (!targetMaster || targetMaster.walletAddress === address) return;
 
         const viewerAlreadyFollowing = targetMaster.followers.includes(currentUser.id);
 
         try {
             setFollowLoadingByWallet((prev) => ({ ...prev, [targetWalletAddress]: true }));
             const updatedTarget = viewerAlreadyFollowing
-                ? await unfollowUser(targetWalletAddress, solanaWallet.address)
-                : await followUser(targetWalletAddress, solanaWallet.address);
+                ? await unfollowUser(targetWalletAddress, address)
+                : await followUser(targetWalletAddress, address);
 
             setMasters((prev) =>
                 prev.map((master) =>
                     master.walletAddress === targetWalletAddress
-                        ? ({
-                              ...master,
-                              followers: updatedTarget.followers,
-                          } as Master)
+                        ? { ...master, followers: updatedTarget.followers }
                         : master,
                 ),
             );
@@ -148,13 +146,15 @@ export default function MastersPage() {
         setIsAppending(false);
     };
 
+    // Reset visible count when filters change
     useEffect(() => {
-        setVisibleCount((count) => Math.min(Math.max(count, INITIAL_VISIBLE_MASTERS), Math.max(filteredMasters.length, INITIAL_VISIBLE_MASTERS)));
-    }, [filteredMasters.length]);
+        setVisibleCount(INITIAL_VISIBLE_MASTERS);
+    }, [search, categoryFilter, verificationFilter]);
 
+    // Infinite scroll observer
     useEffect(() => {
         const loadMoreElement = loadMoreRef.current;
-        if (!loadMoreElement || !hasMoreMasters || isLoading || isAppending) return;
+        if (!loadMoreElement || !hasMoreMasters || isAppending) return;
 
         const observer = new IntersectionObserver(
             ([entry]) => {
@@ -170,9 +170,13 @@ export default function MastersPage() {
         );
 
         observer.observe(loadMoreElement);
-
         return () => observer.disconnect();
-    }, [filteredMasters.length, hasMoreMasters, isAppending, isLoading]);
+    }, [hasMoreMasters, isAppending, filteredMasters.length]);
+
+    const canFollow = Boolean(currentUser?.id && address);
+    const getIsOwnCard = (master: Master) => master.walletAddress === address;
+    const getIsFollowing = (master: Master) => currentUser?.id ? master.followers.includes(currentUser.id) : false;
+    const getIsFollowLoading = (walletAddress: string) => Boolean(followLoadingByWallet[walletAddress]);
 
     return (
         <div className="rekto-page min-h-screen">
@@ -187,10 +191,7 @@ export default function MastersPage() {
                     isVerificationOpen={isVerificationOpen}
                     categoryRef={categoryRef}
                     verificationRef={verificationRef}
-                    onSearchChange={(value) => {
-                        setSearch(value);
-                        resetVisibleCards();
-                    }}
+                    onSearchChange={setSearch}
                     onCategoryToggle={() => {
                         setIsCategoryOpen((prev) => !prev);
                         setIsVerificationOpen(false);
@@ -199,16 +200,8 @@ export default function MastersPage() {
                         setIsVerificationOpen((prev) => !prev);
                         setIsCategoryOpen(false);
                     }}
-                    onCategorySelect={(value) => {
-                        setCategoryFilter(value);
-                        resetVisibleCards();
-                        setIsCategoryOpen(false);
-                    }}
-                    onVerificationSelect={(value) => {
-                        setVerificationFilter(value);
-                        resetVisibleCards();
-                        setIsVerificationOpen(false);
-                    }}
+                    onCategorySelect={setCategoryFilter}
+                    onVerificationSelect={setVerificationFilter}
                     onOpenMobileFilters={() => setIsMobileFiltersOpen(true)}
                 />
 
@@ -218,40 +211,37 @@ export default function MastersPage() {
                     categoryFilter={categoryFilter}
                     verificationFilter={verificationFilter}
                     onClose={() => setIsMobileFiltersOpen(false)}
-                    onSearchChange={(value) => {
-                        setSearch(value);
-                        resetVisibleCards();
-                    }}
+                    onSearchChange={setSearch}
                     onCategorySelect={(value) => {
                         setCategoryFilter(value);
-                        resetVisibleCards();
                         setIsMobileFiltersOpen(false);
                     }}
                     onVerificationSelect={(value) => {
                         setVerificationFilter(value);
-                        resetVisibleCards();
                         setIsMobileFiltersOpen(false);
                     }}
                 />
 
-                {error ? (
-                    <div className="rekto-surface mb-8 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
-                ) : null}
+                {error && (
+                    <div className="rekto-surface mb-8 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                        {error}
+                    </div>
+                )}
 
                 <MastersGrid
                     masters={visibleMasters}
                     error={error}
                     showPlaceholders={isLoading || isAppending}
                     placeholderCount={isLoading ? INITIAL_VISIBLE_MASTERS : PLACEHOLDER_CARD_COUNT}
-                    canFollow={Boolean(currentUser?.id && solanaWallet?.address)}
-                    getIsOwnCard={(master) => master.walletAddress === solanaWallet?.address}
-                    getIsFollowing={(master) => (currentUser?.id ? master.followers.includes(currentUser.id) : false)}
-                    getIsFollowLoading={(walletAddress) => Boolean(followLoadingByWallet[walletAddress])}
+                    canFollow={canFollow}
+                    getIsOwnCard={getIsOwnCard}
+                    getIsFollowing={getIsFollowing}
+                    getIsFollowLoading={getIsFollowLoading}
                     onViewProfile={(walletAddress) => router.push(`/profile/${encodeURIComponent(walletAddress)}`)}
                     onToggleFollow={toggleFollow}
                 />
 
-                {hasMoreMasters ? <div ref={loadMoreRef} className="h-12" aria-hidden="true" /> : null}
+                {hasMoreMasters && <div ref={loadMoreRef} className="h-12" aria-hidden="true" />}
             </div>
         </div>
     );

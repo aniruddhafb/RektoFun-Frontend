@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::{self, Token, TokenAccount, Transfer};
+use anchor_spl::{token::{self, Token, TokenAccount, Transfer}, token_interface::TokenInterface};
 
 use crate::{
     constants::*,
@@ -63,7 +63,7 @@ pub struct SettleChallenge<'info> {
     pub treasury_usdc_account: Account<'info, TokenAccount>,
 
     /// CHECK: USDC mint — validated by token account constraints above
-    pub usdc_mint: AccountInfo<'info>,
+    pub usdc_mint: Interface<'info, TokenInterface>,
 
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,

@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { useAppKitAccount } from "@reown/appkit/react";
 import { CheckCircle, Copy, Gift, Link2, Loader2, Share2 } from "lucide-react";
-import { useSolanaWallet } from "@/app/lib/useSolanaWallet";
 import { acceptReferral } from "@/app/lib/users-service/users";
 
 interface ReferralLinkSectionProps {
@@ -25,8 +25,7 @@ export function ReferralLinkSection({
     const [showSharePopup, setShowSharePopup] = useState(false);
     const [isRedeeming, setIsRedeeming] = useState(false);
 
-    const { publicKey } = useSolanaWallet();
-    const walletAddress = publicKey?.toBase58() ?? null;
+    const { address: walletAddress, isConnected } = useAppKitAccount();
 
     const handleRedeem = async () => {
         if (!redeemCode.trim()) {

@@ -1,10 +1,10 @@
 "use client";
 
 import { Lock, LogIn } from "lucide-react";
-import { usePrivy } from "@privy-io/react-auth";
+import { useAppKit } from "@reown/appkit/react";
 
 export function LoginPrompt() {
-    const { login } = usePrivy();
+    const { open } = useAppKit();
 
     return (
         <div className="referral-hover-shadow rounded-lg border border-black/10 bg-white/80 p-5 shadow-none backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-black sm:p-6">
@@ -17,7 +17,7 @@ export function LoginPrompt() {
                     Create or connect your account to generate a tracked invite link, redeem a friend&apos;s code, and start earning REKTO points.
                 </p>
                 <button
-                    onClick={login}
+                    onClick={() => open()}
                     className="referral-button-shadow inline-flex h-11 cursor-pointer items-center gap-2 rounded-lg bg-black px-6 text-sm font-black text-white transition-colors hover:bg-gray-800"
                 >
                     <LogIn className="h-4 w-4" />

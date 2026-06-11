@@ -236,10 +236,10 @@ export function WaysToWinSection() {
                         </div>
                     </div>
                     <Link
-                        href="/challenges"
+                        href="/beta"
                         className="flex-shrink-0 border-2 border-black bg-black px-8 py-3 text-sm font-black uppercase tracking-[0.08em] text-white shadow-none transition-all hover:-translate-y-1 hover:shadow-[6px_6px_0_#e85a2d] active:translate-y-0 active:shadow-[2px_2px_0_#e85a2d] sm:text-base"
                     >
-                        Get Started {"\u2192"}
+                        Join Waitlist {"\u2192"}
                     </Link>
                 </div>
             </div>
