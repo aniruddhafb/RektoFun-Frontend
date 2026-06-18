@@ -237,7 +237,7 @@ export default function LeaderboardPage() {
             <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6 sm:mb-8">
                     <div>
-                        <h1 className="text-3xl sm:text-4xl font-black text-gray-900">Leaderboard</h1>
+                        <h1 className="text-3xl sm:text-4xl font-black text-gray-900">Leaderboards</h1>
                         <p className="text-gray-600 text-base sm:text-lg">Explore the top challengers and their achievements</p>
                     </div>
                 </div>
