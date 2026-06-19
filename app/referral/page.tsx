@@ -61,7 +61,7 @@ export default function ReferralPage() {
                     <ReferralHeader />
 
                     <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] gap-5 lg:gap-6 items-start">
-                        {/* Left Side - Cards and Referral Link */}
+                        {/* Left Side - Cards and Referral */}
                         <div className="min-w-0 space-y-5">
                             {/* Three Info Cards */}
                             <ReferralInfoCards />
