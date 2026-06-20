@@ -1,22 +1,11 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import Image from "next/image";
 import { DatePickerModal } from "./DatePickerModal";
 import { DurationPickerModal } from "./DurationPickerModal";
-import {
-    buildCreateChallengeTx,
-    deriveChallengePDA,
-    deriveCreatorCounter,
-    getRektoProgram,
-    getReadonlyConnection,
-} from "@/app/lib/rektofun-program";
-import { createChallenge } from "@/app/lib/challenges-service/challenges";
 import { useUserStore } from "@/app/store/useUserStore";
-import { blockedContentError, hasBlockedContent } from "@/app/lib/content-moderation";
 import { useBodyScrollLock } from "@/app/lib/useBodyScrollLock";
 import { useAppKit, useAppKitAccount } from "@reown/appkit/react";
-import { PublicKey, Transaction } from "@solana/web3.js";
 
 interface CreateChallengeModalProps {
     isOpen: boolean;
@@ -27,13 +16,6 @@ interface CreateChallengeModalProps {
 type TxStatus = "idle" | "building" | "signing" | "confirming" | "success" | "error";
 type CreateChallengeStep = "mode" | "category" | "details";
 
-interface ValidationState {
-    suggestions: string[];
-    isValid: boolean;
-    isLoading: boolean;
-    error: string | null;
-    selectedSuggestion: string | null;
-}
 
 export function CreateChallengeModal({
     isOpen,
@@ -51,29 +33,14 @@ export function CreateChallengeModal({
     const [predictionPrice, setPredictionPrice] = useState("66500");
     const [selectedDate, setSelectedDate] = useState(() => new Date(Date.now() + 24 * 60 * 60 * 1000));
     const [duration, setDuration] = useState({ hours: 4, minutes: 0 });
-    const [challengeStatement, setChallengeStatement] = useState("");
-    const [challengeStatementError, setChallengeStatementError] = useState<string | null>(null);
     const [sportsResolutionConsent, setSportsResolutionConsent] = useState(false);
     const [sportsResolutionConsentError, setSportsResolutionConsentError] = useState<string | null>(null);
-
-    // Validation state
-    const [validation, setValidation] = useState<ValidationState>({
-        suggestions: [],
-        isValid: true,
-        isLoading: false,
-        error: null,
-        selectedSuggestion: null,
-    });
 
     // UI state
     const [openDropdown, setOpenDropdown] = useState<string | null>(null);
     const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
     const [isDurationPickerOpen, setIsDurationPickerOpen] = useState(false);
 
-    // Transaction state
-    const [txStatus, setTxStatus] = useState<TxStatus>("idle");
-    const [txError, setTxError] = useState<string | null>(null);
-    const [txSignature, setTxSignature] = useState<string | null>(null);
 
     const { user } = useUserStore();
     const { open } = useAppKit();
@@ -85,16 +52,6 @@ export function CreateChallengeModal({
 
     useBodyScrollLock(isOpen);
 
-    // Reset on open
-    useEffect(() => {
-        if (!isOpen) return;
-        setTxStatus("idle");
-        setTxError(null);
-        setTxSignature(null);
-        setChallengeStatementError(null);
-        setSportsResolutionConsentError(null);
-        setSportsResolutionConsent(false);
-    }, [isOpen]);
 
 
     // Click outside handler
@@ -109,81 +66,13 @@ export function CreateChallengeModal({
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
-    // Reset validation when modal opens
-    useEffect(() => {
-        if (!isOpen) {
-            setValidation({ suggestions: [], isValid: true, isLoading: false, error: null, selectedSuggestion: null });
-            return;
-        }
-        setValidation({
-            suggestions: [],
-            isValid: true,
-            isLoading: false,
-            error: null,
-            selectedSuggestion: null,
-        });
-    }, [isOpen]);
 
     const closeAllDropdowns = useCallback(() => setOpenDropdown(null), []);
 
-    const resetModalState = useCallback(() => {
-        setOpenDropdown(null);
-        setBetAmount(5);
-        setBetAmountError(null);
-        setPredictionDirection("Above");
-        setPredictionPrice("66500");
-        setSelectedDate(new Date(Date.now() + 24 * 60 * 60 * 1000));
-        setIsDatePickerOpen(false);
-        setDuration({ hours: 4, minutes: 0 });
-        setIsDurationPickerOpen(false);
-        setCurrentStep("mode");
-        setChallengeMode("pvp");
-        setChallengeStatement("");
-        setChallengeStatementError(null);
-        setValidation({ suggestions: [], isValid: true, isLoading: false, error: null, selectedSuggestion: null });
-        setSportsResolutionConsent(false);
-        setSportsResolutionConsentError(null);
-        setTxStatus("idle");
-        setTxError(null);
-        setTxSignature(null);
-    }, []);
 
-    const handleModalClose = useCallback(() => {
-        resetModalState();
+    const handleModalClose = () => {
         onClose();
-    }, [resetModalState, onClose]);
-
-    const handleValidateChallengeStatement = useCallback(async () => {
-        if (!challengeStatement.trim()) {
-            setChallengeStatementError("Please enter a challenge statement.");
-            return;
-        }
-        setChallengeStatementError(null);
-        setValidation(prev => ({ ...prev, error: null, selectedSuggestion: null, isValid: false, isLoading: true }));
-        try {
-            // TODO: Implement validation function
-            const response = { valid: true, statements: [challengeStatement] };
-            setValidation(prev => ({
-                ...prev,
-                suggestions: response.statements || [],
-                isValid: false,
-                error: (!response.valid || !response.statements?.length) 
-                    ? "The statement could not be validated. Please rewrite the statement properly." 
-                    : null,
-            }));
-        } catch (error) {
-            console.error("Validate transform error:", error);
-            const errMessage = error instanceof Error ? error.message : "";
-            setValidation(prev => ({
-                ...prev,
-                error: errMessage || "Unable to validate right now. Please try again.",
-                isValid: false,
-                suggestions: [],
-            }));
-        } finally {
-            setValidation(prev => ({ ...prev, isLoading: false }));
-        }
-    }, [challengeStatement]);
+    }
 
     if (!isOpen) return null;
 
@@ -207,9 +96,6 @@ export function CreateChallengeModal({
     const handleCreateChallenge = async () => {
     }
 
-    const isLoading = txStatus === "building" || txStatus === "signing" || txStatus === "confirming";
-    const hasChallengeStatement = challengeStatement.trim().length > 0;
-    const isSelectionComplete = Boolean(validation.selectedSuggestion);
     const stepOrder: CreateChallengeStep[] = ["mode", "category", "details"];
     const currentStepIndex = stepOrder.indexOf(currentStep);
     const isModeStep = currentStep === "mode";
@@ -234,24 +120,6 @@ export function CreateChallengeModal({
         closeAllDropdowns();
     };
 
-    const getButtonLabel = () => {
-        if (!isConnected) return "Connect Wallet to Create";
-        switch (txStatus) {
-            case "building": return "Building Transaction...";
-            case "signing": return "Waiting for Signature...";
-            case "confirming": return "Confirming on-chain...";
-            case "success": return "Challenge Created! 🎉";
-            default: return "Create Challenge";
-        }
-    };
-
-    const getButtonStyle = () => {
-        if (!isConnected) return "rekto-button cursor-pointer w-full py-3 sm:py-4 bg-gray-900 hover:bg-gray-700 text-white font-black text-base sm:text-lg transition-colors";
-        if (isLoading || (!validation.isValid || !isSelectionComplete)) return "cursor-pointer w-full py-3 sm:py-4 border-2 border-black bg-gray-400 text-white font-black text-base sm:text-lg cursor-not-allowed shadow-[3px_3px_0_#111]";
-        if (txStatus === "success") return "cursor-pointer w-full py-3 sm:py-4 border-2 border-black bg-green-500 text-white font-black text-base sm:text-lg cursor-not-allowed shadow-[1px_1px_0_#111]";
-        if (txStatus === "error") return "cursor-pointer w-full py-3 sm:py-4 border-2 border-black bg-red-500 hover:bg-red-600 text-white font-black text-base sm:text-lg transition-colors shadow-[1px_1px_0_#111]";
-        return "rekto-button cursor-pointer w-full py-3 sm:py-4 bg-gray-900 hover:bg-gray-700 text-white font-black text-base sm:text-lg transition-colors";
-    };
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
@@ -367,105 +235,6 @@ export function CreateChallengeModal({
                     )}
 
                     {isDetailsStep && (
-                        <div className="space-y-3">
-                            <div className="flex items-center gap-2">
-                                <label className="text-sm font-medium text-gray-700">Challenge Statement</label>
-                                <span className="relative group/info">
-                                    <svg className="w-4 h-4 text-gray-400 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    </svg>
-                                    <span className="absolute left-0 bottom-full mb-2 px-3 py-2 text-xs text-white bg-gray-800 rounded-lg opacity-0 group-hover/info:opacity-100 transition-opacity pointer-events-none z-20 w-max max-w-[260px]">
-                                        This is the statement on which you are taking a bet, it can be any prediction or outcome conviction related to the selected sport.
-                                    </span>
-                                </span>
-                            </div>
-                            <div className="relative">
-                                <input
-                                    required
-                                    type="text"
-                                    value={challengeStatement}
-                                    onChange={(e) => {
-                                        setChallengeStatement(e.target.value);
-                                        setValidation(prev => ({ ...prev, suggestions: [], selectedSuggestion: null, isValid: false }));
-                                        if (challengeStatementError) setChallengeStatementError(null);
-                                        if (txError) setTxError(null);
-                                    }}
-                                placeholder="Enter your challenge statement..."
-                                    disabled={Boolean(validation.selectedSuggestion)}
-                                    className={`w-full border border-[#e8d5c8] rounded-xl text-base sm:text-lg text-gray-900 placeholder:text-gray-400 placeholder:text-xs sm:placeholder:text-sm ${validation.selectedSuggestion ? "bg-gray-100 cursor-not-allowed px-3 sm:px-4 py-3 pr-16 sm:pr-20" : "bg-[#faf0eb] focus:outline-none focus:border-[#d4b8a8] px-3 sm:px-4 py-3"}`}
-                                />
-                                {validation.selectedSuggestion && (
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setChallengeStatement("");
-                                            setValidation(prev => ({ ...prev, selectedSuggestion: null, suggestions: [], isValid: false, error: null }));
-                                            setChallengeStatementError(null);
-                                            if (txError) setTxError(null);
-                                        }}
-                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-blue-700 hover:text-blue-800 underline"
-                                    >
-                                        Reset
-                                    </button>
-                                )}
-                            </div>
-                            {hasChallengeStatement && !validation.selectedSuggestion && (
-                                <div className="space-y-3">
-                                    <button
-                                        type="button"
-                                        className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-full font-semibold text-sm transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
-                                        onClick={handleValidateChallengeStatement}
-                                        disabled={validation.isLoading}
-                                    >
-                                        {validation.isLoading && (
-                                            <svg className="animate-spin w-4 h-4 text-white" fill="none" viewBox="0 0 24 24">
-                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                                            </svg>
-                                        )}
-                                        <span>{validation.isLoading ? "Validating statement..." : "Validate Statement"}</span>
-                                    </button>
-
-                                    {validation.suggestions.length > 0 && (
-                                        <div className="rounded-2xl border border-[#e8d5c8] bg-white p-4 space-y-3">
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-sm font-semibold text-gray-800">Suggested Valid Statements</span>
-                                                <span className="text-xs text-gray-500">Pick one to use</span>
-                                            </div>
-                                            <div className="space-y-2">
-                                                {validation.suggestions.map((suggestion: string, index: number) => (
-                                                    <button
-                                                        key={`${suggestion}-${index}`}
-                                                        type="button"
-                                                        className="cursor-pointer w-full text-left px-4 py-3 bg-[#fff9f5] border border-[#ead8cc] rounded-xl hover:bg-[#f7e8de] transition-colors text-sm text-gray-900"
-                                                        onClick={() => {
-                                                            setChallengeStatement(suggestion);
-                                                            setValidation(prev => ({ ...prev, selectedSuggestion: suggestion, isValid: true, error: null }));
-                                                        }}
-                                                    >
-                                                        {suggestion}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-                            {validation.isValid && isSelectionComplete && !validation.isLoading && (
-                                <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 text-sm text-green-700">
-                                    Your statement has been validated. Use Reset to edit again or proceed to create the challenge.
-                                </div>
-                            )}
-                            {validation.error && (
-                                <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
-                                    {validation.error}
-                                </div>
-                            )}
-                            {challengeStatementError && <p className="text-red-500 text-sm mt-1">{challengeStatementError}</p>}
-                        </div>
-                    )}
-
-                    {isDetailsStep && (
                         <div className="space-y-2">
                             <label className="text-sm font-medium text-gray-700">Predict Price Movement</label>
                             <div className="flex flex-col min-[380px]:flex-row gap-2">
@@ -561,7 +330,7 @@ export function CreateChallengeModal({
                                     onChange={(e) => {
                                         setSportsResolutionConsent(e.target.checked);
                                         if (e.target.checked) setSportsResolutionConsentError(null);
-                                        if (txError) setTxError(null);
+
                                     }}
                                     className="mt-0.5 h-4 w-4 rounded border-[#d4b8a8] text-gray-900 focus:ring-gray-700"
                                 />
@@ -583,13 +352,8 @@ export function CreateChallengeModal({
                     </div>
                     )}
 
-                    {isDetailsStep && txStatus === "error" && txError && (
-                        <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
-                            ⚠️ {txError}
-                        </div>
-                    )}
 
-                    {isDetailsStep && txStatus === "success" && txSignature && (
+                    {/* {isDetailsStep && txStatus === "success" && txSignature && (
                         <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 text-sm text-green-700">
                             <p className="font-semibold">✅ Challenge created on-chain!</p>
                             <a
@@ -601,18 +365,15 @@ export function CreateChallengeModal({
                                 View on Solana Explorer ↗
                             </a>
                         </div>
-                    )}
+                    )} */}
 
-                    {isDetailsStep && isLoading && (
+                    {isDetailsStep && (
                         <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-sm text-blue-700 flex items-center gap-2">
                             <svg className="animate-spin w-4 h-4 text-blue-500 flex-shrink-0" fill="none" viewBox="0 0 24 24">
                                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
                             </svg>
                             <span>
-                                {txStatus === "building" && "Building transaction..."}
-                                {txStatus === "signing" && "Please approve in your wallet..."}
-                                {txStatus === "confirming" && "Confirming on Solana devnet..."}
                             </span>
                         </div>
                     )}
@@ -622,7 +383,7 @@ export function CreateChallengeModal({
                             <button
                                 type="button"
                                 onClick={goToPreviousStep}
-                                disabled={isLoading}
+                                // disabled={}
                                 className="w-full sm:w-32 py-3 border-2 border-black bg-white text-gray-900 font-black text-base shadow-[2px_2px_0_#111] hover:bg-[#f3e1d7] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                             >
                                 Back
@@ -637,13 +398,14 @@ export function CreateChallengeModal({
                                 Continue
                             </button>
                         ) : (
-                            <button
-                                onClick={handleCreateChallenge}
-                                disabled={isLoading || txStatus === "success" || (!validation.isValid || !isSelectionComplete)}
-                                className={getButtonStyle()}
-                            >
-                                {getButtonLabel()}
-                            </button>
+                            <></>
+                            // <button
+                            //     onClick={handleCreateChallenge}
+                            //     disabled={isLoading || txStatus === "success" || (!validation.isValid || !isSelectionComplete)}
+                            //     className={getButtonStyle()}
+                            // >
+                            //     {getButtonLabel()}
+                            // </button>
                         )}
                     </div>
                 </div>
