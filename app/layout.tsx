@@ -8,6 +8,7 @@ import ReownProvider from "./providers/reown-provider";
 
 import { WelcomeTutorialModal } from "./components/homepage-components";
 import { PageMarginWrapper } from "./components/PageMarginWrapper";
+import { UserOnboarding } from "./components/UserOnboarding";
 
 export const metadata: Metadata = {
   title: {
@@ -93,6 +94,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col">
         <ReownProvider>
           <div className="pixel-shell min-h-full flex flex-col">
+            <UserOnboarding />
             <WelcomeTutorialModal />
             <Navbar />
 

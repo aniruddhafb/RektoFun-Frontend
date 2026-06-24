@@ -225,39 +225,42 @@ export function CreateChallengeModal({
             const asset = (selectedChildCategory?.category ?? "").trim().slice(0, 10);
 
             // Build the transaction server-side (admin signs as fee payer) and get it back partially signed
-            // const response = await fetch("/api/challenges/create", {
-            //     method: "POST",
-            //     headers: { "Content-Type": "application/json" },
-            //     body: JSON.stringify({
-            //         userWallet: address,
-            //         asset,
-            //         betAmountUsdc: betAmount,
-            //         targetPriceUsdCents,
-            //         directionAbove: predictionDirection === "Above",
-            //         expiresAt,
-            //         resolvesAt,
-            //     }),
-            // });
+            const response = await fetch("/api/challenges/create", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    userWallet: address,
+                    asset,
+                    betAmountUsdc: betAmount,
+                    targetPriceUsdCents,
+                    directionAbove: predictionDirection === "Above",
+                    expiresAt,
+                    resolvesAt,
+                    challengeType: challengeMode === "pvp" ? "pvp" : "team",
+                    // For TEAM: 0 means no limit (capped at 50 on-chain). PVP ignores this.
+                    maxTeamSize: 0,
+                }),
+            });
 
-            // const data = await response.json();
-            // if (!response.ok) throw new Error(data.error || "Failed to create challenge");
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error || "Failed to create challenge");
 
-            // // User signs the partially-signed transaction (authorises USDC transfer from their ATA)
-            // setTxStatus("signing");
-            // const tx = Transaction.from(Buffer.from(data.serializedTx, "base64"));
-            // const signedTx = await (walletProvider as any).signTransaction(tx);
+            // User signs the partially-signed transaction (authorises USDC transfer from their ATA)
+            setTxStatus("signing");
+            const tx = Transaction.from(Buffer.from(data.serializedTx, "base64"));
+            const signedTx = await (walletProvider as any).signTransaction(tx);
 
-            // // Broadcast and confirm
-            // setTxStatus("confirming");
-            // const connection = getReadonlyConnection();
-            // const signature = await connection.sendRawTransaction(signedTx.serialize(), {
-            //     skipPreflight: false,
-            //     preflightCommitment: "confirmed",
-            // });
-            // await connection.confirmTransaction(
-            //     { signature, blockhash: data.blockhash, lastValidBlockHeight: data.lastValidBlockHeight },
-            //     "confirmed"
-            // );
+            // Broadcast and confirm
+            setTxStatus("confirming");
+            const connection = getReadonlyConnection();
+            const signature = await connection.sendRawTransaction(signedTx.serialize(), {
+                skipPreflight: false,
+                preflightCommitment: "confirmed",
+            });
+            await connection.confirmTransaction(
+                { signature, blockhash: data.blockhash, lastValidBlockHeight: data.lastValidBlockHeight },
+                "confirmed"
+            );
 
             // Persist the challenge to the backend database
             await createChallenge({
@@ -282,7 +285,7 @@ export function CreateChallengeModal({
             });
 
             setTxStatus("success");
-            // setTxSignature(signature);
+            setTxSignature(signature);
             onCreated();
         } catch (error: any) {
             console.error("Error creating challenge:", error);

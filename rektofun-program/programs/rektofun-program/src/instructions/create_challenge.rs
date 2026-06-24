@@ -3,23 +3,31 @@ use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer};
 use crate::{
     constants::*,
     error::RektoError,
-    state::{ChallengeAccount, ChallengeStatus, CreatorCounter, PredictionDirection},
+    state::{
+        ChallengeAccount, ChallengeStatus, ChallengeType, CreatorCounter, PredictionDirection,
+        WinningSide,
+    },
 };
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct CreateChallengeParams {
     /// Asset symbol, e.g. "BTC"
     pub asset: String,
-    /// Bet amount in USDC micro-units (6 decimals, e.g. $5 = 5_000_000)
+    /// Bet amount in USDC micro-units per participant (6 decimals, e.g. $5 = 5_000_000)
     pub bet_amount: u64,
     /// Target price in USD cents (e.g. $66,500 → 6_650_000)
     pub target_price_usd_cents: u64,
     /// true = creator predicts price will be ABOVE target; false = BELOW
     pub direction_above: bool,
-    /// Unix timestamp: last moment another user can accept this challenge
+    /// Unix timestamp: last moment another user can accept / join this challenge
     pub expires_at: i64,
     /// Unix timestamp: when the price outcome is evaluated
     pub resolves_at: i64,
+    /// PVP = single opponent; Team = any number of participants per side
+    pub challenge_type: ChallengeType,
+    /// TEAM only: max participants per side (0 = no limit, capped at MAX_TEAM_SIZE = 50).
+    /// Ignored for PVP challenges.
+    pub max_team_size: u8,
 }
 
 #[derive(Accounts)]
@@ -53,7 +61,7 @@ pub struct CreateChallenge<'info> {
     pub challenge: Account<'info, ChallengeAccount>,
 
     /// USDC vault token account — an ATA owned by the challenge PDA.
-    /// Holds both bets in USDC.
+    /// Holds all bets (creator's + all participants').
     #[account(
         init,
         payer = creator,
@@ -79,7 +87,7 @@ pub struct CreateChallenge<'info> {
     pub system_program: Program<'info, System>,
 }
 
-pub fn handler(ctx: Context<CreateChallenge>, params: CreateChallengeParams) -> Result<()> {
+pub(crate) fn handler(ctx: Context<CreateChallenge>, params: CreateChallengeParams) -> Result<()> {
     let clock = Clock::get()?;
     let now = clock.unix_timestamp;
 
@@ -95,7 +103,18 @@ pub fn handler(ctx: Context<CreateChallenge>, params: CreateChallengeParams) -> 
         RektoError::InvalidResolvesAt
     );
 
-    // --- Initialise / update counter (before challenge PDA is used as vault authority) ---
+    // For TEAM challenges, clamp max_team_size to the hard cap
+    let effective_max_team_size = if params.challenge_type == ChallengeType::Team {
+        if params.max_team_size == 0 || params.max_team_size > MAX_TEAM_SIZE {
+            MAX_TEAM_SIZE
+        } else {
+            params.max_team_size
+        }
+    } else {
+        0 // unused for PVP
+    };
+
+    // --- Initialise / update counter ---
     let counter = &mut ctx.accounts.creator_counter;
     if counter.creator == Pubkey::default() {
         counter.creator = ctx.accounts.creator.key();
@@ -107,7 +126,6 @@ pub fn handler(ctx: Context<CreateChallenge>, params: CreateChallengeParams) -> 
     // --- Populate challenge account ---
     let challenge = &mut ctx.accounts.challenge;
     challenge.creator = ctx.accounts.creator.key();
-    challenge.challenger = Pubkey::default();
     challenge.challenge_id = challenge_id;
     challenge.asset = params.asset.clone();
     challenge.bet_amount = params.bet_amount;
@@ -122,8 +140,19 @@ pub fn handler(ctx: Context<CreateChallenge>, params: CreateChallengeParams) -> 
     challenge.status = ChallengeStatus::Open;
     challenge.vault_bump = ctx.bumps.vault;
     challenge.bump = ctx.bumps.challenge;
+    challenge.challenge_type = params.challenge_type.clone();
+    challenge.max_team_size = effective_max_team_size;
+    challenge.winning_side = WinningSide::None;
+
+    // PVP-specific defaults
+    challenge.challenger = Pubkey::default();
+
+    // TEAM-specific defaults (empty vecs; creator is implicitly on creator_team)
+    challenge.creator_team = Vec::new();
+    challenge.opponent_team = Vec::new();
 
     // --- Transfer USDC bet from creator to vault ---
+    // Creator always puts in their own bet_amount regardless of challenge type.
     token::transfer(
         CpiContext::new(
             ctx.accounts.token_program.key(),
@@ -137,13 +166,15 @@ pub fn handler(ctx: Context<CreateChallenge>, params: CreateChallengeParams) -> 
     )?;
 
     msg!(
-        "Challenge #{} created by {} — {} {} ${} — expires {} — bet {} USDC micro-units",
+        "Challenge #{} created by {} — type={} asset={} {} ${} — expires={} resolves={} bet={} USDC micro-units",
         challenge_id,
         ctx.accounts.creator.key(),
+        if params.challenge_type == ChallengeType::Pvp { "PVP" } else { "TEAM" },
         params.asset,
         if params.direction_above { "ABOVE" } else { "BELOW" },
         params.target_price_usd_cents / 100,
         params.expires_at,
+        params.resolves_at,
         params.bet_amount,
     );
 

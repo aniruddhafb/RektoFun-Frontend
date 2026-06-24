@@ -1,0 +1,165 @@
+use anchor_lang::prelude::*;
+use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer};
+
+use crate::{
+    constants::*,
+    error::RektoError,
+    state::{ChallengeAccount, ChallengeStatus, ChallengeType, ClaimRecord, WinningSide},
+};
+
+/// TEAM mode only: a winner on the winning side calls this to pull their proportional
+/// share of the pot. The `ClaimRecord` PDA is created on first call and acts as the
+/// double-claim guard — a second call will fail because the account already exists.
+#[derive(Accounts)]
+pub struct ClaimWinnings<'info> {
+    /// The participant claiming their winnings
+    #[account(mut)]
+    pub participant: Signer<'info>,
+
+    /// CHECK: creator's pubkey — needed to derive the challenge PDA
+    pub creator: UncheckedAccount<'info>,
+
+    #[account(
+        mut,
+        seeds = [
+            CHALLENGE_SEED,
+            creator.key().as_ref(),
+            &challenge.challenge_id.to_le_bytes(),
+        ],
+        bump = challenge.bump,
+        constraint = challenge.status == ChallengeStatus::Settled @ RektoError::NotSettled,
+        constraint = challenge.challenge_type == ChallengeType::Team @ RektoError::WrongChallengeType,
+        constraint = challenge.creator == creator.key() @ RektoError::UnauthorizedSettle,
+    )]
+    pub challenge: Account<'info, ChallengeAccount>,
+
+    /// USDC vault token account — owned by the challenge PDA
+    #[account(
+        mut,
+        seeds = [VAULT_SEED, challenge.key().as_ref()],
+        bump = challenge.vault_bump,
+        token::mint = usdc_mint,
+        token::authority = challenge,
+    )]
+    pub vault: Account<'info, TokenAccount>,
+
+    /// Participant's USDC token account (payout destination)
+    #[account(
+        mut,
+        token::mint = usdc_mint,
+        token::authority = participant,
+    )]
+    pub participant_usdc_account: Account<'info, TokenAccount>,
+
+    /// Claim record — created here; its existence prevents double-claiming.
+    /// Seeds: [b"claim", challenge.key(), participant.key()]
+    #[account(
+        init,
+        payer = participant,
+        space = 8 + ClaimRecord::INIT_SPACE,
+        seeds = [CLAIM_SEED, challenge.key().as_ref(), participant.key().as_ref()],
+        bump,
+    )]
+    pub claim_record: Account<'info, ClaimRecord>,
+
+    /// USDC mint
+    pub usdc_mint: Account<'info, Mint>,
+
+    pub token_program: Program<'info, Token>,
+    pub system_program: Program<'info, System>,
+}
+
+pub(crate) fn handler(ctx: Context<ClaimWinnings>) -> Result<()> {
+    let challenge = &ctx.accounts.challenge;
+    let participant_key = ctx.accounts.participant.key();
+
+    // ── 1. Verify the participant is on the winning side ─────────────────────
+    let on_winning_side = match challenge.winning_side {
+        WinningSide::CreatorTeam => {
+            // Creator themselves OR a member of creator_team
+            participant_key == challenge.creator
+                || challenge.creator_team.contains(&participant_key)
+        }
+        WinningSide::OpponentTeam => challenge.opponent_team.contains(&participant_key),
+        WinningSide::None => {
+            return err!(RektoError::NotSettled);
+        }
+    };
+    require!(on_winning_side, RektoError::NotAWinner);
+
+    // ── 2. Calculate payout per winner ───────────────────────────────────────
+    // Total participants = 1 (creator) + creator_team.len() + opponent_team.len()
+    let total_participants = (1u64)
+        .checked_add(challenge.creator_team.len() as u64)
+        .ok_or(RektoError::Overflow)?
+        .checked_add(challenge.opponent_team.len() as u64)
+        .ok_or(RektoError::Overflow)?;
+
+    let total_pot = challenge
+        .bet_amount
+        .checked_mul(total_participants)
+        .ok_or(RektoError::Overflow)?;
+
+    // Fee was already deducted during settle_challenge; remaining pot is net of fee.
+    let net_pot = total_pot
+        .checked_mul(10_000u64.checked_sub(PLATFORM_FEE_BPS).ok_or(RektoError::Overflow)?)
+        .ok_or(RektoError::Overflow)?
+        .checked_div(10_000)
+        .ok_or(RektoError::Overflow)?;
+
+    let winning_team_size = match challenge.winning_side {
+        WinningSide::CreatorTeam => {
+            // 1 (creator) + extra creator_team members
+            1u64.checked_add(challenge.creator_team.len() as u64)
+                .ok_or(RektoError::Overflow)?
+        }
+        WinningSide::OpponentTeam => challenge.opponent_team.len() as u64,
+        WinningSide::None => return err!(RektoError::NotSettled),
+    };
+
+    let payout = net_pot
+        .checked_div(winning_team_size)
+        .ok_or(RektoError::Overflow)?;
+
+    // ── 3. PDA signer seeds for the vault ────────────────────────────────────
+    let challenge_bump = challenge.bump;
+    let challenge_id_bytes = challenge.challenge_id.to_le_bytes();
+    let creator_key = challenge.creator;
+    let vault_signer_seeds: &[&[u8]] = &[
+        CHALLENGE_SEED,
+        creator_key.as_ref(),
+        &challenge_id_bytes,
+        &[challenge_bump],
+    ];
+    let signer_seeds = &[vault_signer_seeds];
+
+    // ── 4. Transfer payout to participant ────────────────────────────────────
+    token::transfer(
+        CpiContext::new_with_signer(
+            ctx.accounts.token_program.key(),
+            Transfer {
+                from: ctx.accounts.vault.to_account_info(),
+                to: ctx.accounts.participant_usdc_account.to_account_info(),
+                authority: ctx.accounts.challenge.to_account_info(),
+            },
+            signer_seeds,
+        ),
+        payout,
+    )?;
+
+    // ── 5. Record the claim ───────────────────────────────────────────────────
+    let claim_record = &mut ctx.accounts.claim_record;
+    claim_record.challenge = ctx.accounts.challenge.key();
+    claim_record.participant = participant_key;
+    claim_record.amount_claimed = payout;
+    claim_record.bump = ctx.bumps.claim_record;
+
+    msg!(
+        "TEAM Challenge #{}: {} claimed {} USDC micro-units",
+        challenge.challenge_id,
+        participant_key,
+        payout,
+    );
+
+    Ok(())
+}

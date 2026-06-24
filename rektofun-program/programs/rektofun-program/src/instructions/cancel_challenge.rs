@@ -52,7 +52,7 @@ pub struct CancelChallenge<'info> {
     pub system_program: Program<'info, System>,
 }
 
-pub fn handler(ctx: Context<CancelChallenge>) -> Result<()> {
+pub(crate) fn handler(ctx: Context<CancelChallenge>) -> Result<()> {
     let challenge = &ctx.accounts.challenge;
     let bet_amount = challenge.bet_amount;
     let challenge_id = challenge.challenge_id;

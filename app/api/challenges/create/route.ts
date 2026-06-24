@@ -12,6 +12,8 @@ export interface CreateChallengePayload {
   directionAbove: boolean;
   expiresAt: number;
   resolvesAt: number;
+  challengeType: "pvp" | "team"; // "pvp" = 1-vs-1, "team" = multi-participant
+  maxTeamSize: number;           // TEAM only: max per side (0 = up to 50); ignored for PVP
 }
 
 export async function POST(req: NextRequest) {
@@ -36,6 +38,12 @@ export async function POST(req: NextRequest) {
     if (typeof body.expiresAt !== "number" || typeof body.resolvesAt !== "number") {
       return NextResponse.json({ error: "Missing or invalid timestamps" }, { status: 400 });
     }
+    if (body.challengeType !== "pvp" && body.challengeType !== "team") {
+      return NextResponse.json({ error: "Missing or invalid challengeType (must be 'pvp' or 'team')" }, { status: 400 });
+    }
+    if (typeof body.maxTeamSize !== "number" || body.maxTeamSize < 0) {
+      return NextResponse.json({ error: "Missing or invalid maxTeamSize" }, { status: 400 });
+    }
 
     const trimmedAsset = body.asset.trim();
     if (trimmedAsset.length === 0 || trimmedAsset.length > 10) {
@@ -53,6 +61,8 @@ export async function POST(req: NextRequest) {
       directionAbove: body.directionAbove,
       expiresAt: Math.floor(body.expiresAt),
       resolvesAt: Math.floor(body.resolvesAt),
+      challengeType: body.challengeType,
+      maxTeamSize: Math.floor(body.maxTeamSize),
     });
 
     return NextResponse.json(result, { status: 200 });

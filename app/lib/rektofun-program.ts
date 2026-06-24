@@ -94,6 +94,8 @@ export interface CreateChallengeArgs {
   directionAbove: boolean;    // true = ABOVE, false = BELOW
   expiresAt: number;          // unix timestamp
   resolvesAt: number;         // unix timestamp
+  challengeType: "pvp" | "team"; // "pvp" = 1-vs-1, "team" = multi-participant
+  maxTeamSize: number;        // TEAM only: max per side (0 = up to 50); ignored for PVP
 }
 
 export interface OnChainChallenge {
@@ -200,6 +202,10 @@ export async function buildCreateChallengeTx(
     );
   }
 
+  // Map the string challenge type to the Anchor enum variant object
+  const challengeTypeParam =
+    args.challengeType === "team" ? { team: {} } : { pvp: {} };
+
   const tx = await (program.methods as any)
     .createChallenge({
       asset: args.asset,
@@ -208,6 +214,8 @@ export async function buildCreateChallengeTx(
       directionAbove: args.directionAbove,
       expiresAt: new BN(args.expiresAt),
       resolvesAt: new BN(args.resolvesAt),
+      challengeType: challengeTypeParam,
+      maxTeamSize: args.maxTeamSize,
     })
     .accounts({
       creator,
