@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import Image from "next/image";
 import { useAppKitAccount } from "@reown/appkit/react";
-import { getUserByPubkey, createUser, type User } from "@/app/lib/users-service/users";
+import { getUserByWallet, createUser, type User } from "@/app/lib/users-service/users";
 import { useUserStore } from "@/app/store/useUserStore";
 import { useBodyScrollLock } from "@/app/lib/useBodyScrollLock";
 
@@ -15,14 +15,14 @@ function getRandomProfileIndex() {
 
 function getProfileImageUrl(index: number) {
   if (typeof window === "undefined") return "";
-  return `${window.location.origin}/profiles/${index}.svg`;
+  return `https://earningrecords.com/assets/rektofun/profiles/${index}.svg`;
 }
 
 export function UserOnboarding() {
   const { address, isConnected } = useAppKitAccount();
   const { user, setUser } = useUserStore();
 
-  const [checkedPubkey, setCheckedPubkey] = useState<string | null>(null);
+  const [checkedWallet, setCheckedWallet] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
 
@@ -39,7 +39,7 @@ export function UserOnboarding() {
   const handleUserLoaded = useCallback(
     (loadedUser: User) => {
       setUser(loadedUser);
-      setCheckedPubkey(loadedUser.pubkey || null);
+      setCheckedWallet(loadedUser.wallet_address || null);
       setIsOpen(false);
     },
     [setUser]
@@ -47,8 +47,8 @@ export function UserOnboarding() {
 
   useEffect(() => {
     if (!isConnected || !address) return;
-    if (checkedPubkey === address) return;
-    if (user?.pubkey === address) return;
+    if (checkedWallet === address) return;
+    if (user?.wallet_address === address) return;
 
     let cancelled = false;
 
@@ -56,7 +56,7 @@ export function UserOnboarding() {
       if (!address) return;
       setIsLoading(true);
       try {
-        const existingUser = await getUserByPubkey(address);
+        const existingUser = await getUserByWallet(address);
         if (!cancelled) {
           handleUserLoaded(existingUser);
         }
@@ -68,12 +68,12 @@ export function UserOnboarding() {
             message.includes("404");
 
           if (isNotFound) {
-            setCheckedPubkey(address);
+            setCheckedWallet(address);
             setProfileIndex(getRandomProfileIndex());
             setIsOpen(true);
           } else {
             console.error("[UserOnboarding] Failed to look up user:", err);
-            setCheckedPubkey(address);
+            setCheckedWallet(address);
           }
         }
       } finally {
@@ -88,7 +88,7 @@ export function UserOnboarding() {
     return () => {
       cancelled = true;
     };
-  }, [address, isConnected, checkedPubkey, user, handleUserLoaded]);
+  }, [address, isConnected, checkedWallet, user, handleUserLoaded]);
 
   const handleCreateUser = async () => {
     if (!address) return;
@@ -100,30 +100,18 @@ export function UserOnboarding() {
       return;
     }
 
-    if (!email.trim()) {
-      setError("Please enter an email.");
-      return;
-    }
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email.trim())) {
-      setError("Please enter a valid email address.");
-      return;
-    }
-
     setIsSubmitting(true);
 
     try {
       const createdUser = await createUser({
         username: username.trim(),
-        email: email.trim(),
-        pubkey: address,
+        wallet_address: address,
         profile_image: getProfileImageUrl(profileIndex),
-        bio: bio.trim(),
+        description: bio.trim(),
       });
 
       setUser(createdUser);
-      setCheckedPubkey(createdUser.pubkey);
+      setCheckedWallet(createdUser.wallet_address);
       setIsOpen(false);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to create account.";

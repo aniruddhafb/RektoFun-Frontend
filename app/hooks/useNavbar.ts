@@ -3,9 +3,12 @@
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAppKitAccount, useAppKit, useDisconnect } from '@reown/appkit/react';
+import { PublicKey } from '@solana/web3.js';
+import { getAssociatedTokenAddress } from '@solana/spl-token';
 import { useUserStore } from '@/app/store/useUserStore';
 import { blockedContentError, hasBlockedContent } from '@/app/lib/content-moderation';
 import { ensureUserByWallet, updateUser, getUserByWallet, acceptReferral, User } from '@/app/lib/users-service/users';
+import { USDC_MINT, getReadonlyConnection } from '@/app/lib/rektofun-program';
 
 export function useNavbar() {
   // AppKit hooks
@@ -38,6 +41,9 @@ export function useNavbar() {
   const [userProfileData, setUserProfileData] = useState<{ username: string; profileImage: string } | null>(null);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [hasInitialized, setHasInitialized] = useState(false);
+
+  // USDC balance
+  const [usdcBalance, setUsdcBalance] = useState<number | null>(null);
 
   // Helper: Get URL referral code
   const getRefCodeFromUrl = () => {
@@ -237,6 +243,26 @@ export function useNavbar() {
     };
   }, [isProfileModalOpen]);
 
+  // Fetch USDC balance whenever wallet connects/changes
+  useEffect(() => {
+    const fetchBalance = async () => {
+      if (!address || !isConnected) {
+        setUsdcBalance(null);
+        return;
+      }
+      try {
+        const connection = getReadonlyConnection();
+        const pubKey = new PublicKey(address);
+        const ata = await getAssociatedTokenAddress(USDC_MINT, pubKey, false);
+        const accountInfo = await connection.getTokenAccountBalance(ata);
+        setUsdcBalance(accountInfo.value.uiAmount || 0);
+      } catch {
+        setUsdcBalance(0);
+      }
+    };
+    fetchBalance();
+  }, [address, isConnected]);
+
   // Check if route is active
   const isActive = (href: string) => {
     if (href === '/') return pathname === href;
@@ -301,6 +327,7 @@ export function useNavbar() {
     currentUser,
     displayAddress,
     displayUsername,
+    usdcBalance,
 
     // Connection state
     address,

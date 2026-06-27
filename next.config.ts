@@ -7,7 +7,9 @@ const nextConfig = {
     return [
       {
         source: '/api/:path*',
-        destination: 'https://api.rekto.fun/:path*',
+        // Preserve the /api/ prefix so backend routes match correctly.
+        // Backend routes are mounted at /api/* in main.py.
+        destination: 'https://api.rekto.fun/api/:path*',
       },
     ];
   },
