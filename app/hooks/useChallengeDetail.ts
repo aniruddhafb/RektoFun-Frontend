@@ -4,8 +4,9 @@ import { useAppKit, useAppKitAccount, useAppKitProvider } from "@reown/appkit/re
 import { PublicKey, Transaction } from "@solana/web3.js";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
 import {
-  Challenge,
+  ChallengeListItem,
   getChallengeById,
+  joinChallenge,
 } from "@/app/lib/challenges-service/challenges";
 import { useUserStore } from "@/app/store/useUserStore";
 import {
@@ -122,7 +123,7 @@ const formatExactCountdownDetails = (timestamp: number | null, nowMs: number): C
   };
 };
 
-export function useChallengeDetail(challenge: Challenge | null, isOpen: boolean, onClose: () => void) {
+export function useChallengeDetail(challenge: ChallengeListItem | null, isOpen: boolean, onClose: () => void) {
   const modalRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const { user } = useUserStore();
@@ -148,42 +149,44 @@ export function useChallengeDetail(challenge: Challenge | null, isOpen: boolean,
   const [isTitleExpanded, setIsTitleExpanded] = useState(true);
   const [usdcBalance, setUsdcBalance] = useState<number | null>(null);
 
-  // Derived values - mapped from Challenge type
+  // Derived values
   const betCurrency = "USDC";
-  const asset = challenge?.ticker || "Market";
-  const assetLogo = "/scribbles/btc.png";
-  const creatorName = `User ${challenge?.creator || "Unknown"}`;
-  const creatorAvatar = assetLogo;
-  const hasOpponentInfo = challenge?.participants !== undefined && challenge.participants > 1;
+  const asset = challenge?.market?.name || "Market";
+  const assetLogo = challenge?.market?.icon || "/scribbles/btc.png";
+  const creatorName = challenge?.creator?.username || "Creator";
+  const creatorAvatar = challenge?.creator?.profile_image || assetLogo;
+  const hasOpponentInfo = Boolean(challenge?.opponent_info?.username || challenge?.opponent_info?.wallet_address);
   const isAccepted =
-    challenge?.status?.toLowerCase() === "locked" ||
-    challenge?.status?.toLowerCase() === "resolved" ||
+    challenge?.status === "locked" ||
+    challenge?.status === "resolved" ||
     hasOpponentInfo;
-  const opponentDisplayName = "Opponent";
-  const opponentAvatar = assetLogo;
-  const isPoolMode = challenge?.mode?.toLowerCase() === "pool";
+  const opponentDisplayName = challenge?.opponent_info?.username || "Opponent";
+  const opponentAvatar = challenge?.opponent_info?.profile_image || assetLogo;
+  const isPoolMode = challenge?.mode === "pool";
   const betAmount = challenge?.initial_bet ?? 0;
   const createdTimestamp = challenge?.created_at ? new Date(challenge.created_at).getTime() : null;
-  const expiryTimestamp = challenge?.expiry ? new Date(challenge.expiry).getTime() : null;
-  const resolveTimestamp = challenge?.resolution_date ? new Date(challenge.resolution_date).getTime() : null;
-  const creatorWalletAddress = ""; // Challenge type doesn't have wallet_address
-  const creatorWalletShort = "Unknown wallet";
+  const expiryTimestamp = challenge?.expire_time ? new Date(challenge.expire_time).getTime() : null;
+  const resolveTimestamp = challenge?.resolve_time ? new Date(challenge.resolve_time).getTime() : null;
+  const creatorWalletAddress = challenge?.creator?.wallet_address || "";
+  const creatorWalletShort = creatorWalletAddress
+    ? `${creatorWalletAddress.slice(0, 6)}...${creatorWalletAddress.slice(-4)}`
+    : "Unknown wallet";
 
-  // Title expansion (using statement as title)
-  const titleWords = (challenge?.statement || "").trim().split(/\s+/).filter(Boolean);
+  // Title expansion
+  const titleWords = (challenge?.title || "").trim().split(/\s+/).filter(Boolean);
   const canExpandTitle = titleWords.length > 6;
   const displayedTitle = isTitleExpanded || !canExpandTitle
-    ? challenge?.statement || ""
+    ? challenge?.title || ""
     : `${titleWords.slice(0, 6).join(" ")}...`;
 
   // Price calculations
   const startPrice = betAmount;
-  const targetPrice = challenge?.target ?? challenge?.pool_size ?? betAmount;
-  const currentPrice = liveSolPrice ?? challenge?.pool_size ?? 0;
+  const targetPrice = challenge?.target_price ?? challenge?.total_pool ?? betAmount;
+  const currentPrice = liveSolPrice ?? challenge?.total_pool ?? 0;
   const priceChange = startPrice > 0 ? ((currentPrice - startPrice) / startPrice) * 100 : 0;
-  const statementLower = (challenge?.statement || "").toLowerCase();
-  const isBelowChallenge = statementLower.includes("below");
-  const isAboveChallenge = statementLower.includes("above");
+  const titleLower = (challenge?.title || "").toLowerCase();
+  const isBelowChallenge = titleLower.includes("below");
+  const isAboveChallenge = titleLower.includes("above");
   const isDirectionalBelow = isBelowChallenge && !isAboveChallenge;
 
   const priceBarPosition = (() => {
@@ -203,8 +206,8 @@ export function useChallengeDetail(challenge: Challenge | null, isOpen: boolean,
   const priceLabelThemeClass = isDirectionalBelow ? "text-red-300" : "text-emerald-300";
 
   // Challenge status
-  const isCreator = false; // Can't determine without wallet_address in Challenge type
-  const hasOpponents = Number(challenge?.participants ?? 0) > 1;
+  const isCreator = user?.wallet_address === creatorWalletAddress;
+  const hasOpponents = Number(challenge?.total_opponents ?? 0) > 0 || hasOpponentInfo;
   const isExpireTimeAchieved = Boolean(expiryTimestamp && expiryTimestamp <= currentTime);
   const isResolveTimeAchieved = Boolean(resolveTimestamp && resolveTimestamp <= currentTime);
   const challengerConditionMet = isDirectionalBelow ? currentPrice < targetPrice : currentPrice > targetPrice;
@@ -238,7 +241,7 @@ export function useChallengeDetail(challenge: Challenge | null, isOpen: boolean,
         : "Neck and neck";
 
   const isManualResolution = String(challenge?.resolution_source ?? "").toLowerCase() === "manual";
-  const challengeWithResolution = challenge as Challenge & {
+  const challengeWithResolution = challenge as ChallengeListItem & {
     resolving_status?: string;
     resolution_status?: string;
   };
@@ -303,9 +306,9 @@ export function useChallengeDetail(challenge: Challenge | null, isOpen: boolean,
         : "border-[#b9dec9] bg-[#f1fbf5] text-[#246044]";
 
   // Description
-  const challengeTicker = challenge?.ticker?.trim().toLowerCase() || "this asset";
+  const challengeTicker = challenge?.market?.name?.trim().toLowerCase() || "this asset";
   const challengeDescriptionText = isManualResolution
-    ? `The challenger has a conviction, ${challenge?.statement}. If you don't think so you can counter it and win $${betAmount} if you are right.`
+    ? `The challenger has a conviction, ${challenge?.title}. If you don't think so you can counter it and win $${betAmount} if you are right.`
     : `The challenger thinks ${challengeTicker} will ${isBelowChallenge ? "fall below" : isAboveChallenge ? "rise above" : "hit"} $${targetPrice.toLocaleString()} by the resolution time. If you think opposite you can counter it and win the total pool of $${betAmount} if you're right.`;
 
   const challengeDescriptionWords = challengeDescriptionText.trim().split(/\s+/).filter(Boolean);
@@ -441,14 +444,15 @@ export function useChallengeDetail(challenge: Challenge | null, isOpen: boolean,
   }, [isOpen, onClose, isBetFormOpen]);
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || !challenge?.market?.description) return;
 
     let isMounted = true;
+    const marketDescription = encodeURIComponent(challenge.market.description.trim() || "Solana");
 
     const fetchSolPrice = async () => {
       try {
         const response = await fetch(
-          `https://api.diadata.org/v1/assetQuotation/Solana/0x0000000000000000000000000000000000000000`,
+          `https://api.diadata.org/v1/assetQuotation/${marketDescription}/0x0000000000000000000000000000000000000000`,
           { cache: "no-store" }
         );
         if (!response.ok) return;
@@ -473,7 +477,7 @@ export function useChallengeDetail(challenge: Challenge | null, isOpen: boolean,
       isMounted = false;
       window.clearInterval(interval);
     };
-  }, [isOpen]);
+  }, [isOpen, challenge?.market?.description]);
 
   useEffect(() => {
     if (!isBetFormOpen || !challenge) return;
@@ -484,9 +488,12 @@ export function useChallengeDetail(challenge: Challenge | null, isOpen: boolean,
         const details = await getChallengeById(challenge.id);
         if (cancelled) return;
 
-        // Use pool_size as min/max bet fallback
-        setModalMinAcceptBet(challenge.initial_bet);
-        setModalMaxAcceptBet(challenge.pool_size);
+        setModalMinAcceptBet(
+          typeof details.min_accept_bet === "number" ? details.min_accept_bet : challenge.min_accept_bet
+        );
+        setModalMaxAcceptBet(
+          typeof details.max_accept_bet === "number" ? details.max_accept_bet : challenge.max_accept_bet
+        );
 
         const metadata = (details.metadata as Record<string, unknown> | undefined) ?? {};
         const onchain = (metadata.onchain as Record<string, unknown> | undefined) ?? {};
@@ -540,9 +547,9 @@ export function useChallengeDetail(challenge: Challenge | null, isOpen: boolean,
     }
     setBetInput(String(challenge?.initial_bet ?? ""));
     setBetError("");
-    setJoinSide(challenge?.mode?.toLowerCase() === "pool" ? "challenger" : "opponent");
-    setModalMinAcceptBet(challenge?.initial_bet);
-    setModalMaxAcceptBet(challenge?.pool_size);
+    setJoinSide(challenge?.mode === "pool" ? "challenger" : "opponent");
+    setModalMinAcceptBet(challenge?.min_accept_bet);
+    setModalMaxAcceptBet(challenge?.max_accept_bet);
     setEscrowAddress(undefined);
     setIsBetFormOpen(true);
   }, [ctaState.disabled, isConnected, open, challenge]);
@@ -654,11 +661,10 @@ export function useChallengeDetail(challenge: Challenge | null, isOpen: boolean,
       const signature = await connection.sendRawTransaction(signedTx.serialize());
       await connection.confirmTransaction(signature, "confirmed");
 
-      // Call join challenge API (placeholder - needs to be implemented)
-      console.log("Joined challenge:", {
+      await joinChallenge({
         challenge_id: challenge.id,
         user_id: user.id,
-        side: challenge.mode?.toLowerCase() === "pool" ? joinSide : "opponent",
+        side: challenge.mode === "pool" ? joinSide : "opponent",
         bet_amount: requiredBetUsdc,
       });
 
@@ -677,12 +683,12 @@ export function useChallengeDetail(challenge: Challenge | null, isOpen: boolean,
     if (!challenge) return;
 
     const shareUrl = `${window.location.origin}/challenges?challengeId=${encodeURIComponent(challenge.id)}`;
-    const shareText = `Check out this challenge: ${challenge.statement}`;
+    const shareText = `Check out this challenge: ${challenge.title}`;
 
     try {
       if (navigator.share) {
         await navigator.share({
-          title: challenge.statement,
+          title: challenge.title,
           text: shareText,
           url: shareUrl,
         });

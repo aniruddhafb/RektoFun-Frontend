@@ -45,16 +45,15 @@ function LeaderboardRow({ entry }: LeaderboardRowProps) {
     // Validate profile_image URL - use fallback if invalid or from unknown domain
     let profileImage = "/scribbles/pepe.png";
     if (user.profile_image) {
+        const trimmedImage = user.profile_image.trim();
         try {
-            // Check if it's a valid URL and from allowed domain
-            const url = new URL(user.profile_image);
+            const url = new URL(trimmedImage);
             if (url.hostname === 'earningrecords.com' || url.protocol === 'data:') {
-                profileImage = user.profile_image;
+                profileImage = trimmedImage;
             }
         } catch {
-            // If URL parsing fails, check if it's a relative path
-            if (user.profile_image.startsWith('/')) {
-                profileImage = user.profile_image;
+            if (trimmedImage.startsWith('/')) {
+                profileImage = trimmedImage;
             }
         }
     }

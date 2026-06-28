@@ -1,4 +1,3 @@
-
 import type { Metadata } from "next";
 import "./globals.css";
 import Navbar from "./components/Navbar";
@@ -7,8 +6,6 @@ import { Analytics } from "@vercel/analytics/next";
 import ReownProvider from "./providers/reown-provider";
 
 import { WelcomeTutorialModal } from "./components/homepage-components";
-import { PageMarginWrapper } from "./components/PageMarginWrapper";
-import { UserOnboarding } from "./components/UserOnboarding";
 
 export const metadata: Metadata = {
   title: {
@@ -90,17 +87,12 @@ export default function RootLayout({
         <meta name="msapplication-TileColor" content="#f3e1d7" />
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
       </head>
-
       <body className="min-h-full flex flex-col">
         <ReownProvider>
-          <div className="pixel-shell min-h-full flex flex-col">
-            <UserOnboarding />
+          <div className="pixel-shell min-h-screen flex flex-col">
             <WelcomeTutorialModal />
             <Navbar />
-
-            <PageMarginWrapper>
-              <main className="flex-1">{children}</main>
-            </PageMarginWrapper>
+            <main className="flex-1 mt-12 md:mt-8">{children}</main>
             <Footer />
           </div>
         </ReownProvider>

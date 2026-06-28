@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { createMarket, getMarkets, type Market } from "@/app/lib/markets-service/market";
 import { useBodyScrollLock } from "@/app/lib/useBodyScrollLock";
 
 interface CreateMarketModalProps {
@@ -40,6 +41,23 @@ export function CreateMarketModal({ isOpen, onClose, onCreated }: CreateMarketMo
         }
     }, [isOpen]);
 
+    useEffect(() => {
+        const fetchParentMarkets = async () => {
+            try {
+                setMarketsLoading(true);
+                const response = await getMarkets({ parent_id: null });
+                setParentMarkets(response.markets);
+            } catch (error) {
+                console.error("Error fetching parent markets:", error);
+            } finally {
+                setMarketsLoading(false);
+            }
+        };
+
+        if (isOpen) {
+            fetchParentMarkets();
+        }
+    }, [isOpen]);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
