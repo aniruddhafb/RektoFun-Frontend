@@ -443,41 +443,6 @@ export function useChallengeDetail(challenge: ChallengeListItem | null, isOpen: 
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isOpen, onClose, isBetFormOpen]);
 
-  useEffect(() => {
-    if (!isOpen || !challenge?.market?.description) return;
-
-    let isMounted = true;
-    const marketDescription = encodeURIComponent(challenge.market.description.trim() || "Solana");
-
-    const fetchSolPrice = async () => {
-      try {
-        const response = await fetch(
-          `https://api.diadata.org/v1/assetQuotation/${marketDescription}/0x0000000000000000000000000000000000000000`,
-          { cache: "no-store" }
-        );
-        if (!response.ok) return;
-
-        const data = await response.json();
-        const rawPrice =
-          data?.price ?? data?.Price ?? data?.quotation ?? data?.value ?? null;
-        const parsedPrice =
-          typeof rawPrice === "number" ? rawPrice : typeof rawPrice === "string" ? Number(rawPrice) : NaN;
-
-        if (isMounted && Number.isFinite(parsedPrice) && parsedPrice > 0) {
-          setLiveSolPrice(parsedPrice);
-        }
-      } catch {
-        // Keep previous value on transient network/API errors
-      }
-    };
-
-    fetchSolPrice();
-    const interval = window.setInterval(fetchSolPrice, 180000);
-    return () => {
-      isMounted = false;
-      window.clearInterval(interval);
-    };
-  }, [isOpen, challenge?.market?.description]);
 
   useEffect(() => {
     if (!isBetFormOpen || !challenge) return;
