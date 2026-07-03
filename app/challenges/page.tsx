@@ -9,23 +9,21 @@ import { FeedbackBanner } from "../components/challenge-components/FeedbackBanne
 import { ChallengeGrid } from "../components/challenge-components/ChallengeGrid";
 import { RektLoadingOverlay } from "../components/RektLoadingOverlay";
 import { CreateChallengeModal } from "../components/challenge-components/CreateChallengeModal";
-import { ChallengeListItem } from "../lib/challenges-service/challenges";
+import { Challenge } from "../lib/challenges-service/challenges";
 import ChallengeDetailModal from "../components/challenge-components/ChallengeDetailModal";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { getMarkets } from "../lib/markets-service/market";
 
 export default function ChallengesPage() {
 
   const CREATE_TOAST_DURATION_MS = 3000;
   const BOOKMARKS_STORAGE_KEY = "rektofun:challenge-bookmarks";
   const [activeFilter, setActiveFilter] = useState("Latest");
-  const [activeAsset, setActiveAsset] = useState("All Markets");
   const [searchQuery, setSearchQuery] = useState("");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [selectedChallenge, setSelectedChallenge] = useState<ChallengeListItem | null>(null);
-  const [challenges, setChallenges] = useState<ChallengeListItem[]>([]);
+  const [selectedChallenge, setSelectedChallenge] = useState<Challenge | null>(null);
+  const [challenges, setChallenges] = useState([]);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
-  const [rektTarget, setRektTarget] = useState<ChallengeListItem | null>(null);
+  const [rektTarget, setRektTarget] = useState(null);
   const [rektTxSig, setRektTxSig] = useState<string | null>(null);
   const [rektError, setRektError] = useState<string | null>(null);
   const [isRekting, setIsRekting] = useState(false);
@@ -33,7 +31,6 @@ export default function ChallengesPage() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [showCreateSuccessToast, setShowCreateSuccessToast] = useState(false);
   const [createToastProgress, setCreateToastProgress] = useState(100);
-  const [marketOptions, setMarketOptions] = useState<string[]>(["All Markets"]);
   const [bookmarkedChallengeIds, setBookmarkedChallengeIds] = useState<string[]>(() => {
     if (typeof window === "undefined") return [];
     try {
@@ -73,7 +70,7 @@ export default function ChallengesPage() {
 
 
   // Handle challenge card click
-  const handleChallengeClick = (challenge: ChallengeListItem) => {
+  const handleChallengeClick = (challenge: Challenge) => {
     setSelectedChallenge(challenge);
     setIsDetailModalOpen(true);
     router.replace(`${pathname}?challengeId=${encodeURIComponent(challenge.id)}`, { scroll: false });
@@ -106,42 +103,13 @@ export default function ChallengesPage() {
     window.setTimeout(() => setIgnoreDeepLink(false), 200);
   };
 
-  const handleChallengesLoaded = (loadedChallenges: ChallengeListItem[]) => {
-    setChallenges(loadedChallenges);
+  const handleChallengesLoaded = (loadedChallenges: Challenge[]) => {
+    
   }
 
-  useEffect(() => {
-    // If we are intentionally ignoring deep link handling (e.g., during manual close), skip.
-    if (ignoreDeepLink) return;
 
-    if (typeof window === "undefined") return;
-    const deepLinkChallengeId = new URLSearchParams(window.location.search).get("challengeId");
-    if (!deepLinkChallengeId) {
-      lastClosedDeepLinkIdRef.current = null;
-      return;
-    }
-    if (deepLinkChallengeId === lastClosedDeepLinkIdRef.current) return;
-    if (challenges.length === 0) return;
 
-    const matchedChallenge = challenges.find((challenge) => challenge.id === deepLinkChallengeId);
-    if (!matchedChallenge) return;
-    if (isDetailModalOpen && selectedChallenge?.id === matchedChallenge.id) return;
-
-    setSelectedChallenge(matchedChallenge);
-    setIsDetailModalOpen(true);
-  }, []);
-
-  async function handleRekt(challenge: ChallengeListItem) {
-    setRektTarget(challenge);
-    setRektError(null);
-    setRektTxSig(null);
-    setIsRekting(true);
-
-    // Simulate transaction
-    await new Promise(resolve => setTimeout(resolve, 1500));
-
-    setRektTxSig("simulated_tx_signature_" + Date.now());
-    setIsRekting(false);
+  async function handleRekt(challenge: Challenge) {
   }
 
   const handleOpenCreateModal = () => {
@@ -155,27 +123,6 @@ export default function ChallengesPage() {
     setShowCreateSuccessToast(true);
   };
 
-  useEffect(() => {
-    let isMounted = true;
-    const loadMarketOptions = async () => {
-      try {
-        const response = await getMarkets({ is_active: true, limit: 100, offset: 0 });
-        if (!isMounted) return;
-        const names = response.markets
-          .map((market) => market.name)
-          .filter((name): name is string => Boolean(name))
-          .sort((a, b) => a.localeCompare(b));
-        setMarketOptions(["All Markets", ...names]);
-      } catch (error) {
-        console.error("Failed to load market options:", error);
-      }
-    };
-
-    loadMarketOptions();
-    return () => {
-      isMounted = false;
-    };
-  }, []);
 
   useEffect(() => {
     if (!showCreateSuccessToast) return;
@@ -221,7 +168,7 @@ export default function ChallengesPage() {
             className="absolute right-3 top-2 text-lg font-black leading-none text-black transition hover:text-[#e85a2d]"
             aria-label="Close success notification"
           >
-            ×
+            x
           </button>
           <div className="px-5 pb-4 pt-4 pr-10">
             <p className="text-base font-black">Challenge created successfully</p>
@@ -241,17 +188,14 @@ export default function ChallengesPage() {
       <ChallengeFiltersSection
         activeFilter={activeFilter}
         setActiveFilter={setActiveFilter}
-        activeAsset={activeAsset}
-        setActiveAsset={setActiveAsset}
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
-        marketOptions={marketOptions}
       />
 
       <FeedbackBanner
         rektTxSig={rektTxSig}
         rektError={rektError}
-        targetCreator={rektTarget?.creator.wallet_address ? `${rektTarget.creator.wallet_address.slice(0, 6)}...` : null}
+        targetCreator={null}
       />
 
       <ChallengeGrid
@@ -263,7 +207,6 @@ export default function ChallengesPage() {
         onChallengesLoaded={handleChallengesLoaded}
         refreshKey={refreshKey}
         activeFilter={activeFilter}
-        activeAsset={activeAsset}
         searchQuery={searchQuery}
       />
 
@@ -283,5 +226,3 @@ export default function ChallengesPage() {
     </div>
   );
 }
-
-

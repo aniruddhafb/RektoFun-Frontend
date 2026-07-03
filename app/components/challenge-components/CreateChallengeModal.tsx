@@ -1,24 +1,15 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import Image from "next/image";
 import { DatePickerModal } from "./DatePickerModal";
 import { DurationPickerModal } from "./DurationPickerModal";
-import {
-    buildCreateChallengeTx,
-    deriveChallengePDA,
-    deriveCreatorCounter,
-    getRektoProgram,
-    getReadonlyConnection,
-} from "@/app/lib/rektofun-program";
-import { createChallenge } from "@/app/lib/challenges-service/challenges";
-import { getMarkets, Market } from "@/app/lib/markets-service/market";
-import { transform } from "@/app/lib/transformation-text-ai/transform";
 import { useUserStore } from "@/app/store/useUserStore";
-import { blockedContentError, hasBlockedContent } from "@/app/lib/content-moderation";
 import { useBodyScrollLock } from "@/app/lib/useBodyScrollLock";
-import { useAppKit, useAppKitAccount } from "@reown/appkit/react";
-import { PublicKey, Transaction } from "@solana/web3.js";
+import { useAppKit, useAppKitAccount, useAppKitProvider } from "@reown/appkit/react";
+import { getParentCategories, getCategoriesByParent, Category } from "@/app/lib/category-service/category";
+import { createChallenge } from "@/app/lib/challenges-service/challenges";
+import { Transaction } from "@solana/web3.js";
+import { getReadonlyConnection } from "@/app/lib/rektofun-program";
 
 interface CreateChallengeModalProps {
     isOpen: boolean;
@@ -29,22 +20,6 @@ interface CreateChallengeModalProps {
 type TxStatus = "idle" | "building" | "signing" | "confirming" | "success" | "error";
 type CreateChallengeStep = "mode" | "category" | "details";
 
-interface ValidationState {
-    suggestions: string[];
-    isValid: boolean;
-    isLoading: boolean;
-    error: string | null;
-    selectedSuggestion: string | null;
-}
-
-interface MarketState {
-    markets: Market[];
-    childMarkets: Market[];
-    sportsEventMarkets: Market[];
-    selected: Market | null;
-    selectedChild: Market | null;
-    selectedSportsEvent: Market | null;
-}
 
 export function CreateChallengeModal({
     isOpen,
@@ -55,36 +30,15 @@ export function CreateChallengeModal({
     const [currentStep, setCurrentStep] = useState<CreateChallengeStep>("mode");
     const [challengeMode, setChallengeMode] = useState<"pvp" | "multi">("pvp");
 
-    // Markets consolidated state
-    const [marketState, setMarketState] = useState<MarketState>({
-        markets: [],
-        childMarkets: [],
-        sportsEventMarkets: [],
-        selected: null,
-        selectedChild: null,
-        selectedSportsEvent: null,
-    });
-
     // Challenge details
-    const [betAmount, setBetAmount] = useState(5);
+    const [betAmount, setBetAmount] = useState(1);
     const [betAmountError, setBetAmountError] = useState<string | null>(null);
     const [predictionDirection, setPredictionDirection] = useState("Above");
     const [predictionPrice, setPredictionPrice] = useState("66500");
     const [selectedDate, setSelectedDate] = useState(() => new Date(Date.now() + 24 * 60 * 60 * 1000));
     const [duration, setDuration] = useState({ hours: 4, minutes: 0 });
-    const [challengeStatement, setChallengeStatement] = useState("");
-    const [challengeStatementError, setChallengeStatementError] = useState<string | null>(null);
     const [sportsResolutionConsent, setSportsResolutionConsent] = useState(false);
     const [sportsResolutionConsentError, setSportsResolutionConsentError] = useState<string | null>(null);
-
-    // Validation state
-    const [validation, setValidation] = useState<ValidationState>({
-        suggestions: [],
-        isValid: true,
-        isLoading: false,
-        error: null,
-        selectedSuggestion: null,
-    });
 
     // UI state
     const [openDropdown, setOpenDropdown] = useState<string | null>(null);
@@ -93,203 +47,130 @@ export function CreateChallengeModal({
 
     // Transaction state
     const [txStatus, setTxStatus] = useState<TxStatus>("idle");
-    const [txError, setTxError] = useState<string | null>(null);
     const [txSignature, setTxSignature] = useState<string | null>(null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    // Category state
+    const [parentCategories, setParentCategories] = useState<Category[]>([]);
+    const [childCategories, setChildCategories] = useState<Category[]>([]);
+    const [selectedParentCategory, setSelectedParentCategory] = useState<Category | null>(null);
+    const [selectedChildCategory, setSelectedChildCategory] = useState<Category | null>(null);
+    const [isLoadingCategories, setIsLoadingCategories] = useState(false);
+    const [categoryError, setCategoryError] = useState<string | null>(null);
 
     const { user } = useUserStore();
     const { open } = useAppKit();
     const { address, isConnected } = useAppKitAccount();
+    const { walletProvider } = useAppKitProvider("solana");
 
     const dropdownRefs = {
-        coin: useRef<HTMLDivElement>(null),
-        sportsEvent: useRef<HTMLDivElement>(null),
         direction: useRef<HTMLDivElement>(null),
+        parentCategory: useRef<HTMLDivElement>(null),
+        childCategory: useRef<HTMLDivElement>(null),
     };
-
-    const isSportsSelected = marketState.selected?.symbol?.toLowerCase() === 'sports' || 
-                            marketState.selected?.name?.toLowerCase() === 'sports';
 
     useBodyScrollLock(isOpen);
 
-    // Reset on open
-    useEffect(() => {
-        if (!isOpen) return;
-        setTxStatus("idle");
-        setTxError(null);
-        setTxSignature(null);
-        setChallengeStatementError(null);
-        setSportsResolutionConsentError(null);
-        setSportsResolutionConsent(false);
-    }, [isOpen]);
 
-    // Fetch markets
-    useEffect(() => {
-        if (!isOpen) return;
-        const fetchMarkets = async () => {
-            try {
-                const response = await getMarkets({ parent_id: null });
-                const fetchedMarkets = response.markets;
-                const cryptoMarket = fetchedMarkets.find(m => m.symbol?.toLowerCase() === 'crypto' || m.name?.toLowerCase() === 'crypto');
-                setMarketState(prev => ({
-                    ...prev,
-                    markets: fetchedMarkets,
-                    selected: cryptoMarket || fetchedMarkets[0] || null,
-                }));
-            } catch (error) {
-                console.error("Error fetching markets:", error);
-            }
-        };
-        fetchMarkets();
-    }, [isOpen]);
-
-    // Fetch child markets when parent changes
-    useEffect(() => {
-        if (!isOpen || !marketState.selected?.id) {
-            setMarketState(prev => ({ ...prev, childMarkets: [], selectedChild: null }));
-            return;
-        }
-        const fetchChildMarkets = async () => {
-            try {
-                const response = await getMarkets({ parent_id: marketState.selected!.name });
-                const fetchedMarkets = response.markets;
-                setMarketState(prev => ({
-                    ...prev,
-                    childMarkets: fetchedMarkets,
-                    selectedChild: fetchedMarkets[0] ?? null,
-                }));
-            } catch (error) {
-                console.error("Error fetching child markets:", error);
-                setMarketState(prev => ({ ...prev, childMarkets: [], selectedChild: null }));
-            }
-        };
-        fetchChildMarkets();
-    }, [isOpen, marketState.selected]);
-
-    // Fetch sports event markets
-    useEffect(() => {
-        if (!isOpen || !isSportsSelected || !marketState.selectedChild?.id) {
-            setMarketState(prev => ({ ...prev, sportsEventMarkets: [], selectedSportsEvent: null }));
-            return;
-        }
-        const fetchSportsEventMarkets = async () => {
-            try {
-                const response = await getMarkets({ parent_id: marketState.selectedChild!.name });
-                const fetchedMarkets = response.markets;
-                setMarketState(prev => ({
-                    ...prev,
-                    sportsEventMarkets: fetchedMarkets,
-                    selectedSportsEvent: fetchedMarkets[0] ?? null,
-                }));
-            } catch (error) {
-                console.error("Error fetching sports event markets:", error);
-                setMarketState(prev => ({ ...prev, sportsEventMarkets: [], selectedSportsEvent: null }));
-            }
-        };
-        fetchSportsEventMarkets();
-    }, [isOpen, isSportsSelected, marketState.selectedChild]);
 
     // Click outside handler
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             const target = event.target as Node;
-            if (dropdownRefs.coin.current && !dropdownRefs.coin.current.contains(target)) {
-                setOpenDropdown(prev => prev === 'coin' ? null : prev);
-            }
-            if (dropdownRefs.sportsEvent.current && !dropdownRefs.sportsEvent.current.contains(target)) {
-                setOpenDropdown(prev => prev === 'sportsEvent' ? null : prev);
-            }
             if (dropdownRefs.direction.current && !dropdownRefs.direction.current.contains(target)) {
                 setOpenDropdown(prev => prev === 'direction' ? null : prev);
+            }
+            if (dropdownRefs.parentCategory.current && !dropdownRefs.parentCategory.current.contains(target)) {
+                setOpenDropdown(prev => prev === 'parentCategory' ? null : prev);
+            }
+            if (dropdownRefs.childCategory.current && !dropdownRefs.childCategory.current.contains(target)) {
+                setOpenDropdown(prev => prev === 'childCategory' ? null : prev);
             }
         };
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
-    // Reset validation when market changes
-    useEffect(() => {
-        if (!isOpen || !marketState.selected) {
-            setValidation({ suggestions: [], isValid: true, isLoading: false, error: null, selectedSuggestion: null });
-            return;
-        }
-        setValidation({
-            suggestions: [],
-            isValid: !isSportsSelected,
-            isLoading: false,
-            error: null,
-            selectedSuggestion: null,
-        });
-    }, [isOpen, marketState.selected, isSportsSelected]);
 
     const closeAllDropdowns = useCallback(() => setOpenDropdown(null), []);
 
-    const resetModalState = useCallback(() => {
-        setMarketState({
-            markets: [],
-            childMarkets: [],
-            sportsEventMarkets: [],
-            selected: null,
-            selectedChild: null,
-            selectedSportsEvent: null,
-        });
-        setOpenDropdown(null);
-        setBetAmount(5);
-        setBetAmountError(null);
-        setPredictionDirection("Above");
-        setPredictionPrice("66500");
-        setSelectedDate(new Date(Date.now() + 24 * 60 * 60 * 1000));
-        setIsDatePickerOpen(false);
-        setDuration({ hours: 4, minutes: 0 });
-        setIsDurationPickerOpen(false);
-        setCurrentStep("mode");
-        setChallengeMode("pvp");
-        setChallengeStatement("");
-        setChallengeStatementError(null);
-        setValidation({ suggestions: [], isValid: true, isLoading: false, error: null, selectedSuggestion: null });
-        setSportsResolutionConsent(false);
-        setSportsResolutionConsentError(null);
-        setTxStatus("idle");
-        setTxError(null);
-        setTxSignature(null);
-    }, []);
-
-    const handleModalClose = useCallback(() => {
-        resetModalState();
-        onClose();
-    }, [resetModalState, onClose]);
-
-    const handleValidateChallengeStatement = useCallback(async () => {
-        if (!isSportsSelected) return;
-        if (!challengeStatement.trim()) {
-            setChallengeStatementError("Please enter a challenge statement.");
-            return;
+    // Fetch parent categories when modal opens
+    useEffect(() => {
+        if (isOpen) {
+            fetchParentCategories();
         }
-        setChallengeStatementError(null);
-        setValidation(prev => ({ ...prev, error: null, selectedSuggestion: null, isValid: false, isLoading: true }));
+    }, [isOpen]);
+
+    // Fetch child categories when parent category is selected
+    useEffect(() => {
+        if (selectedParentCategory) {
+            fetchChildCategories(selectedParentCategory.category);
+        } else {
+            setChildCategories([]);
+            setSelectedChildCategory(null);
+        }
+    }, [selectedParentCategory]);
+
+    const fetchParentCategories = async () => {
+        setIsLoadingCategories(true);
+        setCategoryError(null);
         try {
-            const category = marketState.selectedChild?.symbol || marketState.selectedChild?.name || "sports";
-            const response = await transform({ category, statement: challengeStatement });
-            setValidation(prev => ({
-                ...prev,
-                suggestions: response.statements || [],
-                isValid: false,
-                error: (!response.valid || !response.statements?.length) 
-                    ? "The statement could not be validated. Please rewrite the statement properly." 
-                    : null,
-            }));
+            const categories = await getParentCategories();
+            setParentCategories(categories);
         } catch (error) {
-            console.error("Validate transform error:", error);
-            const errMessage = error instanceof Error ? error.message : "";
-            setValidation(prev => ({
-                ...prev,
-                error: errMessage || "Unable to validate right now. Please try again.",
-                isValid: false,
-                suggestions: [],
-            }));
+            setCategoryError("Failed to load categories. Please try again.");
+            console.error("Error fetching parent categories:", error);
         } finally {
-            setValidation(prev => ({ ...prev, isLoading: false }));
+            setIsLoadingCategories(false);
         }
-    }, [isSportsSelected, challengeStatement, marketState.selectedChild]);
+    };
+
+    const fetchChildCategories = async (parentCategory: string) => {
+        setIsLoadingCategories(true);
+        setCategoryError(null);
+        try {
+            const categories = await getCategoriesByParent(parentCategory);
+            setChildCategories(categories);
+        } catch (error) {
+            setCategoryError("Failed to load subcategories. Please try again.");
+            console.error("Error fetching child categories:", error);
+        } finally {
+            setIsLoadingCategories(false);
+        }
+    };
+
+    const handleParentCategorySelect = (category: Category) => {
+        setSelectedParentCategory(category);
+        setSelectedChildCategory(null);
+        setOpenDropdown(null);
+    };
+
+    const handleChildCategorySelect = (category: Category) => {
+        setSelectedChildCategory(category);
+        setOpenDropdown(null);
+    };
+
+    const handleModalClose = () => {
+        onClose();
+    };
+
+    const getButtonLabel = () => {
+        if (txStatus === "success") return "Created!";
+        if (isSubmitting) return "Creating...";
+        return "Create Challenge";
+    };
+
+    const getButtonStyle = () => {
+        const base =
+            "rekto-button cursor-pointer w-full py-3 sm:py-4 font-black text-base sm:text-lg transition-colors shadow-[2px_2px_0_#111] ";
+        if (txStatus === "success") {
+            return base + "bg-green-600 hover:bg-green-700 text-white";
+        }
+        if (isSubmitting) {
+            return base + "bg-gray-500 text-white cursor-not-allowed";
+        }
+        return base + "bg-gray-900 hover:bg-gray-700 text-white";
+    };
 
     if (!isOpen) return null;
 
@@ -310,175 +191,116 @@ export function CreateChallengeModal({
         return result.trim();
     };
 
-    const handleCreateChallenge = async () => {
-        if (!isConnected) {
-            open();
-            return;
+    const validateDetails = () => {
+        let isValid = true;
+        // if (betAmount < 5) {
+        //     setBetAmountError("Min bet should be $5");
+        //     isValid = false;
+        // }
+        if (!selectedParentCategory || !selectedChildCategory) {
+            setCategoryError("Please select a category and subcategory.");
+            isValid = false;
         }
-        if (!address) {
-            setTxError("Wallet address not found.");
-            return;
+        if (!sportsResolutionConsent) {
+            setSportsResolutionConsentError("You must agree to the resolution terms.");
+            isValid = false;
         }
-        if (betAmount < 5) {
-            setBetAmountError("Min bet should be $5");
-            setTxError("Bet amount must be at least $5.");
-            return;
-        }
-        if (isSportsSelected) {
-            if (!challengeStatement.trim()) {
-                setChallengeStatementError("Please enter a challenge statement.");
-                setTxError("Please enter a challenge statement.");
-                return;
-            }
-            if (!validation.selectedSuggestion) {
-                setTxError("Please validate and select one suggested statement before creating the challenge.");
-                return;
-            }
-            setChallengeStatementError(null);
-            if (!sportsResolutionConsent) {
-                setSportsResolutionConsentError("Please check this box to continue.");
-                setTxError("Please check the box to confirm the sports challenge resolution terms.");
-                return;
-            }
-            setSportsResolutionConsentError(null);
-            if (hasBlockedContent(challengeStatement)) {
-                setTxError(blockedContentError("Challenge statement"));
-                return;
-            }
-        } else {
-            if (!predictionPrice || Number(predictionPrice) <= 0) {
-                setTxError("Please enter a valid prediction price.");
-                return;
-            }
-        }
-        if (duration.hours === 0 && duration.minutes === 0) {
-            setTxError("Please select a challenge expiry duration.");
-            return;
-        }
-        if (!isSportsSelected && selectedDate.getTime() <= Date.now()) {
-            setTxError("Challenge end date must be in the future.");
-            return;
-        }
-        if (!isSportsSelected) {
-            const expiryTimeMs = Date.now() + (duration.hours * 60 + duration.minutes) * 60 * 1000;
-            if (selectedDate.getTime() < expiryTimeMs) {
-                setTxError("Challenge end date cannot be earlier than challenge expiry time.");
-                return;
-            }
-        }
+        return isValid;
+    };
 
+    const handleCreateChallenge = async () => {
+        if (!validateDetails()) return;
+        if (!address || !isConnected) { open(); return; }
+        if (!walletProvider) { setTxStatus("error"); return; }
+
+        setIsSubmitting(true);
         setTxStatus("building");
-        setTxError(null);
         setTxSignature(null);
 
         try {
-            const creatorPubkey = new PublicKey(address);
-            const wallet = {
-                publicKey: creatorPubkey,
-                signTransaction: async (tx: Transaction) => {
-                    const signedTx = await (window as any).solana?.signTransaction(tx);
-                    return signedTx || tx;
-                },
-                signAllTransactions: async (txs: Transaction[]) => {
-                    return await Promise.all(txs.map(tx => (window as any).solana?.signTransaction(tx) || tx));
-                }
-            };
-            
-            const program = getRektoProgram(wallet);
-            const connection = getReadonlyConnection();
             const nowSec = Math.floor(Date.now() / 1000);
             const expiresAt = nowSec + duration.hours * 3600 + duration.minutes * 60;
-            const resolvesAt = isSportsSelected ? expiresAt : Math.floor(selectedDate.getTime() / 1000);
-            const targetPriceUsdCents = Math.round(Number(predictionPrice) * 100);
+            const resolvesAt = Math.max(Math.floor(selectedDate.getTime() / 1000), expiresAt);
+            const targetPriceUsdCents = Math.floor(Number(predictionPrice) * 100);
+            const asset = (selectedChildCategory?.category ?? "").trim().slice(0, 10);
 
-            const tx = await buildCreateChallengeTx(program, creatorPubkey, {
-                asset: marketState.selectedChild?.symbol || "",
-                betAmountUsdc: betAmount,
-                targetPriceUsdCents,
-                directionAbove: predictionDirection === "Above",
-                expiresAt,
-                resolvesAt,
-                challengeType: "pvp",
-                maxTeamSize: 0,
+            // Build the transaction server-side (admin signs as fee payer) and get it back partially signed
+            const response = await fetch("/api/challenges/create", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    userWallet: address,
+                    asset,
+                    betAmountUsdc: betAmount,
+                    targetPriceUsdCents,
+                    directionAbove: predictionDirection === "Above",
+                    expiresAt,
+                    resolvesAt,
+                    challengeType: challengeMode === "pvp" ? "pvp" : "team",
+                    // For TEAM: 0 means no limit (capped at 50 on-chain). PVP ignores this.
+                    maxTeamSize: 0,
+                }),
             });
 
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error || "Failed to create challenge");
+
+            // User signs the partially-signed transaction (authorises USDC transfer from their ATA)
             setTxStatus("signing");
-            
-            const signedTx = await wallet.signTransaction(tx);
-            const signature = await connection.sendRawTransaction(signedTx.serialize());
-            
-            setTxSignature(signature);
+            const tx = Transaction.from(Buffer.from(data.serializedTx, "base64"));
+            const signedTx = await (walletProvider as any).signTransaction(tx);
+
+            // Broadcast and confirm
             setTxStatus("confirming");
+            const connection = getReadonlyConnection();
+            const signature = await connection.sendRawTransaction(signedTx.serialize(), {
+                skipPreflight: false,
+                preflightCommitment: "confirmed",
+            });
+            await connection.confirmTransaction(
+                { signature, blockhash: data.blockhash, lastValidBlockHeight: data.lastValidBlockHeight },
+                "confirmed"
+            );
 
-            const [counterPDA] = deriveCreatorCounter(creatorPubkey);
-            let challengeId = 0;
-            try {
-                const counter = await (program.account as any).creatorCounter.fetch(counterPDA);
-                challengeId = Number(counter.count) - 1;
-            } catch {
-                challengeId = 0;
-            }
-
-            const [challengePDA] = deriveChallengePDA(creatorPubkey, challengeId);
-
-            try {
-                const selectedCategory = isSportsSelected
-                    ? (marketState.selectedSportsEvent?.name || marketState.selectedSportsEvent?.symbol || "")
-                    : (marketState.selectedChild?.name || "");
-                const selectedTicker = isSportsSelected
-                    ? (marketState.selectedSportsEvent?.symbol || marketState.selectedSportsEvent?.name || "")
-                    : (marketState.selectedChild?.symbol || "");
-                const selectedAssetName = isSportsSelected
-                    ? (marketState.selectedSportsEvent?.description || marketState.selectedSportsEvent?.name || marketState.selectedSportsEvent?.symbol || "")
-                    : (marketState.selectedChild?.description || "");
-
-                await createChallenge({
-                    title: isSportsSelected ? challengeStatement : `${marketState.selectedChild?.symbol} ${predictionDirection} $${predictionPrice}`,
-                    description: isSportsSelected
-                        ? challengeStatement
-                        : `Bet ${betAmount} USDC that ${marketState.selectedChild?.symbol} will be ${predictionDirection.toLowerCase()} $${predictionPrice} by ${selectedDate.toISOString()}`,
-                    category: selectedCategory,
-                    event_type: "binary",
-                    ticker: selectedTicker,
-                    asset_name: selectedAssetName,
-                    created_by: user?.id || "",
-                    mode: challengeMode,
-                    initial_bet: betAmount,
-                    min_accept_bet: betAmount,
-                    target_price: isSportsSelected ? undefined : Number(predictionPrice),
-                    bet_unit: 1,
-                    resolution_source: isSportsSelected ? "manual" : "price_feed",
-                    expire_time: new Date(expiresAt * 1000).toISOString(),
-                    resolve_time: new Date(resolvesAt * 1000).toISOString(),
-                    metadata: {
-                        onchain: {
-                            challenge_pda: challengePDA.toBase58(),
-                            challenge_id: challengeId,
-                            creator_wallet: creatorPubkey.toBase58(),
-                            program_id: "4t5KYdKFmPw49yo6Bm1TV2ZDEi6k3Ns4eJLeNhgbVSzJ",
-                            cluster: "devnet",
-                            tx_signature: signature,
-                        },
+            // Persist the challenge to the backend database
+            await createChallenge({
+                statement: `${selectedChildCategory?.category ?? asset} will be ${predictionDirection} $${predictionPrice}`,
+                ticker: asset,
+                trading_pair: `${asset}`,
+                target: Number(predictionPrice),
+                initial_bet: betAmount,
+                pool_size: betAmount,
+                resolution_source: "PRICE_FEED",
+                metadata: {
+                    onchain: {
+                        challenge_pda: data.challengePDA,
+                        creator_wallet: data.creator,
+                        on_chain_challenge_id: data.challengeId,
                     },
-                });
-            } catch (apiErr) {
-                console.warn("Backend API error (non-fatal):", apiErr);
-            }
+                },
+                creator: user?.id ?? 0,
+                resolution_method: "PRICE_FEED",
+                participants: 1,
+                status: "OPEN",
+                mode: challengeMode === "pvp" ? "PVP" : "MULTI",
+                result: "TEAM_A",
+                direction: predictionDirection === "Above" ? "UP" : "DOWN",
+                expiry: new Date(expiresAt * 1000).toISOString().split("T")[0],
+                resolution_date: new Date(resolvesAt * 1000).toISOString().split("T")[0],
+                final_price: 0,
+            });
 
             setTxStatus("success");
+            setTxSignature(signature);
             onCreated();
-        } catch (err: unknown) {
-            console.error("Create challenge error:", err);
-            const errorMessage = err instanceof Error ? err.message : "";
-            const msg = errorMessage.includes("User rejected") ? "Transaction cancelled by user." : errorMessage || "Transaction failed. Please try again.";
-            setTxError(msg);
+        } catch (error: any) {
+            console.error("Error creating challenge:", error);
             setTxStatus("error");
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
-    const isLoading = txStatus === "building" || txStatus === "signing" || txStatus === "confirming";
-    const hasChallengeStatement = challengeStatement.trim().length > 0;
-    const isSportsSelectionComplete = Boolean(validation.selectedSuggestion);
     const stepOrder: CreateChallengeStep[] = ["mode", "category", "details"];
     const currentStepIndex = stepOrder.indexOf(currentStep);
     const isModeStep = currentStep === "mode";
@@ -488,7 +310,7 @@ export function CreateChallengeModal({
     const stepSubtitle = isModeStep
         ? "Start with how players can join your challenge."
         : isCategoryStep
-            ? "Choose the market and asset or event."
+            ? "Choose the asset or event."
             : "Add the bet, prediction, timing, and review the payout.";
 
     const goToNextStep = () => {
@@ -503,24 +325,6 @@ export function CreateChallengeModal({
         closeAllDropdowns();
     };
 
-    const getButtonLabel = () => {
-        if (!isConnected) return "Connect Wallet to Create";
-        switch (txStatus) {
-            case "building": return "Building Transaction...";
-            case "signing": return "Waiting for Signature...";
-            case "confirming": return "Confirming on-chain...";
-            case "success": return "Challenge Created! 🎉";
-            default: return "Create Challenge";
-        }
-    };
-
-    const getButtonStyle = () => {
-        if (!isConnected) return "rekto-button cursor-pointer w-full py-3 sm:py-4 bg-gray-900 hover:bg-gray-700 text-white font-black text-base sm:text-lg transition-colors";
-        if (isLoading || (isSportsSelected && (!validation.isValid || !isSportsSelectionComplete))) return "cursor-pointer w-full py-3 sm:py-4 border-2 border-black bg-gray-400 text-white font-black text-base sm:text-lg cursor-not-allowed shadow-[3px_3px_0_#111]";
-        if (txStatus === "success") return "cursor-pointer w-full py-3 sm:py-4 border-2 border-black bg-green-500 text-white font-black text-base sm:text-lg cursor-not-allowed shadow-[1px_1px_0_#111]";
-        if (txStatus === "error") return "cursor-pointer w-full py-3 sm:py-4 border-2 border-black bg-red-500 hover:bg-red-600 text-white font-black text-base sm:text-lg transition-colors shadow-[1px_1px_0_#111]";
-        return "rekto-button cursor-pointer w-full py-3 sm:py-4 bg-gray-900 hover:bg-gray-700 text-white font-black text-base sm:text-lg transition-colors";
-    };
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
@@ -559,29 +363,6 @@ export function CreateChallengeModal({
                         </div>
                     </div>
 
-                    {isCategoryStep && (
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700">Challenge Market</label>
-                        <div className="flex items-center gap-2 p-1 bg-[#faf0eb] border border-[#e8d5c8] rounded-xl">
-                            {marketState.markets.length === 0 ? (
-                                <div className="flex-1 py-2 px-4 text-sm text-gray-500 text-center">Loading markets...</div>
-                            ) : (
-                                marketState.markets.map((m: Market) => (
-                                    <button
-                                        key={m.id}
-                                        onClick={() => setMarketState(prev => ({ ...prev, selected: m }))}
-                                        className={`flex-1 py-2 px-4 rounded-lg text-sm font-semibold transition-colors ${marketState.selected?.id === m.id
-                                            ? "bg-gray-900 text-white"
-                                            : "bg-transparent text-gray-600 hover:bg-[#f3e1d7]"
-                                            }`}
-                                    >
-                                        {m.symbol || m.name}
-                                    </button>
-                                ))
-                            )}
-                        </div>
-                    </div>
-                    )}
 
                     {isModeStep && (
                     <div className="space-y-2">
@@ -614,118 +395,114 @@ export function CreateChallengeModal({
                     )}
 
                     {isCategoryStep && (
-                    <div className="space-y-2">
-                        {isSportsSelected ? (
-                            <label className="text-sm font-medium text-gray-700">Select Sport Event</label>
-                        ) : <label className="text-sm font-medium text-gray-700">Select Token</label>}
-                        <div className="relative" ref={dropdownRefs.coin}>
-                            <button 
-                                onClick={() => setOpenDropdown(prev => prev === 'coin' ? null : 'coin')} 
-                                className="w-full flex items-center justify-between px-4 py-3 bg-[#faf0eb] border border-[#e8d5c8] rounded-xl hover:border-[#d4b8a8] transition-colors"
-                            >
-                                <div className="flex items-center gap-3">
-                                    <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
-                                        {marketState.selectedChild?.image ? (
-                                            <Image src={marketState.selectedChild.image} alt={marketState.selectedChild.symbol || marketState.selectedChild.name} width={24} height={24} className="w-6 h-6 object-contain" />
-                                        ) : (
-                                            <span className="text-xs font-bold text-white">
-                                                {marketState.selectedChild?.symbol?.slice(0, 2) || "?"}
-                                            </span>
-                                        )}
-                                    </div>
-                                    <span className="font-semibold text-gray-900">{marketState.selectedChild?.symbol || "Select Token"}</span>
-                                </div>
-                                <svg className={`w-5 h-5 text-gray-500 transition-transform ${openDropdown === 'coin' ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                </svg>
-                            </button>
-                            {openDropdown === 'coin' && (
-                                <div className="absolute top-full left-0 right-0 mt-1 bg-[#faf0eb] border border-[#e8d5c8] rounded-xl shadow-lg z-10 overflow-hidden">
-                                    {marketState.childMarkets.length === 0 ? (
-                                        <div className="px-4 py-3 text-sm text-gray-500">Loading tokens...</div>
-                                    ) : (
-                                        marketState.childMarkets.map((childMarket: Market) => (
-                                            <button 
-                                                key={childMarket.id} 
-                                                onClick={() => { 
-                                                    setMarketState(prev => ({ ...prev, selectedChild: childMarket })); 
-                                                    setOpenDropdown(null); 
-                                                }} 
-                                                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#f3e1d7] transition-colors"
-                                            >
-                                                <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
-                                                    {childMarket.image ? (
-                                                        <Image src={childMarket.image} alt={childMarket.symbol || childMarket.name} width={24} height={24} className="w-6 h-6 object-contain" />
-                                                    ) : (
-                                                        <span className="text-xs font-bold text-white">
-                                                            {childMarket.symbol?.slice(0, 2) || "?"}
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                <span className="font-medium text-gray-900">{childMarket.symbol}</span>
-                                            </button>
-                                        ))
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                        {isSportsSelected && (
-                            <div className="space-y-2 pt-2">
-                                <label className="text-sm font-medium text-gray-700">Select Market</label>
-                                <div className="relative" ref={dropdownRefs.sportsEvent}>
-                                    <button 
-                                        onClick={() => setOpenDropdown(prev => prev === 'sportsEvent' ? null : 'sportsEvent')} 
-                                        className="w-full flex items-center justify-between px-4 py-3 bg-[#faf0eb] border border-[#e8d5c8] rounded-xl hover:border-[#d4b8a8] transition-colors"
+                        <div className="space-y-4">
+                            {/* Parent Category Selection */}
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium text-gray-700">Category</label>
+                                <div className="relative" ref={dropdownRefs.parentCategory}>
+                                    <button
+                                        onClick={() => setOpenDropdown(prev => prev === 'parentCategory' ? null : 'parentCategory')}
+                                        disabled={isLoadingCategories}
+                                        className="w-full flex items-center justify-between px-3 sm:px-4 py-3 bg-[#faf0eb] border border-[#e8d5c8] rounded-xl hover:border-[#d4b8a8] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                                     >
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
-                                                {marketState.selectedSportsEvent?.image ? (
-                                                    <Image src={marketState.selectedSportsEvent.image} alt={marketState.selectedSportsEvent.symbol || marketState.selectedSportsEvent.name} width={24} height={24} className="w-6 h-6 object-contain" />
-                                                ) : (
-                                                    <span className="text-xs font-bold text-white">
-                                                        {marketState.selectedSportsEvent?.symbol?.slice(0, 2) || "?"}
-                                                    </span>
-                                                )}
-                                            </div>
-                                            <span className="font-semibold text-gray-900">{marketState.selectedSportsEvent?.symbol || marketState.selectedSportsEvent?.name || "Select Market"}</span>
-                                        </div>
-                                        <svg className={`w-5 h-5 text-gray-500 transition-transform ${openDropdown === 'sportsEvent' ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                        </svg>
+                                        <span className={`font-medium text-sm sm:text-base truncate pr-2 ${selectedParentCategory ? 'text-gray-900' : 'text-gray-500'}`}>
+                                            {selectedParentCategory ? selectedParentCategory.category : "Select a category"}
+                                        </span>
+                                        {isLoadingCategories ? (
+                                            <svg className="animate-spin w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24">
+                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                                            </svg>
+                                        ) : (
+                                            <svg className={`w-5 h-5 text-gray-500 transition-transform ${openDropdown === 'parentCategory' ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                            </svg>
+                                        )}
                                     </button>
-                                    {openDropdown === 'sportsEvent' && (
-                                        <div className="absolute top-full left-0 right-0 mt-1 bg-[#faf0eb] border border-[#e8d5c8] rounded-xl shadow-lg z-10 overflow-hidden">
-                                            {marketState.sportsEventMarkets.length === 0 ? (
-                                                <div className="px-4 py-3 text-sm text-gray-500">Loading markets...</div>
+                                    {openDropdown === 'parentCategory' && (
+                                        <div className="absolute top-full left-0 right-0 mt-1 bg-[#faf0eb] border border-[#e8d5c8] rounded-xl shadow-lg z-10 overflow-hidden max-h-60 overflow-y-auto">
+                                            {parentCategories.length === 0 ? (
+                                                <div className="px-4 py-3 text-gray-500 text-sm">No categories available</div>
                                             ) : (
-                                                marketState.sportsEventMarkets.map((market: Market) => (
-                                                    <button 
-                                                        key={market.id} 
-                                                        onClick={() => { 
-                                                            setMarketState(prev => ({ ...prev, selectedSportsEvent: market })); 
-                                                            setOpenDropdown(null); 
-                                                        }} 
-                                                        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#f3e1d7] transition-colors"
+                                                parentCategories.map((category) => (
+                                                    <button
+                                                        key={category.id}
+                                                        onClick={() => handleParentCategorySelect(category)}
+                                                        className="w-full px-4 py-3 text-left hover:bg-[#f3e1d7] transition-colors font-medium text-gray-900 flex items-center gap-2"
                                                     >
-                                                        <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
-                                                            {market.image ? (
-                                                                <Image src={market.image} alt={market.symbol || market.name} width={24} height={24} className="w-6 h-6 object-contain" />
-                                                            ) : (
-                                                                <span className="text-xs font-bold text-white">
-                                                                    {market.symbol?.slice(0, 2) || "?"}
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                        <span className="font-medium text-gray-900">{market.symbol || market.name}</span>
+                                                        {category.image_url && (
+                                                            <img src={category.image_url} alt="" className="w-5 h-5 rounded-full object-cover" />
+                                                        )}
+                                                        <span>{category.category}</span>
                                                     </button>
                                                 ))
                                             )}
                                         </div>
                                     )}
                                 </div>
+                                {categoryError && <p className="text-red-500 text-sm mt-1">{categoryError}</p>}
                             </div>
-                        )}
-                    </div>
+
+                            {/* Child Category Selection */}
+                            {selectedParentCategory && (
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium text-gray-700">Subcategory</label>
+                                    <div className="relative" ref={dropdownRefs.childCategory}>
+                                        <button
+                                            onClick={() => setOpenDropdown(prev => prev === 'childCategory' ? null : 'childCategory')}
+                                            disabled={isLoadingCategories || childCategories.length === 0}
+                                            className="w-full flex items-center justify-between px-3 sm:px-4 py-3 bg-[#faf0eb] border border-[#e8d5c8] rounded-xl hover:border-[#d4b8a8] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                                        >
+                                            <span className={`font-medium text-sm sm:text-base truncate pr-2 ${selectedChildCategory ? 'text-gray-900' : 'text-gray-500'}`}>
+                                                {selectedChildCategory ? selectedChildCategory.category : childCategories.length === 0 ? "Loading subcategories..." : "Select a subcategory"}
+                                            </span>
+                                            {isLoadingCategories ? (
+                                                <svg className="animate-spin w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24">
+                                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                                                </svg>
+                                            ) : (
+                                                <svg className={`w-5 h-5 text-gray-500 transition-transform ${openDropdown === 'childCategory' ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                                </svg>
+                                            )}
+                                        </button>
+                                        {openDropdown === 'childCategory' && (
+                                            <div className="absolute top-full left-0 right-0 mt-1 bg-[#faf0eb] border border-[#e8d5c8] rounded-xl shadow-lg z-10 overflow-hidden max-h-60 overflow-y-auto">
+                                                {childCategories.length === 0 ? (
+                                                    <div className="px-4 py-3 text-gray-500 text-sm">No subcategories available</div>
+                                                ) : (
+                                                    childCategories.map((category) => (
+                                                        <button
+                                                            key={category.id}
+                                                            onClick={() => handleChildCategorySelect(category)}
+                                                            className="w-full px-4 py-3 text-left hover:bg-[#f3e1d7] transition-colors font-medium text-gray-900 flex items-center gap-2"
+                                                        >
+                                                            {category.image_url && (
+                                                                <img src={category.image_url} alt="" className="w-5 h-5 rounded-full object-cover" />
+                                                            )}
+                                                            <span>{category.category}</span>
+                                                        </button>
+                                                    ))
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Selected Category Summary */}
+                            {selectedParentCategory && selectedChildCategory && (
+                                <div className="bg-[#faf0eb] border border-[#e8d5c8] rounded-xl p-3 sm:p-4">
+                                    <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Selected</p>
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        <span className="font-semibold text-gray-900">{selectedParentCategory.category}</span>
+                                        <span className="text-gray-400">→</span>
+                                        <span className="font-semibold text-gray-900">{selectedChildCategory.category}</span>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                     )}
 
                     {isDetailsStep && (
@@ -734,9 +511,9 @@ export function CreateChallengeModal({
                         <div className="flex items-center gap-2">
                             <button
                                 onClick={() => {
-                                    const newVal = Math.max(5, betAmount - 1);
+                                    const newVal = Math.max(1, betAmount - 1);
                                     setBetAmount(newVal);
-                                    setBetAmountError(newVal < 5 ? "Min bet should be $5" : null);
+                                    setBetAmountError(newVal < 1 ? "Min bet should be $1" : null);
                                 }}
                                 className="w-10 h-10 flex items-center justify-center bg-[#faf0eb] border border-[#e8d5c8] rounded-xl hover:bg-[#f3e1d7] transition-colors text-gray-700 font-bold text-lg"
                             >
@@ -750,10 +527,10 @@ export function CreateChallengeModal({
                                     onChange={(e) => {
                                         const val = Number(e.target.value);
                                         setBetAmount(val);
-                                        setBetAmountError(val < 5 ? "Min bet should be $5" : null);
+                                        setBetAmountError(val < 1 ? "Min bet should be $1" : null);
                                     }}
                                     step="1"
-                                    min="5"
+                                    min="1"
                                     className="w-full pl-8 pr-4 py-3 bg-[#faf0eb] border border-[#e8d5c8] rounded-xl text-lg font-semibold text-gray-900 focus:outline-none focus:border-[#d4b8a8]"
                                 />
                             </div>
@@ -772,112 +549,7 @@ export function CreateChallengeModal({
                     </div>
                     )}
 
-                    {isDetailsStep && isSportsSelected && (
-                        <div className="space-y-3">
-                            <div className="flex items-center gap-2">
-                                <label className="text-sm font-medium text-gray-700">Challenge Statement</label>
-                                <span className="relative group/info">
-                                    <svg className="w-4 h-4 text-gray-400 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    </svg>
-                                    <span className="absolute left-0 bottom-full mb-2 px-3 py-2 text-xs text-white bg-gray-800 rounded-lg opacity-0 group-hover/info:opacity-100 transition-opacity pointer-events-none z-20 w-max max-w-[260px]">
-                                        This is the statement on which you are taking a bet, it can be any prediction or outcome conviction related to the selected sport.
-                                    </span>
-                                </span>
-                            </div>
-                            <div className="relative">
-                                <input
-                                    required
-                                    type="text"
-                                    value={challengeStatement}
-                                    onChange={(e) => {
-                                        setChallengeStatement(e.target.value);
-                                        setValidation(prev => ({ ...prev, suggestions: [], selectedSuggestion: null, isValid: false }));
-                                        if (challengeStatementError) setChallengeStatementError(null);
-                                        if (txError) setTxError(null);
-                                    }}
-                                    placeholder={
-                                        marketState.selectedChild?.symbol?.toLowerCase() === 'cricket'
-                                            ? "e.g. rohit sharma will hit a six in todays MI vs RCB IPL match"
-                                            : marketState.selectedChild?.symbol?.toLowerCase() === 'football'
-                                                ? "e.g. real madrid will win fifa 2026"
-                                                : "Enter your challenge statement..."
-                                    }
-                                    disabled={Boolean(validation.selectedSuggestion)}
-                                    className={`w-full border border-[#e8d5c8] rounded-xl text-base sm:text-lg text-gray-900 placeholder:text-gray-400 placeholder:text-xs sm:placeholder:text-sm ${validation.selectedSuggestion ? "bg-gray-100 cursor-not-allowed px-3 sm:px-4 py-3 pr-16 sm:pr-20" : "bg-[#faf0eb] focus:outline-none focus:border-[#d4b8a8] px-3 sm:px-4 py-3"}`}
-                                />
-                                {validation.selectedSuggestion && (
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setChallengeStatement("");
-                                            setValidation(prev => ({ ...prev, selectedSuggestion: null, suggestions: [], isValid: false, error: null }));
-                                            setChallengeStatementError(null);
-                                            if (txError) setTxError(null);
-                                        }}
-                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-blue-700 hover:text-blue-800 underline"
-                                    >
-                                        Reset
-                                    </button>
-                                )}
-                            </div>
-                            {hasChallengeStatement && !validation.selectedSuggestion && (
-                                <div className="space-y-3">
-                                    <button
-                                        type="button"
-                                        className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-full font-semibold text-sm transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
-                                        onClick={handleValidateChallengeStatement}
-                                        disabled={validation.isLoading}
-                                    >
-                                        {validation.isLoading && (
-                                            <svg className="animate-spin w-4 h-4 text-white" fill="none" viewBox="0 0 24 24">
-                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                                            </svg>
-                                        )}
-                                        <span>{validation.isLoading ? "Validating statement..." : "Validate Statement"}</span>
-                                    </button>
-
-                                    {validation.suggestions.length > 0 && (
-                                        <div className="rounded-2xl border border-[#e8d5c8] bg-white p-4 space-y-3">
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-sm font-semibold text-gray-800">Suggested Valid Statements</span>
-                                                <span className="text-xs text-gray-500">Pick one to use</span>
-                                            </div>
-                                            <div className="space-y-2">
-                                                {validation.suggestions.map((suggestion: string, index: number) => (
-                                                    <button
-                                                        key={`${suggestion}-${index}`}
-                                                        type="button"
-                                                        className="cursor-pointer w-full text-left px-4 py-3 bg-[#fff9f5] border border-[#ead8cc] rounded-xl hover:bg-[#f7e8de] transition-colors text-sm text-gray-900"
-                                                        onClick={() => {
-                                                            setChallengeStatement(suggestion);
-                                                            setValidation(prev => ({ ...prev, selectedSuggestion: suggestion, isValid: true, error: null }));
-                                                        }}
-                                                    >
-                                                        {suggestion}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-                            {validation.isValid && isSportsSelectionComplete && !validation.isLoading && (
-                                <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 text-sm text-green-700">
-                                    Your statement has been validated. Use Reset to edit again or proceed to create the challenge.
-                                </div>
-                            )}
-                            {validation.error && (
-                                <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
-                                    {validation.error}
-                                </div>
-                            )}
-                            {challengeStatementError && <p className="text-red-500 text-sm mt-1">{challengeStatementError}</p>}
-                        </div>
-                    )}
-
-                    {isDetailsStep && !isSportsSelected && (
+                    {isDetailsStep && (
                         <div className="space-y-2">
                             <label className="text-sm font-medium text-gray-700">Predict Price Movement</label>
                             <div className="flex flex-col min-[380px]:flex-row gap-2">
@@ -886,7 +558,7 @@ export function CreateChallengeModal({
                                         onClick={() => setOpenDropdown(prev => prev === 'direction' ? null : 'direction')} 
                                         className="w-full flex items-center justify-between px-3 sm:px-4 py-3 bg-[#faf0eb] border border-[#e8d5c8] rounded-xl hover:border-[#d4b8a8] transition-colors"
                                     >
-                                        <span className="font-semibold text-sm sm:text-base text-gray-900 truncate pr-2">{marketState.selectedChild?.name} {predictionDirection}</span>
+                                        <span className="font-semibold text-sm sm:text-base text-gray-900 truncate pr-2">Token {predictionDirection}</span>
                                         <svg className={`w-5 h-5 text-gray-500 transition-transform ${openDropdown === 'direction' ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                                         </svg>
@@ -902,7 +574,7 @@ export function CreateChallengeModal({
                                                     }} 
                                                     className="w-full px-4 py-3 text-left hover:bg-[#f3e1d7] transition-colors font-medium text-gray-900"
                                                 >
-                                                    {marketState.selectedChild?.name} {dir}
+                                                    Token {dir}
                                                 </button>
                                             ))}
                                         </div>
@@ -944,7 +616,8 @@ export function CreateChallengeModal({
                     </div>
                     )}
 
-                    {isDetailsStep && (!isSportsSelected ? (
+                    {isDetailsStep && (
+                        <>
                         <div className="space-y-2">
                             <div className="flex items-center gap-2">
                                 <label className="text-sm font-medium text-gray-700">Challenge End Date</label>
@@ -964,7 +637,6 @@ export function CreateChallengeModal({
                                 </svg>
                             </button>
                         </div>
-                    ) : (
                         <div className="space-y-1">
                             <label className="flex items-start gap-2 p-3 bg-[#faf0eb] border border-[#e8d5c8] rounded-xl cursor-pointer">
                                 <input
@@ -973,7 +645,7 @@ export function CreateChallengeModal({
                                     onChange={(e) => {
                                         setSportsResolutionConsent(e.target.checked);
                                         if (e.target.checked) setSportsResolutionConsentError(null);
-                                        if (txError) setTxError(null);
+
                                     }}
                                     className="mt-0.5 h-4 w-4 rounded border-[#d4b8a8] text-gray-900 focus:ring-gray-700"
                                 />
@@ -983,30 +655,20 @@ export function CreateChallengeModal({
                             </label>
                             {sportsResolutionConsentError && <p className="text-red-500 text-sm mt-1">{sportsResolutionConsentError}</p>}
                         </div>
-                    ))}
+                        </>
+                    )}
 
                     {isDetailsStep && (
                     <div className="text-center py-2 px-1 sm:px-2">
-                        {isSportsSelected ? (
-                            <p className="text-sm sm:text-base text-gray-700 break-words">
-                                You win <span className="font-bold text-gray-900">${(betAmount * 2 * 0.975).toFixed(4)}</span> if your statement is correct
-                            </p>
-                        ) : (
-                            <p className="text-sm sm:text-base text-gray-700 break-words">
-                                You win <span className="font-bold text-gray-900">${(betAmount * 2 * 0.975).toFixed(4)}</span> if {marketState.selectedChild?.symbol} closes {predictionDirection.toLowerCase()} ${Number(predictionPrice).toLocaleString()} in {formatDuration(duration)}
-                            </p>
-                        )}
+                        <p className="text-sm sm:text-base text-gray-700 break-words">
+                            You win <span className="font-bold text-gray-900">${(betAmount * 2 * 0.975).toFixed(4)}</span> if your statement is correct
+                        </p>
                         <p className="text-xs text-gray-500 mt-1">6% platform fee applies</p>
                     </div>
                     )}
 
-                    {isDetailsStep && txStatus === "error" && txError && (
-                        <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
-                            ⚠️ {txError}
-                        </div>
-                    )}
 
-                    {isDetailsStep && txStatus === "success" && txSignature && (
+                    {/* {isDetailsStep && txStatus === "success" && txSignature && (
                         <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 text-sm text-green-700">
                             <p className="font-semibold">✅ Challenge created on-chain!</p>
                             <a
@@ -1018,19 +680,36 @@ export function CreateChallengeModal({
                                 View on Solana Explorer ↗
                             </a>
                         </div>
+                    )} */}
+
+                    {isDetailsStep && txStatus !== "idle" && txStatus !== "success" && (
+                        <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-sm text-blue-700 flex items-center gap-2">
+                            {isSubmitting && (
+                                <svg className="animate-spin w-4 h-4 text-blue-500 flex-shrink-0" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                                </svg>
+                            )}
+                            <span>
+                                {txStatus === "building" && "Preparing challenge transaction..."}
+                                {txStatus === "signing" && "Waiting for wallet signature..."}
+                                {txStatus === "confirming" && "Confirming on-chain..."}
+                                {txStatus === "error" && "Something went wrong. Please try again."}
+                            </span>
+                        </div>
                     )}
 
-                    {isDetailsStep && isLoading && (
-                        <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-sm text-blue-700 flex items-center gap-2">
-                            <svg className="animate-spin w-4 h-4 text-blue-500 flex-shrink-0" fill="none" viewBox="0 0 24 24">
-                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                            </svg>
-                            <span>
-                                {txStatus === "building" && "Building transaction..."}
-                                {txStatus === "signing" && "Please approve in your wallet..."}
-                                {txStatus === "confirming" && "Confirming on Solana devnet..."}
-                            </span>
+                    {isDetailsStep && txStatus === "success" && txSignature && (
+                        <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 text-sm text-green-700">
+                            <p className="font-semibold">Challenge created on-chain!</p>
+                            <a
+                                href={`https://explorer.solana.com/tx/${txSignature}?cluster=devnet`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-green-600 underline break-all text-xs mt-1 block"
+                            >
+                                View on Solana Explorer ↗
+                            </a>
                         </div>
                     )}
 
@@ -1039,7 +718,7 @@ export function CreateChallengeModal({
                             <button
                                 type="button"
                                 onClick={goToPreviousStep}
-                                disabled={isLoading}
+                                // disabled={}
                                 className="w-full sm:w-32 py-3 border-2 border-black bg-white text-gray-900 font-black text-base shadow-[2px_2px_0_#111] hover:bg-[#f3e1d7] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                             >
                                 Back
@@ -1049,15 +728,15 @@ export function CreateChallengeModal({
                             <button
                                 type="button"
                                 onClick={goToNextStep}
-                                disabled={!marketState.selected && isCategoryStep}
                                 className="rekto-button cursor-pointer w-full py-3 sm:py-4 bg-gray-900 hover:bg-gray-700 text-white font-black text-base sm:text-lg transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
                             >
                                 Continue
                             </button>
                         ) : (
                             <button
+                                type="button"
                                 onClick={handleCreateChallenge}
-                                disabled={isLoading || txStatus === "success" || (isSportsSelected && (!validation.isValid || !isSportsSelectionComplete))}
+                                disabled={isSubmitting || txStatus === "success" || !selectedParentCategory || !selectedChildCategory}
                                 className={getButtonStyle()}
                             >
                                 {getButtonLabel()}

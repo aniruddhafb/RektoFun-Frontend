@@ -3,19 +3,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAppKitAccount } from '@reown/appkit/react';
 import { ChallengeCard } from "./ChallengeCard";
-import { getChallenges } from "../../lib/challenges-service/challenges";
-import { ChallengeListItem } from '../../lib/challenges-service/challenges';
+import { getChallenges, Challenge } from "../../lib/challenges-service/challenges";
 
 interface ChallengeGridProps {
-    onRekt: (challenge: ChallengeListItem) => void;
-    onClick: (challenge: ChallengeListItem) => void;
+    onRekt: (challenge: Challenge) => void;
+    onClick: (challenge: Challenge) => void;
     onToggleBookmark: (challengeId: string) => void;
     isBookmarked: (challengeId: string) => boolean;
     onOpenModal: () => void;
-    onChallengesLoaded?: (challenges: ChallengeListItem[]) => void;
+    onChallengesLoaded?: (challenges: Challenge[]) => void;
     refreshKey?: number;
     activeFilter: string;
-    activeAsset: string;
     searchQuery: string;
 }
 
@@ -30,13 +28,12 @@ export function ChallengeGrid({
     onChallengesLoaded,
     refreshKey = 0,
     activeFilter,
-    activeAsset,
     searchQuery,
 }: ChallengeGridProps) {
     const { address } = useAppKitAccount();
     const ownerAddress = address || '';
 
-    const [challenges, setChallenges] = useState<ChallengeListItem[]>([]);
+    const [challenges, setChallenges] = useState<Challenge[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [loadError, setLoadError] = useState<string | null>(null);
     const [retryNonce, setRetryNonce] = useState(0);
@@ -63,20 +60,16 @@ export function ChallengeGrid({
             const response = await getChallenges({
                 limit: requestLimit,
                 offset: requestOffset,
-                category: activeAsset !== "All Markets" ? activeAsset : undefined,
-                search: searchQuery.trim() || undefined,
-                sort: activeFilter === "Expiring Soon" ? "expiring_soon" : "latest",
-                created_by: activeFilter === "Created By Me" ? ownerAddress || undefined : undefined,
             });
 
             let nextChunk = response.challenges ?? [];
 
             if (isPinnedFilter) {
-                nextChunk = nextChunk.filter((challenge) => isBookmarked(challenge.id));
+                nextChunk = nextChunk.filter((challenge) => isBookmarked(challenge.id.toString()));
             } else {
                 nextChunk = [...nextChunk].sort((a, b) => {
-                    const aBookmarked = isBookmarked(a.id);
-                    const bBookmarked = isBookmarked(b.id);
+                    const aBookmarked = isBookmarked(a.id.toString());
+                    const bBookmarked = isBookmarked(b.id.toString());
                     if (aBookmarked === bBookmarked) return 0;
                     return aBookmarked ? -1 : 1;
                 });
@@ -84,11 +77,30 @@ export function ChallengeGrid({
 
             if (activeFilter === "My Bets" && ownerAddress) {
                 nextChunk = nextChunk.filter((challenge) => {
-                    const creatorWallet = challenge.creator?.wallet_address?.toLowerCase();
-                    const opponentWallet = challenge.opponent_info?.wallet_address?.toLowerCase();
+                    const creatorWallet = challenge.creator?.toString().toLowerCase();
                     const currentUser = ownerAddress.toLowerCase();
-                    return creatorWallet === currentUser || opponentWallet === currentUser;
+                    return creatorWallet === currentUser;
                 });
+            }
+
+            // Apply search filter client-side
+            if (searchQuery.trim()) {
+                const query = searchQuery.toLowerCase();
+                nextChunk = nextChunk.filter((challenge) => 
+                    challenge.statement.toLowerCase().includes(query) ||
+                    challenge.ticker.toLowerCase().includes(query)
+                );
+            }
+
+            // Apply sort filter client-side
+            if (activeFilter === "Expiring Soon") {
+                nextChunk = [...nextChunk].sort((a, b) => 
+                    new Date(a.expiry).getTime() - new Date(b.expiry).getTime()
+                );
+            } else if (activeFilter === "Latest") {
+                nextChunk = [...nextChunk].sort((a, b) => 
+                    new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+                );
             }
 
             setChallenges((prev) => (append ? [...prev, ...nextChunk] : nextChunk));
@@ -107,7 +119,7 @@ export function ChallengeGrid({
                 setIsLoadingMore(false);
             }
         }
-    }, [activeAsset, activeFilter, isBookmarked, ownerAddress, searchQuery, isLoadingMore]);
+    }, [activeFilter, isBookmarked, ownerAddress, searchQuery, isLoadingMore]);
 
     useEffect(() => {
         setIsLoadingMore(false);
@@ -115,7 +127,7 @@ export function ChallengeGrid({
         setOffset(0);
         setHasMore(true);
         fetchChallenges(0, false);
-    }, [refreshKey, retryNonce, activeAsset, activeFilter, searchQuery]);
+    }, [refreshKey, retryNonce, activeFilter, searchQuery]);
 
     useEffect(() => {
         if (!hasMore || isLoading || isLoadingMore) return;
@@ -147,13 +159,6 @@ export function ChallengeGrid({
     if (isLoading) {
         return (
             <div className="max-w-7xl mx-auto px-6 lg:px-8 pb-16">
-                {/* <div className="rounded-2xl border border-white/50 bg-white/60 px-6 py-6 mb-6">
-                    <p className="text-sm text-gray-500">Loading challenges</p>
-                    <p className="text-base font-medium text-gray-900 mt-1">{LOADING_MESSAGES[loadingMessageIndex]}</p>
-                    <div className="mt-4 h-1.5 w-full overflow-hidden rounded-full bg-gray-200">
-                        <div className="h-full w-1/2 animate-pulse rounded-full bg-gray-700/70" />
-                    </div>
-                </div> */}
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
                     {Array.from({ length: 6 }).map((_, index) => (
                         <div
@@ -222,7 +227,7 @@ export function ChallengeGrid({
                         onRekt={onRekt}
                         onClick={onClick}
                         onToggleBookmark={onToggleBookmark}
-                        isBookmarked={isBookmarked(challenge.id)}
+                        isBookmarked={isBookmarked(challenge.id.toString())}
                         ownerAddress={ownerAddress}
                     />
                 ))}
