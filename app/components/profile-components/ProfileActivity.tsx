@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import {
-    ChallengeListItem,
+    Challenge,
     getChallenges,
 } from "@/app/lib/challenges-service/challenges";
 
@@ -52,7 +52,7 @@ function formatResolveCountdown(resolveTime: string): string {
 }
 
 export function ProfileActivity({ userId, username, avatar, isOwnProfile = false }: ProfileActivityProps) {
-    const [activities, setActivities] = useState<ChallengeListItem[]>([]);
+    const [activities, setActivities] = useState<Challenge[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [currentPage, setCurrentPage] = useState(1);

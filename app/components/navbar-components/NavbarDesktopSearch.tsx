@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Search, X } from "lucide-react";
-import { getChallenges, type ChallengeListItem } from "@/app/lib/challenges-service/challenges";
+import { getChallenges, type Challenge } from "@/app/lib/challenges-service/challenges";
 import { getLeaderboard, type LeaderboardUser } from "@/app/lib/users-service/users";
 import { useBodyScrollLock } from "@/app/lib/useBodyScrollLock";
 
@@ -47,7 +47,7 @@ function formatEndsAt(expireTime: string) {
     return `${mins}m`;
 }
 
-function getChallengeStatusMeta(status: ChallengeListItem["status"]) {
+function getChallengeStatusMeta(status: Challenge["status"]) {
     if (status === "open") {
         return { label: "Live", className: "bg-[#eaf9ef] text-[#15803d] border-[#bbf7d0]" };
     }
@@ -84,7 +84,7 @@ export function NavbarDesktopSearch({
     const [activeTab, setActiveTab] = useState<SearchTab>("all");
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [challengeResults, setChallengeResults] = useState<ChallengeListItem[]>([]);
+    const [challengeResults, setChallengeResults] = useState<Challenge[]>([]);
     const [userResults, setUserResults] = useState<LeaderboardUser[]>([]);
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const requestIdRef = useRef(0);

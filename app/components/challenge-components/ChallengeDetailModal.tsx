@@ -19,11 +19,11 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { AcceptChallengeModal } from "./AcceptChallengeModal";
-import { ChallengeListItem } from "@/app/lib/challenges-service/challenges";
+import { Challenge } from "@/app/lib/challenges-service/challenges";
 import { useChallengeDetail } from "@/app/hooks/useChallengeDetail";
 
 interface ChallengeDetailModalProps {
-  challenge: ChallengeListItem | null;
+  challenge: Challenge | null;
   isOpen: boolean;
   onClose: () => void;
 }

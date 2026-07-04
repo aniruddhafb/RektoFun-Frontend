@@ -19,9 +19,10 @@ interface DepositModalProps {
   isOpen: boolean;
   onClose: () => void;
   initialMode?: FundsMode;
+  usdcBalance: number | null;
 }
 
-export function DepositModal({ isOpen, onClose, initialMode = "deposit" }: DepositModalProps) {
+export function DepositModal({ isOpen, onClose, initialMode = "deposit", usdcBalance }: DepositModalProps) {
   const { address, isConnected } = useAppKitAccount();
   const { walletProvider } = useAppKitProvider("solana");
 
@@ -32,7 +33,6 @@ export function DepositModal({ isOpen, onClose, initialMode = "deposit" }: Depos
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [txSignature, setTxSignature] = useState<string | null>(null);
-  const [usdcBalance, setUsdcBalance] = useState<number | null>(null);
 
   const connection = getReadonlyConnection();
   const parsedAmount = parseFloat(amountInput) || 0;
@@ -46,27 +46,6 @@ export function DepositModal({ isOpen, onClose, initialMode = "deposit" }: Depos
   }, [onClose]);
 
   useBodyScrollLock(isOpen);
-
-  // Fetch USDC balance
-  useEffect(() => {
-    const fetchBalance = async () => {
-      if (!address || !isConnected) {
-        setUsdcBalance(null);
-        return;
-      }
-
-      try {
-        const pubKey = new PublicKey(address);
-        const ata = await getAssociatedTokenAddress(USDC_MINT, pubKey, false);
-        const accountInfo = await connection.getTokenAccountBalance(ata);
-        setUsdcBalance(accountInfo.value.uiAmount || 0);
-      } catch {
-        setUsdcBalance(0);
-      }
-    };
-
-    fetchBalance();
-  }, [address, isConnected, connection]);
 
   // Escape key handler
   useEffect(() => {

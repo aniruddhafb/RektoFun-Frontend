@@ -4,7 +4,7 @@ import { useAppKit, useAppKitAccount, useAppKitProvider } from "@reown/appkit/re
 import { PublicKey, Transaction } from "@solana/web3.js";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
 import {
-  ChallengeListItem,
+  Challenge,
   getChallengeById,
   joinChallenge,
 } from "@/app/lib/challenges-service/challenges";
@@ -123,7 +123,7 @@ const formatExactCountdownDetails = (timestamp: number | null, nowMs: number): C
   };
 };
 
-export function useChallengeDetail(challenge: ChallengeListItem | null, isOpen: boolean, onClose: () => void) {
+export function useChallengeDetail(challenge: Challenge | null, isOpen: boolean, onClose: () => void) {
   const modalRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const { user } = useUserStore();
@@ -241,7 +241,7 @@ export function useChallengeDetail(challenge: ChallengeListItem | null, isOpen: 
         : "Neck and neck";
 
   const isManualResolution = String(challenge?.resolution_source ?? "").toLowerCase() === "manual";
-  const challengeWithResolution = challenge as ChallengeListItem & {
+  const challengeWithResolution = challenge as Challenge & {
     resolving_status?: string;
     resolution_status?: string;
   };

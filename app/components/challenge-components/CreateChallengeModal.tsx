@@ -285,7 +285,7 @@ export function CreateChallengeModal({
                 mode: challengeMode === "pvp" ? "PVP" : "MULTI",
                 result: "TEAM_A",
                 direction: predictionDirection === "Above" ? "UP" : "DOWN",
-                expiry: new Date(expiresAt * 1000).toISOString().split("T")[0],
+                expiry: new Date(expiresAt * 1000).toISOString(),
                 resolution_date: new Date(resolvesAt * 1000).toISOString().split("T")[0],
                 final_price: 0,
             });

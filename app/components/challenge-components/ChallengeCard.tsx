@@ -3,13 +3,13 @@
 import React from "react";
 import Image from "next/image";
 import { AcceptChallengeModal } from "./AcceptChallengeModal";
-import { ChallengeListItem } from "@/app/lib/challenges-service/challenges";
 import { useChallengeCard } from "@/app/hooks/useChallengeCard";
+import { Challenge } from "@/app/lib/challenges-service/challenges";
 
 interface ChallengeCardProps {
-    challenge: ChallengeListItem;
-    onClick?: (challenge: ChallengeListItem) => void;
-    onRekt?: (challenge: ChallengeListItem) => void;
+    challenge: Challenge;
+    onClick?: (challenge: Challenge) => void;
+    onRekt?: (challenge: Challenge) => void;
     onToggleBookmark?: (challengeId: string) => void;
     isBookmarked?: boolean;
     ownerAddress?: string;
@@ -31,7 +31,6 @@ export function ChallengeCard({
         setBetInput,
         setBetError,
         setJoinSide,
-        handleClick: hookHandleClick,
         openBetForm,
         closeBetForm,
         openProfile,
@@ -59,7 +58,7 @@ export function ChallengeCard({
         exactCountdownDetails,
         isCreator,
         isPvpMode,
-        isPoolMode,
+        isTeam,
         isManualResolution,
         hasOpponents,
         isExpireTimeAchieved,
@@ -89,7 +88,8 @@ export function ChallengeCard({
     };
 
     const handleJoinChallengeWrapper = async (e: React.SubmitEvent<HTMLFormElement>) => {
-        await handleJoinChallenge(e, onRekt);
+        e.preventDefault();
+        await handleJoinChallenge();
     };
 
     const handleBookmarkClick = (e: React.MouseEvent) => {
@@ -251,7 +251,7 @@ export function ChallengeCard({
                                 </div>
                                 {/* Label */}
                                 <div className="mt-1 px-1.5 py-0.5 bg-[#2d1f1a] text-white text-[9px] font-bold rounded-full">
-                                    {isPoolMode ? "CHALLENGERS" : "CHALLENGER"}
+                                    {isTeam ? "CHALLENGERS" : "CHALLENGER"}
                                 </div>
 
                                 {/* Info */}
@@ -262,22 +262,22 @@ export function ChallengeCard({
                                     </p>
                                 </div>
                             </div>
-                            {!isExpireTimeAchieved && !isCreator && isPoolMode && (
-                                <button
-                                    type="button"
-                                    onClick={(e) => openBetForm(e)}
-                                    className={`absolute -bottom-4.5 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border-2 text-[28px] font-black leading-none transition hover:scale-105 hover:shadow-md ${hasWon
-                                        ? "border-amber-400 bg-gradient-to-br from-amber-100 to-yellow-50 text-amber-700 hover:from-amber-200 hover:to-yellow-100"
-                                        : hasLost
-                                            ? "border-red-300 bg-gradient-to-br from-red-100 to-rose-50 text-red-700 hover:from-red-200 hover:to-rose-100"
-                                            : "border-[#d4a574]/40 bg-white/90 text-[#2d1f1a] hover:bg-white"
-                                        }`}
-                                    aria-label="counter"
-                                    title="counter"
-                                >
-                                    +
-                                </button>
-                            )}
+
+                            <button
+                                type="button"
+                                onClick={(e) => openBetForm(e)}
+                                className={`absolute -bottom-4.5 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border-2 text-[28px] font-black leading-none transition hover:scale-105 hover:shadow-md ${hasWon
+                                    ? "border-amber-400 bg-gradient-to-br from-amber-100 to-yellow-50 text-amber-700 hover:from-amber-200 hover:to-yellow-100"
+                                    : hasLost
+                                        ? "border-red-300 bg-gradient-to-br from-red-100 to-rose-50 text-red-700 hover:from-red-200 hover:to-rose-100"
+                                        : "border-[#d4a574]/40 bg-white/90 text-[#2d1f1a] hover:bg-white"
+                                    }`}
+                                aria-label="Join Challenge"
+                                title="Join Challenge"
+                            >
+                                +
+                            </button>
+
                         </div>
 
                         {/* VS Badge or Pending Badge */}
@@ -356,14 +356,14 @@ export function ChallengeCard({
                                         />
                                     </div>
                                     {/* Count Badge */}
-                                    {isPoolMode && (challenge.total_opponents ?? 0) > 1 && (
+                                    {isTeam && (challenge.total_opponents ?? 0) > 1 && (
                                         <div className="absolute top-1 right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center border-2 border-white">
                                             <span className="text-[9px] font-bold text-white">+{(challenge.total_opponents ?? 0) - 1}</span>
                                         </div>
                                     )}
                                     {/* Label */}
                                     <div className="mt-1 px-1.5 py-0.5 bg-[#2d1f1a] text-white text-[9px] font-bold rounded-full">
-                                        {isPoolMode ? "POOL" : "Opponent"}
+                                        {isTeam ? "POOL" : "Opponent"}
                                     </div>
 
                                     {/* Info */}
@@ -374,7 +374,7 @@ export function ChallengeCard({
                                         </p>
                                     </div>
                                 </div>
-                                {!isExpireTimeAchieved && !isCreator && isPoolMode && (
+                                {!isExpireTimeAchieved && !isCreator && isTeam && (
                                     <button
                                         type="button"
                                         onClick={(e) => openBetForm(e)}
@@ -384,8 +384,8 @@ export function ChallengeCard({
                                                 ? "border-red-300 bg-gradient-to-br from-red-100 to-rose-50 text-red-700 hover:from-red-200 hover:to-rose-100"
                                                 : "border-[#d4a574]/40 bg-white/90 text-[#2d1f1a] hover:bg-white"
                                             }`}
-                                        aria-label="counter"
-                                        title="counter"
+                                        aria-label="Join Challenge"
+                                        title="Join Challenge"
                                     >
                                         +
                                     </button>
@@ -399,7 +399,7 @@ export function ChallengeCard({
                                         <span className="text-xl">❓</span>
                                     </div>
                                     <div className="mt-1 px-1.5 py-0.5 bg-[#2d1f1a] text-white text-[9px] font-bold rounded-full">
-                                        {isPoolMode ? " OPPONENTS" : "OPPONENT"}
+                                        {isTeam ? " OPPONENTS" : "OPPONENT"}
                                     </div>
                                     {isExpireTimeAchieved && !hasOpponents ? (
                                         <div className="mt-2 text-center">
@@ -409,7 +409,7 @@ export function ChallengeCard({
                                         (<div className="mt-2 text-center">
                                             <p className="font-bold text-[#8b7355] text-xs">No one yet!</p>
                                         </div>)}
-                                    {!isExpireTimeAchieved && !isCreator && isPoolMode && (
+                                    {!isExpireTimeAchieved && !isCreator && isTeam && (
                                         <button
                                             type="button"
                                             onClick={(e) => openBetForm(e)}
@@ -419,8 +419,8 @@ export function ChallengeCard({
                                                     ? "border-red-300 bg-gradient-to-br from-red-100 to-rose-50 text-red-700 hover:from-red-200 hover:to-rose-100"
                                                     : "border-[#d4a574]/40 bg-white/90 text-[#2d1f1a] hover:bg-white"
                                                 }`}
-                                            aria-label="counter"
-                                            title="counter"
+                                            aria-label="Join Challenge"
+                                            title="Join Challenge"
                                         >
                                             +
                                         </button>
@@ -443,7 +443,7 @@ export function ChallengeCard({
                             }}
                             className={ctaState.className}
                         >
-                            {isLoading && isPoolMode ? "JOINING..." : ctaState.label}
+                            {isLoading && isTeam ? "JOINING..." : ctaState.label}
                         </button>
                         {ctaState.showCreatorHint && (
                             <div className="pointer-events-none absolute left-1/2 bottom-full z-10 mb-1 -translate-x-1/2 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
@@ -466,7 +466,7 @@ export function ChallengeCard({
                     resolveCountdown={exactCountdownDetails.exactCountdown}
                     resolveLabel={exactCountdownDetails.dayLabel}
                     resolutionSource={challenge.resolution_source ?? undefined}
-                    isPoolMode={isPoolMode}
+                    isTeam={isTeam}
                     joinSide={joinSide}
                     onClose={() => closeBetForm()}
                     onSubmit={(e) => handleJoinChallengeWrapper(e)}

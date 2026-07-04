@@ -1,40 +1,19 @@
-import React, { FormEvent } from "react";
+import React from "react";
 import { useRouter } from "next/navigation";
 import { useAppKitAccount, useAppKitProvider } from "@reown/appkit/react";
-import { PublicKey } from "@solana/web3.js";
+import { PublicKey, Transaction } from "@solana/web3.js";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
-import {
-  ChallengeListItem,
-  getChallengeById,
-  joinChallenge,
-  updateChallengeMetadata,
-} from "@/app/lib/challenges-service/challenges";
+import { Challenge, getChallengeById } from "@/app/lib/challenges-service/challenges";
+import { createPosition } from "@/app/lib/positions-service/positions";
 import { useUserStore } from "@/app/store/useUserStore";
 import {
   buildAcceptChallengeTx,
   fetchChallenge,
+  getRektoProgram,
   USDC_MINT,
+  USDC_MULTIPLIER,
   getReadonlyConnection,
 } from "@/app/lib/rektofun-program";
-
-// Helper types for metadata structure
-interface AssetMetadata {
-  symbol?: string;
-  name?: string;
-  icon?: string;
-}
-
-interface ModeMetadata {
-  type?: "pvp" | "multi";
-  display?: string;
-}
-
-interface LabelsMetadata {
-  creator?: string;
-  opponent?: string;
-  yes?: string;
-  no?: string;
-}
 
 interface ExactCountdownDetails {
   exactCountdown: string;
@@ -122,20 +101,6 @@ function formatExpiryCountdown(timestamp: number | null, nowMs: number): string 
   return `${minutes}m`;
 }
 
-function truncateProfileName(name: string | null | undefined, maxLen = 6): string {
-  const safeName = (name || "").trim();
-  if (!safeName) return "User";
-  if (safeName.length <= maxLen) return safeName;
-  return `${safeName.slice(0, maxLen)}..`;
-}
-
-function formatWalletAddress(address: string | null | undefined): string {
-  const safeAddress = (address || "").trim();
-  if (!safeAddress) return "";
-  if (safeAddress.length <= 12) return safeAddress;
-  return `${safeAddress.slice(0, 4)}...${safeAddress.slice(-4)}`;
-}
-
 function formatExactCountdownDetails(
   timestamp: number | null,
   nowMs: number
@@ -189,7 +154,7 @@ function formatExactCountdownDetails(
   };
 }
 
-export function useChallengeCard(challenge: ChallengeListItem) {
+export function useChallengeCard(challenge: Challenge) {
   const router = useRouter();
   const { user } = useUserStore();
   const { address, isConnected } = useAppKitAccount();
@@ -201,21 +166,10 @@ export function useChallengeCard(challenge: ChallengeListItem) {
   const [betError, setBetError] = React.useState("");
   const [joinSide, setJoinSide] = React.useState<"challenger" | "opponent">("opponent");
   const [currentTime, setCurrentTime] = React.useState(() => Date.now());
-  const [modalMinAcceptBet, setModalMinAcceptBet] = React.useState<number | undefined>(
-    challenge.min_accept_bet
-  );
-  const [modalMaxAcceptBet, setModalMaxAcceptBet] = React.useState<number | undefined>(
-    challenge.max_accept_bet
-  );
   const [escrowAddress, setEscrowAddress] = React.useState<string | undefined>(undefined);
   const [usdcBalance, setUsdcBalance] = React.useState<number | null>(null);
 
   const connection = getReadonlyConnection();
-  const creator = challenge.creator ?? {
-    username: "",
-    profile_image: "",
-    wallet_address: "",
-  };
 
   // Fetch USDC balance
   React.useEffect(() => {
@@ -247,43 +201,32 @@ export function useChallengeCard(challenge: ChallengeListItem) {
     return () => window.clearInterval(interval);
   }, []);
 
-  // Load challenge modal data when bet form opens
+  // Load the on-chain escrow address when the bet form opens
   React.useEffect(() => {
     if (!isBetFormOpen) return;
 
     let cancelled = false;
-    const loadChallengeModalData = async () => {
+    const loadEscrowAddress = async () => {
       try {
         const details = await getChallengeById(challenge.id);
         if (cancelled) return;
 
-        setModalMinAcceptBet(
-          typeof details.min_accept_bet === "number"
-            ? details.min_accept_bet
-            : challenge.min_accept_bet
-        );
-        setModalMaxAcceptBet(
-          typeof details.max_accept_bet === "number"
-            ? details.max_accept_bet
-            : challenge.max_accept_bet
-        );
-
-        const metadata = (details.metadata as Record<string, unknown> | undefined) ?? {};
-        const onchain = (metadata.onchain as Record<string, unknown> | undefined) ?? {};
-        const maybeChallengePda = metadata.challenge_pda ?? onchain.challenge_pda;
-        setEscrowAddress(typeof maybeChallengePda === "string" ? maybeChallengePda : undefined);
+        const onchain = (details.metadata as Record<string, unknown> | undefined)?.onchain as
+          | { challenge_pda?: string }
+          | undefined;
+        setEscrowAddress(typeof onchain?.challenge_pda === "string" ? onchain.challenge_pda : undefined);
       } catch (error) {
         console.error("Failed to load fresh challenge details for modal:", error);
       }
     };
 
-    loadChallengeModalData();
+    loadEscrowAddress();
     return () => {
       cancelled = true;
     };
-  }, [isBetFormOpen, challenge.id, challenge.min_accept_bet, challenge.max_accept_bet]);
+  }, [isBetFormOpen, challenge.id]);
 
-  const handleClick = (callback?: (challenge: ChallengeListItem) => void) => (e: React.MouseEvent) => {
+  const handleClick = (callback?: (challenge: Challenge) => void) => (e: React.MouseEvent) => {
     e.stopPropagation();
 
     if (callback) {
@@ -295,9 +238,7 @@ export function useChallengeCard(challenge: ChallengeListItem) {
     e.stopPropagation();
     setBetInput(String(challenge.initial_bet ?? ""));
     setBetError("");
-    setJoinSide(challenge.mode === "pool" ? "challenger" : "opponent");
-    setModalMinAcceptBet(challenge.min_accept_bet);
-    setModalMaxAcceptBet(challenge.max_accept_bet);
+    setJoinSide(challenge.mode === "TEAM" ? "challenger" : "opponent");
     setEscrowAddress(undefined);
     setIsBetFormOpen(true);
   };
@@ -316,134 +257,100 @@ export function useChallengeCard(challenge: ChallengeListItem) {
     router.push(`/profile/${walletAddress}`);
   };
 
-  const handleJoinChallenge = async (e: React.SubmitEvent<HTMLFormElement>, onRekt?: (challenge: ChallengeListItem) => void) => {
+  const handleJoinChallenge = async () => {
+    if (!isConnected || !address || !walletProvider) {
+      setBetError("Connect your Solana wallet before joining this challenge.");
+      return;
+    }
 
-      e.preventDefault();
-      e.stopPropagation();
+    if (!user?.id) {
+      setBetError("Your user profile is not ready yet. Please try again.");
+      return;
+    }
 
-      if (!isConnected || !address) {
-        setBetError("Connect your wallet to join this challenge.");
-        return;
+    const parsedBetAmount = Number(betInput);
+
+    if (!Number.isFinite(parsedBetAmount) || parsedBetAmount <= 0) {
+      setBetError("Please enter a valid bet amount.");
+      return;
+    }
+
+    if (
+      typeof usdcBalance === "number" &&
+      Number.isFinite(usdcBalance) &&
+      parsedBetAmount > usdcBalance
+    ) {
+      setBetError("Not enough balance.");
+      return;
+    }
+
+    try {
+      setBetError("");
+      setIsLoading(true);
+
+      const challengeDetails = await getChallengeById(challenge.id);
+      const onchainMeta = (challengeDetails.metadata as Record<string, unknown> | undefined)
+        ?.onchain as { challenge_pda?: string; creator_wallet?: string } | undefined;
+
+      const challengePdaStr = onchainMeta?.challenge_pda;
+      const creatorWalletStr = onchainMeta?.creator_wallet;
+
+      if (!challengePdaStr) {
+        throw new Error(
+          "This challenge has no on-chain reference yet. Please ask the creator to recreate it."
+        );
+      }
+      if (!creatorWalletStr) {
+        throw new Error("Creator wallet is missing for this challenge.");
       }
 
-      if (!walletProvider) {
-        setBetError("Wallet provider not available.");
-        return;
+      const challengePDA = new PublicKey(challengePdaStr);
+      const creatorPubkey = new PublicKey(creatorWalletStr);
+      const challengerPubkey = new PublicKey(address);
+
+      const walletAdapter = {
+        publicKey: challengerPubkey,
+        signTransaction: async (tx: Transaction) => (walletProvider as any).signTransaction(tx),
+        signAllTransactions: async (txs: Transaction[]) =>
+          (walletProvider as any).signAllTransactions(txs),
+      };
+
+      const program = getRektoProgram(walletAdapter);
+
+      const onChainChallenge = await fetchChallenge(program, challengePDA);
+      if (!onChainChallenge) {
+        throw new Error("On-chain challenge account not found. It may have been cancelled or settled.");
+      }
+      if (Date.now() / 1000 >= onChainChallenge.expiresAt) {
+        throw new Error("Challenge has already expired.");
+      }
+      if (challengerPubkey.equals(onChainChallenge.creator)) {
+        throw new Error("You cannot accept your own challenge.");
       }
 
-      if (!user?.id) {
-        setBetError("Your user profile is not ready yet. Please try again.");
-        return;
-      }
+      const requiredBetUsdc = Number(onChainChallenge.betAmount) / USDC_MULTIPLIER;
 
-      const parsedBetAmount = Number(betInput);
-      const minAcceptBet = modalMinAcceptBet;
-      const maxAcceptBet = modalMaxAcceptBet;
-      const betCurrency = "USDC";
+      const tx = await buildAcceptChallengeTx(program, challengerPubkey, challengePDA, creatorPubkey);
+      const signedTx = await walletAdapter.signTransaction(tx);
+      const signature = await connection.sendRawTransaction(signedTx.serialize());
+      await connection.confirmTransaction(signature, "confirmed");
 
-      if (!Number.isFinite(parsedBetAmount) || parsedBetAmount <= 0) {
-        setBetError("Please enter a valid bet amount.");
-        return;
-      }
+      await createPosition({
+        challenge_id: challenge.id,
+        bet: requiredBetUsdc,
+        side: challenge.mode === "TEAM" ? joinSide : "opponent",
+        creator: user.id,
+      });
 
-      if (
-        typeof usdcBalance === "number" &&
-        Number.isFinite(usdcBalance) &&
-        parsedBetAmount > usdcBalance
-      ) {
-        setBetError("Not enough balance.");
-        return;
-      }
-
-      if (typeof minAcceptBet === "number" && parsedBetAmount < minAcceptBet) {
-        setBetError(`Bet amount must be at least ${minAcceptBet} ${betCurrency}.`);
-        return;
-      }
-
-      if (typeof maxAcceptBet === "number" && parsedBetAmount > maxAcceptBet) {
-        setBetError(`Bet amount must be at most ${maxAcceptBet} ${betCurrency}.`);
-        return;
-      }
-
-      try {
-        setBetError("");
-        setIsLoading(true);
-
-        const challengeDetails = await getChallengeById(challenge.id);
-
-        const onchainMeta =
-          (challengeDetails.metadata as Record<string, unknown> | undefined)?.onchain as
-            | {
-                challenge_pda?: string;
-                creator_wallet?: string;
-              }
-            | undefined;
-
-        const challengePdaStr = onchainMeta?.challenge_pda;
-        const creatorWalletStr = onchainMeta?.creator_wallet ?? creator.wallet_address;
-
-        if (!challengePdaStr) {
-          throw new Error(
-            "This challenge has no on-chain reference yet. Please ask the creator to recreate it."
-          );
-        }
-        if (!creatorWalletStr) {
-          throw new Error("Creator wallet is missing for this challenge.");
-        }
-
-        const challengePDA = new PublicKey(challengePdaStr);
-        const creatorPubkey = new PublicKey(creatorWalletStr);
-        const userPubkey = new PublicKey(address);
-
-        const program = (walletProvider as any).program;
-        if (!program) {
-          throw new Error("Anchor program not available. Please reconnect your wallet.");
-        }
-
-        const onChainChallenge = await fetchChallenge(program, challengePDA);
-        if (!onChainChallenge) {
-          throw new Error(
-            "On-chain challenge account not found. It may have been cancelled or settled."
-          );
-        }
-        if (Date.now() / 1000 >= onChainChallenge.expiresAt) {
-          throw new Error("Challenge has already expired.");
-        }
-        if (userPubkey.equals(onChainChallenge.creator)) {
-          throw new Error("You cannot accept your own challenge.");
-        }
-
-        const tx = await buildAcceptChallengeTx(program, userPubkey, challengePDA, creatorPubkey);
-
-        tx.feePayer = userPubkey;
-        tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
-
-        const signedTx = await (walletProvider as any).signAndSendTransaction(tx);
-
-        await joinChallenge({
-          challenge_id: challenge.id,
-          user_id: user.id,
-          side: challenge.mode === "pool" ? joinSide : "opponent",
-          bet_amount: parsedBetAmount,
-        });
-
-        // Store challenger wallet so the backend can include it in on-chain settlement
-        const existingOnchain = (challengeDetails.metadata as Record<string, unknown> | undefined)?.onchain as Record<string, unknown> ?? {};
-        await updateChallengeMetadata(challenge.id, {
-          onchain: { ...existingOnchain, challenger_wallet: address },
-        }).catch((err) => console.error("Failed to persist challenger_wallet:", err));
-
-        setIsBetFormOpen(false);
-        if (onRekt) onRekt(challenge);
-      } catch (error) {
-        console.error("Failed to join challenge:", error);
-        const message =
-          error instanceof Error ? error.message : "Failed to join challenge. Please try again.";
-        setBetError(message);
-        alert(message);
-      } finally {
-        setIsLoading(false);
-      }
+      setIsBetFormOpen(false);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to join challenge. Please try again.";
+      setBetError(message);
+      alert(message);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleShareChallenge = async (e: React.MouseEvent) => {
@@ -453,12 +360,12 @@ export function useChallengeCard(challenge: ChallengeListItem) {
     const shareUrl = `${window.location.origin}/challenges?challengeId=${encodeURIComponent(
       challenge.id
     )}`;
-    const shareText = `Check out this challenge: ${challenge.title}`;
+    const shareText = `Check out this challenge: ${challenge.statement ?? ""}`;
 
     try {
       if (navigator.share) {
         await navigator.share({
-          title: challenge.title,
+          title: challenge.statement ?? "RektoFun challenge",
           text: shareText,
           url: shareUrl,
         });
@@ -475,61 +382,34 @@ export function useChallengeCard(challenge: ChallengeListItem) {
   };
 
   // Computed values
-  const market = challenge.market ?? null;
-  const assetMeta: AssetMetadata = {
-    symbol: market?.name,
-    name: market?.name,
-    icon: market?.icon,
-  };
-  const modeMeta: ModeMetadata = {
-    type: challenge.mode === "pool" ? "multi" : "pvp",
-    display: challenge.mode === "pool" ? "Pool Mode" : "PVP Mode",
-  };
-  const labelsMeta: LabelsMetadata = {
-    creator: creator.username,
-  };
+  const assetSymbol = challenge.ticker;
+  const assetIcon = "/scribbles/btc.png";
+  const assetName = challenge.trading_pair || assetSymbol;
 
-  const resolvedPoolAmount = (() => {
-    const totalPoolValue = Number(challenge.total_pool ?? 0);
-    if (Number.isFinite(totalPoolValue) && totalPoolValue > 0) {
-      return totalPoolValue;
-    }
-    const fallbackValue = Number(challenge.initial_bet ?? 0);
-    if (Number.isFinite(fallbackValue) && fallbackValue > 0) {
-      return fallbackValue;
-    }
-    return 0;
-  })();
+  const isPvpMode = challenge.mode !== "TEAM";
+  const isTeam = challenge.mode === "TEAM";
 
-  const challengeMode: "pvp" | "multi" = modeMeta.type || "pvp";
-  const hasWon =
-    challenge.status === "resolved" &&
-    challenge.result &&
-    (challenge.result as Record<string, unknown>).winner === "current_user_id";
-  const hasLost =
-    challenge.status === "resolved" &&
-    challenge.result &&
-    (challenge.result as Record<string, unknown>).winner !== "current_user_id";
+  const creator = challenge.creator;
+  const isCreator = user?.id != null && user.id === creator;
+  const creatorDisplayName = "Creator";
+  const creatorProfileImage = assetIcon;
 
-  const assetSymbol = assetMeta.symbol || assetMeta.name || "BTC";
-  const assetIcon = assetMeta.icon || "/scribbles/btc.png";
-  const assetName = assetMeta.name || assetSymbol;
-  const creatorName = labelsMeta.creator || creator.username || "Creator";
-  const creatorDisplayName = truncateProfileName(creatorName, 10);
-  const creatorWalletDisplay = formatWalletAddress(creator.wallet_address);
-  const creatorProfileImage = creator.profile_image || assetIcon;
-  const opponentInfo = challenge.opponent_info ?? null;
-  const hasOpponentInfo = Boolean(opponentInfo?.username || opponentInfo?.wallet_address);
-  const opponentProfileImage = opponentInfo?.profile_image || assetIcon;
-  const opponentDisplayName = opponentInfo?.username || "Opponent";
-  const opponentWalletDisplay = formatWalletAddress(opponentInfo?.wallet_address);
+  // Opponent/team roster data isn't part of the Challenge payload (it lives in positions).
+  const opponentInfo = null;
+  const hasOpponentInfo = false;
+  const opponentProfileImage = assetIcon;
+  const opponentDisplayName = "Opponent";
 
-  const title = challenge.title || `Bet on ${assetSymbol}`;
-  const betAmount = challenge.initial_bet || 0;
+  const hasWon = false;
+  const hasLost = false;
+
+  const resolvedPoolAmount = challenge.pool_size || challenge.initial_bet || 0;
+
+  const title = challenge.statement || `Bet on ${assetSymbol}`;
   const betCurrency = "USDC";
-  const poolDisplay = `$${resolvedPoolAmount}` || "$0 USDC";
+  const poolDisplay = `$${resolvedPoolAmount}`;
 
-  const expiryTimestamp = parseDateValue(challenge.expire_time);
+  const expiryTimestamp = parseDateValue(challenge.expiry);
   const timeRemaining = formatExpiryCountdown(expiryTimestamp, currentTime);
   const isExpiryUnderOneHour = Boolean(
     expiryTimestamp &&
@@ -538,7 +418,7 @@ export function useChallengeCard(challenge: ChallengeListItem) {
   );
 
   const createdTimeText = formatCreatedTimeAgo(parseDateValue(challenge.created_at));
-  const resolveTimestamp = parseDateValue(challenge.resolve_time);
+  const resolveTimestamp = parseDateValue(challenge.resolution_date);
   const challengeEndTimeText = formatUtcDateTime(resolveTimestamp);
   const resolveDateByText = resolveTimestamp
     ? new Date(resolveTimestamp).toLocaleDateString("en-GB", {
@@ -549,26 +429,13 @@ export function useChallengeCard(challenge: ChallengeListItem) {
     : "";
   const endsByCountdown = formatEndsByCountdown(resolveTimestamp, currentTime);
   const exactCountdownDetails = formatExactCountdownDetails(resolveTimestamp, currentTime);
-  const isCreator = user?.wallet_address === creator.wallet_address;
-  const isPvpMode = challenge.mode !== "pool";
-  const isPoolMode = challenge.mode === "pool";
-  const isManualResolution = String(challenge.resolution_source ?? "").toLowerCase() === "manual";
-  const totalOpponents = Number(challenge.total_opponents ?? 0);
+  const isManualResolution = challenge.resolution_method !== "PRICE_FEED";
+  const totalOpponents = Math.max((challenge.participants ?? 0) - 1, 0);
   const hasOpponents = totalOpponents > 0;
   const isExpireTimeAchieved = Boolean(expiryTimestamp && expiryTimestamp <= currentTime);
   const isResolveTimeAchieved = Boolean(resolveTimestamp && resolveTimestamp <= currentTime);
-
-  const challengeWithResolution = challenge as ChallengeListItem & {
-    resolving_status?: string;
-    resolution_status?: string;
-  };
-  const resolutionStatusRaw = String(
-    challengeWithResolution.resolving_status ??
-      challengeWithResolution.resolution_status ??
-      ""
-  ).toLowerCase();
-  const isResolutionPending = resolutionStatusRaw === "pending";
-  const isResolutionResolved = resolutionStatusRaw === "resolved" || challenge.status === "resolved";
+  const isResolutionPending = challenge.status === "PENDING_RESOLUTION";
+  const isResolutionResolved = challenge.status === "RESOLVED";
 
   // CTA Button logic
   const ctaBaseClassName =
@@ -613,7 +480,7 @@ export function useChallengeCard(challenge: ChallengeListItem) {
         ctaDisabled = isLoading || isCreator;
         ctaClassName = activePvpCtaClassName;
       }
-    } else if (isPoolMode) {
+    } else if (isTeam) {
       if (isResolveTimeAchieved && hasOpponents && isResolutionResolved) {
         ctaLabel = "COMPLETED ✅";
         ctaDisabled = true;
@@ -682,23 +549,15 @@ export function useChallengeCard(challenge: ChallengeListItem) {
     betInput,
     betError,
     joinSide,
-    currentTime,
-    modalMinAcceptBet,
-    modalMaxAcceptBet,
-    escrowAddress,
     usdcBalance,
+    escrowAddress,
+    modalMinAcceptBet: undefined as number | undefined,
+    modalMaxAcceptBet: undefined as number | undefined,
 
     // Setters
-    setIsLoading,
-    setIsBetFormOpen,
     setBetInput,
     setBetError,
     setJoinSide,
-    setCurrentTime,
-    setModalMinAcceptBet,
-    setModalMaxAcceptBet,
-    setEscrowAddress,
-    setUsdcBalance,
 
     // Handlers
     handleClick,
@@ -710,49 +569,34 @@ export function useChallengeCard(challenge: ChallengeListItem) {
 
     // Computed values
     creator,
-    market,
-    assetMeta,
-    modeMeta,
-    labelsMeta,
-    resolvedPoolAmount,
-    challengeMode,
-    hasWon,
-    hasLost,
     assetSymbol,
     assetIcon,
     assetName,
-    creatorName,
     creatorDisplayName,
-    creatorWalletDisplay,
     creatorProfileImage,
     opponentInfo,
     hasOpponentInfo,
     opponentProfileImage,
     opponentDisplayName,
-    opponentWalletDisplay,
     title,
-    betAmount,
     betCurrency,
     poolDisplay,
     expiryTimestamp,
     timeRemaining,
     isExpiryUnderOneHour,
     createdTimeText,
-    resolveTimestamp,
     challengeEndTimeText,
     resolveDateByText,
     endsByCountdown,
     exactCountdownDetails,
     isCreator,
     isPvpMode,
-    isPoolMode,
+    isTeam,
     isManualResolution,
     totalOpponents,
     hasOpponents,
     isExpireTimeAchieved,
     isResolveTimeAchieved,
-    isResolutionPending,
-    isResolutionResolved,
     ctaState,
     isBattleOnState,
     isResolvingState,
@@ -760,5 +604,7 @@ export function useChallengeCard(challenge: ChallengeListItem) {
     isExpiresInState,
     expiryStatusText,
     expiryTooltipText,
+    hasWon,
+    hasLost,
   };
 }

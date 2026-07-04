@@ -1,11 +1,11 @@
 "use client";
 
 import { ChallengeCard } from "../challenge-components/ChallengeCard";
-import { ChallengeListItem } from "@/app/lib/challenges-service/challenges";
+import { Challenge } from "@/app/lib/challenges-service/challenges";
 
 interface MarketChallengesGridProps {
-    challenges: ChallengeListItem[];
-    onChallengeClick?: (challenge: ChallengeListItem) => void;
+    challenges: Challenge[];
+    onChallengeClick?: (challenge: Challenge) => void;
     onToggleBookmark?: (challengeId: string) => void;
     isBookmarked?: (challengeId: string) => boolean;
 }
