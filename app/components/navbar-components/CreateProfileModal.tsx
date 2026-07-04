@@ -1,15 +1,18 @@
 "use client";
 
+import { getProfileAvatarDataUri } from "@/app/lib/profile-avatar";
+
 type CreateProfileModalProps = {
     isOpen: boolean;
     editProfileIndex: number;
     editUsername: string;
+    editEmail: string;
     editBio: string;
     editInviteCode: string;
     profileFormError: string | null;
     onRandomizeProfile: () => void;
-    onRandomizeUsername: () => void;
     onEditUsernameChange: (value: string) => void;
+    onEditEmailChange: (value: string) => void;
     onEditBioChange: (value: string) => void;
     onEditInviteCodeChange: (value: string) => void;
     onSubmit: () => void;
@@ -19,12 +22,13 @@ export function CreateProfileModal({
     isOpen,
     editProfileIndex,
     editUsername,
+    editEmail,
     editBio,
     editInviteCode,
     profileFormError,
     onRandomizeProfile,
-    onRandomizeUsername,
     onEditUsernameChange,
+    onEditEmailChange,
     onEditBioChange,
     onEditInviteCodeChange,
     onSubmit,
@@ -55,7 +59,7 @@ export function CreateProfileModal({
                             <div className="flex items-center gap-4">
                                 <div className="w-20 h-20 rounded-full overflow-hidden border-4 border-black shadow-lg">
                                     <img
-                                        src={`https://earningrecords.com/assets/rektofun/profiles/${editProfileIndex + 1}.svg`}
+                                        src={getProfileAvatarDataUri(editProfileIndex)}
                                         alt="Profile"
                                         className="w-full h-full object-cover"
                                     />
@@ -73,13 +77,6 @@ export function CreateProfileModal({
                                 <label className="block text-sm font-medium text-gray-700">
                                     Username*
                                 </label>
-                                <button
-                                    type="button"
-                                    onClick={onRandomizeUsername}
-                                    className="px-3 py-1.5 bg-white/80 border border-gray-800 rounded-lg text-xs font-semibold text-gray-700 hover:bg-white transition-colors"
-                                >
-                                    Randomize
-                                </button>
                             </div>
                             <input
                                 maxLength={18}
@@ -90,6 +87,18 @@ export function CreateProfileModal({
                                 placeholder="Enter username"
                             />
                             <p className="mt-1 text-xs text-gray-500">Create a unique username</p>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Email (Optional)
+                            </label>
+                            <input
+                                type="email"
+                                value={editEmail}
+                                onChange={(e) => onEditEmailChange(e.target.value)}
+                                className="w-full px-4 py-2 bg-white/80 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:border-transparent"
+                                placeholder="Enter email"
+                            />
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">

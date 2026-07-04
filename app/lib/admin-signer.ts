@@ -17,6 +17,7 @@
  */
 
 import { Keypair, PublicKey, Transaction } from "@solana/web3.js";
+import bs58 from "bs58";
 import {
   buildCreateChallengeTx,
   CreateChallengeArgs,
@@ -25,9 +26,6 @@ import {
   getReadonlyConnection,
   getRektoProgram,
 } from "./rektofun-program";
-
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const bs58 = require("bs58") as { decode: (str: string) => Uint8Array; encode: (buf: Uint8Array) => string };
 
 let cachedKeypair: Keypair | null = null;
 
