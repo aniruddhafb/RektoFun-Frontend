@@ -79,18 +79,18 @@ type LeaderboardRow = {
     rank: number;
     username: string;
     avatar: string;
-    points: number;
-    rekts: number;
-    challenges: number;
-    winRate: string;
-    earnings: string;
+    winRate: number;
+    winRateLabel: string;
+    won: number;
+    rekt: number;
+    profit: string;
+    volume: string;
 };
 
-type SortField = "rank" | "points" | "rekts" | "challenges" | "earnings";
+type SortField = "rank" | "winRate" | "won" | "rekt" | "profit" | "volume";
 type SortOrder = "desc" | "asc";
 
 const ITEMS_PER_PAGE = 10;
-const POINTS_PER_REFERRAL = 100;
 const SEARCH_DEBOUNCE_MS = 300;
 
 const SortIndicator = ({ active, order }: { active: boolean; order: SortOrder }) => {
@@ -100,10 +100,13 @@ const SortIndicator = ({ active, order }: { active: boolean; order: SortOrder })
 
 function mapUserToRow(user: LeaderboardUser, rank: number): LeaderboardRow {
     const referralCount = user.referrals?.length ?? 0;
-    const points = referralCount * POINTS_PER_REFERRAL;
-    const challenges = referralCount;
-    const rekts = Math.max(0, Math.floor(challenges * 0.2));
-    const winRate = challenges > 0 ? `${Math.min(99, Math.max(1, Math.round((points / (points + rekts || 1)) * 100)))}%` : "0%";
+    const won = referralCount;
+    const rekt = Math.max(0, Math.floor(won * 0.2));
+    const profit = (user.earnings ?? 0).toFixed(1);
+    const volume = (won * 250 + rekt * 100 + Number(profit) * 5).toFixed(1);
+    const totalRounds = won + rekt;
+    const winRate = totalRounds > 0 ? Math.round((won / totalRounds) * 100) : 0;
+    const winRateLabel = `${winRate}%`;
 
     return {
         id: user.id,
@@ -111,11 +114,12 @@ function mapUserToRow(user: LeaderboardUser, rank: number): LeaderboardRow {
         rank,
         username: user.username || `user-${user.wallet_address.slice(0, 6)}`,
         avatar: user.profile_image || "/scribbles/pepe.png",
-        points,
-        rekts,
-        challenges,
         winRate,
-        earnings: (user.earnings ?? 0).toFixed(1),
+        winRateLabel,
+        won,
+        rekt,
+        profit,
+        volume,
     };
 }
 
@@ -159,7 +163,7 @@ export default function LeaderboardPage() {
     const router = useRouter();
     const [searchQuery, setSearchQuery] = useState("");
     const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
-    const [sortField, setSortField] = useState<SortField>("points");
+    const [sortField, setSortField] = useState<SortField>("profit");
     const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
     const [currentPage, setCurrentPage] = useState(1);
     const [rows, setRows] = useState<LeaderboardRow[]>([]);
@@ -203,7 +207,9 @@ export default function LeaderboardPage() {
         const sorted = [...rows];
         sorted.sort((a, b) => {
             const direction = sortOrder === "asc" ? 1 : -1;
-            if (sortField === "earnings") return (Number(a.earnings) - Number(b.earnings)) * direction;
+            if (sortField === "profit" || sortField === "volume") {
+                return (Number(a[sortField]) - Number(b[sortField])) * direction;
+            }
             return ((a[sortField] as number) - (b[sortField] as number)) * direction;
         });
         return sorted;
@@ -212,9 +218,6 @@ export default function LeaderboardPage() {
     const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE);
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
     const paginatedData = sortedData;
-    const totalEarned = rows.reduce((sum, row) => sum + Number(row.earnings), 0);
-    const totalChallenges = rows.reduce((sum, row) => sum + row.challenges, 0);
-    const totalPoints = rows.reduce((sum, row) => sum + row.points, 0);
 
     const handlePageChange = (page: number) => {
         if (page >= 1 && page <= totalPages && page !== currentPage) {
@@ -298,7 +301,7 @@ export default function LeaderboardPage() {
                         <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                         <input
                             type="text"
-                            placeholder="Search traders..."
+                            placeholder="Search users..."
                             value={searchQuery}
                             onChange={(e) => {
                                 setSearchQuery(e.target.value);
@@ -307,15 +310,15 @@ export default function LeaderboardPage() {
                         />
                     </div>
                     <div className="rounded-full border border-black/10 bg-white/60 px-4 py-2 text-sm font-semibold text-gray-600">
-                        {totalCount} {totalCount === 1 ? "trader" : "traders"} ranked
+                        {totalCount} {totalCount === 1 ? "user" : "users"} ranked
                     </div>
                 </div>
 
                 <div className="leaderboard-hover-shadow leaderboard-table-shell bg-[#fffaf6]/80 backdrop-blur-sm rounded-2xl border border-black/10 overflow-hidden transition-all duration-200 hover:border-black">
                     <div className="flex flex-col gap-1 border-b border-black/10 bg-white/80 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
                         <div>
-                            <h2 className="text-lg font-black text-gray-900">Trader Rankings</h2>
-                            <p className="text-sm font-medium text-gray-500">Ranked by REKTO points</p>
+                            <h2 className="text-lg font-black text-gray-900">User Rankings</h2>
+                            <p className="text-sm font-medium text-gray-500">Ranked by profit</p>
                         </div>
                         <div className="text-sm font-semibold text-gray-600">
                             Page {Math.min(currentPage, Math.max(totalPages, 1))} of {Math.max(totalPages, 1)}
@@ -327,19 +330,21 @@ export default function LeaderboardPage() {
                                 <div onClick={() => handleSort("rank")} className="col-span-1 flex cursor-pointer items-center gap-1 bg-transparent p-0 text-left font-black text-gray-500 transition hover:text-gray-900">
                                     Rank <SortIndicator active={sortField === "rank"} order={sortOrder} />
                                 </div>
-                                <div className="col-span-3">Trader</div>
-                                <div onClick={() => handleSort("points")} className="col-span-2 flex cursor-pointer items-center gap-1 bg-transparent p-0 text-left font-black text-gray-500 transition hover:text-gray-900">
-                                    Points <SortIndicator active={sortField === "points"} order={sortOrder} />
+                                <div className="col-span-3">User</div>
+                                <div onClick={() => handleSort("winRate")} className="col-span-2 flex cursor-pointer items-center gap-1 bg-transparent p-0 text-left font-black text-gray-500 transition hover:text-gray-900">
+                                    Win Rate <SortIndicator active={sortField === "winRate"} order={sortOrder} />
                                 </div>
-                                <div onClick={() => handleSort("rekts")} className="col-span-1 flex cursor-pointer items-center gap-1 bg-transparent p-0 text-left font-black text-gray-500 transition hover:text-gray-900">
-                                    Rekts <SortIndicator active={sortField === "rekts"} order={sortOrder} />
+                                <div onClick={() => handleSort("won")} className="col-span-1 flex cursor-pointer items-center gap-1 bg-transparent p-0 text-left font-black text-gray-500 transition hover:text-gray-900">
+                                    Won <SortIndicator active={sortField === "won"} order={sortOrder} />
                                 </div>
-                                <div onClick={() => handleSort("challenges")} className="col-span-2 flex cursor-pointer items-center gap-1 bg-transparent p-0 text-left font-black text-gray-500 transition hover:text-gray-900">
-                                    Challenges <SortIndicator active={sortField === "challenges"} order={sortOrder} />
+                                <div onClick={() => handleSort("rekt")} className="col-span-1 flex cursor-pointer items-center gap-1 bg-transparent p-0 text-left font-black text-gray-500 transition hover:text-gray-900">
+                                    Rekt <SortIndicator active={sortField === "rekt"} order={sortOrder} />
                                 </div>
-                                <div className="col-span-1 flex items-center gap-1">Win% <ChevronIcon direction="up" /></div>
-                                <div onClick={() => handleSort("earnings")} className="col-span-2 flex cursor-pointer items-center justify-end gap-1 bg-transparent p-0 text-right font-black text-gray-500 transition hover:text-gray-900">
-                                    Earnings <SortIndicator active={sortField === "earnings"} order={sortOrder} />
+                                <div onClick={() => handleSort("profit")} className="col-span-2 flex cursor-pointer items-center justify-end gap-1 bg-transparent p-0 text-right font-black text-gray-500 transition hover:text-gray-900">
+                                    Profit <SortIndicator active={sortField === "profit"} order={sortOrder} />
+                                </div>
+                                <div onClick={() => handleSort("volume")} className="col-span-2 flex cursor-pointer items-center justify-end gap-1 bg-transparent p-0 text-right font-black text-gray-500 transition hover:text-gray-900">
+                                    Volume <SortIndicator active={sortField === "volume"} order={sortOrder} />
                                 </div>
                             </div>
 
@@ -378,25 +383,24 @@ export default function LeaderboardPage() {
                                             </div>
                                         </div>
 
-                                        <div className="col-span-2 flex items-center gap-2">
-                                            <SparkleIcon className="text-amber-500" />
-                                            <span className="font-black text-gray-900">{user.points}</span>
+                                        <div className="col-span-2 flex items-center gap-1">
+                                            <span className="rounded-full bg-emerald-50 px-2 py-1 text-xs font-black text-emerald-700">{user.winRateLabel}</span>
                                         </div>
 
                                         <div className="col-span-1 flex items-center gap-1">
-                                            <span className="rounded-full bg-red-50 px-2 py-1 text-xs font-black text-red-600">{user.rekts}</span>
+                                            <span className="rounded-full bg-emerald-50 px-2 py-1 text-xs font-black text-emerald-700">{user.won}</span>
                                         </div>
 
-                                        <div className="col-span-2 flex items-center gap-1">
-                                            <span className="font-semibold text-gray-900">{user.challenges}</span>
-                                        </div>
-
-                                        <div className="col-span-1">
-                                            <span className="rounded-full bg-emerald-50 px-2 py-1 text-xs font-black text-emerald-700">{user.winRate}</span>
+                                        <div className="col-span-1 flex items-center gap-1">
+                                            <span className="rounded-full bg-red-50 px-2 py-1 text-xs font-black text-red-600">{user.rekt}</span>
                                         </div>
 
                                         <div className="col-span-2 text-right">
-                                            <span className="font-black text-gray-900">${user.earnings}</span>
+                                            <span className="font-black text-gray-900">${user.profit}</span>
+                                        </div>
+
+                                        <div className="col-span-2 text-right">
+                                            <span className="font-black text-gray-900">${user.volume}</span>
                                         </div>
                                     </div>
                                 ))}
@@ -407,7 +411,7 @@ export default function LeaderboardPage() {
                     {!error && totalPages > 1 && (
                         <div className="flex flex-col gap-4 border-t border-black/10 bg-white/80 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
                             <div className="text-sm font-semibold text-gray-600">
-                                Showing {startIndex + 1}-{Math.min(startIndex + ITEMS_PER_PAGE, totalCount)} of {totalCount} traders
+                                Showing {startIndex + 1}-{Math.min(startIndex + ITEMS_PER_PAGE, totalCount)} of {totalCount} users
                             </div>
                             <div className="flex flex-wrap items-center gap-2">
                                 <button
