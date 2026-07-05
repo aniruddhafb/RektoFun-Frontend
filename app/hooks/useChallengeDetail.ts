@@ -90,7 +90,7 @@ export function useChallengeDetail(
     ? `${creatorWalletAddress.slice(0, 6)}...${creatorWalletAddress.slice(-4)}`
     : "Unknown wallet";
   const hasOpponents = Number(challenge?.participants ?? 0) > 1;
-  const isPoolMode = challenge?.mode === "TEAM";
+  const isTeam= challenge?.mode === "TEAM";
   const betAmount = challenge?.initial_bet ?? 0;
   const createdTimestamp = challenge?.created_at ? new Date(challenge.created_at).getTime() : null;
   const expiryTimestamp = challenge?.expiry ? new Date(challenge.expiry).getTime() : null;
@@ -167,7 +167,7 @@ export function useChallengeDetail(
 
   const hasResolveTimePassed = Boolean(resolveTimestamp && resolveTimestamp <= currentTime);
   const showResolvesBox = !isExpireTimeAchieved || hasOpponents;
-  const hideExpiresBox = !isPoolMode && hasOpponents;
+  const hideExpiresBox = !isTeam&& hasOpponents;
   const timelineColumns = (!hideExpiresBox ? 1 : 0) + 2 + (showResolvesBox ? 1 : 0);
 
   // Countdown texts
@@ -253,7 +253,7 @@ export function useChallengeDetail(
     let ctaDisabled = false;
     let ctaClassName = "";
 
-    if (!isPoolMode) {
+    if (!isTeam) {
       if (isResolveTimeAchieved && isResolutionResolved) {
         ctaLabel = "COMPLETED ✅";
         ctaDisabled = true;
@@ -411,7 +411,7 @@ export function useChallengeDetail(
     creatorWalletAddress,
     creatorWalletShort,
     hasOpponents,
-    isPoolMode,
+    isTeam,
     betAmount,
     canExpandTitle,
     displayedTitle,
@@ -444,7 +444,7 @@ export function useChallengeDetail(
     statusLabel,
     statusClassName,
     canToggleDescription: isDescriptionTruncatable,
-    modeLabel: isPoolMode ? "Multi Mode" : "PvP Mode",
+    modeLabel: isTeam? "Multi Mode" : "PvP Mode",
     totalPoolLabel: `$${Number(betAmount || 0).toLocaleString()}`,
     primaryTitle: displayedTitle + (!isManualResolution && isResolveTimeAchieved && resolveDateByText ? ` by ${resolveDateByText}` : ""),
     resolutionLabel: isManualResolution ? "Community resolution" : "Price feed resolution",

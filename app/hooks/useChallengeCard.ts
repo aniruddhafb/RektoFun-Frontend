@@ -165,7 +165,7 @@ export function useChallengeCard(challenge: Challenge) {
   const [isBetFormOpen, setIsBetFormOpen] = React.useState(false);
   const [betInput, setBetInput] = React.useState(String(challenge.initial_bet ?? ""));
   const [betError, setBetError] = React.useState("");
-  const [joinSide, setJoinSide] = React.useState<"challenger" | "opponent">("opponent");
+  const [joinSide, setJoinSide] = React.useState<"TEAM_A" | "TEAM_B">("TEAM_B");
   const [currentTime, setCurrentTime] = React.useState(() => Date.now());
   const [escrowAddress, setEscrowAddress] = React.useState<string | undefined>(undefined);
   const [usdcBalance, setUsdcBalance] = React.useState<number | null>(null);
@@ -239,7 +239,7 @@ export function useChallengeCard(challenge: Challenge) {
     e.stopPropagation();
     setBetInput(String(challenge.initial_bet ?? ""));
     setBetError("");
-    setJoinSide(challenge.mode === "TEAM" ? "challenger" : "opponent");
+    setJoinSide(challenge.mode === "TEAM" ? "TEAM_A" : "TEAM_B");
     setEscrowAddress(undefined);
     setIsBetFormOpen(true);
   };
@@ -330,8 +330,21 @@ export function useChallengeCard(challenge: Challenge) {
       }
 
       const requiredBetUsdc = Number(onChainChallenge.betAmount) / USDC_MULTIPLIER;
-
-      const tx = await buildAcceptChallengeTx(program, challengerPubkey, challengePDA, creatorPubkey);
+      console.log("opponent data: ", {
+        program,
+        challengerPubkey,
+        challengePDA,
+        creatorPubkey
+      });
+      const tx = await buildAcceptChallengeTx(
+        program,
+        challengerPubkey,
+        challengePDA,
+        creatorPubkey,
+        joinSide === "TEAM_A"
+      );
+      tx.feePayer = challengerPubkey;
+      tx.recentBlockhash = (await connection.getLatestBlockhash("confirmed")).blockhash;
       const signedTx = await walletAdapter.signTransaction(tx);
       const signature = await connection.sendRawTransaction(signedTx.serialize());
       await connection.confirmTransaction(signature, "confirmed");
@@ -339,7 +352,7 @@ export function useChallengeCard(challenge: Challenge) {
       await createPosition({
         challenge_id: challenge.id,
         bet: requiredBetUsdc,
-        side: challenge.mode === "TEAM" ? joinSide : "opponent",
+        side: joinSide,
         creator: user.id,
       });
 
@@ -392,8 +405,10 @@ export function useChallengeCard(challenge: Challenge) {
 
   const creator = challenge.creator;
   const isCreator = user?.id != null && user.id === creator;
-  const creatorDisplayName = "Creator";
-  const creatorProfileImage = assetIcon;
+  const creatorDetails = challenge.creator_details;
+  const creatorDisplayName = creatorDetails?.username || "Creator";
+  const creatorProfileImage = creatorDetails?.profile_image || assetIcon;
+  const creatorWalletAddress = creatorDetails?.pubkey || "";
 
   // Opponent/team roster data isn't part of the Challenge payload (it lives in positions).
   const opponentInfo = null;
@@ -575,6 +590,7 @@ export function useChallengeCard(challenge: Challenge) {
     assetName,
     creatorDisplayName,
     creatorProfileImage,
+    creatorWalletAddress,
     opponentInfo,
     hasOpponentInfo,
     opponentProfileImage,

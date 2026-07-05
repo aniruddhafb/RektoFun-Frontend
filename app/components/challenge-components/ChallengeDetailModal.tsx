@@ -42,7 +42,7 @@ export default function ChallengeDetailModal({ challenge, creator, isOpen, onClo
     creatorName,
     creatorAvatar,
     creatorWalletAddress,
-    isPoolMode,
+    isTeam,
     betAmount,
     creatorWalletShort,
     canExpandTitle,
@@ -362,7 +362,7 @@ export default function ChallengeDetailModal({ challenge, creator, isOpen, onClo
                       />
                     </div>
                     <div className="mt-1 px-1.5 py-0.5 bg-[#2d1f1a] text-white text-[9px] font-bold rounded-full">
-                      {isPoolMode ? "CHALLENGERS" : "CHALLENGER"}
+                      {isTeam ? "CHALLENGERS" : "CHALLENGER"}
                     </div>
                   </div>
                   <div className="mt-2 w-full text-center">
@@ -372,7 +372,7 @@ export default function ChallengeDetailModal({ challenge, creator, isOpen, onClo
                     </p>
                   </div>
                 </div>
-                {!isExpireTimeAchieved && !isCreator && isPoolMode && (
+                {!isExpireTimeAchieved && !isCreator && isTeam && (
                   <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); handleCtaClick(); }}
@@ -449,7 +449,7 @@ export default function ChallengeDetailModal({ challenge, creator, isOpen, onClo
                         <User className="h-5 w-5 text-[#8b7355]" />
                       </div>
                       <div className="mt-1 px-1.5 py-0.5 bg-[#2d1f1a] text-white text-[9px] font-bold rounded-full">
-                        {isPoolMode ? "POOL" : "OPPONENT"}
+                        {isTeam? "POOL" : "OPPONENT"}
                       </div>
                     </div>
                     <div className="mt-2 w-full text-center">

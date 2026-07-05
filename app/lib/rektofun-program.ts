@@ -245,7 +245,8 @@ export async function buildAcceptChallengeTx(
   program: Program,
   challenger: PublicKey,
   challengePDA: PublicKey,
-  creatorPubkey: PublicKey
+  creatorPubkey: PublicKey,
+  joinCreatorSide: boolean = false
 ): Promise<Transaction> {
   const connection = getReadonlyConnection();
   const [vaultPDA] = deriveVaultPDA(challengePDA);
@@ -272,7 +273,7 @@ export async function buildAcceptChallengeTx(
   }
 
   const tx = await (program.methods as any)
-    .acceptChallenge()
+    .acceptChallenge({ joinCreatorSide })
     .accounts({
       challenger,
       creator: creatorPubkey,

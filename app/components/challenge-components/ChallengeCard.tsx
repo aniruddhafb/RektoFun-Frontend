@@ -36,12 +36,12 @@ export function ChallengeCard({
         openProfile,
         handleJoinChallenge,
         handleShareChallenge,
-        creator,
         assetIcon,
         assetName,
         assetSymbol,
         creatorDisplayName,
         creatorProfileImage,
+        creatorWalletAddress,
         opponentInfo,
         hasOpponentInfo,
         opponentProfileImage,
@@ -222,7 +222,7 @@ export function ChallengeCard({
                     <div className="flex flex-row items-center justify-center gap-1.5 sm:gap-4">
                         {/* Challenger Profile */}
                         <div
-                            onClick={(e) => openProfile(e, creator.wallet_address)}
+                            onClick={(e) => openProfile(e, creatorWalletAddress)}
                             className="relative group flex flex-col items-center cursor-pointer"
                         >
                             <div className={`challenge-card-profile-tile flex h-[132px] w-[98px] max-w-full flex-col items-center justify-center rounded-xl p-2 transition-all duration-300 sm:h-[140px] sm:w-[120px] sm:p-3 ${hasWon

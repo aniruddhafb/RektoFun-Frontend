@@ -17,12 +17,12 @@ interface AcceptChallengeModalProps {
     resolveCountdown: string;
     resolveLabel: string;
     resolutionSource?: string;
-    isPoolMode: boolean;
-    joinSide: "challenger" | "opponent";
+    isTeam: boolean;
+    joinSide: "TEAM_A" | "TEAM_B";
     onClose: () => void;
     onSubmit: (event: React.SubmitEvent<HTMLFormElement>) => void;
     onBetInputChange: (value: string) => void;
-    onJoinSideChange: (side: "challenger" | "opponent") => void;
+    onJoinSideChange: (side: "TEAM_A" | "TEAM_B") => void;
 }
 
 const PRESET_AMOUNTS = [5, 10, 25, 50, 100];
@@ -40,7 +40,7 @@ export function AcceptChallengeModal({
     resolveCountdown,
     resolveLabel,
     resolutionSource,
-    isPoolMode,
+    isTeam,
     joinSide,
     onClose,
     onSubmit,
@@ -140,7 +140,7 @@ export function AcceptChallengeModal({
                             <div>
                                 <h3 className="mt-2 text-2xl font-black leading-tight text-[#171411] sm:mt-3 sm:text-3xl">Counter This Challenge</h3>
                                 <p className="mt-1.5 text-sm text-[#6f6a63] sm:mt-2">Confirm your bet to join this prediction battle.</p>
-                                {isPoolMode ? (
+                                {isTeam ? (
                                     <div className="mt-3 space-y-2 sm:mt-4">
                                         <p className="text-xs font-semibold uppercase tracking-wide text-[#6f6a63]">
                                             Which side do you want to join?
@@ -148,23 +148,23 @@ export function AcceptChallengeModal({
                                         <div className="inline-flex rounded-xl border border-[#d7ebe1] bg-[#f5fcf8] p-1">
                                             <button
                                                 type="button"
-                                                onClick={() => onJoinSideChange("challenger")}
-                                                className={`cursor-pointer rounded-lg px-3 py-1.5 text-sm font-semibold transition ${joinSide === "challenger"
+                                                onClick={() => onJoinSideChange("TEAM_A")}
+                                                className={`cursor-pointer rounded-lg px-3 py-1.5 text-sm font-semibold transition ${joinSide === "TEAM_A"
                                                     ? "bg-emerald-600 text-white"
                                                     : "text-[#2a8f66] hover:bg-emerald-100"
                                                     }`}
                                             >
-                                                Challenger
+                                                Creator&apos;s Side (Team A)
                                             </button>
                                             <button
                                                 type="button"
-                                                onClick={() => onJoinSideChange("opponent")}
-                                                className={`cursor-pointer rounded-lg px-3 py-1.5 text-sm font-semibold transition ${joinSide === "opponent"
+                                                onClick={() => onJoinSideChange("TEAM_B")}
+                                                className={`cursor-pointer rounded-lg px-3 py-1.5 text-sm font-semibold transition ${joinSide === "TEAM_B"
                                                     ? "bg-emerald-600 text-white"
                                                     : "text-[#2a8f66] hover:bg-emerald-100"
                                                     }`}
                                             >
-                                                Opponent
+                                                Opponent&apos;s Side (Team B)
                                             </button>
                                         </div>
                                     </div>
