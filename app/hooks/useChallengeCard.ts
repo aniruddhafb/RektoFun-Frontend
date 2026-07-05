@@ -121,16 +121,17 @@ function formatExactCountdownDetails(
       timeZone: "UTC",
     });
     return {
-      exactCountdown: "0d 0h 0m",
+      exactCountdown: "0d 0h 0m 0s",
       timeLeftText: "Challenge ended",
       dayLabel: `${endedDay} (UTC)`,
     };
   }
 
-  const totalMinutes = Math.floor(diffMs / 60000);
-  const days = Math.floor(totalMinutes / (24 * 60));
-  const hours = Math.floor((totalMinutes % (24 * 60)) / 60);
-  const minutes = totalMinutes % 60;
+  const totalSeconds = Math.floor(diffMs / 1000);
+  const days = Math.floor(totalSeconds / (24 * 60 * 60));
+  const hours = Math.floor((totalSeconds % (24 * 60 * 60)) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
 
   const endDate = new Date(timestamp);
   const weekday = endDate.toLocaleDateString("en-US", {
@@ -148,7 +149,7 @@ function formatExactCountdownDetails(
   });
 
   return {
-    exactCountdown: `${days}d ${hours}h ${minutes}m`,
+    exactCountdown: `${days}d ${hours}h ${minutes}m ${seconds}s`,
     timeLeftText: `${days} day${days === 1 ? "" : "s"}, ${hours} hour${hours === 1 ? "" : "s"}, ${minutes} minute${minutes === 1 ? "" : "s"} left`,
     dayLabel: `${weekday}, ${fullDate} UTC`,
   };
@@ -192,11 +193,11 @@ export function useChallengeCard(challenge: Challenge) {
     fetchBalance();
   }, [address, isConnected, connection]);
 
-  // Update current time every minute
+  // Update current time every second so the exact countdown (with seconds) stays live
   React.useEffect(() => {
     const interval = window.setInterval(() => {
       setCurrentTime(Date.now());
-    }, 60000);
+    }, 1000);
 
     return () => window.clearInterval(interval);
   }, []);
@@ -476,7 +477,7 @@ export function useChallengeCard(challenge: Challenge) {
         ctaDisabled = true;
         ctaClassName = expiredCtaClassName;
       } else {
-        ctaLabel = "COUNTER ⚔️";
+        ctaLabel = "Join Challenge ⚔️";
         ctaDisabled = isLoading || isCreator;
         ctaClassName = activePvpCtaClassName;
       }
@@ -505,7 +506,7 @@ export function useChallengeCard(challenge: Challenge) {
     }
 
     const isOngoing = ctaLabel.startsWith("ONGOING");
-    const showCreatorHint = isCreator && ctaLabel === "COUNTER";
+    const showCreatorHint = isCreator && ctaLabel === "Join Challenge";
 
     return {
       label: ctaLabel,

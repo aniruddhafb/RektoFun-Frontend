@@ -435,10 +435,9 @@ export function ChallengeCard({
                 <div className="flex gap-2">
                     <div className="group relative w-full">
                         <button
-                            disabled={ctaState.disabled}
+                        
                             onClick={(e) => {
                                 e.preventDefault();
-                                if (ctaState.disabled) return;
                                 openBetForm(e);
                             }}
                             className={ctaState.className}
