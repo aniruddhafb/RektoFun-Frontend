@@ -1,16 +1,19 @@
 "use client";
 
-import { DepositModal } from "./DepositModal";
-import * as components from "./navbar-components";
+import Image from "next/image";
+import Link from "next/link";
 import { useNavbar } from "@/app/hooks/useNavbar";
-
+import {
+    NavbarAuthSection,
+    CreateProfileModal,
+    NavbarNavLinks
+    
+} from "@/app/components/navbar-components";
+import { DepositModal } from "@/app/components/DepositModal";
+import { NavbarBrand, NavbarDesktopSearch, NavbarMobileBottomNav } from "@/app/components/navbar-components";
 export default function Navbar() {
     const {
         // UI state
-        searchQuery,
-        setSearchQuery,
-        isSearchModalOpen,
-        setIsSearchModalOpen,
         isDropdownOpen,
         setIsDropdownOpen,
         isDepositModalOpen,
@@ -24,10 +27,11 @@ export default function Navbar() {
         // Profile form state
         editUsername,
         setEditUsername,
+        editEmail,
+        setEditEmail,
         editBio,
         setEditBio,
         editProfileIndex,
-        setEditProfileIndex,
         editInviteCode,
         setEditInviteCode,
         profileFormError,
@@ -39,17 +43,17 @@ export default function Navbar() {
         displayUsername,
         usdcBalance,
 
+        // Connection state
+        address,
+        isConnected,
+
         // Handlers
         handleProfileSubmit,
-        generateRandomUsername,
         randomizeProfile,
         handleConnect,
         handleLogout,
-        handleMobileCreateClick,
-        isActive,
         profileHref,
-
-        isConnected
+        isActive,
     } = useNavbar();
 
     return (
@@ -73,17 +77,17 @@ export default function Navbar() {
             <nav className="fixed top-8 left-0 right-0 z-[40] bg-[#f3e1d7]/95 shadow-[0_2px_0_#111] backdrop-blur-md">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex items-center justify-between h-20">
-                        <components.NavbarBrand />
-                        
-                        <components.NavbarDesktopSearch
+                        <NavbarBrand />
+{/*                         
+                        <NavbarDesktopSearch
                             searchQuery={searchQuery}
                             onSearchQueryChange={setSearchQuery}
                             isModalOpen={isSearchModalOpen}
                             onOpenModal={() => setIsSearchModalOpen(true)}
                             onCloseModal={() => setIsSearchModalOpen(false)}
-                        />
+                        /> */}
 
-                        <components.NavbarAuthSection
+                        <NavbarAuthSection
                             authenticated={isConnected}
                             displayAddress={displayAddress || ""}
                             displayUsername={displayUsername}
@@ -110,7 +114,7 @@ export default function Navbar() {
                     </div>
                 </div>
 
-                <components.NavbarNavLinks isActive={isActive} />
+                <NavbarNavLinks isActive={isActive} />
             </nav>
 
             <div className="h-[88px] md:h-[128px]" />
@@ -119,17 +123,21 @@ export default function Navbar() {
                 <div className="fixed inset-0 z-[35]" onClick={() => setIsDropdownOpen(false)} />
             )}
 
-            <components.CreateProfileModal
+            <CreateProfileModal
                 isOpen={isProfileModalOpen}
                 editProfileIndex={editProfileIndex}
                 editUsername={editUsername}
+                editEmail={editEmail}
                 editBio={editBio}
                 editInviteCode={editInviteCode}
                 profileFormError={profileFormError}
                 onRandomizeProfile={randomizeProfile}
-                onRandomizeUsername={generateRandomUsername}
                 onEditUsernameChange={(value) => {
                     setEditUsername(value);
+                    if (profileFormError) setProfileFormError(null);
+                }}
+                onEditEmailChange={(value) => {
+                    setEditEmail(value);
                     if (profileFormError) setProfileFormError(null);
                 }}
                 onEditBioChange={(value) => {
@@ -145,16 +153,17 @@ export default function Navbar() {
                     isOpen={isDepositModalOpen}
                     onClose={() => setIsDepositModalOpen(false)}
                     initialMode={fundsModalMode}
+                    usdcBalance={usdcBalance}
                 />
             )}
 
-            <components.NavbarMobileBottomNav
+            {/* <NavbarMobileBottomNav
                 isActive={isActive}
                 profileHref={profileHref}
                 onSearchClick={() => setIsSearchModalOpen(true)}
                 onCreateClick={handleMobileCreateClick}
                 isSearchOpen={isSearchModalOpen}
-            />
+            /> */}
         </>
     );
 }

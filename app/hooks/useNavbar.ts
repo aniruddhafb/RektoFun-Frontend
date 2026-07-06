@@ -6,8 +6,10 @@ import { useAppKitAccount, useAppKit, useDisconnect } from '@reown/appkit/react'
 import { PublicKey } from '@solana/web3.js';
 import { getAssociatedTokenAddress } from '@solana/spl-token';
 import { useUserStore } from '@/app/store/useUserStore';
+import { createUser, getUserByPubkey, checkUsernameExists } from '@/app/lib/users-service/users';
 import { blockedContentError, hasBlockedContent } from '@/app/lib/content-moderation';
-import { ensureUserByWallet, updateUser, getUserByWallet, acceptReferral, User } from '@/app/lib/users-service/users';
+import { getProfileAvatarDataUri } from '@/app/lib/profile-avatar';
+import { User } from '@/app/lib/users-service/users';
 import { USDC_MINT, getReadonlyConnection } from '@/app/lib/rektofun-program';
 
 export function useNavbar() {
@@ -32,6 +34,7 @@ export function useNavbar() {
 
   // Profile form state
   const [editUsername, setEditUsername] = useState('');
+  const [editEmail, setEditEmail] = useState('');
   const [editBio, setEditBio] = useState('');
   const [editProfileIndex, setEditProfileIndex] = useState(0);
   const [editInviteCode, setEditInviteCode] = useState('');
@@ -41,8 +44,6 @@ export function useNavbar() {
   const [userProfileData, setUserProfileData] = useState<{ username: string; profileImage: string } | null>(null);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [hasInitialized, setHasInitialized] = useState(false);
-
-  // USDC balance
   const [usdcBalance, setUsdcBalance] = useState<number | null>(null);
 
   // Helper: Get URL referral code
@@ -71,7 +72,7 @@ export function useNavbar() {
     if (!isConnected || !address) return null;
 
     try {
-      const userData = await getUserByWallet(address);
+      const userData = await getUserByPubkey(address);
       applyUserToState(userData);
       return userData;
     } catch (error) {
@@ -80,21 +81,29 @@ export function useNavbar() {
     }
   };
 
-  // Generate random username
-  const generateRandomUsername = () => {
-    const gamerPartsA = ['void', 'rift', 'hex', 'nova', 'drift', 'glitch', 'crypt', 'blitz', 'shadow', 'pixel', 'frost', 'vortex', 'phantom', 'neon', 'omega'];
-    const gamerPartsB = ['reaper', 'sniper', 'raider', 'byte', 'wraith', 'core', 'slayer', 'runner', 'forge', 'venom', 'spark', 'quake', 'drone', 'spike', 'nexus'];
-    const joiners = ['', '', '_', 'x', 'z', 'q'];
 
-    const partA = gamerPartsA[Math.floor(Math.random() * gamerPartsA.length)];
-    const partB = gamerPartsB[Math.floor(Math.random() * gamerPartsB.length)];
-    const joiner = joiners[Math.floor(Math.random() * joiners.length)];
-    const uniq = `${Date.now().toString(36).slice(-3)}${Math.random().toString(36).slice(2, 4)}`;
-    const username = `${partA}${joiner}${partB}${uniq}`.slice(0, 18);
+  // Fetch USDC balance
+  const fetchUsdcBalance = async () => {
+    if (!address || !isConnected) {
+      setUsdcBalance(null);
+      return;
+    }
 
-    setEditUsername(username);
-    if (profileFormError) setProfileFormError(null);
+    try {
+      const connection = getReadonlyConnection();
+      const pubKey = new PublicKey(address);
+      const ata = await getAssociatedTokenAddress(USDC_MINT, pubKey, false);
+      const accountInfo = await connection.getTokenAccountBalance(ata);
+      setUsdcBalance(accountInfo.value.uiAmount || 0);
+    } catch {
+      setUsdcBalance(0);
+    }
   };
+
+  useEffect(() => {
+    fetchUsdcBalance();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [address, isConnected]);
 
   // Randomize profile avatar
   const randomizeProfile = () => {
@@ -105,9 +114,8 @@ export function useNavbar() {
   // Handle profile form submission
   const handleProfileSubmit = async () => {
     if (!address) return;
-
-    // Validate content
-    if (hasBlockedContent(editUsername)) {
+    const trimmedUsername = editUsername.trim();
+    if (hasBlockedContent(trimmedUsername)) {
       setProfileFormError(blockedContentError('Username'));
       return;
     }
@@ -115,45 +123,47 @@ export function useNavbar() {
       setProfileFormError(blockedContentError('Bio'));
       return;
     }
+    const trimmedEmail = editEmail.trim();
+    if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      setProfileFormError('Please enter a valid email address.');
+      return;
+    }
 
     try {
-      // Get or create existing user
-      let user = currentUser;
-      if (!user) {
-        user = await fetchUserProfile();
-      }
-      if (!user) return;
-
-      // Update profile
-      const profileIndex = editProfileIndex + 1;
-      const updatedData = {
-        username: editUsername,
-        description: editBio,
-        profile_image: `https://earningrecords.com/assets/rektofun/profiles/${profileIndex}.svg`,
-      };
-      await updateUser(user.id, updatedData);
-      updateStoreUser(updatedData);
-
-      // Handle referral code if present
-      const refCode = editInviteCode || getRefCodeFromUrl();
-      if (refCode) {
-        try {
-          await acceptReferral(address, refCode);
-        } catch (error) {
-          console.error('[Navbar] Referral failed:', error);
+      if (trimmedUsername && trimmedUsername !== currentUser?.username) {
+        const usernameTaken = await checkUsernameExists(trimmedUsername);
+        if (usernameTaken) {
+          setProfileFormError('Username is already taken. Please choose another.');
+          return;
         }
       }
+      
+      console.log("user data", {
+        trimmedUsername,
+        address,
+        editBio: editBio.trim(),
+        profileImage: getProfileAvatarDataUri(editProfileIndex),
+      });
+      const userData = await createUser({
+        pubkey: address,
+        username: trimmedUsername,
+        email: trimmedEmail || undefined,
+        bio: editBio.trim(),
+        profile_image: getProfileAvatarDataUri(editProfileIndex),
+      });
 
+      applyUserToState(userData);
+      setProfileFormError(null);
       setIsProfileModalOpen(false);
-      await fetchUserProfile();
     } catch (error) {
-      console.error('[Navbar] Profile update failed:', error);
+      console.error('[Navbar] Profile submit failed:', error);
+      setProfileFormError('Failed to save profile. Please try again.');
     }
   };
 
   // Sync store user when it changes
   useEffect(() => {
-    if (storeUser && (!address || address === storeUser.wallet_address)) {
+    if (storeUser && (!address || address === storeUser.pubkey)) {
       setCurrentUser(storeUser);
       setUserProfileData({
         username: storeUser.username || 'User',
@@ -162,27 +172,19 @@ export function useNavbar() {
     }
   }, [storeUser, address]);
 
-  // Initialize new user on wallet connect
+  // Initialize user on wallet connect - creates the user if their pubkey is
+  // new, or fetches the existing one if it already exists
   useEffect(() => {
     if (!isConnected || !address || hasInitialized) return;
 
     const initUser = async () => {
       try {
-        const userData = await ensureUserByWallet(address, {
-          wallet_address: address,
-          username: `user-${address.slice(0, 8)}`,
-          login_type: 'wallet',
-        });
-
+        const userData = await getUserByPubkey(address);
         applyUserToState(userData);
 
-        // Show profile modal for new users
-        const isNewUser = userData.username === `user-${address.slice(0, 8)}`;
-        if (isNewUser) {
-          setIsProfileModalOpen(true);
-          generateRandomUsername();
-        }
       } catch (error) {
+
+        setIsProfileModalOpen(true);
         console.error('[Navbar] User initialization failed:', error);
       } finally {
         setHasInitialized(true);
@@ -201,6 +203,7 @@ export function useNavbar() {
         const user = currentUser || (await fetchUserProfile());
         if (user) {
           setEditUsername(user.username || '');
+          setEditEmail(user.email || '');
           setEditBio(user.description || '');
           setEditProfileIndex(user.profile_image ? parseInt(user.profile_image.match(/profiles\/(\d+)\.svg/)?.[1] || '1') - 1 : 0);
         }
@@ -242,26 +245,6 @@ export function useNavbar() {
       window.removeEventListener('keydown', blockEscape, true);
     };
   }, [isProfileModalOpen]);
-
-  // Fetch USDC balance whenever wallet connects/changes
-  useEffect(() => {
-    const fetchBalance = async () => {
-      if (!address || !isConnected) {
-        setUsdcBalance(null);
-        return;
-      }
-      try {
-        const connection = getReadonlyConnection();
-        const pubKey = new PublicKey(address);
-        const ata = await getAssociatedTokenAddress(USDC_MINT, pubKey, false);
-        const accountInfo = await connection.getTokenAccountBalance(ata);
-        setUsdcBalance(accountInfo.value.uiAmount || 0);
-      } catch {
-        setUsdcBalance(0);
-      }
-    };
-    fetchBalance();
-  }, [address, isConnected]);
 
   // Check if route is active
   const isActive = (href: string) => {
@@ -313,6 +296,8 @@ export function useNavbar() {
     // Profile form state
     editUsername,
     setEditUsername,
+    editEmail,
+    setEditEmail,
     editBio,
     setEditBio,
     editProfileIndex,
@@ -328,6 +313,7 @@ export function useNavbar() {
     displayAddress,
     displayUsername,
     usdcBalance,
+    fetchUsdcBalance,
 
     // Connection state
     address,
@@ -335,7 +321,6 @@ export function useNavbar() {
 
     // Handlers
     handleProfileSubmit,
-    generateRandomUsername,
     randomizeProfile,
     handleConnect,
     handleLogout,

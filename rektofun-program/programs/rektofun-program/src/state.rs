@@ -71,20 +71,41 @@ pub struct ChallengeAccount {
     /// PVP only: the single wallet that accepted the challenge (zero if not yet accepted)
     pub challenger: Pubkey,
 
+    /// PVP only: the amount the challenger actually deposited (may differ from
+    /// the creator's `bet_amount`; zero until accepted).
+    pub challenger_bet_amount: u64,
+
     // ── TEAM fields ─────────────────────────────────────────────────────────
     /// TEAM only: participants who joined the creator's side (creator is implicitly included)
     #[max_len(50)]
     pub creator_team: Vec<Pubkey>,
 
+    /// TEAM only: amount each `creator_team` participant deposited, parallel to `creator_team`
+    #[max_len(50)]
+    pub creator_team_amounts: Vec<u64>,
+
     /// TEAM only: participants who joined the opponent's side
     #[max_len(50)]
     pub opponent_team: Vec<Pubkey>,
+
+    /// TEAM only: amount each `opponent_team` participant deposited, parallel to `opponent_team`
+    #[max_len(50)]
+    pub opponent_team_amounts: Vec<u64>,
 
     /// TEAM only: maximum participants per side (0 = no limit up to 50)
     pub max_team_size: u8,
 
     /// TEAM only: which side won (set during settle_challenge)
     pub winning_side: WinningSide,
+
+    /// TEAM only: combined stake of the winning side, snapshotted at settle time
+    /// (creator's bet_amount + creator_team_amounts if creator won, else opponent_team_amounts).
+    /// Used by claim_winnings to compute each winner's proportional share.
+    pub winning_side_total_amount: u64,
+
+    /// TEAM only: net pot (total stake across both sides, minus platform fee),
+    /// snapshotted at settle time and split proportionally in claim_winnings.
+    pub settled_net_pot: u64,
 
     // ── Common fields ────────────────────────────────────────────────────────
     /// Whether this is a PVP or TEAM challenge
@@ -97,7 +118,9 @@ pub struct ChallengeAccount {
     #[max_len(10)]
     pub asset: String,
 
-    /// Bet amount in USDC micro-units per participant (both sides must match per person)
+    /// The creator's own stake, in USDC micro-units. Other participants may deposit a
+    /// different amount when they accept/join (see `challenger_bet_amount`,
+    /// `creator_team_amounts`, `opponent_team_amounts`); MIN_BET_AMOUNT still applies to all.
     pub bet_amount: u64,
 
     /// Target price in USD cents (e.g. $66,500 → 6_650_000)

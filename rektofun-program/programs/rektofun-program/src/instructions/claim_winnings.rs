@@ -90,39 +90,45 @@ pub(crate) fn handler(ctx: Context<ClaimWinnings>) -> Result<()> {
     };
     require!(on_winning_side, RektoError::NotAWinner);
 
-    // ── 2. Calculate payout per winner ───────────────────────────────────────
-    // Total participants = 1 (creator) + creator_team.len() + opponent_team.len()
-    let total_participants = (1u64)
-        .checked_add(challenge.creator_team.len() as u64)
-        .ok_or(RektoError::Overflow)?
-        .checked_add(challenge.opponent_team.len() as u64)
-        .ok_or(RektoError::Overflow)?;
-
-    let total_pot = challenge
-        .bet_amount
-        .checked_mul(total_participants)
-        .ok_or(RektoError::Overflow)?;
-
-    // Fee was already deducted during settle_challenge; remaining pot is net of fee.
-    let net_pot = total_pot
-        .checked_mul(10_000u64.checked_sub(PLATFORM_FEE_BPS).ok_or(RektoError::Overflow)?)
-        .ok_or(RektoError::Overflow)?
-        .checked_div(10_000)
-        .ok_or(RektoError::Overflow)?;
-
-    let winning_team_size = match challenge.winning_side {
+    // ── 2. Calculate this participant's proportional payout ─────────────────
+    // Participants may have staked different amounts, so payout is this
+    // participant's own stake as a share of the winning side's total stake
+    // (both snapshotted on-chain by settle_challenge).
+    let participant_stake = match challenge.winning_side {
         WinningSide::CreatorTeam => {
-            // 1 (creator) + extra creator_team members
-            1u64.checked_add(challenge.creator_team.len() as u64)
-                .ok_or(RektoError::Overflow)?
+            if participant_key == challenge.creator {
+                challenge.bet_amount
+            } else {
+                let idx = challenge
+                    .creator_team
+                    .iter()
+                    .position(|p| *p == participant_key)
+                    .ok_or(RektoError::NotAWinner)?;
+                challenge.creator_team_amounts[idx]
+            }
         }
-        WinningSide::OpponentTeam => challenge.opponent_team.len() as u64,
+        WinningSide::OpponentTeam => {
+            let idx = challenge
+                .opponent_team
+                .iter()
+                .position(|p| *p == participant_key)
+                .ok_or(RektoError::NotAWinner)?;
+            challenge.opponent_team_amounts[idx]
+        }
         WinningSide::None => return err!(RektoError::NotSettled),
     };
 
-    let payout = net_pot
-        .checked_div(winning_team_size)
-        .ok_or(RektoError::Overflow)?;
+    let winning_side_total = challenge.winning_side_total_amount;
+    let net_pot = challenge.settled_net_pot;
+
+    // Use u128 for the intermediate product to avoid overflow before dividing back down.
+    let payout: u64 = (participant_stake as u128)
+        .checked_mul(net_pot as u128)
+        .ok_or(RektoError::Overflow)?
+        .checked_div(winning_side_total as u128)
+        .ok_or(RektoError::Overflow)?
+        .try_into()
+        .map_err(|_| RektoError::Overflow)?;
 
     // ── 3. PDA signer seeds for the vault ────────────────────────────────────
     let challenge_bump = challenge.bump;

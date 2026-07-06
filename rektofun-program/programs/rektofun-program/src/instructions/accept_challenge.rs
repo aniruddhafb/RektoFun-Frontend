@@ -17,6 +17,10 @@ pub struct AcceptChallengeParams {
     /// TEAM only: which side to join (true = creator's side, false = opponent's side).
     /// Ignored for PVP.
     pub join_creator_side: bool,
+    /// Amount this participant deposits, in USDC micro-units. Does not need to match
+    /// the creator's `bet_amount` — PVP pays the winner the full combined pot, and TEAM
+    /// pays each winner proportionally to their own stake. Must be >= MIN_BET_AMOUNT.
+    pub amount: u64,
 }
 
 #[derive(Accounts)]
@@ -76,7 +80,10 @@ pub(crate) fn handler(ctx: Context<AcceptChallenge>, params: AcceptChallengePara
     // Challenge must not have expired yet
     require!(now < challenge.expires_at, RektoError::ChallengeExpired);
 
-    let bet_amount = challenge.bet_amount;
+    // Each participant may deposit their own amount (no longer required to match
+    // the creator's bet_amount) — but it must still clear the platform minimum.
+    require!(params.amount >= MIN_BET_AMOUNT, RektoError::BetTooSmall);
+    let deposit_amount = params.amount;
     let challenger_key = ctx.accounts.challenger.key();
     let decimals = ctx.accounts.usdc_mint.decimals;
 
@@ -89,7 +96,7 @@ pub(crate) fn handler(ctx: Context<AcceptChallenge>, params: AcceptChallengePara
                 RektoError::AlreadyAccepted
             );
 
-            // Transfer matching USDC bet from challenger to vault
+            // Transfer the challenger's own bet from challenger to vault
             token_interface::transfer_checked(
                 CpiContext::new(
                     ctx.accounts.token_program.key(),
@@ -100,11 +107,12 @@ pub(crate) fn handler(ctx: Context<AcceptChallenge>, params: AcceptChallengePara
                         authority: ctx.accounts.challenger.to_account_info(),
                     },
                 ),
-                bet_amount,
+                deposit_amount,
                 decimals,
             )?;
 
             challenge.challenger = challenger_key;
+            challenge.challenger_bet_amount = deposit_amount;
             // PVP goes Active immediately — no more joins possible
             challenge.status = ChallengeStatus::Active;
 
@@ -112,7 +120,10 @@ pub(crate) fn handler(ctx: Context<AcceptChallenge>, params: AcceptChallengePara
                 "PVP Challenge #{} accepted by {} — vault holds {} USDC micro-units",
                 challenge.challenge_id,
                 challenger_key,
-                bet_amount * 2,
+                challenge
+                    .bet_amount
+                    .checked_add(deposit_amount)
+                    .ok_or(RektoError::Overflow)?,
             );
         }
 
@@ -138,6 +149,7 @@ pub(crate) fn handler(ctx: Context<AcceptChallenge>, params: AcceptChallengePara
                     RektoError::TeamFull
                 );
                 challenge.creator_team.push(challenger_key);
+                challenge.creator_team_amounts.push(deposit_amount);
                 msg!(
                     "TEAM Challenge #{}: {} joined creator's side (total creator-side members: {})",
                     challenge.challenge_id,
@@ -151,6 +163,7 @@ pub(crate) fn handler(ctx: Context<AcceptChallenge>, params: AcceptChallengePara
                     RektoError::TeamFull
                 );
                 challenge.opponent_team.push(challenger_key);
+                challenge.opponent_team_amounts.push(deposit_amount);
                 msg!(
                     "TEAM Challenge #{}: {} joined opponent's side (total opponent-side members: {})",
                     challenge.challenge_id,
@@ -159,7 +172,7 @@ pub(crate) fn handler(ctx: Context<AcceptChallenge>, params: AcceptChallengePara
                 );
             }
 
-            // Transfer this participant's bet to the vault
+            // Transfer this participant's own bet to the vault
             token_interface::transfer_checked(
                 CpiContext::new(
                     ctx.accounts.token_program.key(),
@@ -170,24 +183,29 @@ pub(crate) fn handler(ctx: Context<AcceptChallenge>, params: AcceptChallengePara
                         authority: ctx.accounts.challenger.to_account_info(),
                     },
                 ),
-                bet_amount,
+                deposit_amount,
                 decimals,
             )?;
 
             // TEAM challenges stay Open until the creator locks them (or expiry passes).
             // Status remains Open so more participants can join.
+            let creator_team_sum: u64 = challenge
+                .creator_team_amounts
+                .iter()
+                .try_fold(0u64, |acc, &amt| acc.checked_add(amt))
+                .unwrap_or(u64::MAX);
+            let opponent_team_sum: u64 = challenge
+                .opponent_team_amounts
+                .iter()
+                .try_fold(0u64, |acc, &amt| acc.checked_add(amt))
+                .unwrap_or(u64::MAX);
             msg!(
                 "TEAM Challenge #{} vault now holds {} USDC micro-units",
                 challenge.challenge_id,
-                // Approximate: creator + creator_team + opponent_team
-                bet_amount
-                    .checked_mul(
-                        (1u64) // creator
-                            .checked_add(challenge.creator_team.len() as u64)
-                            .unwrap_or(u64::MAX)
-                            .checked_add(challenge.opponent_team.len() as u64)
-                            .unwrap_or(u64::MAX)
-                    )
+                challenge
+                    .bet_amount
+                    .checked_add(creator_team_sum)
+                    .and_then(|v| v.checked_add(opponent_team_sum))
                     .unwrap_or(u64::MAX),
             );
         }

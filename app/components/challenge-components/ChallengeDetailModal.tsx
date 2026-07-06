@@ -18,43 +18,34 @@ import {
   Clock,
   AlertCircle,
 } from "lucide-react";
-import { AcceptChallengeModal } from "./AcceptChallengeModal";
-import { ChallengeListItem } from "@/app/lib/challenges-service/challenges";
+import { Challenge } from "@/app/lib/challenges-service/challenges";
+import { User as UserType } from "@/app/lib/users-service/users";
 import { useChallengeDetail } from "@/app/hooks/useChallengeDetail";
 
 interface ChallengeDetailModalProps {
-  challenge: ChallengeListItem | null;
+  challenge: Challenge | null;
+  creator?: UserType | null;
   isOpen: boolean;
   onClose: () => void;
 }
 
-export default function ChallengeDetailModal({ challenge, isOpen, onClose }: ChallengeDetailModalProps) {
+export default function ChallengeDetailModal({ challenge, creator, isOpen, onClose }: ChallengeDetailModalProps) {
+  const resolvedCreator = creator ?? challenge?.creator_details ?? null;
   const {
     modalRef,
-    isLoading,
-    isBetFormOpen,
-    betInput,
-    betError,
-    joinSide,
-    modalMinAcceptBet,
-    modalMaxAcceptBet,
-    escrowAddress,
-    usdcBalance,
     isDescriptionExpanded,
     isTitleExpanded,
     shareFeedback,
-    setBetInput,
-    setBetError,
-    setJoinSide,
     setIsDescriptionExpanded,
     setIsTitleExpanded,
     assetLogo,
     creatorName,
     creatorAvatar,
-    hasOpponentInfo,
-    opponentDisplayName,
+    creatorWalletAddress,
+    opponentName,
     opponentAvatar,
-    isPoolMode,
+    opponentWalletAddress,
+    isTeam,
     betAmount,
     creatorWalletShort,
     canExpandTitle,
@@ -78,20 +69,16 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
     isManualResolution,
     isResolutionPending,
     isResolutionResolved,
-    hasResolveTimePassed,
     showResolvesBox,
     hideExpiresBox,
     isExpireTimeAchieved,
     timelineColumns,
-    expiresInText,
     createdTimeText,
-    exactCountdownDetails,
     resolvesInText,
     resolvesInSubtext,
     expiresInTextForBox,
     statusLabel,
     statusClassName,
-    displayedDescriptionText,
     canToggleDescription,
     modeLabel,
     totalPoolLabel,
@@ -100,12 +87,10 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
     descriptionToShow,
     ctaState,
     handleCtaClick,
-    closeBetForm,
-    handleJoinChallenge,
     handleShareChallenge,
     openProfile,
     onClose: handleClose,
-  } = useChallengeDetail(challenge, isOpen, onClose);
+  } = useChallengeDetail(challenge, resolvedCreator, isOpen, onClose);
 
   if (!isOpen || !challenge) return null;
 
@@ -146,7 +131,7 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
                 <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-lg border-2 border-black bg-[#fffaf6] p-3 shadow-[2px_2px_0_#111] sm:h-24 sm:w-24">
                   <Image
                     src={assetLogo}
-                    alt={challenge.market?.name || "Market"}
+                    alt={challenge.ticker || "Market"}
                     width={80}
                     height={80}
                     className="h-full w-full object-contain"
@@ -158,7 +143,7 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
                       {statusLabel}
                     </span>
                     <span className="inline-flex items-center rounded-full border border-black/15 bg-[#f7efe9] px-2.5 py-1 text-xs font-bold text-[#5c4a42]">
-                      {challenge.market?.name || "Market"}
+                      {challenge.ticker || "Market"}
                     </span>
                   </div>
                   <h2 className="break-words text-2xl font-black leading-tight text-[#201a16]">
@@ -173,7 +158,7 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
                     {statusLabel}
                   </span>
                   <span className="inline-flex items-center rounded-full border border-black/15 bg-[#f7efe9] px-2.5 py-1 text-xs font-bold text-[#5c4a42]">
-                    {challenge.market?.name || "Market"}
+                    {challenge.ticker || "Market"}
                   </span>
                   <span className="inline-flex items-center rounded-full border border-black/15 bg-white px-2.5 py-1 text-xs font-bold text-[#5c4a42]">
                     {modeLabel}
@@ -230,7 +215,7 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
                   </div>
                   <button
                     type="button"
-                    onClick={() => openProfile(challenge.creator?.wallet_address)}
+                    onClick={() => openProfile(creatorWalletAddress)}
                     className="flex cursor-pointer items-center gap-3 rounded-lg border border-[#ead8cc] bg-[#fffaf6] p-3 text-left transition hover:border-black/30 hover:bg-white"
                   >
                     <div className="h-9 w-9 shrink-0 overflow-hidden rounded-full border border-[#c8c1ba]">
@@ -262,7 +247,7 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
               <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <p className="text-xs font-black uppercase tracking-[0.12em] text-white/70">Market Snapshot</p>
-                  <h3 className="mt-1 text-2xl font-black text-white sm:text-3xl">{challenge.market?.name || "Market"}</h3>
+                  <h3 className="mt-1 text-2xl font-black text-white sm:text-3xl">{challenge.ticker || "Market"}</h3>
                 </div>
                 <div className="rounded-lg border border-white/20 bg-white/10 px-4 py-3 text-left sm:text-right">
                   <div className="flex items-center gap-1.5 sm:justify-end">
@@ -355,7 +340,7 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
             <div className="flex w-full flex-row items-center justify-center gap-2.5 max-[350px]:gap-1.5 sm:gap-4">
               {/* Challenger Profile */}
               <div
-                onClick={() => openProfile(challenge.creator?.wallet_address)}
+                onClick={() => openProfile(creatorWalletAddress)}
                 className="relative group flex cursor-pointer flex-col items-center"
               >
                 <div className={`flex h-[132px] w-[98px] max-w-full flex-col items-center justify-center rounded-xl p-2 text-center transition-all duration-300 group-hover:-translate-y-0.5 sm:h-[140px] sm:w-[120px] sm:p-3 ${hasWon
@@ -380,7 +365,7 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
                       />
                     </div>
                     <div className="mt-1 px-1.5 py-0.5 bg-[#2d1f1a] text-white text-[9px] font-bold rounded-full">
-                      {isPoolMode ? "CHALLENGERS" : "CHALLENGER"}
+                      {isTeam ? "CHALLENGERS" : "CHALLENGER"}
                     </div>
                   </div>
                   <div className="mt-2 w-full text-center">
@@ -390,7 +375,7 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
                     </p>
                   </div>
                 </div>
-                {!isExpireTimeAchieved && !isCreator && isPoolMode && (
+                {!isExpireTimeAchieved && !isCreator && isTeam && (
                   <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); handleCtaClick(); }}
@@ -400,8 +385,8 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
                         ? "border-red-300 bg-gradient-to-br from-red-100 to-rose-50 text-red-700 hover:from-red-200 hover:to-rose-100"
                         : "border-[#d4a574]/40 bg-white/90 text-[#2d1f1a] hover:bg-white"
                       }`}
-                    aria-label="COUNTER"
-                    title="COUNTER"
+                    aria-label="Join Challenge"
+                    title="Join Challenge"
                   >
                     +
                   </button>
@@ -410,7 +395,7 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
 
               {/* VS Badge or Pending Badge */}
               <div className="flex flex-col items-center justify-center px-1 max-[350px]:px-0.5 sm:px-2 shrink-0">
-                {hasOpponentInfo ? (
+                {hasOpponents ? (
                   <>
                     <div className="w-9 h-9 max-[350px]:w-8 max-[350px]:h-8 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-[#2d1f1a] to-[#4a3830] flex items-center justify-center shadow-lg">
                       {ctaState.isOngoing ? (
@@ -449,9 +434,9 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
               </div>
 
               {/* Opponent Profile */}
-              {hasOpponentInfo ? (
+              {hasOpponents ? (
                 <div
-                  onClick={() => openProfile(challenge.opponent_info?.wallet_address)}
+                  onClick={() => openProfile(opponentWalletAddress)}
                   className="relative group flex cursor-pointer flex-col items-center"
                 >
                   <div className={`flex h-[132px] w-[98px] max-w-full flex-col items-center justify-center rounded-xl p-2 text-center transition-all duration-300 group-hover:-translate-y-0.5 sm:h-[140px] sm:w-[120px] sm:p-3 ${hasLost
@@ -469,26 +454,19 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
                       <div className={`h-11 w-11 overflow-hidden rounded-full border-2 sm:h-14 sm:w-14 ${hasLost ? "border-amber-400" : "border-[#d4a574]"} shadow-md`}>
                         <Image
                           src={opponentAvatar}
-                          alt={opponentDisplayName}
+                          alt={opponentName}
                           width={56}
                           height={56}
                           className="w-full h-full object-cover"
                         />
                       </div>
-                      {isPoolMode && (challenge.total_opponents ?? 0) > 1 && (
-                        <div className="absolute -right-1 top-0 flex h-5 w-5 items-center justify-center rounded-full border-2 border-white bg-red-500">
-                          <span className="text-[9px] font-bold text-white">+{(challenge.total_opponents ?? 0) - 1}</span>
-                        </div>
-                      )}
                       <div className="mt-1 px-1.5 py-0.5 bg-[#2d1f1a] text-white text-[9px] font-bold rounded-full">
-                        {isPoolMode ? "POOL" : "OPPONENT"}
+                        {isTeam? "POOL" : "OPPONENT"}
                       </div>
                     </div>
                     <div className="mt-2 w-full text-center">
-                      <p className="break-words font-bold text-[#2d1f1a] text-xs">{opponentDisplayName}</p>
-                      <p className="mt-0.5 break-all text-[10px] text-[#8b7355]">
-                        {hasOpponents ? opponentOutcomeText : "Opposing challenge"}
-                      </p>
+                      <p className="break-words font-bold text-[#2d1f1a] text-xs">{opponentName}</p>
+                      <p className="mt-0.5 break-all text-[10px] text-[#8b7355]">{opponentOutcomeText}</p>
                     </div>
                   </div>
                 </div>
@@ -612,30 +590,6 @@ export default function ChallengeDetailModal({ challenge, isOpen, onClose }: Cha
           </div>
         </div>
       </div>
-
-      <AcceptChallengeModal
-        isOpen={isBetFormOpen}
-        isLoading={isLoading}
-        usdcBalance={usdcBalance}
-        betInput={betInput}
-        betError={betError}
-        betCurrency="USDC"
-        minAcceptBet={modalMinAcceptBet}
-        maxAcceptBet={modalMaxAcceptBet}
-        escrowAddress={escrowAddress}
-        resolveCountdown={exactCountdownDetails.exactCountdown}
-        resolveLabel={exactCountdownDetails.dayLabel}
-        resolutionSource={challenge.resolution_source ?? undefined}
-        isPoolMode={isPoolMode}
-        joinSide={joinSide}
-        onClose={closeBetForm}
-        onSubmit={handleJoinChallenge}
-        onBetInputChange={(value) => {
-          setBetInput(value);
-          if (betError) setBetError("");
-        }}
-        onJoinSideChange={setJoinSide}
-      />
     </div>,
     document.body
   );

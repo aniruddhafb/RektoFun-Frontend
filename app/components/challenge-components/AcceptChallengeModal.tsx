@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { createPortal } from "react-dom";
 import { useBodyScrollLock } from "@/app/lib/useBodyScrollLock";
 
 interface AcceptChallengeModalProps {
@@ -16,12 +17,12 @@ interface AcceptChallengeModalProps {
     resolveCountdown: string;
     resolveLabel: string;
     resolutionSource?: string;
-    isPoolMode: boolean;
-    joinSide: "challenger" | "opponent";
+    isTeam: boolean;
+    joinSide: "TEAM_A" | "TEAM_B";
     onClose: () => void;
     onSubmit: (event: React.SubmitEvent<HTMLFormElement>) => void;
     onBetInputChange: (value: string) => void;
-    onJoinSideChange: (side: "challenger" | "opponent") => void;
+    onJoinSideChange: (side: "TEAM_A" | "TEAM_B") => void;
 }
 
 const PRESET_AMOUNTS = [5, 10, 25, 50, 100];
@@ -39,7 +40,7 @@ export function AcceptChallengeModal({
     resolveCountdown,
     resolveLabel,
     resolutionSource,
-    isPoolMode,
+    isTeam,
     joinSide,
     onClose,
     onSubmit,
@@ -48,12 +49,9 @@ export function AcceptChallengeModal({
 }: AcceptChallengeModalProps) {
     useBodyScrollLock(isOpen);
 
-    if (!isOpen) return null;
     const isPriceFeedResolution = String(resolutionSource ?? "").toLowerCase() === "price_feed";
 
     const parsedBet = Number(betInput);
-    const isValidNumber = Number.isFinite(parsedBet) && parsedBet > 0;
-    const amountForDisplay = isValidNumber ? parsedBet.toFixed(2) : "0.00";
     const liveValidationError = React.useMemo(() => {
         if (!betInput.trim()) return "Please enter a valid bet amount.";
 
@@ -114,7 +112,9 @@ export function AcceptChallengeModal({
         return `https://solscan.io/account/${encodeURIComponent(escrowAddress)}?cluster=devnet`;
     }, [escrowAddress]);
 
-    return (
+    if (!isOpen) return null;
+
+    return createPortal(
         <div
             onClick={onClose}
             className="fixed inset-0 z-[120] flex items-center justify-center bg-black/50 p-2 backdrop-blur-sm md:p-4"
@@ -140,7 +140,7 @@ export function AcceptChallengeModal({
                             <div>
                                 <h3 className="mt-2 text-2xl font-black leading-tight text-[#171411] sm:mt-3 sm:text-3xl">Counter This Challenge</h3>
                                 <p className="mt-1.5 text-sm text-[#6f6a63] sm:mt-2">Confirm your bet to join this prediction battle.</p>
-                                {isPoolMode ? (
+                                {isTeam ? (
                                     <div className="mt-3 space-y-2 sm:mt-4">
                                         <p className="text-xs font-semibold uppercase tracking-wide text-[#6f6a63]">
                                             Which side do you want to join?
@@ -148,23 +148,23 @@ export function AcceptChallengeModal({
                                         <div className="inline-flex rounded-xl border border-[#d7ebe1] bg-[#f5fcf8] p-1">
                                             <button
                                                 type="button"
-                                                onClick={() => onJoinSideChange("challenger")}
-                                                className={`cursor-pointer rounded-lg px-3 py-1.5 text-sm font-semibold transition ${joinSide === "challenger"
+                                                onClick={() => onJoinSideChange("TEAM_A")}
+                                                className={`cursor-pointer rounded-lg px-3 py-1.5 text-sm font-semibold transition ${joinSide === "TEAM_A"
                                                     ? "bg-emerald-600 text-white"
                                                     : "text-[#2a8f66] hover:bg-emerald-100"
                                                     }`}
                                             >
-                                                Challenger
+                                                Creator&apos;s Side (Team A)
                                             </button>
                                             <button
                                                 type="button"
-                                                onClick={() => onJoinSideChange("opponent")}
-                                                className={`cursor-pointer rounded-lg px-3 py-1.5 text-sm font-semibold transition ${joinSide === "opponent"
+                                                onClick={() => onJoinSideChange("TEAM_B")}
+                                                className={`cursor-pointer rounded-lg px-3 py-1.5 text-sm font-semibold transition ${joinSide === "TEAM_B"
                                                     ? "bg-emerald-600 text-white"
                                                     : "text-[#2a8f66] hover:bg-emerald-100"
                                                     }`}
                                             >
-                                                Opponent
+                                                Opponent&apos;s Side (Team B)
                                             </button>
                                         </div>
                                     </div>
@@ -174,16 +174,9 @@ export function AcceptChallengeModal({
                                             You are joining as an
                                         </p>
                                         <div className="inline-flex rounded-xl border border-[#d7ebe1] bg-[#f5fcf8] p-1">
-                                            <button
-                                                type="button"
-                                                onClick={() => onJoinSideChange("opponent")}
-                                                className={`cursor-pointer rounded-lg px-3 py-1.5 text-sm font-semibold transition ${joinSide === "opponent"
-                                                    ? "bg-emerald-600 text-white"
-                                                    : "text-[#2a8f66] hover:bg-emerald-100"
-                                                    }`}
-                                            >
+                                            <span className="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white">
                                                 Opponent
-                                            </button>
+                                            </span>
                                         </div>
                                     </div>
                                 )}
@@ -196,7 +189,7 @@ export function AcceptChallengeModal({
                             className="group h-9 w-9 shrink-0 cursor-pointer rounded-full border-2 border-black bg-white text-base font-black text-[#6f6a63] shadow-[2px_2px_0_#111] transition-all hover:-translate-y-0.5 hover:border-black hover:bg-[#fffaf7] hover:text-[#2d1f1a] hover:shadow-[2px_2px_0_#111] disabled:cursor-not-allowed disabled:opacity-60 sm:h-10 sm:w-10 sm:text-lg"
                             aria-label="Close"
                         >
-                            <span className="leading-none">×</span>
+                            <span className="leading-none">x</span>
                         </button>
                     </div>
 
@@ -246,7 +239,6 @@ export function AcceptChallengeModal({
                                     className="w-1/2 bg-transparent text-3xl font-black text-[#1f1b16] outline-none sm:text-4xl"
                                     placeholder="0"
                                 />
-                                {/* fetch the balance  */}
                                 <div className="text-right">
                                     <p className="text-xs font-semibold uppercase text-[#9d958d]">Balance</p>
                                     <p className="text-2xl font-semibold text-[#53473f]">${usdcBalance}</p>
@@ -288,9 +280,7 @@ export function AcceptChallengeModal({
                         ) : null}
                     </div>
 
-                    {/* info section  */}
                     <div className="grid gap-2 sm:grid-cols-2">
-                        {/* contract section  */}
                         <div className="grid rounded-xl border border-[#e7ddd5] bg-white p-2.5">
                             <div className="flex items-center gap-2 md:pr-3">
                                 <div className="min-w-0">
@@ -319,7 +309,6 @@ export function AcceptChallengeModal({
                             </div>
                         </div>
 
-                        {/* winner section  */}
                         <div className="flex items-center gap-2 rounded-xl border border-[#d9ece3] bg-[#eff8f3] px-2.5 py-2">
                             <div className="min-w-0">
                                 <p className="text-sm font-bold text-[#2d2a26]">Prize is distributed after challenge gets resolved 🏆</p>
@@ -338,6 +327,7 @@ export function AcceptChallengeModal({
 
                 </form>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 }

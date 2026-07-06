@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import ChallengeDetailModal from "@/app/components/challenge-components/ChallengeDetailModal";
 import {
-    ChallengeListItem,
+    Challenge,
     getChallenges,
 } from "@/app/lib/challenges-service/challenges";
 import { useBodyScrollLock } from "@/app/lib/useBodyScrollLock";
@@ -94,14 +94,14 @@ export default function ActivityPage() {
     const [activeFilter, setActiveFilter] = useState<ActivityType>("All Activity");
     const [activeStatus, setActiveStatus] = useState<ActivityStatus>("All Status");
     const [searchQuery, setSearchQuery] = useState("");
-    const [activities, setActivities] = useState<ChallengeListItem[]>([]);
+    const [activities, setActivities] = useState<Challenge[]>([]);
     const [pageIndex, setPageIndex] = useState(1);
     const [reloadKey, setReloadKey] = useState(0);
     const [isInitialLoading, setIsInitialLoading] = useState(true);
     const [isLoadingMore, setIsLoadingMore] = useState(false);
     const [hasMore, setHasMore] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [selectedChallenge, setSelectedChallenge] = useState<ChallengeListItem | null>(null);
+    const [selectedChallenge, setSelectedChallenge] = useState<Challenge | null>(null);
     const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
     const [isTypeDropdownOpen, setIsTypeDropdownOpen] = useState(false);
     const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
@@ -301,7 +301,7 @@ export default function ActivityPage() {
         });
     }, [activeFilter, activeStatus, activities, currentTimeMs, searchQuery]);
 
-    const handleActivityClick = (challenge: ChallengeListItem) => {
+    const handleActivityClick = (challenge: Challenge) => {
         setSelectedChallenge(challenge);
         setIsDetailModalOpen(true);
     };

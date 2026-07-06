@@ -145,13 +145,18 @@ pub(crate) fn handler(ctx: Context<CreateChallenge>, params: CreateChallengePara
     challenge.challenge_type = params.challenge_type.clone();
     challenge.max_team_size = effective_max_team_size;
     challenge.winning_side = WinningSide::None;
+    challenge.winning_side_total_amount = 0;
+    challenge.settled_net_pot = 0;
 
     // PVP-specific defaults
     challenge.challenger = Pubkey::default();
+    challenge.challenger_bet_amount = 0;
 
     // TEAM-specific defaults (empty vecs; creator is implicitly on creator_team)
     challenge.creator_team = Vec::new();
+    challenge.creator_team_amounts = Vec::new();
     challenge.opponent_team = Vec::new();
+    challenge.opponent_team_amounts = Vec::new();
 
     // --- Transfer USDC bet from creator to vault ---
     // Creator always puts in their own bet_amount regardless of challenge type.
