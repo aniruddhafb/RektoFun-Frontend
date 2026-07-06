@@ -282,7 +282,7 @@ export function CreateChallengeModal({
                 resolution_method: "PRICE_FEED",
                 participants: 1,
                 status: "OPEN",
-                mode: challengeMode === "pvp" ? "PVP" : "Team",
+                mode: challengeMode === "pvp" ? "PVP" : "TEAM",
                 result: "TEAM_A",
                 direction: predictionDirection === "Above" ? "UP" : "DOWN",
                 expiry: new Date(expiresAt * 1000).toISOString(),

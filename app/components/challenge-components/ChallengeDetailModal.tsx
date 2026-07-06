@@ -42,6 +42,9 @@ export default function ChallengeDetailModal({ challenge, creator, isOpen, onClo
     creatorName,
     creatorAvatar,
     creatorWalletAddress,
+    opponentName,
+    opponentAvatar,
+    opponentWalletAddress,
     isTeam,
     betAmount,
     creatorWalletShort,
@@ -432,8 +435,11 @@ export default function ChallengeDetailModal({ challenge, creator, isOpen, onClo
 
               {/* Opponent Profile */}
               {hasOpponents ? (
-                <div className="relative flex flex-col items-center">
-                  <div className={`flex h-[132px] w-[98px] max-w-full flex-col items-center justify-center rounded-xl p-2 text-center transition-all duration-300 sm:h-[140px] sm:w-[120px] sm:p-3 ${hasLost
+                <div
+                  onClick={() => openProfile(opponentWalletAddress)}
+                  className="relative group flex cursor-pointer flex-col items-center"
+                >
+                  <div className={`flex h-[132px] w-[98px] max-w-full flex-col items-center justify-center rounded-xl p-2 text-center transition-all duration-300 group-hover:-translate-y-0.5 sm:h-[140px] sm:w-[120px] sm:p-3 ${hasLost
                     ? "bg-gradient-to-br from-amber-100 to-yellow-50 border-2 border-amber-400 shadow-lg shadow-amber-200"
                     : hasWon
                       ? "bg-gradient-to-br from-red-100 to-rose-50 border-2 border-red-300"
@@ -445,15 +451,22 @@ export default function ChallengeDetailModal({ challenge, creator, isOpen, onClo
                       </div>
                     )}
                     <div className="relative flex flex-col items-center">
-                      <div className={`flex h-11 w-11 items-center justify-center overflow-hidden rounded-full border-2 sm:h-14 sm:w-14 ${hasLost ? "border-amber-400" : "border-[#d4a574]"} bg-gray-200 shadow-md`}>
-                        <User className="h-5 w-5 text-[#8b7355]" />
+                      <div className={`h-11 w-11 overflow-hidden rounded-full border-2 sm:h-14 sm:w-14 ${hasLost ? "border-amber-400" : "border-[#d4a574]"} shadow-md`}>
+                        <Image
+                          src={opponentAvatar}
+                          alt={opponentName}
+                          width={56}
+                          height={56}
+                          className="w-full h-full object-cover"
+                        />
                       </div>
                       <div className="mt-1 px-1.5 py-0.5 bg-[#2d1f1a] text-white text-[9px] font-bold rounded-full">
                         {isTeam? "POOL" : "OPPONENT"}
                       </div>
                     </div>
                     <div className="mt-2 w-full text-center">
-                      <p className="break-words font-bold text-[#2d1f1a] text-xs">{opponentOutcomeText}</p>
+                      <p className="break-words font-bold text-[#2d1f1a] text-xs">{opponentName}</p>
+                      <p className="mt-0.5 break-all text-[10px] text-[#8b7355]">{opponentOutcomeText}</p>
                     </div>
                   </div>
                 </div>

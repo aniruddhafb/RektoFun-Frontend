@@ -406,15 +406,18 @@ export function useChallengeCard(challenge: Challenge) {
   const creator = challenge.creator;
   const isCreator = user?.id != null && user.id === creator;
   const creatorDetails = challenge.creator_details;
-  const creatorDisplayName = creatorDetails?.username || "Creator";
-  const creatorProfileImage = creatorDetails?.profile_image || assetIcon;
-  const creatorWalletAddress = creatorDetails?.pubkey || "";
+  const teamAHighestBet = challenge.bet_info?.highest_bet?.TEAM_A;
+  const teamBHighestBet = challenge.bet_info?.highest_bet?.TEAM_B;
 
-  // Opponent/team roster data isn't part of the Challenge payload (it lives in positions).
-  const opponentInfo = null;
-  const hasOpponentInfo = false;
-  const opponentProfileImage = assetIcon;
-  const opponentDisplayName = "Opponent";
+  const creatorDisplayName = teamAHighestBet?.username || creatorDetails?.username || "Creator";
+  const creatorProfileImage = teamAHighestBet?.profile_image || creatorDetails?.profile_image || assetIcon;
+  const creatorWalletAddress = teamAHighestBet?.pubkey || creatorDetails?.pubkey || "";
+
+  // Opponent/team roster data comes from the challenge's bet_info.highest_bet.TEAM_B entry.
+  const opponentInfo = teamBHighestBet ? { wallet_address: teamBHighestBet.pubkey } : null;
+  const hasOpponentInfo = Boolean(teamBHighestBet);
+  const opponentProfileImage = teamBHighestBet?.profile_image || assetIcon;
+  const opponentDisplayName = teamBHighestBet?.username || "Opponent";
 
   const hasWon = false;
   const hasLost = false;
@@ -447,7 +450,7 @@ export function useChallengeCard(challenge: Challenge) {
   const exactCountdownDetails = formatExactCountdownDetails(resolveTimestamp, currentTime);
   const isManualResolution = challenge.resolution_method !== "PRICE_FEED";
   const totalOpponents = Math.max((challenge.participants ?? 0) - 1, 0);
-  const hasOpponents = totalOpponents > 0;
+  const hasOpponents = hasOpponentInfo || totalOpponents > 0;
   const isExpireTimeAchieved = Boolean(expiryTimestamp && expiryTimestamp <= currentTime);
   const isResolveTimeAchieved = Boolean(resolveTimestamp && resolveTimestamp <= currentTime);
   const isResolutionPending = challenge.status === "PENDING_RESOLUTION";

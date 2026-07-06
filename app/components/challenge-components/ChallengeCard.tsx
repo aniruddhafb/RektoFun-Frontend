@@ -100,8 +100,8 @@ export function ChallengeCard({
 
     return (
         <>
-            <div
-                className="challenge-card-shell group/card block overflow-hidden rounded-xl border border-gray-200 bg-[#fffaf6] p-3 transition-all duration-300 hover:-translate-y-0.5 hover:border-gray-300 hover:shadow-md sm:p-4"
+            <div onClick={handleClick}
+                className="challenge-card-shell cursor-pointer group/card block overflow-hidden rounded-xl border border-gray-200 bg-[#fffaf6] p-3 transition-all duration-300 hover:-translate-y-0.5 hover:border-gray-300 hover:shadow-md sm:p-4"
             >
                 {/* Header */}
                 <div className="mb-3 flex items-start justify-between gap-2">
@@ -202,15 +202,15 @@ export function ChallengeCard({
                 <div className="border-t border-gray-200 my-3"></div>
 
                 {/* Challenge Mode Info */}
-                <div onClick={handleClick} className="mb-4 flex items-center justify-center">
+                <div  className="mb-4 flex items-center justify-center">
                     <div className="group relative inline-flex cursor-pointer">
                         <h2 className="border border-black bg-[#f5d547] px-3 py-1 text-xs font-black uppercase tracking-[0.12em] text-black hover:shadow-[2px_2px_0_#111]">
-                            {isPvpMode ? "PVP Mode" : "Pool Mode"}
+                            {isPvpMode ? "PVP Mode" : "Team Mode"}
                         </h2>
                         <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 text-center pointer-events-none">
                             {isPvpMode
                                 ? "The creator has set this challenge to PVP mode, meaning it's a 1v1 challenge only."
-                                : "The creator has set this challenge to pool mode, meaning multiple people can join."}
+                                : "The creator has set this challenge to team mode, meaning multiple people can join."}
                             <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
                         </div>
                     </div>
@@ -263,7 +263,7 @@ export function ChallengeCard({
                                 </div>
                             </div>
 
-                            <button
+                            {/* <button
                                 type="button"
                                 onClick={(e) => openBetForm(e)}
                                 className={`absolute -bottom-4.5 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border-2 text-[28px] font-black leading-none transition hover:scale-105 hover:shadow-md ${hasWon
@@ -276,7 +276,7 @@ export function ChallengeCard({
                                 title="Join Challenge"
                             >
                                 +
-                            </button>
+                            </button> */}
 
                         </div>
 
@@ -435,9 +435,11 @@ export function ChallengeCard({
                 <div className="flex gap-2">
                     <div className="group relative w-full">
                         <button
-                        
+                            type="button"
+                            disabled={ctaState.disabled}
                             onClick={(e) => {
                                 e.preventDefault();
+                                if (ctaState.disabled) return;
                                 openBetForm(e);
                             }}
                             className={ctaState.className}

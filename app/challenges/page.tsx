@@ -68,7 +68,7 @@ export default function ChallengesPage() {
   const isChallengeBookmarked = 
     (challengeId: string) => bookmarkedChallengeIds.includes(challengeId)
 
-
+  
   // Handle challenge card click
   const handleChallengeClick = (challenge: Challenge) => {
     setSelectedChallenge(challenge);

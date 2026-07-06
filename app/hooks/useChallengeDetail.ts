@@ -83,13 +83,18 @@ export function useChallengeDetail(
 
   // Derived values
   const assetLogo = "/scribbles/btc.png";
-  const creatorName = creator?.username || "Creator";
-  const creatorAvatar = creator?.profile_image || assetLogo;
-  const creatorWalletAddress = creator?.pubkey || "";
+  const teamAHighestBet = challenge?.bet_info?.highest_bet?.TEAM_A;
+  const teamBHighestBet = challenge?.bet_info?.highest_bet?.TEAM_B;
+  const creatorName = teamAHighestBet?.username || creator?.username || "Creator";
+  const creatorAvatar = teamAHighestBet?.profile_image || creator?.profile_image || assetLogo;
+  const creatorWalletAddress = teamAHighestBet?.pubkey || creator?.pubkey || "";
   const creatorWalletShort = creatorWalletAddress
     ? `${creatorWalletAddress.slice(0, 6)}...${creatorWalletAddress.slice(-4)}`
     : "Unknown wallet";
-  const hasOpponents = Number(challenge?.participants ?? 0) > 1;
+  const opponentName = teamBHighestBet?.username || "Opponent";
+  const opponentAvatar = teamBHighestBet?.profile_image || assetLogo;
+  const opponentWalletAddress = teamBHighestBet?.pubkey || "";
+  const hasOpponents = Boolean(teamBHighestBet) || Number(challenge?.participants ?? 0) > 1;
   const isTeam= challenge?.mode === "TEAM";
   const betAmount = challenge?.initial_bet ?? 0;
   const createdTimestamp = challenge?.created_at ? new Date(challenge.created_at).getTime() : null;
@@ -410,6 +415,9 @@ export function useChallengeDetail(
     creatorAvatar,
     creatorWalletAddress,
     creatorWalletShort,
+    opponentName,
+    opponentAvatar,
+    opponentWalletAddress,
     hasOpponents,
     isTeam,
     betAmount,

@@ -21,6 +21,23 @@ export interface CreateChallengeParams {
   final_price: number;
 }
 
+export interface HighestBetEntry {
+  id: number;
+  username: string;
+  profile_image: string;
+  pubkey: string;
+  bet: number;
+}
+
+export interface HighestBets {
+  TEAM_A?: HighestBetEntry;
+  TEAM_B?: HighestBetEntry;
+}
+
+export interface BetInfo {
+  highest_bet?: HighestBets;
+}
+
 export interface Challenge {
   id: number;
   statement: string;
@@ -43,6 +60,7 @@ export interface Challenge {
   resolution_date: string;
   final_price: number;
   created_at: string;
+  bet_info?: BetInfo | null;
 }
 
 export interface GetChallengesResponse {
