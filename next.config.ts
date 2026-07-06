@@ -4,14 +4,17 @@
 const nextConfig = {
 
   async rewrites() {
-    return [
-      {
-        source: '/api/:path*',
-        // Preserve the /api/ prefix so backend routes match correctly.
-        // Backend routes are mounted at /api/* in main.py.
-        destination: 'https://api.rekto.fun/api/:path*',
-      },
-    ];
+    return {
+      // fallback: checked AFTER all pages, public files, AND dynamic routes.
+      // This lets app/api/sports/scores/[fixtureId]/route.ts handle its own requests
+      // before Next.js ever considers forwarding to the FastAPI backend.
+      fallback: [
+        {
+          source: '/api/:path*',
+          destination: 'https://api.rekto.fun/api/:path*',
+        },
+      ],
+    };
   },
   images: {
     remotePatterns: [
