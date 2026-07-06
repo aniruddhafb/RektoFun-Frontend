@@ -34,8 +34,19 @@ export interface HighestBets {
   TEAM_B?: HighestBetEntry;
 }
 
+export interface TeamCountEntry {
+  total_bets: number;
+  total_amount: number;
+}
+
+export interface TeamCount {
+  TEAM_A?: TeamCountEntry;
+  TEAM_B?: TeamCountEntry;
+}
+
 export interface BetInfo {
   highest_bet?: HighestBets;
+  team_count?: TeamCount;
 }
 
 export interface Challenge {

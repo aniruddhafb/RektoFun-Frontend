@@ -240,13 +240,17 @@ export async function buildCreateChallengeTx(
 
 /**
  * Build an `accept_challenge` (REKT HIM) transaction using USDC.
+ *
+ * `amountMicroUsdc` is the depositing participant's own chosen bet amount
+ * (USDC micro-units) — it does not need to match the creator's bet_amount.
  */
 export async function buildAcceptChallengeTx(
   program: Program,
   challenger: PublicKey,
   challengePDA: PublicKey,
   creatorPubkey: PublicKey,
-  joinCreatorSide: boolean = false
+  joinCreatorSide: boolean = false,
+  amountMicroUsdc: BN | bigint | number
 ): Promise<Transaction> {
   const connection = getReadonlyConnection();
   const [vaultPDA] = deriveVaultPDA(challengePDA);
@@ -273,7 +277,7 @@ export async function buildAcceptChallengeTx(
   }
 
   const tx = await (program.methods as any)
-    .acceptChallenge({ joinCreatorSide })
+    .acceptChallenge({ joinCreatorSide, amount: new BN(amountMicroUsdc.toString()) })
     .accounts({
       challenger,
       creator: creatorPubkey,

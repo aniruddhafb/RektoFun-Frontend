@@ -46,6 +46,10 @@ export function ChallengeCard({
         hasOpponentInfo,
         opponentProfileImage,
         opponentDisplayName,
+        teamATotalBets,
+        teamATotalAmount,
+        teamBTotalBets,
+        teamBTotalAmount,
         title,
         betCurrency,
         poolDisplay,
@@ -225,7 +229,7 @@ export function ChallengeCard({
                             onClick={(e) => openProfile(e, creatorWalletAddress)}
                             className="relative group flex flex-col items-center cursor-pointer"
                         >
-                            <div className={`challenge-card-profile-tile flex h-[132px] w-[98px] max-w-full flex-col items-center justify-center rounded-xl p-2 transition-all duration-300 sm:h-[140px] sm:w-[120px] sm:p-3 ${hasWon
+                            <div className={`challenge-card-profile-tile relative flex h-[132px] w-[98px] max-w-full flex-col items-center justify-center rounded-xl p-2 transition-all duration-300 sm:h-[140px] sm:w-[120px] sm:p-3 ${hasWon
                                 ? "bg-gradient-to-br from-amber-100 to-yellow-50 border-2 border-amber-400"
                                 : hasLost
                                     ? "bg-gradient-to-br from-red-100 to-rose-50 border-2 border-red-300"
@@ -235,6 +239,13 @@ export function ChallengeCard({
                                 {hasWon && (
                                     <div className="text-2xl">
                                         👑
+                                    </div>
+                                )}
+
+                                {/* Backers Count Badge */}
+                                {isTeam && teamATotalBets > 1 && (
+                                    <div className="absolute top-1 right-1 w-5 h-5 bg-emerald-600 rounded-full flex items-center justify-center border-2 border-white">
+                                        <span className="text-[9px] font-bold text-white">+{teamATotalBets - 1}</span>
                                     </div>
                                 )}
 
@@ -257,9 +268,15 @@ export function ChallengeCard({
                                 {/* Info */}
                                 <div className="mt-2 w-full text-center">
                                     <p className="break-words font-bold text-[#2d1f1a] text-xs">{creatorDisplayName}</p>
-                                    <p className="mt-0.5 break-all text-[10px] text-[#8b7355]">
-                                        {hasWon ? "Won!" : hasLost ? "Lost" : ""}
-                                    </p>
+                                    {teamATotalAmount > 0 ? (
+                                        <p className="mt-0.5 break-all text-[10px] font-semibold text-emerald-600">
+                                            ${teamATotalAmount}{isTeam ? ` from ${teamATotalBets}` : ""}
+                                        </p>
+                                    ) : (
+                                        <p className="mt-0.5 break-all text-[10px] text-[#8b7355]">
+                                            {hasWon ? "Won!" : hasLost ? "Lost" : ""}
+                                        </p>
+                                    )}
                                 </div>
                             </div>
 
@@ -356,9 +373,9 @@ export function ChallengeCard({
                                         />
                                     </div>
                                     {/* Count Badge */}
-                                    {isTeam && (challenge.total_opponents ?? 0) > 1 && (
+                                    {isTeam && teamBTotalBets > 1 && (
                                         <div className="absolute top-1 right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center border-2 border-white">
-                                            <span className="text-[9px] font-bold text-white">+{(challenge.total_opponents ?? 0) - 1}</span>
+                                            <span className="text-[9px] font-bold text-white">+{teamBTotalBets - 1}</span>
                                         </div>
                                     )}
                                     {/* Label */}
@@ -369,9 +386,15 @@ export function ChallengeCard({
                                     {/* Info */}
                                     <div className="mt-2 w-full text-center">
                                         <p className="break-words font-bold text-[#2d1f1a] text-xs">{opponentDisplayName}</p>
-                                        <p className="mt-0.5 break-all text-[10px] text-[#8b7355]">
-                                            {hasLost ? "Won!" : hasWon ? "Lost" : ""}
-                                        </p>
+                                        {teamBTotalAmount > 0 ? (
+                                            <p className="mt-0.5 break-all text-[10px] font-semibold text-emerald-600">
+                                                ${teamBTotalAmount}{isTeam ? ` from ${teamBTotalBets}` : ""}
+                                            </p>
+                                        ) : (
+                                            <p className="mt-0.5 break-all text-[10px] text-[#8b7355]">
+                                                {hasLost ? "Won!" : hasWon ? "Lost" : ""}
+                                            </p>
+                                        )}
                                     </div>
                                 </div>
                                 {!isExpireTimeAchieved && !isCreator && isTeam && (

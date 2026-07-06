@@ -329,19 +329,14 @@ export function useChallengeCard(challenge: Challenge) {
         throw new Error("You cannot accept your own challenge.");
       }
 
-      const requiredBetUsdc = Number(onChainChallenge.betAmount) / USDC_MULTIPLIER;
-      console.log("opponent data: ", {
-        program,
-        challengerPubkey,
-        challengePDA,
-        creatorPubkey
-      });
+      const depositMicroUsdc = BigInt(Math.round(parsedBetAmount * USDC_MULTIPLIER));
       const tx = await buildAcceptChallengeTx(
         program,
         challengerPubkey,
         challengePDA,
         creatorPubkey,
-        joinSide === "TEAM_A"
+        joinSide === "TEAM_A",
+        depositMicroUsdc
       );
       tx.feePayer = challengerPubkey;
       tx.recentBlockhash = (await connection.getLatestBlockhash("confirmed")).blockhash;
@@ -351,7 +346,7 @@ export function useChallengeCard(challenge: Challenge) {
 
       await createPosition({
         challenge_id: challenge.id,
-        bet: requiredBetUsdc,
+        bet: parsedBetAmount,
         side: joinSide,
         creator: user.id,
       });
@@ -408,6 +403,12 @@ export function useChallengeCard(challenge: Challenge) {
   const creatorDetails = challenge.creator_details;
   const teamAHighestBet = challenge.bet_info?.highest_bet?.TEAM_A;
   const teamBHighestBet = challenge.bet_info?.highest_bet?.TEAM_B;
+  const teamACount = challenge.bet_info?.team_count?.TEAM_A;
+  const teamBCount = challenge.bet_info?.team_count?.TEAM_B;
+  const teamATotalBets = teamACount?.total_bets ?? 0;
+  const teamATotalAmount = teamACount?.total_amount ?? 0;
+  const teamBTotalBets = teamBCount?.total_bets ?? 0;
+  const teamBTotalAmount = teamBCount?.total_amount ?? 0;
 
   const creatorDisplayName = teamAHighestBet?.username || creatorDetails?.username || "Creator";
   const creatorProfileImage = teamAHighestBet?.profile_image || creatorDetails?.profile_image || assetIcon;
@@ -422,7 +423,10 @@ export function useChallengeCard(challenge: Challenge) {
   const hasWon = false;
   const hasLost = false;
 
-  const resolvedPoolAmount = challenge.pool_size || challenge.initial_bet || 0;
+  const totalPooledAmount = teamATotalAmount + teamBTotalAmount;
+  const resolvedPoolAmount = totalPooledAmount > 0
+    ? totalPooledAmount
+    : (challenge.pool_size || challenge.initial_bet || 0);
 
   const title = challenge.statement || `Bet on ${assetSymbol}`;
   const betCurrency = "USDC";
@@ -598,6 +602,10 @@ export function useChallengeCard(challenge: Challenge) {
     hasOpponentInfo,
     opponentProfileImage,
     opponentDisplayName,
+    teamATotalBets,
+    teamATotalAmount,
+    teamBTotalBets,
+    teamBTotalAmount,
     title,
     betCurrency,
     poolDisplay,
