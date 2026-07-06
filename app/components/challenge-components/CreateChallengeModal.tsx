@@ -28,7 +28,7 @@ export function CreateChallengeModal({
 }: CreateChallengeModalProps) {
     // Step and mode
     const [currentStep, setCurrentStep] = useState<CreateChallengeStep>("mode");
-    const [challengeMode, setChallengeMode] = useState<"pvp" | "multi">("pvp");
+    const [challengeMode, setChallengeMode] = useState<"pvp" | "Team">("pvp");
 
     // Challenge details
     const [betAmount, setBetAmount] = useState(1);
@@ -282,10 +282,10 @@ export function CreateChallengeModal({
                 resolution_method: "PRICE_FEED",
                 participants: 1,
                 status: "OPEN",
-                mode: challengeMode === "pvp" ? "PVP" : "MULTI",
+                mode: challengeMode === "pvp" ? "PVP" : "TEAM",
                 result: "TEAM_A",
                 direction: predictionDirection === "Above" ? "UP" : "DOWN",
-                expiry: new Date(expiresAt * 1000).toISOString().split("T")[0],
+                expiry: new Date(expiresAt * 1000).toISOString(),
                 resolution_date: new Date(resolvesAt * 1000).toISOString().split("T")[0],
                 final_price: 0,
             });
@@ -380,14 +380,14 @@ export function CreateChallengeModal({
                             </button>
                             <button
                                 type="button"
-                                onClick={() => setChallengeMode("multi")}
-                                className={`min-h-28 rounded-xl border px-4 py-4 text-left transition-colors ${challengeMode === "multi"
+                                onClick={() => setChallengeMode("Team")}
+                                className={`min-h-28 rounded-xl border px-4 py-4 text-left transition-colors ${challengeMode === "Team"
                                     ? "border-gray-900 bg-gray-900 text-white shadow-[3px_3px_0_#f5d547]"
                                     : "border-[#e8d5c8] bg-[#faf0eb] text-gray-700 hover:border-[#d4b8a8]"
                                     }`}
                             >
-                                <span className="block text-base font-black">Multi</span>
-                                <span className={`mt-1 block text-sm ${challengeMode === "multi" ? "text-white/80" : "text-gray-500"}`}>Multiple players can join the same challenge.</span>
+                                <span className="block text-base font-black">Team</span>
+                                <span className={`mt-1 block text-sm ${challengeMode === "Team" ? "text-white/80" : "text-gray-500"}`}>Multiple players can join the same challenge.</span>
                             </button>
                         </div>
                         <p className="text-xs text-gray-500">You can change this before moving forward.</p>

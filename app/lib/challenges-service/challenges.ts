@@ -1,3 +1,5 @@
+import { User } from '../users-service/users';
+
 export interface CreateChallengeParams {
   statement: string;
   ticker: string;
@@ -19,6 +21,34 @@ export interface CreateChallengeParams {
   final_price: number;
 }
 
+export interface HighestBetEntry {
+  id: number;
+  username: string;
+  profile_image: string;
+  pubkey: string;
+  bet: number;
+}
+
+export interface HighestBets {
+  TEAM_A?: HighestBetEntry;
+  TEAM_B?: HighestBetEntry;
+}
+
+export interface TeamCountEntry {
+  total_bets: number;
+  total_amount: number;
+}
+
+export interface TeamCount {
+  TEAM_A?: TeamCountEntry;
+  TEAM_B?: TeamCountEntry;
+}
+
+export interface BetInfo {
+  highest_bet?: HighestBets;
+  team_count?: TeamCount;
+}
+
 export interface Challenge {
   id: number;
   statement: string;
@@ -30,16 +60,18 @@ export interface Challenge {
   resolution_source: string;
   metadata: Record<string, Record<string, unknown>>;
   creator: number;
+  creator_details?: User | null;
   resolution_method: 'PRICE_FEED' | string;
   participants: number;
-  status: 'OPEN' | string;
-  mode: 'PVP' | string;
+  status: 'OPEN' | 'PENDING_RESOLUTION' | 'EXPIRED' | 'RESOLVED' | 'CANCELLED' | string;
+  mode: 'PVP' | 'TEAM' | string;
   result: 'TEAM_A' | string;
-  direction: 'UP' | string;
+  direction: 'UP' | 'DOWN' | string;
   expiry: string;
   resolution_date: string;
   final_price: number;
   created_at: string;
+  bet_info?: BetInfo | null;
 }
 
 export interface GetChallengesResponse {

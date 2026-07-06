@@ -79,13 +79,16 @@ pub(crate) fn handler(ctx: Context<ClaimRefund>) -> Result<()> {
     let challenge = &ctx.accounts.challenge;
     let participant_key = ctx.accounts.participant.key();
     let decimals = ctx.accounts.usdc_mint.decimals;
-    let bet_amount = challenge.bet_amount;
 
-    // Only creator_team members are eligible — the creator was already refunded in cancel_challenge
-    require!(
-        challenge.creator_team.contains(&participant_key),
-        RektoError::NotEligibleForRefund
-    );
+    // Only creator_team members are eligible — the creator was already refunded in cancel_challenge.
+    // Refund this participant their own deposited amount, not a uniform bet_amount —
+    // creator_team members may have joined with different custom amounts.
+    let idx = challenge
+        .creator_team
+        .iter()
+        .position(|p| *p == participant_key)
+        .ok_or(RektoError::NotEligibleForRefund)?;
+    let refund_amount = challenge.creator_team_amounts[idx];
 
     // PDA signer seeds
     let challenge_bump = challenge.bump;
@@ -101,7 +104,7 @@ pub(crate) fn handler(ctx: Context<ClaimRefund>) -> Result<()> {
 
     // If this is the last refund the vault balance will hit zero — close it now
     // to recover rent for the participant doing the final cleanup.
-    let is_last_claim = ctx.accounts.vault.amount == bet_amount;
+    let is_last_claim = ctx.accounts.vault.amount == refund_amount;
 
     // Transfer refund to participant
     token_interface::transfer_checked(
@@ -115,7 +118,7 @@ pub(crate) fn handler(ctx: Context<ClaimRefund>) -> Result<()> {
             },
             signer_seeds,
         ),
-        bet_amount,
+        refund_amount,
         decimals,
     )?;
 
@@ -136,14 +139,14 @@ pub(crate) fn handler(ctx: Context<ClaimRefund>) -> Result<()> {
     let claim_record = &mut ctx.accounts.claim_record;
     claim_record.challenge = ctx.accounts.challenge.key();
     claim_record.participant = participant_key;
-    claim_record.amount_claimed = bet_amount;
+    claim_record.amount_claimed = refund_amount;
     claim_record.bump = ctx.bumps.claim_record;
 
     msg!(
         "TEAM Challenge #{}: {} refunded {} USDC micro-units (cancelled challenge)",
         challenge.challenge_id,
         participant_key,
-        bet_amount,
+        refund_amount,
     );
 
     Ok(())

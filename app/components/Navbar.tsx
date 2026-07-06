@@ -41,6 +41,7 @@ export default function Navbar() {
         userProfileData,
         displayAddress,
         displayUsername,
+        usdcBalance,
 
         // Connection state
         address,
@@ -54,8 +55,6 @@ export default function Navbar() {
         profileHref,
         isActive,
     } = useNavbar();
-
-    const usdcBalance = null; // fetched inside DepositModal / NavbarAuthSection independently
 
     return (
         <>
@@ -154,6 +153,7 @@ export default function Navbar() {
                     isOpen={isDepositModalOpen}
                     onClose={() => setIsDepositModalOpen(false)}
                     initialMode={fundsModalMode}
+                    usdcBalance={usdcBalance}
                 />
             )}
 

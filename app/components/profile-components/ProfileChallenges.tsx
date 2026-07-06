@@ -2,12 +2,12 @@
 
 import React from "react";
 import { ChallengeCard } from "@/app/components/challenge-components/ChallengeCard";
-import { ChallengeListItem } from "@/app/lib/challenges-service/challenges";
+import { Challenge } from "@/app/lib/challenges-service/challenges";
 
 interface ProfileChallengesProps {
-    challenges: ChallengeListItem[];
+    challenges: Challenge[];
     loading?: boolean;
-    onChallengeClick: (challenge: ChallengeListItem) => void;
+    onChallengeClick: (challenge: Challenge) => void;
     onToggleBookmark?: (challengeId: string) => void;
     isBookmarked?: (challengeId: string) => boolean;
 }

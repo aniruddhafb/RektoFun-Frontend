@@ -97,9 +97,11 @@ pub(crate) fn handler(ctx: Context<SettleChallenge>, creator_wins: bool) -> Resu
                 RektoError::NotActive
             );
 
+            // Both sides may have deposited different amounts; the winner takes
+            // the full combined pot.
             let total_pot = challenge
                 .bet_amount
-                .checked_mul(2)
+                .checked_add(challenge.challenger_bet_amount)
                 .ok_or(RektoError::Overflow)?;
 
             let fee = total_pot
@@ -184,16 +186,24 @@ pub(crate) fn handler(ctx: Context<SettleChallenge>, creator_wins: bool) -> Resu
                 RektoError::NoWinningSide
             );
 
-            // Total participants: 1 (creator) + creator_team.len() + opponent_team.len()
-            let total_participants = (1u64)
-                .checked_add(challenge.creator_team.len() as u64)
-                .ok_or(RektoError::Overflow)?
-                .checked_add(challenge.opponent_team.len() as u64)
+            // Participants may have deposited different amounts; sum each side's
+            // actual stake instead of assuming a uniform bet_amount.
+            let creator_team_sum: u64 = challenge
+                .creator_team_amounts
+                .iter()
+                .try_fold(0u64, |acc, &amt| acc.checked_add(amt))
+                .ok_or(RektoError::Overflow)?;
+            let opponent_team_sum: u64 = challenge
+                .opponent_team_amounts
+                .iter()
+                .try_fold(0u64, |acc, &amt| acc.checked_add(amt))
                 .ok_or(RektoError::Overflow)?;
 
             let total_pot = challenge
                 .bet_amount
-                .checked_mul(total_participants)
+                .checked_add(creator_team_sum)
+                .ok_or(RektoError::Overflow)?
+                .checked_add(opponent_team_sum)
                 .ok_or(RektoError::Overflow)?;
 
             // Deduct platform fee from the total pot
@@ -219,6 +229,20 @@ pub(crate) fn handler(ctx: Context<SettleChallenge>, creator_wins: bool) -> Resu
                 decimals,
             )?;
 
+            let net_pot = total_pot.checked_sub(fee).ok_or(RektoError::Overflow)?;
+
+            // Winning side's combined stake — each winner's claim_winnings payout is
+            // their own stake's proportional share of net_pot (participants staked
+            // different amounts, so this can no longer be split evenly by headcount).
+            let winning_side_total_amount = if creator_wins {
+                challenge
+                    .bet_amount
+                    .checked_add(creator_team_sum)
+                    .ok_or(RektoError::Overflow)?
+            } else {
+                opponent_team_sum
+            };
+
             // Record the winning side — individual winners claim via claim_winnings
             let challenge = &mut ctx.accounts.challenge;
             challenge.status = ChallengeStatus::Settled;
@@ -227,27 +251,15 @@ pub(crate) fn handler(ctx: Context<SettleChallenge>, creator_wins: bool) -> Resu
             } else {
                 WinningSide::OpponentTeam
             };
-
-            let winning_team_size = if creator_wins {
-                // creator (1) + creator_team members
-                1u64.checked_add(challenge.creator_team.len() as u64)
-                    .ok_or(RektoError::Overflow)?
-            } else {
-                challenge.opponent_team.len() as u64
-            };
-
-            let payout_per_winner = total_pot
-                .checked_sub(fee)
-                .ok_or(RektoError::Overflow)?
-                .checked_div(winning_team_size)
-                .ok_or(RektoError::Overflow)?;
+            challenge.winning_side_total_amount = winning_side_total_amount;
+            challenge.settled_net_pot = net_pot;
 
             msg!(
-                "TEAM Challenge #{} settled — {} team wins — {} winners each claim {} USDC micro-units (fee: {})",
+                "TEAM Challenge #{} settled — {} team wins — net pot {} USDC micro-units split proportionally across {} USDC micro-units of winning stake (fee: {})",
                 challenge.challenge_id,
                 if creator_wins { "creator's" } else { "opponent's" },
-                winning_team_size,
-                payout_per_winner,
+                net_pot,
+                winning_side_total_amount,
                 fee,
             );
         }

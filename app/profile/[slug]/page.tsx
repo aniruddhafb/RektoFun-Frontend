@@ -14,7 +14,7 @@ import { LoadingPage } from "@/app/components/LoadingPage";
 import { followUser, getUserByWallet, unfollowUser, User } from "@/app/lib/users-service/users";
 import { useUserStore } from "@/app/store/useUserStore";
 import {
-    ChallengeListItem,
+    Challenge,
     getChallenges,
 } from "@/app/lib/challenges-service/challenges";
 
@@ -29,12 +29,12 @@ export default function ProfilePage() {
     const walletFromSlug = decodeURIComponent(slug || "");
 
     const [activeTab, setActiveTab] = useState<TabType>("challenges");
-    const [selectedChallenge, setSelectedChallenge] = useState<ChallengeListItem | null>(null);
+    const [selectedChallenge, setSelectedChallenge] = useState<Challenge | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [userChallenges, setUserChallenges] = useState<ChallengeListItem[]>([]);
+    const [userChallenges, setUserChallenges] = useState<Challenge[]>([]);
     const [challengesLoading, setChallengesLoading] = useState(false);
     const [isFollowActionLoading, setIsFollowActionLoading] = useState(false);
 
@@ -89,7 +89,7 @@ export default function ProfilePage() {
         fetchUserChallenges();
     }, [user?.id]);
 
-    const handleChallengeClick = (challenge: ChallengeListItem) => {
+    const handleChallengeClick = (challenge: Challenge) => {
         setSelectedChallenge(challenge);
         setIsModalOpen(true);
     };

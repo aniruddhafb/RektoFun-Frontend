@@ -14,8 +14,8 @@
         "TEAM: A participant joins either the creator's side or the opponent's side.",
         "",
         "`params.join_creator_side` is only meaningful for TEAM challenges:",
-        "- true  → join the creator's side",
-        "- false → join the opponent's side",
+        "- true  \u2192 join the creator's side",
+        "- false \u2192 join the opponent's side",
         "For PVP challenges this field is ignored."
       ],
       "discriminator": [
@@ -71,7 +71,7 @@
         {
           "name": "vault",
           "docs": [
-            "USDC vault token account — owned by the challenge PDA"
+            "USDC vault token account \u2014 owned by the challenge PDA"
           ],
           "writable": true,
           "pda": {
@@ -103,7 +103,7 @@
         {
           "name": "usdc_mint",
           "docs": [
-            "USDC mint — validated by token account constraints above"
+            "USDC mint \u2014 validated by token account constraints above"
           ]
         },
         {
@@ -181,7 +181,7 @@
         {
           "name": "vault",
           "docs": [
-            "USDC vault token account — owned by the challenge PDA"
+            "USDC vault token account \u2014 owned by the challenge PDA"
           ],
           "writable": true,
           "pda": {
@@ -213,7 +213,7 @@
         {
           "name": "usdc_mint",
           "docs": [
-            "USDC mint — validated by token account constraints above"
+            "USDC mint \u2014 validated by token account constraints above"
           ]
         },
         {
@@ -290,7 +290,7 @@
         {
           "name": "vault",
           "docs": [
-            "USDC vault token account — owned by the challenge PDA"
+            "USDC vault token account \u2014 owned by the challenge PDA"
           ],
           "writable": true,
           "pda": {
@@ -322,7 +322,7 @@
         {
           "name": "claim_record",
           "docs": [
-            "Claim record — created here; its existence prevents double-claiming.",
+            "Claim record \u2014 created here; its existence prevents double-claiming.",
             "Seeds: [b\"claim\", challenge.key(), participant.key()]"
           ],
           "writable": true,
@@ -392,7 +392,7 @@
         {
           "name": "creator_counter",
           "docs": [
-            "Per-creator counter — init on first challenge, increment thereafter"
+            "Per-creator counter \u2014 init on first challenge, increment thereafter"
           ],
           "writable": true,
           "pda": {
@@ -461,7 +461,7 @@
         {
           "name": "vault",
           "docs": [
-            "USDC vault token account — an ATA owned by the challenge PDA.",
+            "USDC vault token account \u2014 an ATA owned by the challenge PDA.",
             "Holds all bets (creator's + all participants')."
           ],
           "writable": true,
@@ -494,7 +494,7 @@
         {
           "name": "usdc_mint",
           "docs": [
-            "USDC mint — must match the devnet USDC address"
+            "USDC mint \u2014 must match the devnet USDC address"
           ]
         },
         {
@@ -552,7 +552,7 @@
         {
           "name": "challenger",
           "docs": [
-            "For TEAM challenges pass any pubkey (e.g. creator again) — it won't be paid out here."
+            "For TEAM challenges pass any pubkey (e.g. creator again) \u2014 it won't be paid out here."
           ]
         },
         {
@@ -590,7 +590,7 @@
         {
           "name": "vault",
           "docs": [
-            "USDC vault token account — owned by the challenge PDA"
+            "USDC vault token account \u2014 owned by the challenge PDA"
           ],
           "writable": true,
           "pda": {
@@ -616,7 +616,7 @@
           "name": "winner_usdc_account",
           "docs": [
             "PVP only: winner's USDC token account (creator or challenger depending on outcome).",
-            "For TEAM challenges pass any valid USDC token account — it won't be written to."
+            "For TEAM challenges pass any valid USDC token account \u2014 it won't be written to."
           ],
           "writable": true
         },
@@ -630,7 +630,7 @@
         {
           "name": "usdc_mint",
           "docs": [
-            "USDC mint — validated by token account constraints above"
+            "USDC mint \u2014 validated by token account constraints above"
           ]
         },
         {
@@ -803,8 +803,8 @@
       "name": "AcceptChallengeParams",
       "docs": [
         "`side` is only meaningful for TEAM challenges:",
-        "- `true`  → join the **creator's** side",
-        "- `false` → join the **opponent's** side",
+        "- `true`  \u2192 join the **creator's** side",
+        "- `false` \u2192 join the **opponent's** side",
         "",
         "For PVP challenges `side` is ignored; the caller becomes the single challenger."
       ],
@@ -818,6 +818,16 @@
               "Ignored for PVP."
             ],
             "type": "bool"
+          },
+          {
+            "name": "amount",
+            "docs": [
+              "Amount this participant deposits, in USDC micro-units. Does not need to",
+              "match the creator's bet_amount \u2014 PVP pays the winner the full combined",
+              "pot, and TEAM pays each winner proportionally to their own stake.",
+              "Must be >= MIN_BET_AMOUNT."
+            ],
+            "type": "u64"
           }
         ]
       }
@@ -828,7 +838,7 @@
         "The main challenge account stored on-chain.",
         "",
         "PVP seeds:  [b\"challenge\", creator.key(), challenge_id.to_le_bytes()]",
-        "TEAM seeds: same — challenge_type differentiates behaviour at runtime."
+        "TEAM seeds: same \u2014 challenge_type differentiates behaviour at runtime."
       ],
       "type": {
         "kind": "struct",
@@ -848,6 +858,14 @@
             "type": "pubkey"
           },
           {
+            "name": "challenger_bet_amount",
+            "docs": [
+              "PVP only: the amount the challenger actually deposited (may differ from",
+              "the creator's bet_amount; zero until accepted)."
+            ],
+            "type": "u64"
+          },
+          {
             "name": "creator_team",
             "docs": [
               "TEAM only: participants who joined the creator's side (creator is implicitly included)"
@@ -857,12 +875,30 @@
             }
           },
           {
+            "name": "creator_team_amounts",
+            "docs": [
+              "TEAM only: amount each creator_team participant deposited, parallel to creator_team"
+            ],
+            "type": {
+              "vec": "u64"
+            }
+          },
+          {
             "name": "opponent_team",
             "docs": [
               "TEAM only: participants who joined the opponent's side"
             ],
             "type": {
               "vec": "pubkey"
+            }
+          },
+          {
+            "name": "opponent_team_amounts",
+            "docs": [
+              "TEAM only: amount each opponent_team participant deposited, parallel to opponent_team"
+            ],
+            "type": {
+              "vec": "u64"
             }
           },
           {
@@ -882,6 +918,22 @@
                 "name": "WinningSide"
               }
             }
+          },
+          {
+            "name": "winning_side_total_amount",
+            "docs": [
+              "TEAM only: combined stake of the winning side, snapshotted at settle time.",
+              "Used by claim_winnings to compute each winner's proportional share."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "settled_net_pot",
+            "docs": [
+              "TEAM only: net pot (total stake across both sides, minus platform fee),",
+              "snapshotted at settle time and split proportionally in claim_winnings."
+            ],
+            "type": "u64"
           },
           {
             "name": "challenge_type",
@@ -911,14 +963,16 @@
           {
             "name": "bet_amount",
             "docs": [
-              "Bet amount in USDC micro-units per participant (both sides must match per person)"
+              "The creator's own stake, in USDC micro-units. Other participants may deposit a",
+              "different amount when they accept/join (see challenger_bet_amount,",
+              "creator_team_amounts, opponent_team_amounts); MIN_BET_AMOUNT still applies to all."
             ],
             "type": "u64"
           },
           {
             "name": "target_price_usd_cents",
             "docs": [
-              "Target price in USD cents (e.g. $66,500 → 6_650_000)"
+              "Target price in USD cents (e.g. $66,500 \u2192 6_650_000)"
             ],
             "type": "u64"
           },
@@ -1068,7 +1122,7 @@
           {
             "name": "target_price_usd_cents",
             "docs": [
-              "Target price in USD cents (e.g. $66,500 → 6_650_000)"
+              "Target price in USD cents (e.g. $66,500 \u2192 6_650_000)"
             ],
             "type": "u64"
           },
