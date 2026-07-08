@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { ChallengeHeader } from "../components/challenge-components/ChallengeHeader";
 import { ChallengeFiltersSection } from "../components/challenge-components/ChallengeFiltersSection";
 import { FeedbackBanner } from "../components/challenge-components/FeedbackBanner";
@@ -13,7 +13,7 @@ import { Challenge } from "../lib/challenges-service/challenges";
 import ChallengeDetailModal from "../components/challenge-components/ChallengeDetailModal";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
-export default function ChallengesPage() {
+function ChallengesPageContent() {
 
   const CREATE_TOAST_DURATION_MS = 3000;
   const BOOKMARKS_STORAGE_KEY = "rektofun:challenge-bookmarks";
@@ -224,5 +224,13 @@ export default function ChallengesPage() {
         onClose={closeDetailModal}
       />
     </div>
+  );
+}
+
+export default function ChallengesPage() {
+  return (
+    <Suspense fallback={null}>
+      <ChallengesPageContent />
+    </Suspense>
   );
 }
