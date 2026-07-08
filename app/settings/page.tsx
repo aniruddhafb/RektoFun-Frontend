@@ -6,8 +6,7 @@ import { useAppKitAccount } from "@reown/appkit/react";
 import { getUserByWallet, updateUser } from "@/app/lib/users-service/users";
 import { blockedContentError, hasBlockedContent } from "@/app/lib/content-moderation";
 import { useUserStore } from "@/app/store/useUserStore";
-
-const PROFILE_SVGS = Array.from({ length: 31 }, (_, i) => `/profiles/${i + 1}.svg`);
+import { getDiceBearAvatarUrl } from "@/app/lib/profile-avatar";
 
 export default function SettingsPage() {
   const { address, isConnected } = useAppKitAccount();
@@ -16,7 +15,8 @@ export default function SettingsPage() {
   // Profile state
   const [username, setUsername] = useState("");
   const [description, setDescription] = useState("");
-  const [editProfileIndex, setEditProfileIndex] = useState(0);
+  const [profileImageUrl, setProfileImageUrl] = useState(() => getDiceBearAvatarUrl("rektofun-default"));
+  const [isAvatarLoading, setIsAvatarLoading] = useState(false);
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
@@ -35,12 +35,7 @@ export default function SettingsPage() {
         const userData = await getUserByWallet(address);
         setUsername(userData.username || "");
         setDescription(userData.description || "");
-        if (userData.profile_image) {
-          const profileMatch = userData.profile_image.match(/profiles\/(\d+)\.svg/);
-          if (profileMatch) {
-            setEditProfileIndex(parseInt(profileMatch[1]) - 1);
-          }
-        }
+        setProfileImageUrl(userData.profile_image || getDiceBearAvatarUrl());
         setUser(userData);
       } catch (error) {
         console.error("[Settings] Could not fetch user data:", error);
@@ -67,8 +62,8 @@ export default function SettingsPage() {
 
   // Randomize profile
   const randomizeProfile = () => {
-    const randomIndex = Math.floor(Math.random() * 31);
-    setEditProfileIndex(randomIndex);
+    setIsAvatarLoading(true);
+    setProfileImageUrl(getDiceBearAvatarUrl());
   };
 
   // Save profile changes
@@ -88,11 +83,10 @@ export default function SettingsPage() {
     setIsSavingProfile(true);
 
     try {
-      const profileIndex = editProfileIndex + 1;
       const updatedUser = await updateUser(user.id, {
         username: username,
         description: description,
-        profile_image: `https://earningrecords.com/assets/rektofun/profiles/${profileIndex}.svg`,
+        profile_image: profileImageUrl,
       });
       setUser(updatedUser);
       setShowSuccessMessage(true);
@@ -149,17 +143,29 @@ export default function SettingsPage() {
             {/* Profile Photo */}
             <div className="flex flex-col items-center">
               <div className="relative">
-                <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-white">
-                  <img
-                    src={PROFILE_SVGS[editProfileIndex]}
+                <div className="relative w-24 h-24 rounded-full overflow-hidden border-4 border-white">
+                  <Image
+                    src={profileImageUrl}
                     alt="Profile"
-                    className="w-full h-full object-cover"
+                    fill
+                    sizes="96px"
+                    className="object-cover"
+                    onLoad={() => setIsAvatarLoading(false)}
+                    onError={() => setIsAvatarLoading(false)}
                   />
+                  {isAvatarLoading && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-white/75 backdrop-blur-[1px]">
+                      <div
+                        className="h-7 w-7 animate-spin rounded-full border-2 border-gray-300 border-t-black"
+                        aria-label="Loading randomized avatar"
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
               <button
                 onClick={randomizeProfile}
-                className="mt-3 flex items-center gap-2 px-4 py-2 bg-black text-white text-sm font-medium rounded-full hover:bg-gray-800 transition-colors"
+                className="mt-3 flex cursor-pointer items-center gap-2 px-4 py-2 bg-black text-white text-sm font-medium rounded-full hover:bg-gray-800 transition-colors"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -206,7 +212,7 @@ export default function SettingsPage() {
               <button
                 onClick={saveProfile}
                 disabled={isSavingProfile || isLoadingProfile}
-                className="w-full px-4 py-2 bg-black text-white rounded-xl hover:bg-gray-800 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                className="cursor-pointer w-full px-4 py-2 bg-black text-white rounded-xl hover:bg-gray-800 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isSavingProfile ? "Saving..." : "Save Changes"}
               </button>

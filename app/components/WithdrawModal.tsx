@@ -11,6 +11,7 @@ import {
 } from "@solana/spl-token";
 import { ArrowUpFromLine, X } from "lucide-react";
 import { USDC_MINT, USDC_MULTIPLIER, getReadonlyConnection } from "@/app/lib/rektofun-program";
+import { fetchUsdcBalance as fetchUsdcTokenBalance } from "@/app/lib/token-balances";
 import { useBodyScrollLock } from "@/app/lib/useBodyScrollLock";
 
 interface WithdrawModalProps {
@@ -51,10 +52,8 @@ export function WithdrawModal({ isOpen, onClose }: WithdrawModalProps) {
       }
 
       try {
-        const pubKey = new PublicKey(address);
-        const ata = await getAssociatedTokenAddress(USDC_MINT, pubKey, false);
-        const accountInfo = await connection.getTokenAccountBalance(ata);
-        setUsdcBalance(accountInfo.value.uiAmount || 0);
+        const balance = await fetchUsdcTokenBalance(address);
+        setUsdcBalance(balance);
       } catch {
         setUsdcBalance(0);
       }
@@ -171,7 +170,7 @@ export function WithdrawModal({ isOpen, onClose }: WithdrawModalProps) {
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center px-4">
       <div className="absolute inset-0 bg-black/45 backdrop-blur-sm" onClick={handleClose} />
-      <div className="relative z-10 w-full max-w-md overflow-hidden rounded-lg border border-[#1f2937] bg-[#fff8f4] shadow-[0_18px_60px_rgba(17,17,17,0.28)]">
+      <div className="relative z-10 w-full max-w-md overflow-hidden rounded-lg border border-[#1f2937] bg-[#fff8f4]">
         <div className="border-b border-[#ead7cc] bg-white/55 px-5 py-4">
           <div className="flex items-center justify-between gap-4">
             <div className="flex min-w-0 items-center gap-3">

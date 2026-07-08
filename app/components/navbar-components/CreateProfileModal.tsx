@@ -1,10 +1,10 @@
 "use client";
 
-import { getProfileAvatarDataUri } from "@/app/lib/profile-avatar";
+import Image from "next/image";
 
 type CreateProfileModalProps = {
     isOpen: boolean;
-    editProfileIndex: number;
+    editProfileImageUrl: string;
     editUsername: string;
     editEmail: string;
     editBio: string;
@@ -20,7 +20,7 @@ type CreateProfileModalProps = {
 
 export function CreateProfileModal({
     isOpen,
-    editProfileIndex,
+    editProfileImageUrl,
     editUsername,
     editEmail,
     editBio,
@@ -57,11 +57,13 @@ export function CreateProfileModal({
                                 Profile Character
                             </label>
                             <div className="flex items-center gap-4">
-                                <div className="w-20 h-20 rounded-full overflow-hidden border-4 border-black shadow-lg">
-                                    <img
-                                        src={getProfileAvatarDataUri(editProfileIndex)}
+                                <div className="relative w-20 h-20 rounded-full overflow-hidden border-4 border-black shadow-lg">
+                                    <Image
+                                        src={editProfileImageUrl}
                                         alt="Profile"
-                                        className="w-full h-full object-cover"
+                                        fill
+                                        sizes="80px"
+                                        className="object-cover"
                                     />
                                 </div>
                                 <button

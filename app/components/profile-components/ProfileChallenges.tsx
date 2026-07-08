@@ -43,7 +43,7 @@ export function ProfileChallenges({
                     challenge={challenge}
                     onClick={onChallengeClick}
                     onToggleBookmark={onToggleBookmark}
-                    isBookmarked={isBookmarked?.(challenge.id)}
+                    isBookmarked={isBookmarked?.(String(challenge.id))}
                 />
             ))}
         </div>
