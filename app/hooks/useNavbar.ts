@@ -3,14 +3,12 @@
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAppKitAccount, useAppKit, useDisconnect } from '@reown/appkit/react';
-import { PublicKey } from '@solana/web3.js';
-import { getAssociatedTokenAddress } from '@solana/spl-token';
 import { useUserStore } from '@/app/store/useUserStore';
 import { createUser, getUserByPubkey, checkUsernameExists } from '@/app/lib/users-service/users';
 import { blockedContentError, hasBlockedContent } from '@/app/lib/content-moderation';
 import { getProfileAvatarDataUri } from '@/app/lib/profile-avatar';
 import { User } from '@/app/lib/users-service/users';
-import { USDC_MINT, getReadonlyConnection } from '@/app/lib/rektofun-program';
+import { fetchUsdcBalance as fetchUsdcTokenBalance } from '@/app/lib/token-balances';
 
 export function useNavbar() {
   // AppKit hooks
@@ -90,11 +88,8 @@ export function useNavbar() {
     }
 
     try {
-      const connection = getReadonlyConnection();
-      const pubKey = new PublicKey(address);
-      const ata = await getAssociatedTokenAddress(USDC_MINT, pubKey, false);
-      const accountInfo = await connection.getTokenAccountBalance(ata);
-      setUsdcBalance(accountInfo.value.uiAmount || 0);
+      const balance = await fetchUsdcTokenBalance(address);
+      setUsdcBalance(balance);
     } catch {
       setUsdcBalance(0);
     }

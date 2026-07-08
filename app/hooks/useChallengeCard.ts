@@ -2,7 +2,6 @@ import React from "react";
 import { useRouter } from "next/navigation";
 import { useAppKitAccount, useAppKitProvider } from "@reown/appkit/react";
 import { PublicKey, Transaction } from "@solana/web3.js";
-import { getAssociatedTokenAddress } from "@solana/spl-token";
 import { Challenge, getChallengeById } from "@/app/lib/challenges-service/challenges";
 import { createPosition } from "@/app/lib/positions-service/positions";
 import { useUserStore } from "@/app/store/useUserStore";
@@ -10,10 +9,10 @@ import {
   buildAcceptChallengeTx,
   fetchChallenge,
   getRektoProgram,
-  USDC_MINT,
   USDC_MULTIPLIER,
   getReadonlyConnection,
 } from "@/app/lib/rektofun-program";
+import { fetchUsdcBalance as fetchUsdcTokenBalance } from "@/app/lib/token-balances";
 
 interface ExactCountdownDetails {
   exactCountdown: string;
@@ -181,10 +180,8 @@ export function useChallengeCard(challenge: Challenge) {
       }
 
       try {
-        const pubKey = new PublicKey(address);
-        const ata = await getAssociatedTokenAddress(USDC_MINT, pubKey, false);
-        const accountInfo = await connection.getTokenAccountBalance(ata);
-        setUsdcBalance(accountInfo.value.uiAmount || 0);
+        const balance = await fetchUsdcTokenBalance(address);
+        setUsdcBalance(balance);
       } catch {
         setUsdcBalance(0);
       }

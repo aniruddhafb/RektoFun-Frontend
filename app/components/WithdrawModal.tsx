@@ -11,6 +11,7 @@ import {
 } from "@solana/spl-token";
 import { ArrowUpFromLine, X } from "lucide-react";
 import { USDC_MINT, USDC_MULTIPLIER, getReadonlyConnection } from "@/app/lib/rektofun-program";
+import { fetchUsdcBalance as fetchUsdcTokenBalance } from "@/app/lib/token-balances";
 import { useBodyScrollLock } from "@/app/lib/useBodyScrollLock";
 
 interface WithdrawModalProps {
@@ -51,10 +52,8 @@ export function WithdrawModal({ isOpen, onClose }: WithdrawModalProps) {
       }
 
       try {
-        const pubKey = new PublicKey(address);
-        const ata = await getAssociatedTokenAddress(USDC_MINT, pubKey, false);
-        const accountInfo = await connection.getTokenAccountBalance(ata);
-        setUsdcBalance(accountInfo.value.uiAmount || 0);
+        const balance = await fetchUsdcTokenBalance(address);
+        setUsdcBalance(balance);
       } catch {
         setUsdcBalance(0);
       }
