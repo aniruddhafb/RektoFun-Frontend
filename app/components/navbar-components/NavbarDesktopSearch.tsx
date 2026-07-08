@@ -7,7 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Search, X } from "lucide-react";
 import { getChallenges, type Challenge } from "@/app/lib/challenges-service/challenges";
-import { getLeaderboard, type LeaderboardUser } from "@/app/lib/users-service/users";
+import { getUsers, type User } from "@/app/lib/users-service/users";
 import { useBodyScrollLock } from "@/app/lib/useBodyScrollLock";
 
 type SearchTab = "all" | "challenges" | "users";
@@ -48,13 +48,15 @@ function formatEndsAt(expireTime: string) {
 }
 
 function getChallengeStatusMeta(status: Challenge["status"]) {
-    if (status === "open") {
+    const normalizedStatus = status.toLowerCase();
+
+    if (normalizedStatus === "open") {
         return { label: "Live", className: "bg-[#eaf9ef] text-[#15803d] border-[#bbf7d0]" };
     }
-    if (status === "locked") {
+    if (normalizedStatus === "locked" || normalizedStatus === "pending_resolution" || normalizedStatus === "expired") {
         return { label: "Locked", className: "bg-[#fff2e8] text-[#b45309] border-[#fed7aa]" };
     }
-    if (status === "resolved") {
+    if (normalizedStatus === "resolved") {
         return { label: "Resolved", className: "bg-[#e8f0ff] text-[#1d4ed8] border-[#bfdbfe]" };
     }
     return { label: "Cancelled", className: "bg-[#fee2e2] text-[#b91c1c] border-[#fecaca]" };
@@ -68,6 +70,34 @@ function formatCompactWallet(walletAddress: string | null | undefined) {
     if (!walletAddress) return "No wallet";
     if (walletAddress.length <= 10) return walletAddress;
     return `${walletAddress.slice(0, 4)}...${walletAddress.slice(-4)}`;
+}
+
+function filterChallenges(challenges: Challenge[], searchTerm: string) {
+    const query = searchTerm.trim().toLowerCase();
+    if (!query) return challenges;
+
+    return challenges.filter((challenge) =>
+        [
+            challenge.statement,
+            challenge.ticker,
+            challenge.trading_pair,
+            challenge.creator_details?.username,
+            challenge.creator_details?.pubkey,
+        ]
+            .filter(Boolean)
+            .some((value) => value!.toLowerCase().includes(query))
+    );
+}
+
+function filterUsers(users: User[], searchTerm: string) {
+    const query = searchTerm.trim().toLowerCase();
+    if (!query) return users;
+
+    return users.filter((user) =>
+        [user.username, user.pubkey, user.email]
+            .filter(Boolean)
+            .some((value) => value!.toLowerCase().includes(query))
+    );
 }
 
 export function NavbarDesktopSearch({
@@ -85,7 +115,7 @@ export function NavbarDesktopSearch({
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [challengeResults, setChallengeResults] = useState<Challenge[]>([]);
-    const [userResults, setUserResults] = useState<LeaderboardUser[]>([]);
+    const [userResults, setUserResults] = useState<User[]>([]);
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const requestIdRef = useRef(0);
     const hasInitializedOpenStateRef = useRef(false);
@@ -101,8 +131,8 @@ export function NavbarDesktopSearch({
 
         try {
             const [challengesRes, usersRes] = await Promise.all([
-                getChallenges({ limit: CHALLENGE_RESULT_LIMIT, sort: "latest" }).catch(() => null),
-                getLeaderboard(USER_RESULT_LIMIT, 0).catch(() => null),
+                getChallenges({ limit: CHALLENGE_RESULT_LIMIT }).catch(() => null),
+                getUsers({ limit: USER_RESULT_LIMIT }).catch(() => null),
             ]);
 
             if (requestIdRef.current !== reqId) return;
@@ -150,14 +180,14 @@ export function NavbarDesktopSearch({
 
         try {
             const [challengesRes, usersRes] = await Promise.all([
-                getChallenges({ search: nextQuery, limit: CHALLENGE_RESULT_LIMIT, sort: "latest" }).catch(() => null),
-                getLeaderboard(USER_RESULT_LIMIT, 0, nextQuery).catch(() => null),
+                getChallenges({ limit: CHALLENGE_RESULT_LIMIT }).catch(() => null),
+                getUsers({ limit: USER_RESULT_LIMIT }).catch(() => null),
             ]);
 
             if (requestIdRef.current !== reqId) return;
 
-            setChallengeResults((challengesRes?.challenges ?? []).slice(0, CHALLENGE_RESULT_LIMIT));
-            setUserResults((usersRes?.users ?? []).slice(0, USER_RESULT_LIMIT));
+            setChallengeResults(filterChallenges(challengesRes?.challenges ?? [], nextQuery).slice(0, CHALLENGE_RESULT_LIMIT));
+            setUserResults(filterUsers(usersRes?.users ?? [], nextQuery).slice(0, USER_RESULT_LIMIT));
 
             if (!challengesRes && !usersRes) {
                 setError("Could not fetch search results. Please try again.");
@@ -386,7 +416,7 @@ export function NavbarDesktopSearch({
                             <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2">
                                 {challengeResults.map((challenge) => {
                                     const statusMeta = getChallengeStatusMeta(challenge.status);
-                                    const participantCount = (challenge.total_challengers ?? 0) + (challenge.total_opponents ?? 0);
+                                    const participantCount = challenge.participants ?? 0;
                                     return (
                                         <button
                                             key={challenge.id}
@@ -398,10 +428,10 @@ export function NavbarDesktopSearch({
                                             className="group w-full cursor-pointer rounded-lg border-2 border-[#eadfd6] bg-white p-3 text-left shadow-[2px_2px_0_rgba(17,17,17,0.08)] transition hover:-translate-y-0.5 hover:border-black hover:bg-[#fffaf6] hover:shadow-[3px_3px_0_#111] focus:outline-none focus:shadow-[0_0_0_4px_rgba(232,90,45,0.18)]"
                                         >
                                             <div className="flex items-start gap-3">
-                                                <div className="relative h-12 w-12 overflow-hidden rounded-md border border-[#eadfd6] bg-[#f3f4f6] flex-shrink-0">
-                                                    {challenge.market?.image ? (
-                                                        <Image src={challenge.market.image} alt={challenge.title} fill sizes="48px" className="object-cover" />
-                                                    ) : null}
+                                                <div className="relative flex h-12 w-12 flex-shrink-0 items-center justify-center overflow-hidden rounded-md border border-[#eadfd6] bg-[#f3f4f6]">
+                                                    <span className="text-xs font-black text-[#8a7468]">
+                                                        {challenge.ticker.slice(0, 4).toUpperCase()}
+                                                    </span>
                                                 </div>
                                                 <div className="min-w-0 flex-1">
                                                     <div className="flex items-center gap-2">
@@ -409,11 +439,11 @@ export function NavbarDesktopSearch({
                                                             {statusMeta.label}
                                                         </span>
                                                         <span className="truncate text-[11px] font-bold uppercase tracking-[0.08em] text-[#8a7468]">
-                                                            {challenge.market?.name ?? "General"}
+                                                            {challenge.trading_pair || challenge.ticker || "General"}
                                                         </span>
                                                     </div>
                                                     <p className="mt-1 line-clamp-2 text-sm font-black leading-snug text-[#111827] group-hover:text-[#e85a2d]">
-                                                        {challenge.title}
+                                                        {challenge.statement}
                                                     </p>
                                                 </div>
                                             </div>
@@ -421,13 +451,13 @@ export function NavbarDesktopSearch({
                                                 <div>
                                                     <p className="text-[10px] font-black uppercase tracking-[0.08em] text-[#8a7468]">Pool</p>
                                                     <p className="truncate text-sm font-black text-[#111827]">
-                                                        {formatPool((challenge.total_pool ?? 0) > 0 ? challenge.total_pool : challenge.initial_bet)}
+                                                        {formatPool((challenge.pool_size ?? 0) > 0 ? challenge.pool_size : challenge.initial_bet)}
                                                     </p>
                                                 </div>
                                                 <div>
                                                     <p className="text-[10px] font-black uppercase tracking-[0.08em] text-[#8a7468]">Ends</p>
                                                     <p className="truncate text-sm font-black text-[#166534]">
-                                                        {formatEndsAt(challenge.resolve_time || challenge.expire_time)}
+                                                        {formatEndsAt(challenge.resolution_date || challenge.expiry)}
                                                     </p>
                                                 </div>
                                                 <div>
@@ -439,7 +469,7 @@ export function NavbarDesktopSearch({
                                             </div>
                                             <div className="mt-2 flex items-center justify-between gap-2">
                                                 <span className="truncate text-xs font-semibold text-[#64748b]">
-                                                    by {challenge.creator?.username || "Unknown"}
+                                                    by {challenge.creator_details?.username || "Unknown"}
                                                 </span>
                                                 <span className="shrink-0 rounded-md bg-[#f5d547] px-2 py-1 text-[10px] font-black uppercase text-black">
                                                     {formatMode(challenge.mode)}
@@ -464,7 +494,7 @@ export function NavbarDesktopSearch({
                                     return (
                                         <Link
                                             key={user.id}
-                                            href={user.wallet_address ? `/profile/${user.wallet_address}` : "/settings"}
+                                            href={user.pubkey ? `/profile/${user.pubkey}` : "/settings"}
                                             onClick={closeModal}
                                             className="group rounded-lg border-2 border-[#eadfd6] bg-white p-3 shadow-[2px_2px_0_rgba(17,17,17,0.08)] transition hover:-translate-y-0.5 hover:border-black hover:bg-[#fffaf6] hover:shadow-[3px_3px_0_#111] focus:outline-none focus:shadow-[0_0_0_4px_rgba(232,90,45,0.18)]"
                                         >
@@ -483,17 +513,19 @@ export function NavbarDesktopSearch({
                                                 </div>
                                                 <div className="min-w-0 flex-1">
                                                     <p className="truncate text-sm font-black text-[#0f172a] group-hover:text-[#e85a2d]">{username}</p>
-                                                    <p className="truncate text-xs font-semibold text-[#64748b]">{formatCompactWallet(user.wallet_address)}</p>
+                                                    <p className="truncate text-xs font-semibold text-[#64748b]">{formatCompactWallet(user.pubkey)}</p>
                                                 </div>
                                             </div>
                                             <div className="mt-3 grid grid-cols-2 gap-2 border-t border-[#f0dfd2] pt-2">
                                                 <div>
-                                                    <p className="text-[10px] font-black uppercase tracking-[0.08em] text-[#8a7468]">Earned</p>
-                                                    <p className="truncate text-xs font-black text-[#111827]">{formatPool(user.earnings ?? 0)}</p>
+                                                    <p className="text-[10px] font-black uppercase tracking-[0.08em] text-[#8a7468]">User ID</p>
+                                                    <p className="truncate text-xs font-black text-[#111827]">#{user.id}</p>
                                                 </div>
                                                 <div>
-                                                    <p className="text-[10px] font-black uppercase tracking-[0.08em] text-[#8a7468]">Refs</p>
-                                                    <p className="truncate text-xs font-black text-[#111827]">{user.referrals?.length ?? 0}</p>
+                                                    <p className="text-[10px] font-black uppercase tracking-[0.08em] text-[#8a7468]">Joined</p>
+                                                    <p className="truncate text-xs font-black text-[#111827]">
+                                                        {new Date(user.created_at).toLocaleDateString()}
+                                                    </p>
                                                 </div>
                                             </div>
                                         </Link>
