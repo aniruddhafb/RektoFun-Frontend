@@ -28,6 +28,7 @@ export function useNavbar() {
   const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
   const [fundsModalMode, setFundsModalMode] = useState<'deposit' | 'withdraw'>('deposit');
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isReferralModalOpen, setIsReferralModalOpen] = useState(false);
   const [isMobileViewport, setIsMobileViewport] = useState(false);
 
   // Profile form state
@@ -288,6 +289,8 @@ export function useNavbar() {
     setFundsModalMode,
     isProfileModalOpen,
     setIsProfileModalOpen,
+    isReferralModalOpen,
+    setIsReferralModalOpen,
     isMobileViewport,
 
     // Profile form state

@@ -18,6 +18,7 @@ type NavbarProfileDropdownProps = {
     onLogout: () => void;
     onOpenDeposit: () => void;
     onOpenWithdraw: () => void;
+    onOpenReferral: () => void;
     profileHref: string;
     isMobileViewport: boolean;
 };
@@ -59,7 +60,7 @@ function MenuAction(props: MenuActionProps) {
         <button
             type="button"
             onClick={props.onClick}
-            className={`w-full text-left bg-transparent border-0 ${className}`}
+            className={`w-full text-left bg-transparent border-0 !shadow-none ${className}`}
         >
             {content}
         </button>
@@ -79,6 +80,7 @@ export function NavbarProfileDropdown({
     onLogout,
     onOpenDeposit,
     onOpenWithdraw,
+    onOpenReferral,
     profileHref,
     isMobileViewport,
 }: NavbarProfileDropdownProps) {
@@ -230,8 +232,10 @@ export function NavbarProfileDropdown({
                             </div>
 
                             <MenuAction
-                                href="/referral"
-                                onClick={onClose}
+                                onClick={() => {
+                                    onClose();
+                                    onOpenReferral();
+                                }}
                                 icon={
                                     <svg
                                         className="w-5 h-5 text-gray-500"

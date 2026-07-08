@@ -262,8 +262,8 @@ export async function getLeaderboard(
   }
 
   const data = await response.json();
-  const leaderboardResponse = {
-    users: (data.users || []).map(normalizeUser),
+  const leaderboardResponse: { users: User[]; total: number } = {
+    users: ((data.users || []) as BackendUser[]).map(normalizeUser),
     total: data.total || 0,
   };
   const normalizedSearch = search?.trim().toLowerCase();

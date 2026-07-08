@@ -8,6 +8,7 @@ import {
     
 } from "@/app/components/navbar-components";
 import { DepositModal } from "@/app/components/DepositModal";
+import { ReferralModal } from "@/app/components/ReferralModal";
 import { NavbarBrand, NavbarDesktopSearch, NavbarMobileBottomNav } from "@/app/components/navbar-components";
 export default function Navbar() {
     const {
@@ -23,6 +24,8 @@ export default function Navbar() {
         fundsModalMode,
         setFundsModalMode,
         isProfileModalOpen,
+        isReferralModalOpen,
+        setIsReferralModalOpen,
         isMobileViewport,
 
         // Profile form state
@@ -109,6 +112,7 @@ export default function Navbar() {
                                 setFundsModalMode("withdraw");
                                 setIsDepositModalOpen(true);
                             }}
+                            onOpenReferral={() => setIsReferralModalOpen(true)}
                             profileHref={profileHref}
                             isMobileViewport={isMobileViewport}
                         />
@@ -157,6 +161,11 @@ export default function Navbar() {
                     usdcBalance={usdcBalance}
                 />
             )}
+
+            <ReferralModal
+                isOpen={isReferralModalOpen}
+                onClose={() => setIsReferralModalOpen(false)}
+            />
 
             <NavbarMobileBottomNav
                 isActive={isActive}
