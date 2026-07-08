@@ -6,6 +6,7 @@ export interface CreateUserParams {
   profile_image?: string;
   bio?: string;
   description?: string;
+  referrer_code?: string;
 }
 
 export interface UpdateUserParams {
@@ -112,6 +113,7 @@ function toBackendUserPayload(params: CreateUserParams | UpdateUserParams) {
     pubkey: params.pubkey || params.wallet_address,
     profile_image: params.profile_image,
     bio: params.bio ?? params.description,
+    referrer_code: "referrer_code" in params ? params.referrer_code : undefined,
   };
 }
 
@@ -243,14 +245,34 @@ export async function getLeaderboard(
   offset = 0,
   search?: string,
 ): Promise<LeaderboardResponse> {
-  const response = await getUsers({ limit, offset });
+  const queryParams = new URLSearchParams();
+
+  queryParams.append("limit", limit.toString());
+  queryParams.append("offset", offset.toString());
+
+  const response = await fetch(`${API_BASE_URL}/users/leaderboard?${queryParams.toString()}`, {
+    method: "GET",
+    headers: {
+      accept: "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    throw await parseError(response, `Failed to fetch leaderboard: ${response.statusText}`);
+  }
+
+  const data = await response.json();
+  const leaderboardResponse = {
+    users: (data.users || []).map(normalizeUser),
+    total: data.total || 0,
+  };
   const normalizedSearch = search?.trim().toLowerCase();
   const users = normalizedSearch
-    ? response.users.filter((user) =>
+    ? leaderboardResponse.users.filter((user) =>
         user.username.toLowerCase().includes(normalizedSearch) ||
         user.wallet_address.toLowerCase().includes(normalizedSearch),
       )
-    : response.users;
+    : leaderboardResponse.users;
 
   return {
     users: users.map((user) => ({
@@ -259,18 +281,36 @@ export async function getLeaderboard(
       followers: (user.followers || []).map(String),
       following: (user.following || []).map(String),
     })),
-    count: normalizedSearch ? users.length : response.total,
+    count: normalizedSearch ? users.length : leaderboardResponse.total,
   };
 }
 
 export async function followUser(targetWalletAddress: string, _viewerWalletAddress: string): Promise<User> {
+  void _viewerWalletAddress;
   return getUserByWallet(targetWalletAddress);
 }
 
 export async function unfollowUser(targetWalletAddress: string, _viewerWalletAddress: string): Promise<User> {
+  void _viewerWalletAddress;
   return getUserByWallet(targetWalletAddress);
 }
 
-export async function acceptReferral(walletAddress: string, _referralCode: string): Promise<User> {
-  return getUserByWallet(walletAddress);
+export async function acceptReferral(walletAddress: string, referralCode: string): Promise<User> {
+  const response = await fetch(`${API_BASE_URL}/users/accept-referral`, {
+    method: "POST",
+    headers: {
+      accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      new_user_wallet: walletAddress,
+      referrer_code: referralCode,
+    }),
+  });
+
+  if (!response.ok) {
+    throw await parseError(response, `Failed to accept referral: ${response.statusText}`);
+  }
+
+  return normalizeUser(await response.json());
 }

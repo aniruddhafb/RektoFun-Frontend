@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useAppKitAccount } from "@reown/appkit/react";
 import { getUserByWallet } from "@/app/lib/users-service/users";
 import {
@@ -24,31 +24,35 @@ export default function ReferralPage() {
 
     const { address, isConnected } = useAppKitAccount();
 
-    useEffect(() => {
-        const fetchUserData = async () => {
-            if (!isConnected || !address) {
-                setUserData(null);
-                setReferralLink("https://rekto.fun/");
-                return;
-            }
+    const fetchUserData = useCallback(async () => {
+        if (!isConnected || !address) {
+            setUserData(null);
+            setReferralLink("https://rekto.fun/");
+            return;
+        }
 
-            try {
-                const user = await getUserByWallet(address);
-                setUserData({
-                    referral_code: user.referral_code,
-                    referred_by: user.referred_by || null,
-                    referrals: user.referrals || [],
-                });
-                setReferralLink(`https://rekto.fun/?ref=${user.referral_code}`);
-            } catch (error) {
-                console.error("Failed to fetch user data:", error);
-                setUserData(null);
-                setReferralLink("https://rekto.fun/");
-            }
-        };
-
-        fetchUserData();
+        try {
+            const user = await getUserByWallet(address);
+            setUserData({
+                referral_code: user.referral_code,
+                referred_by: user.referred_by || null,
+                referrals: user.referrals || [],
+            });
+            setReferralLink(`https://rekto.fun/?ref=${user.referral_code}`);
+        } catch (error) {
+            console.error("Failed to fetch user data:", error);
+            setUserData(null);
+            setReferralLink("https://rekto.fun/");
+        }
     }, [isConnected, address]);
+
+    useEffect(() => {
+        const timer = window.setTimeout(() => {
+            fetchUserData();
+        }, 0);
+
+        return () => window.clearTimeout(timer);
+    }, [fetchUserData]);
 
     const referralsCount = userData?.referrals?.length || 0;
     const referralPoints = referralsCount * REFERRAL_POINTS_PER_USER;
@@ -72,6 +76,7 @@ export default function ReferralPage() {
                                     referralLink={referralLink}
                                     referralCode={userData?.referral_code || ""}
                                     referredBy={userData?.referred_by || null}
+                                    onRedeemSuccess={fetchUserData}
                                 />
                             ) : (
                                 <LoginPrompt />

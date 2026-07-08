@@ -144,6 +144,7 @@ export function useNavbar() {
         email: trimmedEmail || undefined,
         bio: editBio.trim(),
         profile_image: editProfileImageUrl,
+        referrer_code: editInviteCode.trim() || undefined,
       });
 
       applyUserToState(userData);

@@ -25,7 +25,7 @@ export function ReferralLinkSection({
     const [showSharePopup, setShowSharePopup] = useState(false);
     const [isRedeeming, setIsRedeeming] = useState(false);
 
-    const { address: walletAddress, isConnected } = useAppKitAccount();
+    const { address: walletAddress } = useAppKitAccount();
 
     const handleRedeem = async () => {
         if (!redeemCode.trim()) {

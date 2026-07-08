@@ -26,6 +26,11 @@ export function UserOnboarding() {
 
   useBodyScrollLock(isOpen);
 
+  const getRefCodeFromUrl = () => {
+    if (typeof window === "undefined") return "";
+    return new URLSearchParams(window.location.search).get("ref") || "";
+  };
+
   const handleUserLoaded = useCallback(
     (loadedUser: User) => {
       setUser(loadedUser);
@@ -98,6 +103,7 @@ export function UserOnboarding() {
         wallet_address: address,
         profile_image: profileImageUrl,
         description: bio.trim(),
+        referrer_code: getRefCodeFromUrl() || undefined,
       });
 
       setUser(createdUser);
