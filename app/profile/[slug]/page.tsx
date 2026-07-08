@@ -194,7 +194,7 @@ export default function ProfilePage() {
 
                         {activeTab === "activity" && (
                             <ProfileActivity
-                                userId={user.id}
+                                userId={String(user.id)}
                                 username={user.username}
                                 avatar={user.profile_image || "/scribbles/pepe.png"}
                                 isOwnProfile={isOwnProfile}

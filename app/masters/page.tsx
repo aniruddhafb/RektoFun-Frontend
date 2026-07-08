@@ -98,7 +98,8 @@ export default function MastersPage() {
         const targetMaster = masters.find((m) => m.walletAddress === targetWalletAddress);
         if (!targetMaster || targetMaster.walletAddress === address) return;
 
-        const viewerAlreadyFollowing = targetMaster.followers.includes(currentUser.id);
+        const currentUserId = String(currentUser.id);
+        const viewerAlreadyFollowing = targetMaster.followers.includes(currentUserId);
 
         try {
             setFollowLoadingByWallet((prev) => ({ ...prev, [targetWalletAddress]: true }));
@@ -109,7 +110,7 @@ export default function MastersPage() {
             setMasters((prev) =>
                 prev.map((master) =>
                     master.walletAddress === targetWalletAddress
-                        ? { ...master, followers: updatedTarget.followers }
+                        ? { ...master, followers: (updatedTarget.followers || []).map(String) }
                         : master,
                 ),
             );
@@ -175,7 +176,7 @@ export default function MastersPage() {
 
     const canFollow = Boolean(currentUser?.id && address);
     const getIsOwnCard = (master: Master) => master.walletAddress === address;
-    const getIsFollowing = (master: Master) => currentUser?.id ? master.followers.includes(currentUser.id) : false;
+    const getIsFollowing = (master: Master) => currentUser?.id ? master.followers.includes(String(currentUser.id)) : false;
     const getIsFollowLoading = (walletAddress: string) => Boolean(followLoadingByWallet[walletAddress]);
 
     return (

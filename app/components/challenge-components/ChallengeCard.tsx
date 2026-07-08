@@ -99,7 +99,7 @@ export function ChallengeCard({
     const handleBookmarkClick = (e: React.MouseEvent) => {
         e.preventDefault();
         e.stopPropagation();
-        onToggleBookmark?.(challenge.id);
+        onToggleBookmark?.(String(challenge.id));
     };
 
     return (
