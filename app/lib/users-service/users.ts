@@ -26,7 +26,7 @@ export interface GetUsersParams {
   offset?: number;
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+const API_BASE_URL = process.env.NEXT_PUBLIC_BE_API_URL || 'http://localhost:8000/api';
 
 export async function createUser(params: CreateUserParams): Promise<User> {
   const response = await fetch(`${API_BASE_URL}/users`, {

@@ -7,7 +7,7 @@ export interface Category {
   created_at: string;
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+const API_BASE_URL = process.env.NEXT_PUBLIC_BE_API_URL || 'http://localhost:8000/api';
 
 export async function getCategories(): Promise<Category[]> {
   const response = await fetch(`${API_BASE_URL}/categories`, {
