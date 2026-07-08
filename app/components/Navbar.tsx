@@ -1,7 +1,5 @@
 "use client";
 
-import Image from "next/image";
-import Link from "next/link";
 import { useNavbar } from "@/app/hooks/useNavbar";
 import {
     NavbarAuthSection,
@@ -25,7 +23,6 @@ export default function Navbar() {
         fundsModalMode,
         setFundsModalMode,
         isProfileModalOpen,
-        setIsProfileModalOpen,
         isMobileViewport,
 
         // Profile form state
@@ -35,7 +32,7 @@ export default function Navbar() {
         setEditEmail,
         editBio,
         setEditBio,
-        editProfileIndex,
+        editProfileImageUrl,
         editInviteCode,
         setEditInviteCode,
         profileFormError,
@@ -48,7 +45,6 @@ export default function Navbar() {
         usdcBalance,
 
         // Connection state
-        address,
         isConnected,
 
         // Handlers
@@ -130,7 +126,7 @@ export default function Navbar() {
 
             <CreateProfileModal
                 isOpen={isProfileModalOpen}
-                editProfileIndex={editProfileIndex}
+                editProfileImageUrl={editProfileImageUrl}
                 editUsername={editUsername}
                 editEmail={editEmail}
                 editBio={editBio}

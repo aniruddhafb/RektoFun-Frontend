@@ -6,7 +6,7 @@ import { useAppKitAccount, useAppKit, useDisconnect } from '@reown/appkit/react'
 import { useUserStore } from '@/app/store/useUserStore';
 import { createUser, getUserByPubkey, checkUsernameExists } from '@/app/lib/users-service/users';
 import { blockedContentError, hasBlockedContent } from '@/app/lib/content-moderation';
-import { getProfileAvatarDataUri } from '@/app/lib/profile-avatar';
+import { getDiceBearAvatarUrl } from '@/app/lib/profile-avatar';
 import { User } from '@/app/lib/users-service/users';
 import { fetchUsdcBalance as fetchUsdcTokenBalance } from '@/app/lib/token-balances';
 
@@ -17,7 +17,7 @@ export function useNavbar() {
   const { disconnect } = useDisconnect();
 
   // Store and routing
-  const { user: storeUser, setUser, updateUser: updateStoreUser, clearUser } = useUserStore();
+  const { user: storeUser, setUser, clearUser } = useUserStore();
   const pathname = usePathname();
   const router = useRouter();
 
@@ -34,7 +34,7 @@ export function useNavbar() {
   const [editUsername, setEditUsername] = useState('');
   const [editEmail, setEditEmail] = useState('');
   const [editBio, setEditBio] = useState('');
-  const [editProfileIndex, setEditProfileIndex] = useState(0);
+  const [editProfileImageUrl, setEditProfileImageUrl] = useState(() => getDiceBearAvatarUrl('rektofun-default'));
   const [editInviteCode, setEditInviteCode] = useState('');
   const [profileFormError, setProfileFormError] = useState<string | null>(null);
 
@@ -102,8 +102,7 @@ export function useNavbar() {
 
   // Randomize profile avatar
   const randomizeProfile = () => {
-    const randomIndex = Math.floor(Math.random() * 31);
-    setEditProfileIndex(randomIndex);
+    setEditProfileImageUrl(getDiceBearAvatarUrl());
   };
 
   // Handle profile form submission
@@ -137,14 +136,14 @@ export function useNavbar() {
         trimmedUsername,
         address,
         editBio: editBio.trim(),
-        profileImage: getProfileAvatarDataUri(editProfileIndex),
+        profileImage: editProfileImageUrl,
       });
       const userData = await createUser({
         pubkey: address,
         username: trimmedUsername,
         email: trimmedEmail || undefined,
         bio: editBio.trim(),
-        profile_image: getProfileAvatarDataUri(editProfileIndex),
+        profile_image: editProfileImageUrl,
       });
 
       applyUserToState(userData);
@@ -200,7 +199,9 @@ export function useNavbar() {
           setEditUsername(user.username || '');
           setEditEmail(user.email || '');
           setEditBio(user.description || '');
-          setEditProfileIndex(user.profile_image ? parseInt(user.profile_image.match(/profiles\/(\d+)\.svg/)?.[1] || '1') - 1 : 0);
+          setEditProfileImageUrl(user.profile_image || getDiceBearAvatarUrl());
+        } else {
+          setEditProfileImageUrl(getDiceBearAvatarUrl());
         }
       } catch (error) {
         console.error('[Navbar] Profile modal init failed:', error);
@@ -295,8 +296,8 @@ export function useNavbar() {
     setEditEmail,
     editBio,
     setEditBio,
-    editProfileIndex,
-    setEditProfileIndex,
+    editProfileImageUrl,
+    setEditProfileImageUrl,
     editInviteCode,
     setEditInviteCode,
     profileFormError,

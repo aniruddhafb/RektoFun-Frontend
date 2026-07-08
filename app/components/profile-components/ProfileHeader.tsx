@@ -109,13 +109,13 @@ export function ProfileHeader({
                 <div className="relative flex w-full sm:w-auto flex-col items-center sm:items-start flex-shrink-0 mx-auto sm:mx-0">
                     <div className="absolute inset-0 rounded-full blur-xl pointer-events-none"></div>
                     {/* Image container  */}
-                    <div className="relative z-10 w-24 h-24 sm:w-32 sm:h-32 rounded-full ring-4 ring-orange-200">
+                    <div className="relative z-10 w-24 h-24 sm:w-32 sm:h-32 overflow-hidden rounded-full bg-white ring-4 ring-orange-200">
                         <Image
                             src={avatar}
                             alt={username}
-                            width={128}
-                            height={128}
-                            className="w-full h-full object-cover"
+                            fill
+                            sizes="(min-width: 640px) 128px, 96px"
+                            className="object-cover"
                         />
                         {twitterUsername && (
                             <a
@@ -271,9 +271,9 @@ export function ProfileHeader({
                         <Image
                             src="/fav_old.png"
                             alt="REKTO"
-                            width={48}
-                            height={48}
-                            className="w-9 h-9 sm:w-12 sm:h-12 object-contain"
+                            width={40}
+                            height={40}
+                            className="w-8 h-8 sm:w-10 sm:h-10 object-contain"
                         />
                         <div className="flex flex-col items-start">
                             <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">$REKTO</span>
