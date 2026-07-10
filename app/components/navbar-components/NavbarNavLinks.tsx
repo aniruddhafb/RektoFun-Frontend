@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Search, Shield, Sword, Zap } from "lucide-react";
+import { Shield, Sword, Zap } from "lucide-react";
 import { NAV_LINKS, MORE_LINKS } from "./navbarData";
 
 type NavbarNavLinksProps = {
@@ -13,7 +13,6 @@ export function NavbarNavLinks({ isActive }: NavbarNavLinksProps) {
     const [isMoreOpen, setIsMoreOpen] = useState(false);
     const navIconByHref = {
         "/challenges": Sword,
-        "/masters": Search,
         "/leaderboard": Shield,
         "/activity": Zap,
     } as const;
@@ -26,7 +25,6 @@ export function NavbarNavLinks({ isActive }: NavbarNavLinksProps) {
         const iconClassByHref = {
             "/challenges": "text-[#cb8a22]",
             "/leaderboard": "text-[#2e9ec3]",
-            "/masters": "text-[#4b6fd1]",
             "/activity": "text-[#d9a31b]",
         } as const;
 

@@ -6,17 +6,7 @@ import { useAppKitAccount } from "@reown/appkit/react";
 import { getUserByWallet, createUser, type User } from "@/app/lib/users-service/users";
 import { useUserStore } from "@/app/store/useUserStore";
 import { useBodyScrollLock } from "@/app/lib/useBodyScrollLock";
-
-const PROFILE_COUNT = 31;
-
-function getRandomProfileIndex() {
-  return Math.floor(Math.random() * PROFILE_COUNT) + 1;
-}
-
-function getProfileImageUrl(index: number) {
-  if (typeof window === "undefined") return "";
-  return `https://earningrecords.com/assets/rektofun/profiles/${index}.svg`;
-}
+import { getDiceBearAvatarUrl } from "@/app/lib/profile-avatar";
 
 export function UserOnboarding() {
   const { address, isConnected } = useAppKitAccount();
@@ -29,12 +19,17 @@ export function UserOnboarding() {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [bio, setBio] = useState("");
-  const [profileIndex, setProfileIndex] = useState(getRandomProfileIndex);
+  const [profileImageUrl, setProfileImageUrl] = useState(() => getDiceBearAvatarUrl("rektofun-default"));
 
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useBodyScrollLock(isOpen);
+
+  const getRefCodeFromUrl = () => {
+    if (typeof window === "undefined") return "";
+    return new URLSearchParams(window.location.search).get("ref") || "";
+  };
 
   const handleUserLoaded = useCallback(
     (loadedUser: User) => {
@@ -69,7 +64,7 @@ export function UserOnboarding() {
 
           if (isNotFound) {
             setCheckedWallet(address);
-            setProfileIndex(getRandomProfileIndex());
+            setProfileImageUrl(getDiceBearAvatarUrl());
             setIsOpen(true);
           } else {
             console.error("[UserOnboarding] Failed to look up user:", err);
@@ -106,8 +101,9 @@ export function UserOnboarding() {
       const createdUser = await createUser({
         username: username.trim(),
         wallet_address: address,
-        profile_image: getProfileImageUrl(profileIndex),
+        profile_image: profileImageUrl,
         description: bio.trim(),
+        referrer_code: getRefCodeFromUrl() || undefined,
       });
 
       setUser(createdUser);
@@ -137,7 +133,7 @@ export function UserOnboarding() {
           <div className="mt-5 flex flex-col items-center gap-3">
             <div className="relative h-24 w-24 overflow-hidden rounded-full border-2 border-black bg-white shadow-sm">
               <Image
-                src={`/profiles/${profileIndex}.svg`}
+                src={profileImageUrl}
                 alt="Selected profile avatar"
                 fill
                 className="object-cover"
@@ -145,7 +141,7 @@ export function UserOnboarding() {
             </div>
             <button
               type="button"
-              onClick={() => setProfileIndex(getRandomProfileIndex())}
+              onClick={() => setProfileImageUrl(getDiceBearAvatarUrl())}
               className="text-xs font-bold text-black/70 underline underline-offset-2 transition hover:text-black"
             >
               Randomize avatar

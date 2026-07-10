@@ -1,8 +1,13 @@
-import { Avatar, Style } from '@dicebear/core';
-import dylanStyle from '@dicebear/styles/dylan.json' with { type: 'json' };
+const DICEBEAR_AVATAAARS_BASE_URL = "https://api.dicebear.com/10.x/avataaars/svg";
 
-const dylan = new Style(dylanStyle);
+export function createDiceBearSeed() {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID().replace(/-/g, "").slice(0, 12);
+  }
 
-export function getProfileAvatarDataUri(profileIndex: number): string {
-  return new Avatar(dylan, { seed: `profile-${profileIndex}` }).toDataUri();
+  return Math.random().toString(36).slice(2, 14);
+}
+
+export function getDiceBearAvatarUrl(seed = createDiceBearSeed()) {
+  return `${DICEBEAR_AVATAAARS_BASE_URL}?seed=${encodeURIComponent(seed)}`;
 }

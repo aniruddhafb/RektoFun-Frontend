@@ -5,12 +5,16 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import {
+    BadgeDollarSign,
     ChevronDown,
     ChevronRight,
     Clock,
     ListFilter,
     Search,
     Shapes,
+    ShieldCheck,
+    Trophy,
+    Users,
 } from "lucide-react";
 import ChallengeDetailModal from "@/app/components/challenge-components/ChallengeDetailModal";
 import {
@@ -66,6 +70,68 @@ function getShortWallet(address: string): string {
     if (address.length <= 12) return address;
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
 }
+
+function getStatusKey(challenge: Challenge): string {
+    return (challenge.status || "").toLowerCase();
+}
+
+function getModeLabel(mode?: string): string {
+    const normalizedMode = mode?.toLowerCase() ?? "";
+    if (normalizedMode.includes("team") || normalizedMode.includes("multi")) return "Multi Mode";
+    if (normalizedMode.includes("pvp")) return "PVP Mode";
+    return mode || "Challenge";
+}
+
+function getStatusLabel(challenge: Challenge, currentTimeMs: number): string {
+    const status = getStatusKey(challenge);
+    const expireMs = new Date(challenge.expire_time).getTime();
+    const resolveMs = new Date(challenge.resolve_time).getTime();
+
+    if (status === "resolved" || Boolean(challenge.resolved_at)) return "Resolved";
+    if (status === "cancelled") return "Cancelled";
+    if (status === "locked" || status === "pending_resolution") return "Resolving";
+    if (Number.isFinite(resolveMs) && resolveMs <= currentTimeMs) return "Resolving";
+    if (Number.isFinite(expireMs) && expireMs <= currentTimeMs) return "Expired";
+    return "Ongoing";
+}
+
+function getStatusClassName(statusLabel: string): string {
+    switch (statusLabel) {
+        case "Resolved":
+            return "border-[#b8dcc8] bg-[#e8f7ee] text-[#246044]";
+        case "Resolving":
+            return "border-[#f2d28f] bg-[#fff3cf] text-[#7a5413]";
+        case "Expired":
+        case "Cancelled":
+            return "border-[#efb9ad] bg-[#fff0ed] text-[#9a3324]";
+        default:
+            return "border-[#b8d6f0] bg-[#edf7ff] text-[#24547a]";
+    }
+}
+
+function getActivityCreator(challenge: Challenge) {
+    const creator =
+        typeof challenge.creator === "object" && challenge.creator !== null
+            ? challenge.creator
+            : challenge.creator_details;
+
+    const wallet = creator?.wallet_address || creator?.pubkey || "";
+    const username = creator?.username || getShortWallet(wallet) || "Unknown user";
+
+    return {
+        username,
+        wallet,
+        profileSlug: wallet || username,
+        avatar: creator?.profile_image || challenge.market?.icon || "/scribbles/btc.png",
+    };
+}
+
+function formatCurrency(value?: number): string {
+    return `$${Number(value ?? 0).toLocaleString(undefined, {
+        maximumFractionDigits: 2,
+    })}`;
+}
+
 function ActivitySkeleton() {
     return (
         <div
@@ -264,12 +330,14 @@ export default function ActivityPage() {
     const filteredActivities = useMemo(() => {
         return activities.filter((activity) => {
             const mode = activity.mode?.toLowerCase() ?? "";
-            const marketName = activity.market.name?.toLowerCase() ?? "";
-            const parentId = activity.market.parent_id?.toLowerCase() ?? "";
+            const marketName = activity.market?.name?.toLowerCase() ?? "";
+            const parentId = activity.market?.parent_id?.toLowerCase() ?? "";
             const resolutionStatus = activity.resolution_status?.toLowerCase() ?? "";
             const normalizedSearch = searchQuery.trim().toLowerCase();
             const expireMs = new Date(activity.expire_time).getTime();
             const resolveMs = new Date(activity.resolve_time).getTime();
+            const status = getStatusKey(activity);
+            const creator = getActivityCreator(activity);
 
             const matchesType =
                 activeFilter === "All Activity" ||
@@ -281,21 +349,22 @@ export default function ActivityPage() {
 
             const matchesStatus =
                 activeStatus === "All Status" ||
-                (activeStatus === "Expired" && Number.isFinite(expireMs) && expireMs <= currentTimeMs && activity.status !== "resolved") ||
-                (activeStatus === "Ongoing" && activity.status === "open" && (!Number.isFinite(expireMs) || expireMs > currentTimeMs)) ||
-                (activeStatus === "Resolved" && activity.status === "resolved") ||
+                (activeStatus === "Expired" && Number.isFinite(expireMs) && expireMs <= currentTimeMs && status !== "resolved") ||
+                (activeStatus === "Ongoing" && status === "open" && (!Number.isFinite(expireMs) || expireMs > currentTimeMs)) ||
+                (activeStatus === "Resolved" && status === "resolved") ||
                 (activeStatus === "Resolving" &&
-                    (activity.status === "locked" ||
+                    (status === "locked" ||
+                        status === "pending_resolution" ||
                         resolutionStatus.includes("resolving") ||
-                        (Number.isFinite(resolveMs) && resolveMs <= currentTimeMs && activity.status !== "resolved"))) ||
-                (activeStatus === "Completed" && (activity.status === "resolved" || Boolean(activity.resolved_at)));
+                        (Number.isFinite(resolveMs) && resolveMs <= currentTimeMs && status !== "resolved"))) ||
+                (activeStatus === "Completed" && (status === "resolved" || Boolean(activity.resolved_at)));
 
             const matchesSearch =
                 normalizedSearch.length === 0 ||
-                activity.title.toLowerCase().includes(normalizedSearch) ||
-                activity.creator.username?.toLowerCase().includes(normalizedSearch) ||
-                activity.creator.wallet_address?.toLowerCase().includes(normalizedSearch) ||
-                activity.market.name?.toLowerCase().includes(normalizedSearch);
+                activity.title?.toLowerCase().includes(normalizedSearch) ||
+                creator.username.toLowerCase().includes(normalizedSearch) ||
+                creator.wallet.toLowerCase().includes(normalizedSearch) ||
+                marketName.includes(normalizedSearch);
 
             return matchesType && matchesStatus && matchesSearch;
         });
@@ -518,12 +587,15 @@ export default function ActivityPage() {
 
                     {!isInitialLoading &&
                         filteredActivities.map((item) => {
-                            const creatorName = item.creator.username || "Unknown user";
-                            const creatorWallet = item.creator.wallet_address || "";
-                            const profileSlug = creatorWallet || creatorName;
-                            const avatar = item.creator.profile_image || item.market.icon || "/scribbles/btc.png";
+                            const creator = getActivityCreator(item);
                             const timeAgo = formatTimeAgo(item.created_at);
                             const resolveCountdown = formatResolveCountdown(item.resolve_time);
+                            const statusLabel = getStatusLabel(item, currentTimeMs);
+                            const modeLabel = getModeLabel(item.mode);
+                            const marketName = item.market?.name || item.ticker || "Market";
+                            const marketIcon = item.market?.icon || "/scribbles/btc.png";
+                            const totalPool = item.total_pool || item.pool_size || item.initial_bet || 0;
+                            const participantCount = item.total_challengers || item.participants || 0;
 
                             return (
                                 <article
@@ -537,49 +609,99 @@ export default function ActivityPage() {
                                             handleActivityClick(item);
                                         }
                                     }}
-                                    className="group relative cursor-pointer overflow-hidden rounded-[28px] border border-[#ead7ca] bg-gradient-to-br from-white via-[#fffaf7] to-[#f8ede7] p-5 transition-all duration-300 hover:-translate-y-0.5 hover:border-[#d2b6a1] hover:shadow-[0_18px_45px_rgba(71,45,20,0.14)]"
+                                    className="group relative cursor-pointer overflow-hidden rounded-2xl border border-[#e6cfbf] bg-[#fffaf6] p-4 shadow-[3px_3px_0_rgba(45,31,26,0.10)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[#c99f7f] hover:bg-white hover:shadow-[6px_6px_0_rgba(45,31,26,0.14)] sm:p-5"
                                 >
-                                    <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(224,167,110,0.15),transparent_38%),radial-gradient(circle_at_bottom_left,rgba(187,132,96,0.08),transparent_30%)] opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+                                    <div className="pointer-events-none absolute inset-x-0 top-0 h-1 " />
 
-                                    <div className="relative flex items-start gap-4">
-                                        <div className="relative flex-shrink-0">
-                                            <div className="h-14 w-14 overflow-hidden rounded-2xl border border-[#dec5b4] bg-white">
-                                                <Image
-                                                    src={avatar}
-                                                    alt={creatorName}
-                                                    width={56}
-                                                    height={56}
-                                                    className="h-full w-full object-cover"
-                                                />
+                                    <div className="relative flex flex-col gap-4 sm:flex-row sm:items-start">
+                                        <div className="flex items-start gap-3 sm:min-w-0 sm:flex-1">
+                                            <div className="relative h-14 w-14 flex-shrink-0">
+                                                <div className="h-14 w-14 overflow-hidden rounded-2xl border-2 border-[#d8bca8] bg-white">
+                                                    <Image
+                                                        src={creator.avatar}
+                                                        alt={creator.username}
+                                                        width={56}
+                                                        height={56}
+                                                        className="h-full w-full object-cover"
+                                                    />
+                                                </div>
+                                                <div className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full border border-[#e6cfbf] bg-white">
+                                                    <Image
+                                                        src={marketIcon}
+                                                        alt=""
+                                                        width={18}
+                                                        height={18}
+                                                        className="h-4 w-4 rounded-full object-cover"
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div className="min-w-0 flex-1">
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <Link
+                                                        href={`/profile/${creator.profileSlug}`}
+                                                        onClick={(event) => event.stopPropagation()}
+                                                        className="max-w-[12rem] truncate text-sm font-black text-[#2d1f1a] transition-colors hover:text-[#8b5e3c]"
+                                                    >
+                                                        {creator.username}
+                                                    </Link>
+                                                    {creator.wallet && (
+                                                        <span className="text-xs font-medium text-[#9b7b6c]">
+                                                            {getShortWallet(creator.wallet)}
+                                                        </span>
+                                                    )}
+                                                    <span className="text-xs text-[#b99787]">|</span>
+                                                    <span className="inline-flex items-center gap-1 text-xs font-medium text-[#7a665b]">
+                                                        <Clock className="h-3.5 w-3.5" />
+                                                        {timeAgo}
+                                                    </span>
+                                                </div>
+
+                                                <h2 className="mt-2 line-clamp-2 text-base font-black leading-snug text-[#2d1f1a] sm:text-lg">
+                                                    {item.title}
+                                                </h2>
+
+                                                <div className="mt-3 flex flex-wrap items-center gap-2">
+                                                    <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-bold ${getStatusClassName(statusLabel)}`}>
+                                                        <ShieldCheck className="h-3.5 w-3.5" />
+                                                        {statusLabel}
+                                                    </span>
+                                                    <span className="inline-flex items-center gap-1 rounded-full border border-[#e3cab7] bg-white/80 px-2.5 py-1 text-xs font-bold text-[#5c4a42]">
+                                                        <Trophy className="h-3.5 w-3.5" />
+                                                        {modeLabel}
+                                                    </span>
+                                                    <span className="inline-flex items-center gap-1 rounded-full border border-[#e3cab7] bg-white/80 px-2.5 py-1 text-xs font-bold text-[#5c4a42]">
+                                                        <BadgeDollarSign className="h-3.5 w-3.5" />
+                                                        {formatCurrency(item.initial_bet)} entry
+                                                    </span>
+                                                </div>
                                             </div>
                                         </div>
 
-                                        <div className="min-w-0 flex-1">
-                                            <div className="flex flex-wrap items-center gap-2">
-                                                <Link
-                                                    href={`/profile/${profileSlug}`}
-                                                    onClick={(event) => event.stopPropagation()}
-                                                    className="text-sm font-semibold text-[#2d1f1a] transition-colors hover:text-[#8b5e3c]"
-                                                >
-                                                    {creatorName}
-                                                </Link>
-                                                <span className="text-xs text-[#a08070]">{getShortWallet(creatorWallet)}</span>
-                                                <span className="text-xs text-[#c8a693]">|</span>
-                                                <span className="text-xs text-[#8b7355]">{timeAgo}</span>
+                                        <div className="grid grid-cols-3 gap-2 rounded-xl border border-[#ecd8c9] bg-white/70 p-2 text-center sm:w-64 sm:flex-shrink-0">
+                                            <div className="min-w-0 rounded-lg bg-[#fff7df] px-2 py-2">
+                                                <p className="text-[10px] font-bold uppercase tracking-wide text-[#8a6b18]">Pool</p>
+                                                <p className="truncate text-sm font-black text-[#2d1f1a]">{formatCurrency(totalPool)}</p>
                                             </div>
-
-                                            <h2 className="mt-3 max-w-3xl text-lg font-bold leading-snug text-[#2d1f1a] sm:text-xl">
-                                                {item.title}
-                                            </h2>
-
-                                            <p className="mt-2 max-w-3xl text-sm leading-6 text-[#6f574d]">
-                                                Expires {resolveCountdown || "soon"}
-                                            </p>
-                                        </div>
-
-                                        <div className="flex-shrink-0">
-                                            <div className="flex h-10 w-10 items-center justify-center rounded-full border border-[#ead7ca] bg-white/85 text-[#5c4a42] transition-all duration-200 group-hover:border-[#2d1f1a] group-hover:bg-[#2d1f1a] group-hover:text-[#f8ede7]">
-                                                <ChevronRight className="h-4 w-4" />
+                                            <div className="min-w-0 rounded-lg bg-[#eef8f1] px-2 py-2">
+                                                <p className="text-[10px] font-bold uppercase tracking-wide text-[#246044]">Players</p>
+                                                <p className="flex items-center justify-center gap-1 text-sm font-black text-[#2d1f1a]">
+                                                    <Users className="h-3.5 w-3.5" />
+                                                    {participantCount}
+                                                </p>
+                                            </div>
+                                            <div className="min-w-0 rounded-lg bg-[#f8ede7] px-2 py-2">
+                                                <p className="text-[10px] font-bold uppercase tracking-wide text-[#8b5e3c]">Resolves</p>
+                                                <p className="truncate text-sm font-black text-[#2d1f1a]">{resolveCountdown || "soon"}</p>
+                                            </div>
+                                            <div className="col-span-3 flex items-center justify-between gap-2 px-1 pt-1 text-left">
+                                                <div className="min-w-0">
+                                                    <p className="text-[10px] font-bold uppercase tracking-wide text-[#9b7b6c]">Market</p>
+                                                    <p className="truncate text-xs font-semibold text-[#5c4a42]">{marketName}</p>
+                                                </div>
+                                                <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-[#ead7ca] bg-white text-[#5c4a42] transition-all duration-200 group-hover:border-[#2d1f1a] group-hover:bg-[#2d1f1a] group-hover:text-[#f8ede7]">
+                                                    <ChevronRight className="h-4 w-4" />
+                                                </div>
                                             </div>
                                         </div>
                                     </div>

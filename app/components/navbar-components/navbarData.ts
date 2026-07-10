@@ -5,14 +5,12 @@ export const PROFILE_SVGS = Array.from(
 
 export const NAV_LINKS = [
     { href: "/challenges", label: "Live Challenges" },
-    { href: "/masters", label: "Find Masters" },
     { href: "/leaderboard", label: "Leaderboard" },
     { href: "/activity", label: "Live Activity" },
 ];
 
 export const MORE_LINKS = [
     // { href: "/leaderboard", label: "Leaderboard" },
-    { href: "/referral", label: "Refer & Earn" },
     { href: "/resolve", label: "Resolve Challenges" },
     // { href: "/resolve/nft", label: "Rekto Masters NFT" },
     {

@@ -12,8 +12,7 @@ interface ProfileHeaderProps {
     bio: string;
     joinedDate: string;
     balance: {
-        sol: number;
-        solUsd: number;
+        rekto: number;
         usdc: number;
         usdcUsd: number;
     };
@@ -31,6 +30,24 @@ interface ProfileHeaderProps {
     onToggleFollow?: () => void;
     isFollowActionLoading?: boolean;
     showSettingsIcon?: boolean;
+    isRektoBalanceLoading?: boolean;
+    isUsdcBalanceLoading?: boolean;
+}
+
+function formatTokenBalance(balance: number) {
+    if (!Number.isFinite(balance)) return "0";
+
+    if (Math.abs(balance) < 1000) {
+        return balance.toLocaleString(undefined, {
+            maximumFractionDigits: 4,
+        });
+    }
+
+    return new Intl.NumberFormat(undefined, {
+        notation: "compact",
+        compactDisplay: "short",
+        maximumFractionDigits: 1,
+    }).format(balance).toUpperCase();
 }
 
 export function ProfileHeader({
@@ -49,6 +66,8 @@ export function ProfileHeader({
     onToggleFollow,
     isFollowActionLoading = false,
     showSettingsIcon = false,
+    isRektoBalanceLoading = false,
+    isUsdcBalanceLoading = false,
 }: ProfileHeaderProps) {
     const [walletCopied, setWalletCopied] = React.useState(false);
     const [profileCopied, setProfileCopied] = React.useState(false);
@@ -80,6 +99,8 @@ export function ProfileHeader({
         ? `${walletAddress.slice(0, 8)}...${walletAddress.slice(-8)}`
         : walletAddress;
 
+    const formattedRektoBalance = formatTokenBalance(balance.rekto);
+
     return (
         <div className="flex flex-col lg:flex-row lg:items-stretch gap-4 sm:gap-6 lg:gap-8 p-4 sm:p-6 bg-white/40 backdrop-blur-xl rounded-2xl sm:rounded-3xl border border-gray-400 items-center sm:items-start">
             {/* Left: Avatar and Info */}
@@ -88,13 +109,13 @@ export function ProfileHeader({
                 <div className="relative flex w-full sm:w-auto flex-col items-center sm:items-start flex-shrink-0 mx-auto sm:mx-0">
                     <div className="absolute inset-0 rounded-full blur-xl pointer-events-none"></div>
                     {/* Image container  */}
-                    <div className="relative z-10 w-24 h-24 sm:w-32 sm:h-32 rounded-full ring-4 ring-orange-200">
+                    <div className="relative z-10 w-24 h-24 sm:w-32 sm:h-32 overflow-hidden rounded-full bg-white ring-4 ring-orange-200">
                         <Image
                             src={avatar}
                             alt={username}
-                            width={128}
-                            height={128}
-                            className="w-full h-full object-cover"
+                            fill
+                            sizes="(min-width: 640px) 128px, 96px"
+                            className="object-cover"
                         />
                         {twitterUsername && (
                             <a
@@ -245,19 +266,21 @@ export function ProfileHeader({
             <div className="flex flex-col bg-white/20 backdrop-blur-lg rounded-2xl p-3 sm:p-5 border border-gray-200/40 gap-3 sm:gap-4 w-full lg:w-[480px]">
                 {/* Balance Section */}
                 <div className="grid grid-cols-2 sm:grid-cols-[1fr_auto_1fr] items-stretch sm:items-center gap-2 sm:gap-4 p-3 bg-gradient-to-r from-gray-50 to-gray-100/50 rounded-xl">
-                    {/* SOL Balance */}
+                    {/* REKTO Balance */}
                     <div className="flex items-center justify-center sm:justify-start gap-2 sm:gap-3 flex-1 min-w-0">
                         <Image
-                            src="/scribbles/solbal.png"
-                            alt="SOL"
-                            width={48}
-                            height={48}
-                            className="w-9 h-9 sm:w-12 sm:h-12 object-contain"
+                            src="/fav_old.png"
+                            alt="REKTO"
+                            width={40}
+                            height={40}
+                            className="w-8 h-8 sm:w-10 sm:h-10 object-contain"
                         />
                         <div className="flex flex-col items-start">
-                            <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">SOL</span>
+                            <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">$REKTO</span>
                             <div className="flex items-baseline gap-1.5">
-                                <span className="text-xl sm:text-2xl font-bold text-gray-900 break-all sm:break-normal">{balance.sol.toFixed(2)}</span>
+                                <span className="text-xl sm:text-2xl font-bold text-gray-900 break-all sm:break-normal">
+                                    {isRektoBalanceLoading ? ".." : formattedRektoBalance}
+                                </span>
                             </div>
                         </div>
                     </div>
@@ -276,7 +299,9 @@ export function ProfileHeader({
                         <div className="flex flex-col items-start">
                             <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">USDC</span>
                             <div className="flex items-baseline gap-1.5">
-                                <span className="text-xl sm:text-2xl font-bold text-gray-900 break-all sm:break-normal">{balance.usdc.toFixed(2)}</span>
+                                <span className="text-xl sm:text-2xl font-bold text-gray-900 break-all sm:break-normal">
+                                    {isUsdcBalanceLoading ? ".." : balance.usdc.toFixed(2)}
+                                </span>
                             </div>
                         </div>
                     </div>

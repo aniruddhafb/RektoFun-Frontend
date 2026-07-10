@@ -1,7 +1,5 @@
 "use client";
 
-import Image from "next/image";
-import Link from "next/link";
 import { useNavbar } from "@/app/hooks/useNavbar";
 import {
     NavbarAuthSection,
@@ -10,10 +8,15 @@ import {
     
 } from "@/app/components/navbar-components";
 import { DepositModal } from "@/app/components/DepositModal";
+import { ReferralModal } from "@/app/components/ReferralModal";
 import { NavbarBrand, NavbarDesktopSearch, NavbarMobileBottomNav } from "@/app/components/navbar-components";
 export default function Navbar() {
     const {
         // UI state
+        searchQuery,
+        setSearchQuery,
+        isSearchModalOpen,
+        setIsSearchModalOpen,
         isDropdownOpen,
         setIsDropdownOpen,
         isDepositModalOpen,
@@ -21,7 +24,8 @@ export default function Navbar() {
         fundsModalMode,
         setFundsModalMode,
         isProfileModalOpen,
-        setIsProfileModalOpen,
+        isReferralModalOpen,
+        setIsReferralModalOpen,
         isMobileViewport,
 
         // Profile form state
@@ -31,7 +35,7 @@ export default function Navbar() {
         setEditEmail,
         editBio,
         setEditBio,
-        editProfileIndex,
+        editProfileImageUrl,
         editInviteCode,
         setEditInviteCode,
         profileFormError,
@@ -44,7 +48,6 @@ export default function Navbar() {
         usdcBalance,
 
         // Connection state
-        address,
         isConnected,
 
         // Handlers
@@ -52,6 +55,7 @@ export default function Navbar() {
         randomizeProfile,
         handleConnect,
         handleLogout,
+        handleMobileCreateClick,
         profileHref,
         isActive,
     } = useNavbar();
@@ -78,14 +82,14 @@ export default function Navbar() {
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex items-center justify-between h-20">
                         <NavbarBrand />
-{/*                         
+
                         <NavbarDesktopSearch
                             searchQuery={searchQuery}
                             onSearchQueryChange={setSearchQuery}
                             isModalOpen={isSearchModalOpen}
                             onOpenModal={() => setIsSearchModalOpen(true)}
                             onCloseModal={() => setIsSearchModalOpen(false)}
-                        /> */}
+                        />
 
                         <NavbarAuthSection
                             authenticated={isConnected}
@@ -108,6 +112,7 @@ export default function Navbar() {
                                 setFundsModalMode("withdraw");
                                 setIsDepositModalOpen(true);
                             }}
+                            onOpenReferral={() => setIsReferralModalOpen(true)}
                             profileHref={profileHref}
                             isMobileViewport={isMobileViewport}
                         />
@@ -125,7 +130,7 @@ export default function Navbar() {
 
             <CreateProfileModal
                 isOpen={isProfileModalOpen}
-                editProfileIndex={editProfileIndex}
+                editProfileImageUrl={editProfileImageUrl}
                 editUsername={editUsername}
                 editEmail={editEmail}
                 editBio={editBio}
@@ -157,13 +162,18 @@ export default function Navbar() {
                 />
             )}
 
-            {/* <NavbarMobileBottomNav
+            <ReferralModal
+                isOpen={isReferralModalOpen}
+                onClose={() => setIsReferralModalOpen(false)}
+            />
+
+            <NavbarMobileBottomNav
                 isActive={isActive}
                 profileHref={profileHref}
                 onSearchClick={() => setIsSearchModalOpen(true)}
                 onCreateClick={handleMobileCreateClick}
                 isSearchOpen={isSearchModalOpen}
-            /> */}
+            />
         </>
     );
 }

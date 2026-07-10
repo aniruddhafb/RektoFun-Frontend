@@ -3,14 +3,12 @@
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAppKitAccount, useAppKit, useDisconnect } from '@reown/appkit/react';
-import { PublicKey } from '@solana/web3.js';
-import { getAssociatedTokenAddress } from '@solana/spl-token';
 import { useUserStore } from '@/app/store/useUserStore';
 import { createUser, getUserByPubkey, checkUsernameExists } from '@/app/lib/users-service/users';
 import { blockedContentError, hasBlockedContent } from '@/app/lib/content-moderation';
-import { getProfileAvatarDataUri } from '@/app/lib/profile-avatar';
+import { getDiceBearAvatarUrl } from '@/app/lib/profile-avatar';
 import { User } from '@/app/lib/users-service/users';
-import { USDC_MINT, getReadonlyConnection } from '@/app/lib/rektofun-program';
+import { fetchUsdcBalance as fetchUsdcTokenBalance } from '@/app/lib/token-balances';
 
 export function useNavbar() {
   // AppKit hooks
@@ -19,7 +17,7 @@ export function useNavbar() {
   const { disconnect } = useDisconnect();
 
   // Store and routing
-  const { user: storeUser, setUser, updateUser: updateStoreUser, clearUser } = useUserStore();
+  const { user: storeUser, setUser, clearUser } = useUserStore();
   const pathname = usePathname();
   const router = useRouter();
 
@@ -30,13 +28,14 @@ export function useNavbar() {
   const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
   const [fundsModalMode, setFundsModalMode] = useState<'deposit' | 'withdraw'>('deposit');
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isReferralModalOpen, setIsReferralModalOpen] = useState(false);
   const [isMobileViewport, setIsMobileViewport] = useState(false);
 
   // Profile form state
   const [editUsername, setEditUsername] = useState('');
   const [editEmail, setEditEmail] = useState('');
   const [editBio, setEditBio] = useState('');
-  const [editProfileIndex, setEditProfileIndex] = useState(0);
+  const [editProfileImageUrl, setEditProfileImageUrl] = useState(() => getDiceBearAvatarUrl('rektofun-default'));
   const [editInviteCode, setEditInviteCode] = useState('');
   const [profileFormError, setProfileFormError] = useState<string | null>(null);
 
@@ -90,11 +89,8 @@ export function useNavbar() {
     }
 
     try {
-      const connection = getReadonlyConnection();
-      const pubKey = new PublicKey(address);
-      const ata = await getAssociatedTokenAddress(USDC_MINT, pubKey, false);
-      const accountInfo = await connection.getTokenAccountBalance(ata);
-      setUsdcBalance(accountInfo.value.uiAmount || 0);
+      const balance = await fetchUsdcTokenBalance(address);
+      setUsdcBalance(balance);
     } catch {
       setUsdcBalance(0);
     }
@@ -107,8 +103,7 @@ export function useNavbar() {
 
   // Randomize profile avatar
   const randomizeProfile = () => {
-    const randomIndex = Math.floor(Math.random() * 31);
-    setEditProfileIndex(randomIndex);
+    setEditProfileImageUrl(getDiceBearAvatarUrl());
   };
 
   // Handle profile form submission
@@ -142,14 +137,15 @@ export function useNavbar() {
         trimmedUsername,
         address,
         editBio: editBio.trim(),
-        profileImage: getProfileAvatarDataUri(editProfileIndex),
+        profileImage: editProfileImageUrl,
       });
       const userData = await createUser({
         pubkey: address,
         username: trimmedUsername,
         email: trimmedEmail || undefined,
         bio: editBio.trim(),
-        profile_image: getProfileAvatarDataUri(editProfileIndex),
+        profile_image: editProfileImageUrl,
+        referrer_code: editInviteCode.trim() || undefined,
       });
 
       applyUserToState(userData);
@@ -205,7 +201,9 @@ export function useNavbar() {
           setEditUsername(user.username || '');
           setEditEmail(user.email || '');
           setEditBio(user.description || '');
-          setEditProfileIndex(user.profile_image ? parseInt(user.profile_image.match(/profiles\/(\d+)\.svg/)?.[1] || '1') - 1 : 0);
+          setEditProfileImageUrl(user.profile_image || getDiceBearAvatarUrl());
+        } else {
+          setEditProfileImageUrl(getDiceBearAvatarUrl());
         }
       } catch (error) {
         console.error('[Navbar] Profile modal init failed:', error);
@@ -291,6 +289,8 @@ export function useNavbar() {
     setFundsModalMode,
     isProfileModalOpen,
     setIsProfileModalOpen,
+    isReferralModalOpen,
+    setIsReferralModalOpen,
     isMobileViewport,
 
     // Profile form state
@@ -300,8 +300,8 @@ export function useNavbar() {
     setEditEmail,
     editBio,
     setEditBio,
-    editProfileIndex,
-    setEditProfileIndex,
+    editProfileImageUrl,
+    setEditProfileImageUrl,
     editInviteCode,
     setEditInviteCode,
     profileFormError,

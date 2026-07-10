@@ -17,6 +17,7 @@ import {
     Challenge,
     getChallenges,
 } from "@/app/lib/challenges-service/challenges";
+import { fetchRektoBalance, fetchUsdcBalance } from "@/app/lib/token-balances";
 
 type TabType = "challenges" | "activity";
 
@@ -37,9 +38,14 @@ export default function ProfilePage() {
     const [userChallenges, setUserChallenges] = useState<Challenge[]>([]);
     const [challengesLoading, setChallengesLoading] = useState(false);
     const [isFollowActionLoading, setIsFollowActionLoading] = useState(false);
+    const [rektoBalance, setRektoBalance] = useState(0);
+    const [isRektoBalanceLoading, setIsRektoBalanceLoading] = useState(true);
+    const [usdcBalance, setUsdcBalance] = useState(0);
+    const [isUsdcBalanceLoading, setIsUsdcBalanceLoading] = useState(true);
 
     const isOwnProfile = connectedWalletAddress?.toLowerCase() === user?.wallet_address?.toLowerCase();
     const isFollowing = !!(currentUser?.id && user?.followers?.includes(currentUser.id));
+    const profileWalletAddress = user?.wallet_address || walletFromSlug;
 
     // Fetch user data by wallet address
     useEffect(() => {
@@ -89,6 +95,76 @@ export default function ProfilePage() {
         fetchUserChallenges();
     }, [user?.id]);
 
+    useEffect(() => {
+        let cancelled = false;
+
+        async function fetchProfileRektoBalance() {
+            if (!profileWalletAddress) {
+                setRektoBalance(0);
+                setIsRektoBalanceLoading(false);
+                return;
+            }
+
+            try {
+                setIsRektoBalanceLoading(true);
+                const balance = await fetchRektoBalance(profileWalletAddress);
+                if (!cancelled) {
+                    setRektoBalance(balance);
+                }
+            } catch (balanceError) {
+                console.error("Failed to fetch REKTO balance:", balanceError);
+                if (!cancelled) {
+                    setRektoBalance(0);
+                }
+            } finally {
+                if (!cancelled) {
+                    setIsRektoBalanceLoading(false);
+                }
+            }
+        }
+
+        fetchProfileRektoBalance();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [profileWalletAddress]);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        async function fetchProfileUsdcBalance() {
+            if (!profileWalletAddress) {
+                setUsdcBalance(0);
+                setIsUsdcBalanceLoading(false);
+                return;
+            }
+
+            try {
+                setIsUsdcBalanceLoading(true);
+                const balance = await fetchUsdcBalance(profileWalletAddress);
+                if (!cancelled) {
+                    setUsdcBalance(balance);
+                }
+            } catch (balanceError) {
+                console.error("Failed to fetch USDC balance:", balanceError);
+                if (!cancelled) {
+                    setUsdcBalance(0);
+                }
+            } finally {
+                if (!cancelled) {
+                    setIsUsdcBalanceLoading(false);
+                }
+            }
+        }
+
+        fetchProfileUsdcBalance();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [profileWalletAddress]);
+
     const handleChallengeClick = (challenge: Challenge) => {
         setSelectedChallenge(challenge);
         setIsModalOpen(true);
@@ -134,11 +210,12 @@ export default function ProfilePage() {
                             twitterUsername={null}
                             joinedDate={new Date().toISOString()}
                             balance={{
-                                sol: 0,
-                                solUsd: 0,
-                                usdc: 0,
+                                rekto: rektoBalance,
+                                usdc: usdcBalance,
                                 usdcUsd: 0,
                             }}
+                            isRektoBalanceLoading={isRektoBalanceLoading}
+                            isUsdcBalanceLoading={isUsdcBalanceLoading}
                             stats={{
                                 wins: 0,
                                 rekts: 0,
@@ -169,11 +246,12 @@ export default function ProfilePage() {
                             isFollowActionLoading={isFollowActionLoading}
                             joinedDate={user.created_at}
                             balance={{
-                                sol: user.earnings ?? 0,
-                                solUsd: (user.earnings ?? 0) * 165,
-                                usdc: 0,
+                                rekto: rektoBalance,
+                                usdc: usdcBalance,
                                 usdcUsd: 0,
                             }}
+                            isRektoBalanceLoading={isRektoBalanceLoading}
+                            isUsdcBalanceLoading={isUsdcBalanceLoading}
                             stats={{
                                 wins: userChallenges.filter((c) => c.status === "resolved").length,
                                 rekts: 0,
@@ -194,7 +272,7 @@ export default function ProfilePage() {
 
                         {activeTab === "activity" && (
                             <ProfileActivity
-                                userId={user.id}
+                                userId={String(user.id)}
                                 username={user.username}
                                 avatar={user.profile_image || "/scribbles/pepe.png"}
                                 isOwnProfile={isOwnProfile}

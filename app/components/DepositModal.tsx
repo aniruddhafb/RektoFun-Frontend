@@ -175,7 +175,7 @@ export function DepositModal({ isOpen, onClose, initialMode = "deposit", usdcBal
         className="absolute inset-0 bg-black/45 backdrop-blur-sm"
         onClick={handleClose}
       />
-      <div className="relative z-10 w-full max-w-md overflow-hidden rounded-lg border border-[#1f2937] bg-[#fff8f4] shadow-[4px_4px_0_#111]">
+      <div className="relative z-10 w-full max-w-md overflow-hidden rounded-lg border border-[#1f2937] bg-[#fff8f4]">
         {/* Header */}
         <div className="border-b border-[#ead7cc] bg-white/55 px-5 py-4">
           <div className="flex items-center justify-between gap-4">
