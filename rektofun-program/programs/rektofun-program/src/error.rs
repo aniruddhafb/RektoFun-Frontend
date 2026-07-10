@@ -75,4 +75,15 @@ pub enum RektoError {
 
     #[msg("You are not eligible for a refund (you are not on the creator's team)")]
     NotEligibleForRefund,
+
+    // ── Config / admin errors ────────────────────────────────────────────────
+
+    #[msg("Only the platform admin can perform this action")]
+    Unauthorized,
+
+    #[msg("Invalid parameter value")]
+    InvalidParam,
+
+    #[msg("Challenge is already settled or cancelled; nothing to cancel")]
+    NotOpenOrActive,
 }

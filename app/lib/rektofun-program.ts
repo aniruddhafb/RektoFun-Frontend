@@ -51,8 +51,13 @@ export const USDC_MULTIPLIER = 10 ** USDC_DECIMALS; // 1_000_000
 const CHALLENGE_SEED = Buffer.from("challenge");
 const VAULT_SEED = Buffer.from("vault");
 const COUNTER_SEED = Buffer.from("creator_counter");
+const CONFIG_SEED = Buffer.from("config");
 
 // ─── PDA Derivation ───────────────────────────────────────────────────────────
+
+export function deriveConfigPDA(): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync([CONFIG_SEED], PROGRAM_ID);
+}
 
 export function deriveCreatorCounter(creator: PublicKey): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
@@ -142,7 +147,8 @@ export function getReadonlyConnection(): Connection {
  * Build a `create_challenge` transaction.
  *
  * - `creator`  : the user's wallet — owns the USDC ATA that will be debited.
- * - `feePayer` : the admin wallet — pays all SOL rent / transaction fees.
+ * - `feePayer` : the admin wallet — must equal the on-chain Config.admin;
+ *                pays all SOL rent / transaction fees.
  *
  * The returned transaction has `feePayer` set to `feePayer` and is NOT yet
  * signed.  The caller must:
@@ -154,7 +160,7 @@ export async function buildCreateChallengeTx(
   program: Program,
   creator: PublicKey,
   args: CreateChallengeArgs,
-  feePayer?: PublicKey   // optional: if provided, this wallet pays SOL fees
+  feePayer: PublicKey   // must match the on-chain Config.admin — the program pays all SOL rent from this account
 ): Promise<Transaction> {
   const connection = getReadonlyConnection();
 
@@ -173,6 +179,12 @@ export async function buildCreateChallengeTx(
 
   const [challengePDA] = deriveChallengePDA(creator, currentCount);
   const [vaultPDA] = deriveVaultPDA(challengePDA);
+  const [configPDA] = deriveConfigPDA();
+
+  // The Anchor program pays for `creator_counter`/`challenge`/`vault` rent
+  // directly out of `feePayer`'s balance (`payer = fee_payer` in
+  // create_challenge.rs) — the creator's own SOL balance is never touched.
+  const preTxInstructions: any[] = [];
 
   // Convert whole USDC to micro-units (6 decimals)
   const betAmountMicroUsdc = new BN(
@@ -188,13 +200,11 @@ export async function buildCreateChallengeTx(
 
   // Check if the creator's USDC ATA exists; if not, prepend an init instruction.
   // The ATA init payer is the feePayer (admin) so the user doesn't need SOL.
-  const preTxInstructions: any[] = [];
   const ataInfo = await connection.getAccountInfo(creatorUsdcAta);
   if (!ataInfo) {
-    const ataPayer = feePayer ?? creator;
     preTxInstructions.push(
       createAssociatedTokenAccountInstruction(
-        ataPayer,       // payer (admin pays rent for ATA creation)
+        feePayer,       // payer (admin pays rent for ATA creation)
         creatorUsdcAta, // ata
         creator,        // owner
         USDC_MINT       // mint
@@ -219,6 +229,8 @@ export async function buildCreateChallengeTx(
     })
     .accounts({
       creator,
+      config: configPDA,
+      feePayer,
       creatorCounter: counterPDA,
       challenge: challengePDA,
       vault: vaultPDA,
@@ -231,9 +243,7 @@ export async function buildCreateChallengeTx(
     .transaction();
 
   // Override the fee payer so the admin wallet covers SOL costs
-  if (feePayer) {
-    tx.feePayer = feePayer;
-  }
+  tx.feePayer = feePayer;
 
   return tx;
 }
@@ -276,6 +286,8 @@ export async function buildAcceptChallengeTx(
     );
   }
 
+  const [configPDA] = deriveConfigPDA();
+
   const tx = await (program.methods as any)
     .acceptChallenge({ joinCreatorSide, amount: new BN(amountMicroUsdc.toString()) })
     .accounts({
@@ -287,6 +299,7 @@ export async function buildAcceptChallengeTx(
       usdcMint: USDC_MINT,
       tokenProgram: TOKEN_PROGRAM_ID,
       systemProgram: SystemProgram.programId,
+      config: configPDA,
     })
     .preInstructions(preTxInstructions)
     .transaction();
@@ -296,6 +309,8 @@ export async function buildAcceptChallengeTx(
 
 /**
  * Build a `cancel_challenge` transaction (refunds USDC to creator).
+ * The vault's reclaimed SOL rent is returned to the current Config.admin
+ * (it originally paid for the vault's creation) — fetched from on-chain.
  */
 export async function buildCancelChallengeTx(
   program: Program,
@@ -303,6 +318,10 @@ export async function buildCancelChallengeTx(
   challengePDA: PublicKey
 ): Promise<Transaction> {
   const [vaultPDA] = deriveVaultPDA(challengePDA);
+  const [configPDA] = deriveConfigPDA();
+
+  const config = await (program.account as any).config.fetch(configPDA);
+  const adminPubkey = config.admin as PublicKey;
 
   // Derive the creator's USDC ATA
   const creatorUsdcAta = await getAssociatedTokenAddress(
@@ -319,6 +338,8 @@ export async function buildCancelChallengeTx(
       vault: vaultPDA,
       creatorUsdcAccount: creatorUsdcAta,
       usdcMint: USDC_MINT,
+      config: configPDA,
+      admin: adminPubkey,
       tokenProgram: TOKEN_PROGRAM_ID,
       systemProgram: SystemProgram.programId,
     })

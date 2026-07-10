@@ -4,8 +4,8 @@ use crate::{
     constants::*,
     error::RektoError,
     state::{
-        ChallengeAccount, ChallengeStatus, ChallengeType, CreatorCounter, PredictionDirection,
-        WinningSide,
+        ChallengeAccount, ChallengeStatus, ChallengeType, Config, CreatorCounter,
+        PredictionDirection, WinningSide,
     },
 };
 
@@ -36,10 +36,17 @@ pub struct CreateChallenge<'info> {
     #[account(mut)]
     pub creator: Signer<'info>,
 
+    #[account(seeds = [CONFIG_SEED], bump = config.bump)]
+    pub config: Account<'info, Config>,
+
+    /// Platform wallet that sponsors all SOL rent for account creation.
+    #[account(mut, address = config.admin @ RektoError::Unauthorized)]
+    pub fee_payer: Signer<'info>,
+
     /// Per-creator counter — init on first challenge, increment thereafter
     #[account(
         init_if_needed,
-        payer = creator,
+        payer = fee_payer,
         space = 8 + CreatorCounter::INIT_SPACE,
         seeds = [COUNTER_SEED, creator.key().as_ref()],
         bump,
@@ -49,7 +56,7 @@ pub struct CreateChallenge<'info> {
     /// The challenge account itself
     #[account(
         init,
-        payer = creator,
+        payer = fee_payer,
         space = 8 + ChallengeAccount::INIT_SPACE,
         seeds = [
             CHALLENGE_SEED,
@@ -64,7 +71,7 @@ pub struct CreateChallenge<'info> {
     /// Holds all bets (creator's + all participants').
     #[account(
         init,
-        payer = creator,
+        payer = fee_payer,
         token::mint = usdc_mint,
         token::authority = challenge,
         token::token_program = token_program,
@@ -93,22 +100,33 @@ pub(crate) fn handler(ctx: Context<CreateChallenge>, params: CreateChallengePara
     let clock = Clock::get()?;
     let now = clock.unix_timestamp;
 
+    let config = &ctx.accounts.config;
+
     // --- Validations ---
     require!(params.asset.len() <= 10, RektoError::AssetTooLong);
-    require!(params.bet_amount >= MIN_BET_AMOUNT, RektoError::BetTooSmall);
+    require!(
+        params.bet_amount >= config.min_bet_amount,
+        RektoError::BetTooSmall
+    );
 
     let duration = params.expires_at.saturating_sub(now);
-    require!(duration >= MIN_DURATION_SECS, RektoError::DurationTooShort);
-    require!(duration <= MAX_DURATION_SECS, RektoError::DurationTooLong);
+    require!(
+        duration >= config.min_duration_secs,
+        RektoError::DurationTooShort
+    );
+    require!(
+        duration <= config.max_duration_secs,
+        RektoError::DurationTooLong
+    );
     require!(
         params.resolves_at >= params.expires_at,
         RektoError::InvalidResolvesAt
     );
 
-    // For TEAM challenges, clamp max_team_size to the hard cap
+    // For TEAM challenges, clamp max_team_size to the configured cap
     let effective_max_team_size = if params.challenge_type == ChallengeType::Team {
-        if params.max_team_size == 0 || params.max_team_size > MAX_TEAM_SIZE {
-            MAX_TEAM_SIZE
+        if params.max_team_size == 0 || params.max_team_size > config.max_team_size {
+            config.max_team_size
         } else {
             params.max_team_size
         }

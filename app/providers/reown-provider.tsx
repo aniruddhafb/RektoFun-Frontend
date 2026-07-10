@@ -11,7 +11,7 @@ const solanaAdapter = new SolanaAdapter()
 
 createAppKit({
   adapters: [solanaAdapter],
-  networks: [solanaDevnet],
+  networks: [solana, solanaTestnet, solanaDevnet],
   projectId,
   metadata: {
     name: 'RektoFun',

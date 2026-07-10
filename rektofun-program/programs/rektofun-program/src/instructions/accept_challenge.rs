@@ -4,7 +4,7 @@ use anchor_spl::token_interface::{self, Mint, TokenAccount, TokenInterface, Tran
 use crate::{
     constants::*,
     error::RektoError,
-    state::{ChallengeAccount, ChallengeStatus, ChallengeType},
+    state::{ChallengeAccount, ChallengeStatus, ChallengeType, Config},
 };
 
 /// `side` is only meaningful for TEAM challenges:
@@ -69,6 +69,9 @@ pub struct AcceptChallenge<'info> {
 
     pub token_program: Interface<'info, TokenInterface>,
     pub system_program: Program<'info, System>,
+
+    #[account(seeds = [CONFIG_SEED], bump = config.bump)]
+    pub config: Account<'info, Config>,
 }
 
 pub(crate) fn handler(ctx: Context<AcceptChallenge>, params: AcceptChallengeParams) -> Result<()> {
@@ -82,7 +85,10 @@ pub(crate) fn handler(ctx: Context<AcceptChallenge>, params: AcceptChallengePara
 
     // Each participant may deposit their own amount (no longer required to match
     // the creator's bet_amount) — but it must still clear the platform minimum.
-    require!(params.amount >= MIN_BET_AMOUNT, RektoError::BetTooSmall);
+    require!(
+        params.amount >= ctx.accounts.config.min_bet_amount,
+        RektoError::BetTooSmall
+    );
     let deposit_amount = params.amount;
     let challenger_key = ctx.accounts.challenger.key();
     let decimals = ctx.accounts.usdc_mint.decimals;
