@@ -110,7 +110,7 @@ export interface GetChallengesOptions {
   bypassCache?: boolean;
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
+const API_BASE_URL = process.env.NEXT_PUBLIC_BE_API_URL;
 
 export async function createChallenge(params: CreateChallengeParams): Promise<Challenge> {
   const response = await fetch(`${API_BASE_URL}/challenges`, {

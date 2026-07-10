@@ -266,7 +266,7 @@ Create `.env` or `.env.local`:
 ```
 VITE_PROJECT_ID=b56e18d47c72ab683b10814fe9495694 # localhost testing only
 # or for Next.js
-NEXT_PUBLIC_PROJECT_ID=b56e18d47c72ab683b10814fe9495694 # localhost testing only
+NEXT_PUBLIC_REOWN_PROJECT_ID=b56e18d47c72ab683b10814fe9495694 # localhost testing only
 ```
 
 ## Running Examples

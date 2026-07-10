@@ -1,13 +1,21 @@
 pub mod accept_challenge;
+pub mod admin_cancel_challenge;
 pub mod cancel_challenge;
 pub mod claim_refund;
 pub mod claim_winnings;
 pub mod create_challenge;
+pub mod initialize_config;
 pub mod settle_challenge;
+pub mod update_admin;
+pub mod update_platform_params;
 
 pub use accept_challenge::*;
+pub use admin_cancel_challenge::*;
 pub use cancel_challenge::*;
 pub use claim_refund::*;
 pub use claim_winnings::*;
 pub use create_challenge::*;
+pub use initialize_config::*;
 pub use settle_challenge::*;
+pub use update_admin::*;
+pub use update_platform_params::*;

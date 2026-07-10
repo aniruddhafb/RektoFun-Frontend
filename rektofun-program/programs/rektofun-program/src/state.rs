@@ -168,3 +168,27 @@ pub struct ClaimRecord {
     pub amount_claimed: u64,
     pub bump: u8,
 }
+
+/// Global platform configuration — a single singleton PDA.
+/// Seeds: [b"config"]
+///
+/// `admin` is the live source of truth for who sponsors SOL rent/fees and is
+/// authorised to settle challenges and update these parameters — set once at
+/// `initialize_config`, changeable afterwards via `update_admin`. The other
+/// fields mirror the compile-time defaults in `constants.rs` but can be
+/// tuned at runtime via `update_platform_params` without a program redeploy.
+/// `platform_fee_bps` and `creator_fee_bps` are both deducted from the pot
+/// at settlement — the former to the platform treasury, the latter to
+/// `challenge.creator` regardless of who wins.
+#[account]
+#[derive(InitSpace)]
+pub struct Config {
+    pub admin: Pubkey,
+    pub platform_fee_bps: u64,
+    pub creator_fee_bps: u64,
+    pub min_bet_amount: u64,
+    pub max_duration_secs: i64,
+    pub min_duration_secs: i64,
+    pub max_team_size: u8,
+    pub bump: u8,
+}
