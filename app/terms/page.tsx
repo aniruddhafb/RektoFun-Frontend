@@ -113,7 +113,7 @@ export default function TermsPage() {
                         </h2>
                         <p className="mb-4">
                             If you have any questions about these Terms of Service, please contact us
-                            through our twitter or email support at rektofun@gmail.com
+                            through our Twitter DM or Discord ticket support system.
                         </p>
                     </section>
                 </div>

@@ -4,8 +4,7 @@ import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAppKitAccount, useAppKit, useDisconnect } from '@reown/appkit/react';
 import { useUserStore } from '@/app/store/useUserStore';
-import { createUser, getUserByPubkey, checkUsernameExists } from '@/app/lib/users-service/users';
-import { blockedContentError, hasBlockedContent } from '@/app/lib/content-moderation';
+import { createUser, getUserByPubkey } from '@/app/lib/users-service/users';
 import { getDiceBearAvatarUrl } from '@/app/lib/profile-avatar';
 import { User } from '@/app/lib/users-service/users';
 import { fetchUsdcBalance as fetchUsdcTokenBalance } from '@/app/lib/token-balances';
@@ -27,28 +26,28 @@ export function useNavbar() {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
   const [fundsModalMode, setFundsModalMode] = useState<'deposit' | 'withdraw'>('deposit');
-  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isReferralModalOpen, setIsReferralModalOpen] = useState(false);
   const [isMobileViewport, setIsMobileViewport] = useState(false);
-
-  // Profile form state
-  const [editUsername, setEditUsername] = useState('');
-  const [editEmail, setEditEmail] = useState('');
-  const [editBio, setEditBio] = useState('');
-  const [editProfileImageUrl, setEditProfileImageUrl] = useState(() => getDiceBearAvatarUrl('rektofun-default'));
-  const [editInviteCode, setEditInviteCode] = useState('');
-  const [profileFormError, setProfileFormError] = useState<string | null>(null);
 
   // User data
   const [userProfileData, setUserProfileData] = useState<{ username: string; profileImage: string } | null>(null);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [hasInitialized, setHasInitialized] = useState(false);
+  const [initializedAddress, setInitializedAddress] = useState<string | null>(null);
   const [usdcBalance, setUsdcBalance] = useState<number | null>(null);
 
   // Helper: Get URL referral code
   const getRefCodeFromUrl = () => {
     if (typeof window === 'undefined') return '';
-    return new URLSearchParams(window.location.search).get('ref') || '';
+    const params = new URLSearchParams(window.location.search);
+    return params.get('referral_code') || params.get('ref') || '';
+  };
+
+  const createRandomUsername = (walletAddress: string) => {
+    const adjectives = ['Lucky', 'Brave', 'Swift', 'Cosmic', 'Rekto', 'Mighty', 'Sunny', 'Wild'];
+    const nouns = ['Bull', 'Bear', 'Fox', 'Whale', 'Tiger', 'Degen', 'Otter', 'Falcon'];
+    const randomItem = (items: string[]) => items[Math.floor(Math.random() * items.length)];
+    const walletSuffix = walletAddress.slice(-6);
+    return `${randomItem(adjectives)}${randomItem(nouns)}${walletSuffix}`;
   };
 
   // Helper: Sync user state
@@ -101,62 +100,6 @@ export function useNavbar() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [address, isConnected]);
 
-  // Randomize profile avatar
-  const randomizeProfile = () => {
-    setEditProfileImageUrl(getDiceBearAvatarUrl());
-  };
-
-  // Handle profile form submission
-  const handleProfileSubmit = async () => {
-    if (!address) return;
-    const trimmedUsername = editUsername.trim();
-    if (hasBlockedContent(trimmedUsername)) {
-      setProfileFormError(blockedContentError('Username'));
-      return;
-    }
-    if (hasBlockedContent(editBio)) {
-      setProfileFormError(blockedContentError('Bio'));
-      return;
-    }
-    const trimmedEmail = editEmail.trim();
-    if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
-      setProfileFormError('Please enter a valid email address.');
-      return;
-    }
-
-    try {
-      if (trimmedUsername && trimmedUsername !== currentUser?.username) {
-        const usernameTaken = await checkUsernameExists(trimmedUsername);
-        if (usernameTaken) {
-          setProfileFormError('Username is already taken. Please choose another.');
-          return;
-        }
-      }
-      
-      console.log("user data", {
-        trimmedUsername,
-        address,
-        editBio: editBio.trim(),
-        profileImage: editProfileImageUrl,
-      });
-      const userData = await createUser({
-        pubkey: address,
-        username: trimmedUsername,
-        email: trimmedEmail || undefined,
-        bio: editBio.trim(),
-        profile_image: editProfileImageUrl,
-        referrer_code: editInviteCode.trim() || undefined,
-      });
-
-      applyUserToState(userData);
-      setProfileFormError(null);
-      setIsProfileModalOpen(false);
-    } catch (error) {
-      console.error('[Navbar] Profile submit failed:', error);
-      setProfileFormError('Failed to save profile. Please try again.');
-    }
-  };
-
   // Sync store user when it changes
   useEffect(() => {
     if (storeUser && (!address || address === storeUser.pubkey)) {
@@ -171,48 +114,32 @@ export function useNavbar() {
   // Initialize user on wallet connect - creates the user if their pubkey is
   // new, or fetches the existing one if it already exists
   useEffect(() => {
-    if (!isConnected || !address || hasInitialized) return;
+    if (!isConnected || !address || initializedAddress === address) return;
 
     const initUser = async () => {
       try {
         const userData = await getUserByPubkey(address);
         applyUserToState(userData);
-
       } catch (error) {
-
-        setIsProfileModalOpen(true);
-        console.error('[Navbar] User initialization failed:', error);
+        console.info('[Navbar] No account found; creating a generated profile.', error);
+        try {
+          const userData = await createUser({
+            pubkey: address,
+            username: createRandomUsername(address),
+            profile_image: getDiceBearAvatarUrl(),
+            referrer_code: getRefCodeFromUrl() || undefined,
+          });
+          applyUserToState(userData);
+        } catch (createError) {
+          console.error('[Navbar] Automatic account creation failed:', createError);
+        }
       } finally {
-        setHasInitialized(true);
+        setInitializedAddress(address);
       }
     };
 
     initUser();
-  }, [isConnected, address, hasInitialized]);
-
-  // Handle profile modal open - load user data
-  useEffect(() => {
-    if (!isProfileModalOpen || !address) return;
-
-    const initProfileModal = async () => {
-      try {
-        const user = currentUser || (await fetchUserProfile());
-        if (user) {
-          setEditUsername(user.username || '');
-          setEditEmail(user.email || '');
-          setEditBio(user.description || '');
-          setEditProfileImageUrl(user.profile_image || getDiceBearAvatarUrl());
-        } else {
-          setEditProfileImageUrl(getDiceBearAvatarUrl());
-        }
-      } catch (error) {
-        console.error('[Navbar] Profile modal init failed:', error);
-      }
-      setEditInviteCode(getRefCodeFromUrl());
-    };
-
-    initProfileModal();
-  }, [isProfileModalOpen, address]);
+  }, [isConnected, address, initializedAddress]);
 
   // Detect mobile viewport
   useEffect(() => {
@@ -222,27 +149,6 @@ export function useNavbar() {
     mediaQuery.addEventListener('change', syncViewport);
     return () => mediaQuery.removeEventListener('change', syncViewport);
   }, []);
-
-  // Lock scroll when profile modal is open
-  useEffect(() => {
-    if (!isProfileModalOpen) return;
-
-    const originalOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-
-    const blockEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        e.stopPropagation();
-      }
-    };
-
-    window.addEventListener('keydown', blockEscape, true);
-    return () => {
-      document.body.style.overflow = originalOverflow;
-      window.removeEventListener('keydown', blockEscape, true);
-    };
-  }, [isProfileModalOpen]);
 
   // Check if route is active
   const isActive = (href: string) => {
@@ -268,7 +174,7 @@ export function useNavbar() {
 
   // Handle logout
   const handleLogout = () => {
-    setHasInitialized(false);
+    setInitializedAddress(null);
     setCurrentUser(null);
     setUserProfileData(null);
     clearUser();
@@ -287,25 +193,9 @@ export function useNavbar() {
     setIsDepositModalOpen,
     fundsModalMode,
     setFundsModalMode,
-    isProfileModalOpen,
-    setIsProfileModalOpen,
     isReferralModalOpen,
     setIsReferralModalOpen,
     isMobileViewport,
-
-    // Profile form state
-    editUsername,
-    setEditUsername,
-    editEmail,
-    setEditEmail,
-    editBio,
-    setEditBio,
-    editProfileImageUrl,
-    setEditProfileImageUrl,
-    editInviteCode,
-    setEditInviteCode,
-    profileFormError,
-    setProfileFormError,
 
     // User data
     userProfileData,
@@ -320,8 +210,6 @@ export function useNavbar() {
     isConnected,
 
     // Handlers
-    handleProfileSubmit,
-    randomizeProfile,
     handleConnect,
     handleLogout,
     handleMobileCreateClick,
