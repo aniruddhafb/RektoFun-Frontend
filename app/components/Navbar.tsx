@@ -8,6 +8,8 @@ import {
 } from "@/app/components/navbar-components";
 import { DepositModal } from "@/app/components/DepositModal";
 import { ReferralModal } from "@/app/components/ReferralModal";
+import { CreateProfileModal } from "@/app/components/navbar-components/CreateProfileModal";
+import { SettingsModal } from "@/app/components/SettingsModal";
 import { NavbarBrand, NavbarDesktopSearch, NavbarMobileBottomNav } from "@/app/components/navbar-components";
 export default function Navbar() {
     const {
@@ -24,13 +26,19 @@ export default function Navbar() {
         setFundsModalMode,
         isReferralModalOpen,
         setIsReferralModalOpen,
+        isEditProfileModalOpen,
+        setIsEditProfileModalOpen,
+        isSettingsModalOpen,
+        setIsSettingsModalOpen,
         isMobileViewport,
 
         // User data
         userProfileData,
+        currentUser,
         displayAddress,
         displayUsername,
         usdcBalance,
+        rektoBalance,
 
         // Connection state
         isConnected,
@@ -41,6 +49,7 @@ export default function Navbar() {
         handleMobileCreateClick,
         profileHref,
         isActive,
+        applyUserToState,
     } = useNavbar();
 
     return (
@@ -96,6 +105,8 @@ export default function Navbar() {
                                 setIsDepositModalOpen(true);
                             }}
                             onOpenReferral={() => setIsReferralModalOpen(true)}
+                            onOpenEditProfile={() => setIsEditProfileModalOpen(true)}
+                            onOpenSettings={() => setIsSettingsModalOpen(true)}
                             profileHref={profileHref}
                             isMobileViewport={isMobileViewport}
                         />
@@ -117,12 +128,26 @@ export default function Navbar() {
                     onClose={() => setIsDepositModalOpen(false)}
                     initialMode={fundsModalMode}
                     usdcBalance={usdcBalance}
+                    rektoBalance={rektoBalance}
                 />
             )}
 
             <ReferralModal
                 isOpen={isReferralModalOpen}
                 onClose={() => setIsReferralModalOpen(false)}
+            />
+
+            <CreateProfileModal
+                key={`${currentUser?.id || "none"}-${currentUser?.username || ""}-${isEditProfileModalOpen}`}
+                isOpen={isEditProfileModalOpen}
+                user={currentUser}
+                onClose={() => setIsEditProfileModalOpen(false)}
+                onSaved={applyUserToState}
+            />
+
+            <SettingsModal
+                isOpen={isSettingsModalOpen}
+                onClose={() => setIsSettingsModalOpen(false)}
             />
 
             <NavbarMobileBottomNav

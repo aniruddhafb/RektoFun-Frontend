@@ -2,7 +2,6 @@
 
 import React from "react";
 import Image from "next/image";
-import Link from "next/link";
 import dayjs from "dayjs";
 
 interface ProfileHeaderProps {
@@ -109,30 +108,40 @@ export function ProfileHeader({
                 <div className="relative flex w-full sm:w-auto flex-col items-center sm:items-start flex-shrink-0 mx-auto sm:mx-0">
                     <div className="absolute inset-0 rounded-full blur-xl pointer-events-none"></div>
                     {/* Image container  */}
-                    <div className="relative z-10 w-24 h-24 sm:w-32 sm:h-32 overflow-hidden rounded-full bg-white ring-4 ring-orange-200">
-                        <Image
-                            src={avatar}
-                            alt={username}
-                            fill
-                            sizes="(min-width: 640px) 128px, 96px"
-                            className="object-cover"
-                        />
+                    <div className="relative z-10 w-24 h-24 sm:w-32 sm:h-32">
+                        <div className="absolute inset-0 overflow-hidden rounded-full bg-white ring-4 ring-orange-200">
+                            <Image
+                                src={avatar}
+                                alt={username}
+                                fill
+                                sizes="(min-width: 640px) 128px, 96px"
+                                className="object-cover"
+                            />
+                        </div>
                         {twitterUsername && (
-                            <a
-                                href={`https://x.com/${twitterUsername}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                aria-label={`${username} on Twitter/X`}
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    window.open(`https://x.com/${twitterUsername}`, "_blank", "noopener,noreferrer");
-                                }}
-                                className="absolute bottom-0 right-0 z-20 flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full bg-black text-white ring-2 ring-white hover:bg-gray-800 transition-colors"
+                            <span
+                                className="absolute -bottom-1 -right-1 z-20 flex h-8 w-8 items-center justify-center text-white drop-shadow-sm sm:h-9 sm:w-9"
+                                title="Verified on X"
+                                aria-label="Verified on X"
                             >
-                                <svg className="w-3 h-3 sm:w-3.5 sm:h-3.5" fill="currentColor" viewBox="0 0 24 24">
-                                    <path d="M18.244 2H21.5l-7.1 8.114L22.75 22h-6.542l-5.122-6.65L5.27 22H2l7.592-8.682L1.75 2h6.708l4.63 6.08L18.244 2zm-1.146 18.06h1.804L7.48 3.84H5.55l11.548 16.22z" />
+                                <svg className="h-full w-full" viewBox="0 0 32 32" aria-hidden="true">
+                                    <path
+                                        fill="#378FDB"
+                                        stroke="white"
+                                        strokeWidth="1.5"
+                                        strokeLinejoin="round"
+                                        d="M16 1.5l2.8 2.2 3.5-1 1.6 3.2 3.6.5.1 3.7 3 2-1.4 3.4 1.4 3.4-3 2-.1 3.7-3.6.5-1.6 3.2-3.5-1L16 30.5l-2.8-2.2-3.5 1-1.6-3.2-3.6-.5-.1-3.7-3-2 1.4-3.4-1.4-3.4 3-2 .1-3.7 3.6-.5 1.6-3.2 3.5 1L16 1.5Z"
+                                    />
+                                    <path
+                                        d="m9.4 16.2 4.2 4.2 9-9"
+                                        fill="none"
+                                        stroke="white"
+                                        strokeWidth="3.4"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                    />
                                 </svg>
-                            </a>
+                            </span>
                         )}
                     </div>
                     <div className="mt-3 flex w-full min-w-[180px] max-w-[280px] sm:max-w-[220px] flex-col items-center gap-2">
@@ -169,33 +178,31 @@ export function ProfileHeader({
                             {username}
                         </h1>
                         {twitterUsername ? (
-                            <span
-                                className="inline-flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center rounded-full bg-blue-500 text-white flex-shrink-0"
-                                title="Verified on X"
-                                aria-label="Verified on X"
+                            <a
+                                href={`https://x.com/${twitterUsername}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex h-6 w-6 cursor-pointer items-center justify-center rounded-full bg-black text-white transition-colors hover:bg-gray-800 sm:h-7 sm:w-7 flex-shrink-0"
+                                title={`@${twitterUsername} on X`}
+                                aria-label={`Open @${twitterUsername} on X`}
                             >
-                                <svg className="h-3 w-3 sm:h-3.5 sm:w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                                <svg className="h-3 w-3 sm:h-3.5 sm:w-3.5" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M18.244 2H21.5l-7.1 8.114L22.75 22h-6.542l-5.122-6.65L5.27 22H2l7.592-8.682L1.75 2h6.708l4.63 6.08L18.244 2zm-1.146 18.06h1.804L7.48 3.84H5.55l11.548 16.22z" />
                                 </svg>
-                            </span>
+                            </a>
                         ) : null}
                         {showSettingsIcon ? (
-                            <Link
-                                href="/settings"
-                                className="inline-flex h-7 w-7 border border-gray-400 items-center justify-center rounded-lg bg-gray-100/80 text-gray-600 hover:text-gray-900 hover:bg-gray-200/80 transition-colors flex-shrink-0"
-                                aria-label="Open settings"
-                                title="Open settings"
+                            <button
+                                type="button"
+                                onClick={() => window.dispatchEvent(new Event("rektofun:open-edit-profile"))}
+                                className="inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg border border-gray-400 bg-gray-100/80 text-gray-600 transition-colors hover:bg-gray-200/80 hover:text-gray-900 flex-shrink-0"
+                                aria-label="Edit profile"
+                                title="Edit profile"
                             >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={2}
-                                        d="M11.983 5.5a1.5 1.5 0 0 1 2.034-.547l.422.244a1.5 1.5 0 0 0 1.446.02l.431-.23a1.5 1.5 0 0 1 2.02.599l.516.894a1.5 1.5 0 0 0 1.024.73l.488.107a1.5 1.5 0 0 1 1.145 1.77l-.116.483a1.5 1.5 0 0 0 .408 1.386l.356.356a1.5 1.5 0 0 1 0 2.122l-.356.356a1.5 1.5 0 0 0-.408 1.386l.116.483a1.5 1.5 0 0 1-1.145 1.77l-.488.107a1.5 1.5 0 0 0-1.024.73l-.516.894a1.5 1.5 0 0 1-2.02.599l-.431-.23a1.5 1.5 0 0 0-1.446.02l-.422.244a1.5 1.5 0 0 1-2.034-.547l-.257-.426a1.5 1.5 0 0 0-1.23-.734l-.549-.039a1.5 1.5 0 0 1-1.392-1.602l.04-.547a1.5 1.5 0 0 0-.734-1.23l-.426-.258a1.5 1.5 0 0 1-.547-2.033l.244-.423a1.5 1.5 0 0 0 .02-1.446l-.23-.43a1.5 1.5 0 0 1 .599-2.02l.894-.517a1.5 1.5 0 0 0 .73-1.023l.107-.49A1.5 1.5 0 0 1 10.53 5.3l.483.116a1.5 1.5 0 0 0 1.386-.409l.356-.356Z"
-                                    />
-                                    <circle cx="12" cy="12" r="3" strokeWidth={2} />
+                                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16.862 3.487a2.1 2.1 0 0 1 2.97 2.97L8.25 18.04 4 19l.96-4.25L16.862 3.487Z" />
                                 </svg>
-                            </Link>
+                            </button>
                         ) : null}
                     </div>
 

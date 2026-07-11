@@ -6,6 +6,7 @@ export interface CreateUserParams {
   profile_image?: string;
   bio?: string;
   description?: string;
+  twitter_username?: string | null;
   referrer_code?: string;
 }
 
@@ -17,6 +18,7 @@ export interface UpdateUserParams {
   profile_image?: string;
   bio?: string;
   description?: string;
+  twitter_username?: string | null;
 }
 
 export interface User {
@@ -28,6 +30,7 @@ export interface User {
   profile_image: string;
   bio: string;
   description: string;
+  twitter_username: string | null;
   created_at: string;
   followers?: Array<number | string>;
   following?: Array<number | string>;
@@ -35,6 +38,7 @@ export interface User {
   referral_code: string;
   referred_by: string | null;
   earnings?: number;
+  user_type: "user" | "moderator";
 }
 
 export type LeaderboardUser = Omit<User, "id" | "followers" | "following"> & {
@@ -74,6 +78,7 @@ type BackendUser = {
   profile_image?: string | null;
   bio?: string | null;
   description?: string | null;
+  twitter_username?: string | null;
   created_at: string;
   followers?: Array<number | string> | null;
   following?: Array<number | string> | null;
@@ -81,6 +86,7 @@ type BackendUser = {
   referral_code?: string | null;
   referred_by?: string | null;
   earnings?: number | null;
+  user_type?: "user" | "moderator" | null;
 };
 
 function normalizeUser(user: BackendUser): User {
@@ -96,6 +102,7 @@ function normalizeUser(user: BackendUser): User {
     profile_image: user.profile_image || "",
     bio,
     description: bio,
+    twitter_username: user.twitter_username || null,
     created_at: user.created_at,
     followers: user.followers || [],
     following: user.following || [],
@@ -103,6 +110,7 @@ function normalizeUser(user: BackendUser): User {
     referral_code: user.referral_code || "",
     referred_by: user.referred_by || null,
     earnings: user.earnings || 0,
+    user_type: user.user_type || "user",
   };
 }
 
@@ -113,6 +121,7 @@ function toBackendUserPayload(params: CreateUserParams | UpdateUserParams) {
     pubkey: params.pubkey || params.wallet_address,
     profile_image: params.profile_image,
     bio: params.bio ?? params.description,
+    twitter_username: params.twitter_username,
     referrer_code: "referrer_code" in params ? params.referrer_code : undefined,
   };
 }

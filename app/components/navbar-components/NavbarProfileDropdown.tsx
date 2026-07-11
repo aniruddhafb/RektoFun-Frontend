@@ -19,6 +19,8 @@ type NavbarProfileDropdownProps = {
     onOpenDeposit: () => void;
     onOpenWithdraw: () => void;
     onOpenReferral: () => void;
+    onOpenEditProfile: () => void;
+    onOpenSettings: () => void;
     profileHref: string;
     isMobileViewport: boolean;
 };
@@ -81,6 +83,8 @@ export function NavbarProfileDropdown({
     onOpenDeposit,
     onOpenWithdraw,
     onOpenReferral,
+    onOpenEditProfile,
+    onOpenSettings,
     profileHref,
     isMobileViewport,
 }: NavbarProfileDropdownProps) {
@@ -256,8 +260,25 @@ export function NavbarProfileDropdown({
                             </MenuAction>
 
                             <MenuAction
-                                href="/settings"
-                                onClick={onClose}
+                                onClick={() => {
+                                    onClose();
+                                    onOpenEditProfile();
+                                }}
+                                icon={
+                                    <svg className="h-5 w-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536M9 11l6.586-6.586a2 2 0 112.828 2.828L11.828 13.828A4 4 0 019 15H7v-2a4 4 0 012-2z" />
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5h5M5 5v14h14v-5" />
+                                    </svg>
+                                }
+                            >
+                                Edit profile
+                            </MenuAction>
+
+                            <MenuAction
+                                onClick={() => {
+                                    onClose();
+                                    onOpenSettings();
+                                }}
                                 icon={
                                     <svg
                                         className="w-5 h-5 text-gray-500"

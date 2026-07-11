@@ -237,7 +237,7 @@ export default function ProfilePage() {
                             walletAddress={user.wallet_address}
                             bio={user.description || "No bio yet"}
                             showSettingsIcon={isOwnProfile}
-                            twitterUsername={null}
+                            twitterUsername={user.twitter_username}
                             isOwnProfile={isOwnProfile}
                             isFollowing={isFollowing}
                             followersCount={user.followers?.length ?? 0}

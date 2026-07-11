@@ -7,7 +7,7 @@ import { useUserStore } from '@/app/store/useUserStore';
 import { createUser, getUserByPubkey } from '@/app/lib/users-service/users';
 import { getDiceBearAvatarUrl } from '@/app/lib/profile-avatar';
 import { User } from '@/app/lib/users-service/users';
-import { fetchUsdcBalance as fetchUsdcTokenBalance } from '@/app/lib/token-balances';
+import { fetchRektoBalance, fetchUsdcBalance as fetchUsdcTokenBalance } from '@/app/lib/token-balances';
 
 export function useNavbar() {
   // AppKit hooks
@@ -27,6 +27,8 @@ export function useNavbar() {
   const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
   const [fundsModalMode, setFundsModalMode] = useState<'deposit' | 'withdraw'>('deposit');
   const [isReferralModalOpen, setIsReferralModalOpen] = useState(false);
+  const [isEditProfileModalOpen, setIsEditProfileModalOpen] = useState(false);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isMobileViewport, setIsMobileViewport] = useState(false);
 
   // User data
@@ -34,6 +36,7 @@ export function useNavbar() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [initializedAddress, setInitializedAddress] = useState<string | null>(null);
   const [usdcBalance, setUsdcBalance] = useState<number | null>(null);
+  const [rektoBalance, setRektoBalance] = useState<number | null>(null);
 
   // Helper: Get URL referral code
   const getRefCodeFromUrl = () => {
@@ -80,16 +83,21 @@ export function useNavbar() {
   };
 
 
-  // Fetch USDC balance
+  // Fetch tracked asset balances
   const fetchUsdcBalance = async () => {
     if (!address || !isConnected) {
       setUsdcBalance(null);
+      setRektoBalance(null);
       return;
     }
 
     try {
-      const balance = await fetchUsdcTokenBalance(address);
-      setUsdcBalance(balance);
+      const [usdc, rekto] = await Promise.all([
+        fetchUsdcTokenBalance(address).catch(() => 0),
+        fetchRektoBalance(address).catch(() => 0),
+      ]);
+      setUsdcBalance(usdc);
+      setRektoBalance(rekto);
     } catch {
       setUsdcBalance(0);
     }
@@ -150,13 +158,24 @@ export function useNavbar() {
     return () => mediaQuery.removeEventListener('change', syncViewport);
   }, []);
 
+  useEffect(() => {
+    const openSettings = () => setIsSettingsModalOpen(true);
+    const openEditProfile = () => setIsEditProfileModalOpen(true);
+    window.addEventListener('rektofun:open-settings', openSettings);
+    window.addEventListener('rektofun:open-edit-profile', openEditProfile);
+    return () => {
+      window.removeEventListener('rektofun:open-settings', openSettings);
+      window.removeEventListener('rektofun:open-edit-profile', openEditProfile);
+    };
+  }, []);
+
   // Check if route is active
   const isActive = (href: string) => {
     if (href === '/') return pathname === href;
     return pathname === href || pathname.startsWith(`${href}/`);
   };
 
-  const profileHref = address ? `/profile/${address}` : '/settings';
+  const profileHref = address ? `/profile/${address}` : '/';
 
   // Handle mobile create challenge
   const handleMobileCreateClick = () => {
@@ -195,6 +214,10 @@ export function useNavbar() {
     setFundsModalMode,
     isReferralModalOpen,
     setIsReferralModalOpen,
+    isEditProfileModalOpen,
+    setIsEditProfileModalOpen,
+    isSettingsModalOpen,
+    setIsSettingsModalOpen,
     isMobileViewport,
 
     // User data
@@ -203,6 +226,7 @@ export function useNavbar() {
     displayAddress,
     displayUsername,
     usdcBalance,
+    rektoBalance,
     fetchUsdcBalance,
 
     // Connection state
@@ -214,6 +238,7 @@ export function useNavbar() {
     handleLogout,
     handleMobileCreateClick,
     fetchUserProfile,
+    applyUserToState,
     isActive,
     profileHref,
   };

@@ -26,6 +26,7 @@ import {
   createAssociatedTokenAccountInstruction,
 } from "@solana/spl-token";
 import idl from "./rektofun_program.json";
+import { getSolanaRpcEndpoint, getTokenMintAddress } from "./solana-config";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -34,13 +35,13 @@ export const PROGRAM_ID = new PublicKey(
 );
 
 export const RPC_ENDPOINT =
-  process.env.NEXT_PUBLIC_SOLANA_RPC || "https://api.devnet.solana.com";
+  getSolanaRpcEndpoint();
 
 const sharedReadonlyConnection = new Connection(RPC_ENDPOINT, "confirmed");
 
 /** USDC mint on Solana devnet */
 export const USDC_MINT = new PublicKey(
-  "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU"
+  getTokenMintAddress("usdc")
 );
 
 /** USDC has 6 decimal places */

@@ -1,23 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Connection, PublicKey } from "@solana/web3.js";
 import {
-  REKTO_MINT_ADDRESS,
   SupportedBalanceToken,
 } from "@/app/lib/token-balances";
+import {
+  SOLANA_CLUSTER,
+  getSolanaRpcEndpoint,
+  getTokenMintAddress,
+} from "@/app/lib/solana-config";
 
 export const runtime = "nodejs";
-
-type SolanaCluster = "devnet" | "mainnet";
-
-const USDC_MINTS: Record<SolanaCluster, string> = {
-  devnet: "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
-  mainnet: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-};
-
-const DEFAULT_RPC_ENDPOINTS: Record<SolanaCluster, string> = {
-  devnet: "https://api.devnet.solana.com",
-  mainnet: "https://api.mainnet-beta.solana.com",
-};
 
 const connections = new Map<string, Connection>();
 
@@ -32,37 +24,8 @@ type ParsedTokenAccountData = {
   };
 };
 
-function getUsdcCluster(): SolanaCluster {
-  const configuredCluster = (
-    process.env.SOLANA_USDC_CLUSTER ||
-    process.env.NEXT_PUBLIC_SOLANA_USDC_CLUSTER ||
-    process.env.SOLANA_CLUSTER ||
-    process.env.NEXT_PUBLIC_SOLANA_CLUSTER ||
-    "devnet"
-  ).toLowerCase();
-
-  return configuredCluster.includes("mainnet") ? "mainnet" : "devnet";
-}
-
-function getRpcEndpoint(cluster: SolanaCluster) {
-  if (cluster === "mainnet") {
-    return (
-      process.env.SOLANA_MAINNET_RPC ||
-      process.env.NEXT_PUBLIC_SOLANA_MAINNET_RPC ||
-      DEFAULT_RPC_ENDPOINTS.mainnet
-    );
-  }
-
-  return (
-    process.env.SOLANA_DEVNET_RPC ||
-    process.env.NEXT_PUBLIC_SOLANA_DEVNET_RPC ||
-    process.env.NEXT_PUBLIC_SOLANA_RPC ||
-    DEFAULT_RPC_ENDPOINTS.devnet
-  );
-}
-
-function getConnection(cluster: SolanaCluster) {
-  const endpoint = getRpcEndpoint(cluster);
+function getConnection() {
+  const endpoint = getSolanaRpcEndpoint();
   const cachedConnection = connections.get(endpoint);
 
   if (cachedConnection) {
@@ -75,20 +38,12 @@ function getConnection(cluster: SolanaCluster) {
 }
 
 function getTokenConfig(token: SupportedBalanceToken): {
-  cluster: SolanaCluster;
+  cluster: typeof SOLANA_CLUSTER;
   mint: PublicKey;
 } {
-  if (token === "rekto") {
-    return {
-      cluster: "mainnet",
-      mint: new PublicKey(REKTO_MINT_ADDRESS),
-    };
-  }
-
-  const cluster = getUsdcCluster();
   return {
-    cluster,
-    mint: new PublicKey(USDC_MINTS[cluster]),
+    cluster: SOLANA_CLUSTER,
+    mint: new PublicKey(getTokenMintAddress(token)),
   };
 }
 
@@ -102,7 +57,7 @@ async function fetchSplTokenBalance(
   token: SupportedBalanceToken
 ) {
   const { cluster, mint } = getTokenConfig(token);
-  const connection = getConnection(cluster);
+  const connection = getConnection();
   const tokenAccounts = await connection.getParsedTokenAccountsByOwner(owner, {
     mint,
   });

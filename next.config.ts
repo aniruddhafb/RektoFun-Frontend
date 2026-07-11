@@ -2,6 +2,9 @@
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  env: {
+    NEXT_PUBLIC_SOLANA_CLUSTER: process.env.SOLANA_CLUSTER,
+  },
 
   async rewrites() {
     return {

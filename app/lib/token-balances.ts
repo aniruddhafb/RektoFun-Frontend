@@ -1,6 +1,6 @@
-export const REKTO_MINT_ADDRESS = "13QUwwFK5bMTrxZ9xhYpD8oEVizRSFk79nTQqtvFEASY";
+import { SupportedToken } from "@/app/lib/solana-config";
 
-export type SupportedBalanceToken = "rekto" | "usdc";
+export type SupportedBalanceToken = SupportedToken;
 
 type TokenBalanceResponse = {
   balance?: number;

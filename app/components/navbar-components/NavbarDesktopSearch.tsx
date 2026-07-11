@@ -494,7 +494,7 @@ export function NavbarDesktopSearch({
                                     return (
                                         <Link
                                             key={user.id}
-                                            href={user.pubkey ? `/profile/${user.pubkey}` : "/settings"}
+                                            href={user.pubkey ? `/profile/${user.pubkey}` : "/"}
                                             onClick={closeModal}
                                             className="group rounded-lg border-2 border-[#eadfd6] bg-white p-3 shadow-[2px_2px_0_rgba(17,17,17,0.08)] transition hover:-translate-y-0.5 hover:border-black hover:bg-[#fffaf6] hover:shadow-[3px_3px_0_#111] focus:outline-none focus:shadow-[0_0_0_4px_rgba(232,90,45,0.18)]"
                                         >

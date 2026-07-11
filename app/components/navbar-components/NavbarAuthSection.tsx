@@ -18,6 +18,8 @@ type NavbarAuthSectionProps = {
     onOpenDeposit: () => void;
     onOpenWithdraw: () => void;
     onOpenReferral: () => void;
+    onOpenEditProfile: () => void;
+    onOpenSettings: () => void;
     profileHref: string;
     isMobileViewport: boolean;
 };
@@ -38,6 +40,8 @@ export function NavbarAuthSection({
     onOpenDeposit,
     onOpenWithdraw,
     onOpenReferral,
+    onOpenEditProfile,
+    onOpenSettings,
     profileHref,
     isMobileViewport,
 }: NavbarAuthSectionProps) {
@@ -75,6 +79,8 @@ export function NavbarAuthSection({
                         onOpenDeposit={onOpenDeposit}
                         onOpenWithdraw={onOpenWithdraw}
                         onOpenReferral={onOpenReferral}
+                        onOpenEditProfile={onOpenEditProfile}
+                        onOpenSettings={onOpenSettings}
                         profileHref={profileHref}
                         isMobileViewport={isMobileViewport}
                     />
