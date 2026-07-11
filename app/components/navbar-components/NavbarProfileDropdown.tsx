@@ -9,6 +9,7 @@ type NavbarProfileDropdownProps = {
     displayAddress: string;
     displayUsername: string;
     displayProfileImage: string | null;
+    isXVerified: boolean;
     usdcBalance: number | null;
     isOpen: boolean;
     onClose: () => void;
@@ -73,6 +74,7 @@ export function NavbarProfileDropdown({
     displayAddress,
     displayUsername,
     displayProfileImage,
+    isXVerified,
     usdcBalance,
     isOpen,
     onClose,
@@ -165,9 +167,20 @@ export function NavbarProfileDropdown({
                                     />
                                 )}
                                 <div className="min-w-0">
-                                    <p className="font-black text-gray-900 truncate">
-                                        {displayUsername}
-                                    </p>
+                                    <div className="flex min-w-0 items-center gap-1.5">
+                                        <p className="truncate font-black text-gray-900">
+                                            {displayUsername}
+                                        </p>
+                                        {isXVerified && (
+                                            <svg className="h-4 w-4 shrink-0" viewBox="0 0 32 32" role="img" aria-label="Verified on X">
+                                                <path
+                                                    fill="#378FDB"
+                                                    d="M16 1.5l2.8 2.2 3.5-1 1.6 3.2 3.6.5.1 3.7 3 2-1.4 3.4 1.4 3.4-3 2-.1 3.7-3.6.5-1.6 3.2-3.5-1L16 30.5l-2.8-2.2-3.5 1-1.6-3.2-3.6-.5-.1-3.7-3-2 1.4-3.4-1.4-3.4 3-2 .1-3.7 3.6-.5 1.6-3.2 3.5 1L16 1.5Z"
+                                                />
+                                                <path d="m9.4 16.2 4.2 4.2 9-9" fill="none" stroke="white" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
+                                            </svg>
+                                        )}
+                                    </div>
                                     <p className="text-xs text-gray-500 font-mono truncate">
                                         {displayAddress}
                                     </p>

@@ -12,15 +12,13 @@ const SparkleIcon = ({ className }: { className?: string }) => (
     </svg>
 );
 
-const StarBadge = () => (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-        <path d="M8 1L9.5 5.5L14 6L10.5 9L11.5 13.5L8 11L4.5 13.5L5.5 9L2 6L6.5 5.5L8 1Z" fill="#f59e0b" stroke="#d97706" strokeWidth="1" />
-    </svg>
-);
-
-const DiamondIcon = () => (
-    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-        <path d="M6 2L10 6L6 10L2 6L6 2Z" fill="#9ca3af" />
+const VerifiedBadge = () => (
+    <svg className="h-4 w-4 shrink-0" viewBox="0 0 32 32" aria-hidden="true">
+        <path
+            fill="#378FDB"
+            d="M16 1.5l2.8 2.2 3.5-1 1.6 3.2 3.6.5.1 3.7 3 2-1.4 3.4 1.4 3.4-3 2-.1 3.7-3.6.5-1.6 3.2-3.5-1L16 30.5l-2.8-2.2-3.5 1-1.6-3.2-3.6-.5-.1-3.7-3-2 1.4-3.4-1.4-3.4 3-2 .1-3.7 3.6-.5 1.6-3.2 3.5 1L16 1.5Z"
+        />
+        <path d="m9.4 16.2 4.2 4.2 9-9" fill="none" stroke="white" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
 );
 
@@ -78,6 +76,7 @@ type LeaderboardRow = {
     walletAddress: string;
     rank: number;
     username: string;
+    twitterUsername: string | null;
     avatar: string;
     winRate: number;
     winRateLabel: string;
@@ -113,6 +112,7 @@ function mapUserToRow(user: LeaderboardUser, rank: number): LeaderboardRow {
         walletAddress: user.wallet_address,
         rank,
         username: user.username || `user-${user.wallet_address.slice(0, 6)}`,
+        twitterUsername: user.twitter_username,
         avatar: user.profile_image || "/scribbles/pepe.png",
         winRate,
         winRateLabel,
@@ -371,15 +371,20 @@ export default function LeaderboardPage() {
                                             <span className={`flex h-8 min-w-8 items-center justify-center rounded-full border px-2 text-sm font-black ${getRankBadgeClass(user.rank)}`}>
                                                 {user.rank}
                                             </span>
-                                            {user.rank === 1 ? <StarBadge /> : <DiamondIcon />}
                                         </div>
 
                                         <div className="col-span-3 flex items-center gap-3">
                                             <div className="relative w-10 h-10 rounded-full overflow-hidden bg-gray-200 border-2 border-white shadow-sm flex-shrink-0">
                                                 <Image src={user.avatar} alt={user.username} fill className="object-cover" sizes="40px" />
                                             </div>
-                                            <div className="flex items-center gap-1.5 min-w-0">
+                                            <div className="flex min-w-0 flex-col">
                                                 <span className="font-semibold text-gray-900 truncate">{user.username}</span>
+                                                {user.twitterUsername && (
+                                                    <span className="flex min-w-0 items-center gap-1 text-xs font-semibold text-gray-500" title={`Verified on X as @${user.twitterUsername}`}>
+                                                        <span className="truncate">@{user.twitterUsername}</span>
+                                                        <VerifiedBadge />
+                                                    </span>
+                                                )}
                                             </div>
                                         </div>
 

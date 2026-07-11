@@ -88,6 +88,7 @@ export default function Navbar() {
                             displayAddress={displayAddress || ""}
                             displayUsername={displayUsername}
                             displayProfileImage={userProfileData?.profileImage || null}
+                            isXVerified={Boolean(currentUser?.twitter_username)}
                             usdcBalance={usdcBalance}
                             isDropdownOpen={isDropdownOpen}
                             onAuth={handleConnect}
