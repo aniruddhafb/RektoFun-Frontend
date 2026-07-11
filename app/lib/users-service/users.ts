@@ -41,10 +41,19 @@ export interface User {
   user_type: "user" | "moderator";
 }
 
+export type LeaderboardPeriod = "1d" | "7d" | "30d" | "all";
+export type LeaderboardSort = "rank" | "win_rate" | "won" | "lost" | "pnl" | "volume";
+
 export type LeaderboardUser = Omit<User, "id" | "followers" | "following"> & {
   id: string;
   followers: string[];
   following: string[];
+  rank: number;
+  won: number;
+  lost: number;
+  win_rate: number;
+  pnl: number;
+  volume: number;
 };
 
 export interface GetUsersResponse {
@@ -55,6 +64,13 @@ export interface GetUsersResponse {
 export interface LeaderboardResponse {
   users: LeaderboardUser[];
   count: number;
+  period: LeaderboardPeriod;
+  summary: {
+    total_users: number;
+    total_challenges: number;
+    total_volume: number;
+    total_pnl: number;
+  };
 }
 
 export interface GetUsersParams {
@@ -253,11 +269,18 @@ export async function getLeaderboard(
   limit = 100,
   offset = 0,
   search?: string,
+  period: LeaderboardPeriod = "all",
+  sort: LeaderboardSort = "pnl",
+  order: "asc" | "desc" = "desc",
 ): Promise<LeaderboardResponse> {
   const queryParams = new URLSearchParams();
 
   queryParams.append("limit", limit.toString());
   queryParams.append("offset", offset.toString());
+  queryParams.append("period", period);
+  queryParams.append("sort", sort);
+  queryParams.append("order", order);
+  if (search?.trim()) queryParams.append("search", search.trim());
 
   const response = await fetch(`${API_BASE_URL}/users/leaderboard?${queryParams.toString()}`, {
     method: "GET",
@@ -271,26 +294,20 @@ export async function getLeaderboard(
   }
 
   const data = await response.json();
-  const leaderboardResponse: { users: User[]; total: number } = {
-    users: ((data.users || []) as BackendUser[]).map(normalizeUser),
-    total: data.total || 0,
-  };
-  const normalizedSearch = search?.trim().toLowerCase();
-  const users = normalizedSearch
-    ? leaderboardResponse.users.filter((user) =>
-        user.username.toLowerCase().includes(normalizedSearch) ||
-        user.wallet_address.toLowerCase().includes(normalizedSearch),
-      )
-    : leaderboardResponse.users;
+  const users = (data.users || []).map((rawUser: BackendUser & {
+    rank: number; won: number; lost: number; win_rate: number; pnl: number; volume: number;
+  }) => ({ ...normalizeUser(rawUser), ...rawUser }));
 
   return {
-    users: users.map((user) => ({
+    users: users.map((user: User & { rank: number; won: number; lost: number; win_rate: number; pnl: number; volume: number }) => ({
       ...user,
       id: String(user.id),
       followers: (user.followers || []).map(String),
       following: (user.following || []).map(String),
     })),
-    count: normalizedSearch ? users.length : leaderboardResponse.total,
+    count: data.total || 0,
+    period: data.period || period,
+    summary: data.summary || { total_users: 0, total_challenges: 0, total_volume: 0, total_pnl: 0 },
   };
 }
 
