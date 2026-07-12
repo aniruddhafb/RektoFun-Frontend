@@ -4,6 +4,7 @@ export interface CreateUserParams {
   pubkey?: string;
   wallet_address?: string;
   profile_image?: string;
+  twitter_profile_image?: string | null;
   bio?: string;
   description?: string;
   twitter_username?: string | null;
@@ -16,6 +17,7 @@ export interface UpdateUserParams {
   pubkey?: string;
   wallet_address?: string;
   profile_image?: string;
+  twitter_profile_image?: string | null;
   bio?: string;
   description?: string;
   twitter_username?: string | null;
@@ -28,6 +30,7 @@ export interface User {
   pubkey: string;
   wallet_address: string;
   profile_image: string;
+  twitter_profile_image: string | null;
   bio: string;
   description: string;
   twitter_username: string | null;
@@ -92,6 +95,7 @@ type BackendUser = {
   pubkey?: string | null;
   wallet_address?: string | null;
   profile_image?: string | null;
+  twitter_profile_image?: string | null;
   bio?: string | null;
   description?: string | null;
   twitter_username?: string | null;
@@ -116,6 +120,7 @@ function normalizeUser(user: BackendUser): User {
     pubkey: user.pubkey || walletAddress,
     wallet_address: walletAddress,
     profile_image: user.profile_image || "",
+    twitter_profile_image: user.twitter_profile_image || null,
     bio,
     description: bio,
     twitter_username: user.twitter_username || null,
@@ -136,6 +141,7 @@ function toBackendUserPayload(params: CreateUserParams | UpdateUserParams) {
     email: params.email,
     pubkey: params.pubkey || params.wallet_address,
     profile_image: params.profile_image,
+    twitter_profile_image: params.twitter_profile_image,
     bio: params.bio ?? params.description,
     twitter_username: params.twitter_username,
     referrer_code: "referrer_code" in params ? params.referrer_code : undefined,

@@ -72,6 +72,12 @@ export function CreateProfileModal({ isOpen, user, onClose, onSaved }: EditProfi
     setProfileImage(getDiceBearAvatarUrl());
   };
 
+  const useXProfileImage = () => {
+    if (!user.twitter_profile_image) return;
+    setIsAvatarLoading(true);
+    setProfileImage(user.twitter_profile_image);
+  };
+
   const linkXAccount = async () => {
     if (!address || !walletProvider) {
       setError("Connect your Solana wallet before linking X.");
@@ -146,11 +152,18 @@ export function CreateProfileModal({ isOpen, user, onClose, onSaved }: EditProfi
                 </div>
               )}
             </div>
-            <div>
+            <div className="min-w-0">
               <p className="text-sm font-black text-gray-900">Profile image</p>
-              <button type="button" onClick={randomizeProfile} className="mt-2 cursor-pointer rounded-md border-2 border-black bg-[#f5d547] px-3 py-2 text-xs font-black">
-                Randomize avatar
-              </button>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <button type="button" onClick={randomizeProfile} className="cursor-pointer rounded-md border-2 border-black bg-[#f5d547] px-3 py-2 text-xs font-black">
+                  Randomize avatar
+                </button>
+                {user.twitter_username && user.twitter_profile_image && (
+                  <button type="button" onClick={useXProfileImage} className="cursor-pointer rounded-md border-2 border-black bg-black px-3 py-2 text-xs font-black text-white">
+                    Use X profile
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 

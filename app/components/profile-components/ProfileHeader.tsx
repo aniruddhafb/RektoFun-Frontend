@@ -3,6 +3,7 @@
 import React from "react";
 import Image from "next/image";
 import dayjs from "dayjs";
+import { ShareProfileModal } from "./ShareProfileModal";
 
 interface ProfileHeaderProps {
     username: string;
@@ -20,6 +21,8 @@ interface ProfileHeaderProps {
         rekts: number;
         totalChallenges: number;
         winRatio: number;
+        pnl: number;
+        volume: number;
     };
     twitterUsername?: string | null;
     isOwnProfile?: boolean;
@@ -69,29 +72,12 @@ export function ProfileHeader({
     isUsdcBalanceLoading = false,
 }: ProfileHeaderProps) {
     const [walletCopied, setWalletCopied] = React.useState(false);
-    const [profileCopied, setProfileCopied] = React.useState(false);
+    const [isShareModalOpen, setIsShareModalOpen] = React.useState(false);
 
-    const copyToClipboard = (text: string, type: 'wallet' | 'profile') => {
+    const copyToClipboard = (text: string) => {
         navigator.clipboard.writeText(text);
-        if (type === 'wallet') {
-            setWalletCopied(true);
-            setTimeout(() => setWalletCopied(false), 2000);
-        } else {
-            setProfileCopied(true);
-            setTimeout(() => setProfileCopied(false), 2000);
-        }
-    };
-
-    const shareProfile = () => {
-        const profileUrl = `${window.location.origin}/profile/${username}`;
-        if (navigator.share) {
-            navigator.share({
-                title: `${username}'s Profile`,
-                url: profileUrl,
-            });
-        } else {
-            copyToClipboard(profileUrl, 'profile');
-        }
+        setWalletCopied(true);
+        setTimeout(() => setWalletCopied(false), 2000);
     };
 
     const truncatedAddress = walletAddress.length > 16
@@ -214,7 +200,7 @@ export function ProfileHeader({
                         </div>
                         <button
                             className="p-1.5 rounded-lg bg-gray-100/80 border border-gray-200/50 text-gray-500 hover:text-orange-600 hover:bg-orange-50 hover:border-orange-200 transition-all duration-200 active:scale-95"
-                            onClick={() => copyToClipboard(walletAddress, 'wallet')}
+                            onClick={() => copyToClipboard(walletAddress)}
                             title={walletCopied ? "Copied!" : "Copy address"}
                         >
                             {walletCopied ? (
@@ -241,29 +227,20 @@ export function ProfileHeader({
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                             </svg>
-                            Joined {dayjs(joinedDate).format("MMM YYYY")}
+                            Joined {dayjs(joinedDate).format("D MMMM YYYY")}
                         </div>
 
                         {/* Share Button */}
                         <button
                             className="w-full sm:w-auto cursor-pointer group px-3 sm:px-4 py-2.5 sm:py-2 bg-orange-400 rounded-xl text-sm sm:text-sm font-semibold text-white hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 flex items-center justify-center gap-2"
-                            onClick={shareProfile}
+                            onClick={() => setIsShareModalOpen(true)}
                         >
-                            {profileCopied ? (
-                                <>
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                    </svg>
-                                    Copied!
-                                </>
-                            ) : (
                                 <>
                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
                                     </svg>
                                     Share Profile
                                 </>
-                            )}
                         </button>
                     </div>
                 </div>
@@ -350,6 +327,7 @@ export function ProfileHeader({
                     </div>
                 </div>
             </div>
+            <ShareProfileModal isOpen={isShareModalOpen} onClose={() => setIsShareModalOpen(false)} username={username} avatar={avatar} verified={!!twitterUsername} stats={stats} />
         </div>
     );
 }

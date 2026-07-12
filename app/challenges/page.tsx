@@ -2,14 +2,14 @@
 
 export const dynamic = 'force-dynamic';
 
-import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import { ChallengeHeader } from "../components/challenge-components/ChallengeHeader";
 import { ChallengeFiltersSection } from "../components/challenge-components/ChallengeFiltersSection";
 import { FeedbackBanner } from "../components/challenge-components/FeedbackBanner";
 import { ChallengeGrid } from "../components/challenge-components/ChallengeGrid";
 import { RektLoadingOverlay } from "../components/RektLoadingOverlay";
 import { CreateChallengeModal } from "../components/challenge-components/CreateChallengeModal";
-import { Challenge } from "../lib/challenges-service/challenges";
+import { Challenge, getChallengeById } from "../lib/challenges-service/challenges";
 import ChallengeDetailModal from "../components/challenge-components/ChallengeDetailModal";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
@@ -28,7 +28,6 @@ function ChallengesPageContent() {
   const [rektTxSig, setRektTxSig] = useState<string | null>(null);
   const [rektError, setRektError] = useState<string | null>(null);
   const [isRekting, setIsRekting] = useState(false);
-  const [ignoreDeepLink, setIgnoreDeepLink] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [showCreateSuccessToast, setShowCreateSuccessToast] = useState(false);
   const [createToastProgress, setCreateToastProgress] = useState(100);
@@ -48,7 +47,6 @@ function ChallengesPageContent() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const lastClosedDeepLinkIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     try {
@@ -81,16 +79,6 @@ function ChallengesPageContent() {
 
   // Close detail modal handler
   const closeDetailModal = () => {
-    setIgnoreDeepLink(true);
-
-    const activeDeepLinkId =
-      typeof window !== "undefined"
-        ? new URLSearchParams(window.location.search).get("challengeId")
-        : null;
-    if (activeDeepLinkId) {
-      lastClosedDeepLinkIdRef.current = activeDeepLinkId;
-    }
-
     const nextParams =
       typeof window !== "undefined"
         ? new URLSearchParams(window.location.search)
@@ -103,7 +91,6 @@ function ChallengesPageContent() {
     setIsDetailModalOpen(false);
     setSelectedChallenge(null);
 
-    window.setTimeout(() => setIgnoreDeepLink(false), 200);
   };
 
   const handleChallengesLoaded = (loadedChallenges: Challenge[]) => {
@@ -147,17 +134,44 @@ function ChallengesPageContent() {
   }, []);
 
   useEffect(() => {
+    const challengeId = searchParams.get("challengeId");
+    if (!challengeId) return;
+
+    const numericChallengeId = Number(challengeId);
+    if (!Number.isInteger(numericChallengeId) || numericChallengeId <= 0) return;
+
+    let cancelled = false;
+    getChallengeById(numericChallengeId)
+      .then((challenge) => {
+        if (cancelled) return;
+        setSelectedChallenge(challenge);
+        setIsDetailModalOpen(true);
+      })
+      .catch((challengeError) => {
+        console.error("Failed to open shared challenge:", challengeError);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [searchParams]);
+
+  useEffect(() => {
     const shouldOpenCreateModal = searchParams.get("create") === "1";
     if (!shouldOpenCreateModal) return;
 
-    setIsCreateModalOpen(true);
+    window.setTimeout(() => {
+      setIsDetailModalOpen(false);
+      setSelectedChallenge(null);
+      setIsCreateModalOpen(true);
+    }, 0);
 
     const params = new URLSearchParams(searchParams.toString());
     params.delete("create");
     const nextQuery = params.toString();
     const nextUrl = nextQuery ? `${pathname}?${nextQuery}` : pathname;
     router.replace(nextUrl, { scroll: false });
-  }, []);
+  }, [pathname, router, searchParams]);
 
   return (
     <div className="relative min-h-[calc(100vh-5rem)] overflow-hidden bg-[#f3e1d7] pb-10 sm:pb-16">

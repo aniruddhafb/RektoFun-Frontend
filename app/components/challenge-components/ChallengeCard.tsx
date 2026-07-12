@@ -5,6 +5,7 @@ import Image from "next/image";
 import { AcceptChallengeModal } from "./AcceptChallengeModal";
 import { useChallengeCard } from "@/app/hooks/useChallengeCard";
 import { Challenge } from "@/app/lib/challenges-service/challenges";
+import { ShareChallengeModal } from "./ShareChallengeModal";
 
 interface ChallengeCardProps {
     challenge: Challenge;
@@ -24,6 +25,7 @@ export function ChallengeCard({
     isBookmarked = false,
     showPin = true,
 }: ChallengeCardProps) {
+    const [isShareModalOpen, setIsShareModalOpen] = React.useState(false);
     const {
         isLoading,
         isBetFormOpen,
@@ -37,10 +39,8 @@ export function ChallengeCard({
         closeBetForm,
         openProfile,
         handleJoinChallenge,
-        handleShareChallenge,
         assetIcon,
         assetName,
-        assetSymbol,
         creatorDisplayName,
         creatorProfileImage,
         creatorWalletAddress,
@@ -91,6 +91,12 @@ export function ChallengeCard({
         } else if (onRekt) {
             window.setTimeout(() => onRekt(challenge), 0);
         }
+    };
+
+    const openShareModal = (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsShareModalOpen(true);
     };
 
     const handleJoinChallengeWrapper = async (e: React.SubmitEvent<HTMLFormElement>) => {
@@ -563,7 +569,7 @@ export function ChallengeCard({
                     </div>
                     <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-3">
                         <div
-                            onClick={handleShareChallenge}
+                            onClick={openShareModal}
                             className="flex flex-col items-center p-2 rounded-lg transition-colors cursor-pointer"
                             title="Share challenge link"
                             aria-label="Share challenge link"
@@ -612,6 +618,7 @@ export function ChallengeCard({
                     }
                 }
             `}</style>
+            <ShareChallengeModal challenge={challenge} isOpen={isShareModalOpen} onClose={() => setIsShareModalOpen(false)} />
         </>
     );
 }

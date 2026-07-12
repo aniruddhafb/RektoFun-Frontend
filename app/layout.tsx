@@ -56,9 +56,9 @@ export const metadata: Metadata = {
     },
   },
   icons: {
-    icon: "/fav.png",
-    shortcut: "/fav.png",
-    apple: "/fav.png",
+    icon: "/fav_old.png",
+    shortcut: "/fav_old.png",
+    apple: "/fav_old.png",
   },
   manifest: "/manifest.json",
   verification: {
@@ -80,9 +80,9 @@ export default function RootLayout({
           href="https://fonts.cdnfonts.com/css/craftwork-grotesk"
           rel="stylesheet"
         />
-        <link rel="icon" type="image/png" href="/fav.png" />
-        <link rel="shortcut icon" type="image/png" href="/fav.png" />
-        <link rel="apple-touch-icon" href="/fav.png" />
+        <link rel="icon" type="image/png" href="/fav_old.png" />
+        <link rel="shortcut icon" type="image/png" href="/fav_old.png" />
+        <link rel="apple-touch-icon" href="/fav_old.png" />
         <meta name="theme-color" content="#f3e1d7" />
         <meta name="msapplication-TileColor" content="#f3e1d7" />
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />

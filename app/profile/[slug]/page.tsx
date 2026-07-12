@@ -11,7 +11,7 @@ import {
     ProfileActivity,
 } from "@/app/components/profile-components";
 import { LoadingPage } from "@/app/components/LoadingPage";
-import { followUser, getUserByWallet, unfollowUser, User } from "@/app/lib/users-service/users";
+import { followUser, getLeaderboard, getUserByWallet, LeaderboardUser, unfollowUser, User } from "@/app/lib/users-service/users";
 import { useUserStore } from "@/app/store/useUserStore";
 import {
     Challenge,
@@ -42,6 +42,7 @@ export default function ProfilePage() {
     const [isRektoBalanceLoading, setIsRektoBalanceLoading] = useState(true);
     const [usdcBalance, setUsdcBalance] = useState(0);
     const [isUsdcBalanceLoading, setIsUsdcBalanceLoading] = useState(true);
+    const [profileMetrics, setProfileMetrics] = useState<LeaderboardUser | null>(null);
 
     const isOwnProfile = connectedWalletAddress?.toLowerCase() === user?.wallet_address?.toLowerCase();
     const isFollowing = !!(currentUser?.id && user?.followers?.includes(currentUser.id));
@@ -67,6 +68,15 @@ export default function ProfilePage() {
 
         fetchUser();
     }, [walletFromSlug]);
+
+    useEffect(() => {
+        if (!user) return;
+        let cancelled = false;
+        getLeaderboard(10, 0, user.username, "all").then(({ users }) => {
+            if (!cancelled) setProfileMetrics(users.find(item => item.wallet_address.toLowerCase() === user.wallet_address.toLowerCase()) || null);
+        }).catch(() => { if (!cancelled) setProfileMetrics(null); });
+        return () => { cancelled = true; };
+    }, [user]);
 
     // Fetch challenges created by this user
     useEffect(() => {
@@ -221,6 +231,8 @@ export default function ProfilePage() {
                                 rekts: 0,
                                 totalChallenges: 0,
                                 winRatio: 0,
+                                pnl: 0,
+                                volume: 0,
                             }}
                         />
                         <div className="rekto-surface mt-6 p-4 bg-orange-100/50 backdrop-blur-sm rounded-2xl border border-orange-200/50 text-center">
@@ -242,7 +254,7 @@ export default function ProfilePage() {
                             isFollowing={isFollowing}
                             followersCount={user.followers?.length ?? 0}
                             followingCount={user.following?.length ?? 0}
-                            onToggleFollow={handleToggleFollow}
+                            onToggleFollow={connectedWalletAddress ? handleToggleFollow : undefined}
                             isFollowActionLoading={isFollowActionLoading}
                             joinedDate={user.created_at}
                             balance={{
@@ -253,10 +265,12 @@ export default function ProfilePage() {
                             isRektoBalanceLoading={isRektoBalanceLoading}
                             isUsdcBalanceLoading={isUsdcBalanceLoading}
                             stats={{
-                                wins: userChallenges.filter((c) => c.status === "resolved").length,
-                                rekts: 0,
+                                wins: profileMetrics?.won ?? 0,
+                                rekts: profileMetrics?.lost ?? 0,
                                 totalChallenges: userChallenges.length,
-                                winRatio: 0,
+                                winRatio: profileMetrics?.win_rate ?? 0,
+                                pnl: profileMetrics?.pnl ?? 0,
+                                volume: profileMetrics?.volume ?? 0,
                             }}
                         />
 

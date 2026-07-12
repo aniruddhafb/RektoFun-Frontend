@@ -181,6 +181,7 @@ export function useNavbar() {
   const handleMobileCreateClick = () => {
     if (pathname === '/challenges') {
       const params = new URLSearchParams(window.location.search);
+      params.delete('challengeId');
       params.set('create', '1');
       router.replace(pathname + (params.toString() ? `?${params.toString()}` : ''), { scroll: false });
     } else {
