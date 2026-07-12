@@ -588,8 +588,11 @@ export default function ActivityPage() {
                     )}
 
                     {!isInitialLoading && !error && filteredActivities.length === 0 && (
-                        <div className="rounded-2xl border border-[#ead7ca] bg-white/80 p-6 text-[#5c4a42]">
-                            {activities.length === 0 ? "No activity yet." : "No activity found."}
+                        <div className="mx-auto max-w-2xl px-6 py-10 text-center sm:py-12">
+                            <div className="mx-auto flex h-14 w-14 items-center justify-center border border-black/15 bg-[#f5d547] shadow-[3px_3px_0_#111]">
+                                <Clock className="h-7 w-7 text-black" aria-hidden="true" />
+                            </div>
+                            <h2 className="mt-6 text-xl font-black text-gray-950 sm:text-2xl">No activity found</h2>
                         </div>
                     )}
 

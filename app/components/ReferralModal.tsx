@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useAppKit, useAppKitAccount } from "@reown/appkit/react";
-import { Check, Copy, Crown, Gift, Loader2, Medal, Sparkles, Trophy, Users, X } from "lucide-react";
-import { acceptReferral, getLeaderboard, getUserByWallet, type LeaderboardUser, type User } from "@/app/lib/users-service/users";
+import { Check, Copy, Crown, History, Loader2, Medal, Sparkles, Trophy, Users, X } from "lucide-react";
+import { getLeaderboard, getReferralHistory, getUserByWallet, requestReferralRedemption, type LeaderboardUser, type ReferralHistory, type User } from "@/app/lib/users-service/users";
 import { useBodyScrollLock } from "@/app/lib/useBodyScrollLock";
 
 type ReferralModalProps = {
@@ -42,9 +42,12 @@ export function ReferralModal({ isOpen, onClose }: ReferralModalProps) {
   const [isLoadingLeaderboard, setIsLoadingLeaderboard] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const [redeemCode, setRedeemCode] = useState("");
   const [isRedeeming, setIsRedeeming] = useState(false);
-  const [redeemMessage, setRedeemMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [redeemMessage, setRedeemMessage] = useState<string | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
+  const [history, setHistory] = useState<ReferralHistory | null>(null);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [historyTab, setHistoryTab] = useState<"commissions" | "withdrawals">("commissions");
 
   useBodyScrollLock(isOpen);
 
@@ -105,12 +108,16 @@ export function ReferralModal({ isOpen, onClose }: ReferralModalProps) {
   }, [isOpen, showLeaderboard]);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {
-      loadUser();
-    }, 0);
+    const timer = window.setTimeout(loadUser, 0);
+    const refreshTimer = isOpen && isConnected
+      ? window.setInterval(loadUser, 15_000)
+      : undefined;
 
-    return () => window.clearTimeout(timer);
-  }, [loadUser]);
+    return () => {
+      window.clearTimeout(timer);
+      if (refreshTimer) window.clearInterval(refreshTimer);
+    };
+  }, [isConnected, isOpen, loadUser]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -137,8 +144,6 @@ export function ReferralModal({ isOpen, onClose }: ReferralModalProps) {
     const timer = window.setTimeout(() => {
       setCopied(false);
       setShowLeaderboard(false);
-      setRedeemCode("");
-      setRedeemMessage(null);
     }, 0);
 
     return () => window.clearTimeout(timer);
@@ -153,23 +158,28 @@ export function ReferralModal({ isOpen, onClose }: ReferralModalProps) {
   };
 
   const handleRedeem = async () => {
-    const code = redeemCode.trim().toUpperCase();
-    if (!address || !code) return;
-
+    if (!address || totalEarned < 5) return;
     try {
       setIsRedeeming(true);
       setRedeemMessage(null);
-      const updatedUser = await acceptReferral(address, code);
-      setUser(updatedUser);
-      setRedeemCode("");
-      setRedeemMessage({ type: "success", text: "Referral code redeemed successfully." });
+      setUser(await requestReferralRedemption(address));
+      setRedeemMessage("Redemption request submitted.");
     } catch (redeemError) {
-      setRedeemMessage({
-        type: "error",
-        text: redeemError instanceof Error ? redeemError.message : "Unable to redeem this referral code.",
-      });
+      setRedeemMessage(redeemError instanceof Error ? redeemError.message : "Unable to submit request.");
     } finally {
       setIsRedeeming(false);
+    }
+  };
+
+  const handleHistory = async () => {
+    const nextOpen = !showHistory;
+    setShowHistory(nextOpen);
+    if (!nextOpen || !address) return;
+    try {
+      setIsLoadingHistory(true);
+      setHistory(await getReferralHistory(address));
+    } finally {
+      setIsLoadingHistory(false);
     }
   };
 
@@ -224,9 +234,22 @@ export function ReferralModal({ isOpen, onClose }: ReferralModalProps) {
             <>
               <div className="mb-4 grid grid-cols-2 gap-3">
                 <div className="rounded-lg border border-[#ead7cc] bg-white p-4">
-                  <p className="text-xs font-black uppercase tracking-[0.08em] text-[#7c6a60]">Total earned</p>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs font-black uppercase tracking-[0.08em] text-[#7c6a60]">Total earned</p>
+                    {isConnected && (
+                      <button type="button" onClick={handleHistory} aria-label="View referral history" title="Referral history" className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-[#7c6a60] transition hover:bg-[#ffe8db] hover:text-[#e85a2d]">
+                        <History className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
                   <p className="mt-2 text-2xl font-black text-gray-950">{formatUsdc(totalEarned)}</p>
                   <p className="mt-1 text-xs font-semibold text-gray-500">USDC rewards</p>
+                  {totalEarned >= 5 && (
+                    <button type="button" onClick={handleRedeem} disabled={isRedeeming} className="mt-3 inline-flex h-9 w-full cursor-pointer items-center justify-center rounded-md bg-gray-900 px-3 text-xs font-black text-white transition hover:bg-[#e85a2d] disabled:cursor-not-allowed disabled:opacity-50">
+                      {isRedeeming ? <Loader2 className="h-4 w-4 animate-spin" /> : "Redeem earnings"}
+                    </button>
+                  )}
+                  {redeemMessage && <p className="mt-2 text-xs font-bold text-emerald-700">{redeemMessage}</p>}
                 </div>
                 <div className="rounded-lg border border-[#ead7cc] bg-white p-4">
                   <p className="text-xs font-black uppercase tracking-[0.08em] text-[#7c6a60]">Invites</p>
@@ -269,38 +292,49 @@ export function ReferralModal({ isOpen, onClose }: ReferralModalProps) {
                     </div>
                   </div>
 
-                  <div className="mb-4 rounded-lg border border-[#ead7cc] bg-white p-4">
-                    <div className="mb-2 flex items-center gap-2">
-                      <Gift className="h-4 w-4 text-[#e85a2d]" strokeWidth={2.6} />
-                      <p className="text-xs font-black uppercase tracking-[0.08em] text-[#7c6a60]">Redeem a referral code</p>
-                    </div>
-                    {user?.referred_by ? (
-                      <div className="flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm font-bold text-emerald-700">
-                        <Check className="h-4 w-4 shrink-0" /> Code {user.referred_by} redeemed
-                      </div>
-                    ) : (
-                      <div className="flex gap-2">
-                        <input
-                          value={redeemCode}
-                          onChange={(event) => setRedeemCode(event.target.value.toUpperCase())}
-                          onKeyDown={(event) => event.key === "Enter" && handleRedeem()}
-                          placeholder="Enter code"
-                          aria-label="Referral code"
-                          maxLength={32}
-                          className="h-10 min-w-0 flex-1 rounded-md border border-[#d7c5ba] bg-[#fffaf7] px-3 text-sm font-black uppercase tracking-wide text-gray-900 outline-none transition placeholder:font-semibold placeholder:normal-case placeholder:tracking-normal focus:border-gray-900 focus:ring-2 focus:ring-[#f5d547]/50"
-                        />
-                        <button type="button" onClick={handleRedeem} disabled={!redeemCode.trim() || isRedeeming} className="inline-flex h-10 items-center justify-center rounded-md bg-gray-900 px-4 text-sm font-black text-white transition hover:bg-[#e85a2d] disabled:cursor-not-allowed disabled:opacity-50">
-                          {isRedeeming ? <Loader2 className="h-4 w-4 animate-spin" /> : "Redeem"}
-                        </button>
-                      </div>
-                    )}
-                    {redeemMessage && <p className={`mt-2 text-xs font-bold ${redeemMessage.type === "success" ? "text-emerald-700" : "text-red-600"}`}>{redeemMessage.text}</p>}
-                  </div>
-
                   {error && <p className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">{error}</p>}
                 </>
               )}
             </>
+          )}
+
+          {showHistory && (
+            <div className="mb-4 rounded-lg border border-[#ead7cc] bg-white p-4">
+              <p className="mb-3 text-xs font-black uppercase tracking-[0.08em] text-[#7c6a60]">Referral history</p>
+              <div className="mb-3 grid grid-cols-2 rounded-md bg-[#f5e9e2] p-1">
+                <button type="button" onClick={() => setHistoryTab("commissions")} className={`h-8 cursor-pointer rounded text-xs font-black transition ${historyTab === "commissions" ? "bg-white text-gray-950 shadow-sm" : "text-[#7c6a60] hover:text-gray-950"}`}>
+                  Commission
+                </button>
+                <button type="button" onClick={() => setHistoryTab("withdrawals")} className={`h-8 cursor-pointer rounded text-xs font-black transition ${historyTab === "withdrawals" ? "bg-white text-gray-950 shadow-sm" : "text-[#7c6a60] hover:text-gray-950"}`}>
+                  Withdrawals
+                </button>
+              </div>
+              {isLoadingHistory ? (
+                <div className="flex justify-center py-5"><Loader2 className="h-5 w-5 animate-spin text-[#e85a2d]" /></div>
+              ) : (
+                <div className="referral-history-scrollbar max-h-48 overflow-y-auto pr-1">
+                  {historyTab === "commissions" ? (
+                    <div>
+                    {history?.commissions.length ? history.commissions.map((item, index) => (
+                      <div key={`${item.created_at}-${index}`} className="flex justify-between gap-3 border-t border-[#f0e3dc] py-2 text-xs">
+                        <span className="font-semibold text-gray-500">{new Date(item.created_at).toLocaleString()}</span>
+                        <span className="font-black text-emerald-700">+{Number(item.amount).toFixed(2)} USDC</span>
+                      </div>
+                    )) : <p className="text-xs font-semibold text-gray-500">No commissions yet.</p>}
+                    </div>
+                  ) : (
+                    <div>
+                    {history?.redemptions.length ? history.redemptions.map((item, index) => (
+                      <div key={`${item.requested_at}-${index}`} className="flex justify-between gap-3 border-t border-[#f0e3dc] py-2 text-xs">
+                        <span className="font-semibold text-gray-500">{new Date(item.requested_at).toLocaleString()}</span>
+                        <span className="text-right font-black text-gray-900">{Number(item.amount).toFixed(2)} USDC <span className="block text-[10px] uppercase text-[#e85a2d]">{item.status}</span></span>
+                      </div>
+                    )) : <p className="text-xs font-semibold text-gray-500">No withdrawals yet.</p>}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           )}
 
           <div className="flex items-center justify-between gap-4 rounded-lg border border-[#e2c8ba] bg-gradient-to-r from-white to-[#fff0e8] p-4 shadow-[0_3px_0_#ead7cc]">
@@ -330,6 +364,7 @@ export function ReferralModal({ isOpen, onClose }: ReferralModalProps) {
                 <div><p className="text-sm font-black">Referral champions</p><p className="text-[11px] font-semibold text-white/65">Most successful community builders</p></div>
                 <Crown className="h-5 w-5 text-[#f5d547]" fill="currentColor" />
               </div>
+
               {isLoadingLeaderboard ? (
                 <div className="flex items-center justify-center gap-2 px-4 py-6 text-sm font-bold text-gray-500">
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -370,23 +405,27 @@ export function ReferralModal({ isOpen, onClose }: ReferralModalProps) {
       </div>
       <style jsx global>{`
         .referral-modal-scrollbar,
-        .referral-leaderboard-scrollbar {
+        .referral-leaderboard-scrollbar,
+        .referral-history-scrollbar {
           scrollbar-width: thin;
           scrollbar-color: #d7c5ba transparent;
         }
 
         .referral-modal-scrollbar::-webkit-scrollbar,
-        .referral-leaderboard-scrollbar::-webkit-scrollbar {
+        .referral-leaderboard-scrollbar::-webkit-scrollbar,
+        .referral-history-scrollbar::-webkit-scrollbar {
           width: 4px;
         }
 
         .referral-modal-scrollbar::-webkit-scrollbar-track,
-        .referral-leaderboard-scrollbar::-webkit-scrollbar-track {
+        .referral-leaderboard-scrollbar::-webkit-scrollbar-track,
+        .referral-history-scrollbar::-webkit-scrollbar-track {
           background: transparent;
         }
 
         .referral-modal-scrollbar::-webkit-scrollbar-thumb,
-        .referral-leaderboard-scrollbar::-webkit-scrollbar-thumb {
+        .referral-leaderboard-scrollbar::-webkit-scrollbar-thumb,
+        .referral-history-scrollbar::-webkit-scrollbar-thumb {
           background: #d7c5ba;
           border-radius: 999px;
         }

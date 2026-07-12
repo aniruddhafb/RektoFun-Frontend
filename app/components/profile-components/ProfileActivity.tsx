@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { ChevronRight } from "lucide-react";
 import {
@@ -14,6 +14,8 @@ interface ProfileActivityProps {
     avatar?: string;
     isOwnProfile?: boolean;
     onActivityClick?: (challenge: Challenge) => void;
+    searchQuery: string;
+    sortOrder: "latest" | "oldest";
 }
 
 const PAGE_SIZE = 10;
@@ -76,13 +78,23 @@ function ActivitySkeleton({ id }: { id: string }) {
     );
 }
 
-export function ProfileActivity({ userId, username, avatar, onActivityClick }: ProfileActivityProps) {
+export function ProfileActivity({ userId, username, avatar, onActivityClick, searchQuery, sortOrder }: ProfileActivityProps) {
     const [activities, setActivities] = useState<Challenge[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
     const [isLoadingMore, setIsLoadingMore] = useState(false);
     const loadMoreRef = useRef<HTMLDivElement>(null);
+    const filteredActivities = useMemo(() => {
+        const query = searchQuery.trim().toLowerCase();
+        return activities
+            .filter((activity) => !query || [activity.statement, activity.title, activity.ticker, activity.trading_pair]
+                .some((value) => value?.toLowerCase().includes(query)))
+            .sort((a, b) => {
+                const difference = new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+                return sortOrder === "latest" ? difference : -difference;
+            });
+    }, [activities, searchQuery, sortOrder]);
 
     useEffect(() => {
         let isMounted = true;
@@ -138,7 +150,7 @@ export function ProfileActivity({ userId, username, avatar, onActivityClick }: P
     }, [activities.length, isLoadingMore, visibleCount]);
 
     return (
-        <div className="mt-6 max-w-3xl">
+        <div className="mt-6 w-full">
             <div className="space-y-3">
                 {isLoading && (
                     Array.from({ length: SKELETON_CARDS_COUNT }).map((_, index) => (
@@ -152,13 +164,18 @@ export function ProfileActivity({ userId, username, avatar, onActivityClick }: P
                     </div>
                 )}
 
-                {!isLoading && !error && activities.length === 0 && (
-                    <div className="bg-[#f8ede7] rounded-2xl p-6 border border-[#e8d5c8] text-[#5c4a42]">
-                        No activity yet.
+                {!isLoading && !error && filteredActivities.length === 0 && (
+                    <div className="mx-auto max-w-2xl px-6 py-10 text-center sm:py-12">
+                        <div className="mx-auto flex h-14 w-14 items-center justify-center border border-black/15 bg-[#f5d547] shadow-[3px_3px_0_#111]">
+                            <svg className="h-7 w-7 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6l4 2m5-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        </div>
+                        <h2 className="mt-6 text-xl font-black text-gray-950 sm:text-2xl">No activity found</h2>
                     </div>
                 )}
 
-                {!isLoading && !error && activities.slice(0, visibleCount).map((item) => {
+                {!isLoading && !error && filteredActivities.slice(0, visibleCount).map((item) => {
                     const resolutionStatus = getResolutionStatus(item);
                     const participantCount = item.total_challengers || item.participants || 0;
                     const totalPool = item.total_pool || item.pool_size || item.initial_bet || 0;

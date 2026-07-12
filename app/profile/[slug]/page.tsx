@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { useAppKitAccount } from "@reown/appkit/react";
 import ChallengeDetailModal from "@/app/components/challenge-components/ChallengeDetailModal";
+import { CreateChallengeModal } from "@/app/components/challenge-components/CreateChallengeModal";
 import {
     ProfileHeader,
     ProfileTabs,
@@ -30,12 +31,17 @@ export default function ProfilePage() {
     const walletFromSlug = decodeURIComponent(slug || "");
 
     const [activeTab, setActiveTab] = useState<TabType>("challenges");
+    const [profileSearchQuery, setProfileSearchQuery] = useState("");
+    const [profileSortOrder, setProfileSortOrder] = useState<"latest" | "oldest">("latest");
     const [selectedChallenge, setSelectedChallenge] = useState<Challenge | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+    const [challengeRefreshKey, setChallengeRefreshKey] = useState(0);
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [userChallenges, setUserChallenges] = useState<Challenge[]>([]);
+    const [totalChallengesCreated, setTotalChallengesCreated] = useState(0);
     const [challengesLoading, setChallengesLoading] = useState(false);
     const [isFollowActionLoading, setIsFollowActionLoading] = useState(false);
     const [rektoBalance, setRektoBalance] = useState(0);
@@ -70,19 +76,35 @@ export default function ProfilePage() {
     }, [walletFromSlug]);
 
     useEffect(() => {
-        if (!user) return;
+        if (!user?.wallet_address) {
+            return;
+        }
+
         let cancelled = false;
-        getLeaderboard(10, 0, user.username, "all").then(({ users }) => {
-            if (!cancelled) setProfileMetrics(users.find(item => item.wallet_address.toLowerCase() === user.wallet_address.toLowerCase()) || null);
-        }).catch(() => { if (!cancelled) setProfileMetrics(null); });
+
+        // The leaderboard is the source of truth for resolved wins/losses. Search
+        // by wallet so duplicate/similar usernames cannot show another user's stats.
+        getLeaderboard(1, 0, user.wallet_address, "all")
+            .then(({ users }) => {
+                if (cancelled) return;
+                const walletAddress = user.wallet_address.toLowerCase();
+                setProfileMetrics(
+                    users.find((item) => item.wallet_address.toLowerCase() === walletAddress) ?? null,
+                );
+            })
+            .catch(() => {
+                if (!cancelled) setProfileMetrics(null);
+            });
+
         return () => { cancelled = true; };
-    }, [user]);
+    }, [user?.wallet_address]);
 
     // Fetch challenges created by this user
     useEffect(() => {
         async function fetchUserChallenges() {
             if (!user?.id) {
                 setUserChallenges([]);
+                setTotalChallengesCreated(0);
                 return;
             }
 
@@ -94,16 +116,18 @@ export default function ProfilePage() {
                     offset: 0,
                 });
                 setUserChallenges(challengeData.challenges || []);
+                setTotalChallengesCreated(challengeData.total ?? challengeData.challenges?.length ?? 0);
             } catch (challengeError) {
                 console.error("Failed to fetch user challenges:", challengeError);
                 setUserChallenges([]);
+                setTotalChallengesCreated(0);
             } finally {
                 setChallengesLoading(false);
             }
         }
 
         fetchUserChallenges();
-    }, [user?.id]);
+    }, [user?.id, challengeRefreshKey]);
 
     useEffect(() => {
         let cancelled = false;
@@ -184,6 +208,17 @@ export default function ProfilePage() {
         setIsModalOpen(false);
         setTimeout(() => setSelectedChallenge(null), 300);
     };
+
+    const filteredChallenges = useMemo(() => {
+        const query = profileSearchQuery.trim().toLowerCase();
+        return userChallenges
+            .filter((challenge) => !query || [challenge.statement, challenge.title, challenge.ticker, challenge.trading_pair]
+                .some((value) => value?.toLowerCase().includes(query)))
+            .sort((a, b) => {
+                const difference = new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+                return profileSortOrder === "latest" ? difference : -difference;
+            });
+    }, [profileSearchQuery, profileSortOrder, userChallenges]);
 
     const handleToggleFollow = useCallback(async () => {
         if (!connectedWalletAddress || !user?.wallet_address || isOwnProfile) return;
@@ -267,21 +302,29 @@ export default function ProfilePage() {
                             stats={{
                                 wins: profileMetrics?.won ?? 0,
                                 rekts: profileMetrics?.lost ?? 0,
-                                totalChallenges: userChallenges.length,
+                                totalChallenges: totalChallengesCreated,
                                 winRatio: profileMetrics?.win_rate ?? 0,
                                 pnl: profileMetrics?.pnl ?? 0,
                                 volume: profileMetrics?.volume ?? 0,
                             }}
                         />
 
-                        <ProfileTabs activeTab={activeTab} onTabChange={setActiveTab} />
+                        <ProfileTabs
+                            activeTab={activeTab}
+                            onTabChange={setActiveTab}
+                            searchQuery={profileSearchQuery}
+                            onSearchChange={setProfileSearchQuery}
+                            sortOrder={profileSortOrder}
+                            onSortChange={setProfileSortOrder}
+                        />
 
                         {activeTab === "challenges" && (
                             <ProfileChallenges
                                 key={user.id}
-                                challenges={userChallenges}
+                                challenges={filteredChallenges}
                                 loading={challengesLoading}
                                 onChallengeClick={handleChallengeClick}
+                                onCreateChallenge={() => setIsCreateModalOpen(true)}
                             />
                         )}
 
@@ -293,6 +336,8 @@ export default function ProfilePage() {
                                 avatar={user.profile_image || "/scribbles/pepe.png"}
                                 isOwnProfile={isOwnProfile}
                                 onActivityClick={handleChallengeClick}
+                                searchQuery={profileSearchQuery}
+                                sortOrder={profileSortOrder}
                             />
                         )}
                     </>
@@ -303,6 +348,14 @@ export default function ProfilePage() {
                 challenge={selectedChallenge}
                 isOpen={isModalOpen}
                 onClose={closeModal}
+            />
+            <CreateChallengeModal
+                isOpen={isCreateModalOpen}
+                onClose={() => setIsCreateModalOpen(false)}
+                onCreated={() => {
+                    setIsCreateModalOpen(false);
+                    setChallengeRefreshKey((key) => key + 1);
+                }}
             />
         </div>
     );

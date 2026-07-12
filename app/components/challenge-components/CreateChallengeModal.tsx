@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { DatePickerModal } from "./DatePickerModal";
 import { DurationPickerModal } from "./DurationPickerModal";
 import { useUserStore } from "@/app/store/useUserStore";
@@ -333,8 +334,8 @@ export function CreateChallengeModal({
     };
 
 
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
+    return createPortal(
+        <div className="fixed inset-0 z-[250] flex items-center justify-center p-2 sm:p-4">
             <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={handleModalClose} />
             <div
                 className="rekto-modal-panel relative w-full max-w-md md:max-w-2xl max-h-[94vh] sm:max-h-[90vh] overflow-hidden flex flex-col [&_button:not(:disabled)]:cursor-pointer"
@@ -775,6 +776,7 @@ export function CreateChallengeModal({
 
             <DatePickerModal isOpen={isDatePickerOpen} onClose={() => setIsDatePickerOpen(false)} selectedDate={selectedDate} onSelectDate={setSelectedDate} />
             <DurationPickerModal isOpen={isDurationPickerOpen} onClose={() => setIsDurationPickerOpen(false)} selectedDuration={duration} onSelectDuration={setDuration} />
-        </div>
+        </div>,
+        document.body,
     );
 }

@@ -724,6 +724,28 @@ body {
   box-shadow: none !important;
 }
 
+/* Profile summary uses soft cards instead of the global pixel outlines. */
+.pixel-shell .profile-header-shell.profile-header-shell,
+.pixel-shell .profile-performance-panel.profile-performance-panel,
+.pixel-shell .profile-balance-panel.profile-balance-panel {
+  border: 0 !important;
+  border-radius: 0 !important;
+}
+
+.pixel-shell .profile-header-shell.profile-header-shell {
+  border: 2px solid #111 !important;
+  border-radius: 0 !important;
+}
+
+.pixel-shell .profile-header-shell :is(div, button, a, span) {
+  border-radius: 0 !important;
+}
+
+.pixel-shell .profile-header-shell .profile-avatar,
+.pixel-shell .profile-header-shell .profile-avatar * {
+  border-radius: 9999px !important;
+}
+
 .pixel-shell .challenge-card-shell.challenge-card-shell {
   box-shadow: none !important;
 }

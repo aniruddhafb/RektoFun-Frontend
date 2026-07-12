@@ -271,6 +271,27 @@ export async function getUserByPubkey(pubkey: string): Promise<User> {
 
 export const getUserByWallet = getUserByPubkey;
 
+export type ReferralHistory = {
+  commissions: Array<{ amount: number; created_at: string }>;
+  redemptions: Array<{ amount: number; status: "pending" | "paid" | "rejected"; requested_at: string }>;
+};
+
+export async function getReferralHistory(walletAddress: string): Promise<ReferralHistory> {
+  const response = await fetch(`${API_BASE_URL}/users/referral-history/${encodeURIComponent(walletAddress)}`);
+  if (!response.ok) throw await parseError(response, "Failed to load referral history");
+  return response.json();
+}
+
+export async function requestReferralRedemption(walletAddress: string): Promise<User> {
+  const response = await fetch(`${API_BASE_URL}/users/referral-redemptions`, {
+    method: "POST",
+    headers: { accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify({ wallet_address: walletAddress }),
+  });
+  if (!response.ok) throw await parseError(response, "Failed to create redemption request");
+  return normalizeUser(await response.json());
+}
+
 export async function getLeaderboard(
   limit = 100,
   offset = 0,

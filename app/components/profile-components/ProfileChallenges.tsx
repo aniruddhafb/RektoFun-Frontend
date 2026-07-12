@@ -8,12 +8,14 @@ interface ProfileChallengesProps {
     challenges: Challenge[];
     loading?: boolean;
     onChallengeClick: (challenge: Challenge) => void;
+    onCreateChallenge: () => void;
 }
 
 export function ProfileChallenges({
     challenges,
     loading,
     onChallengeClick,
+    onCreateChallenge,
 }: ProfileChallengesProps) {
     const PAGE_SIZE = 6;
     const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
@@ -53,8 +55,21 @@ export function ProfileChallenges({
 
     if (!challenges.length) {
         return (
-            <div className="bg-[#f8ede7] rounded-2xl p-6 border border-[#e8d5c8] text-[#5c4a42] mt-4">
-                No challenges found for this user yet.
+            <div className="mx-auto mt-8 max-w-2xl px-6 py-10 text-center sm:py-12">
+                <div className="mx-auto flex h-14 w-14 items-center justify-center border border-black/15 bg-[#f5d547] shadow-[3px_3px_0_#111]">
+                    <svg className="h-7 w-7 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6l4 2m5-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </div>
+                <h2 className="mt-6 text-xl font-black text-gray-950 sm:text-2xl">No challenges found</h2>
+                <button
+                    type="button"
+                    onClick={onCreateChallenge}
+                    className="mt-7 inline-flex cursor-pointer items-center justify-center border border-black bg-black px-6 py-3 text-sm font-black uppercase tracking-[0.08em] text-white shadow-[4px_4px_0_#e85a2d] transition-colors hover:bg-gray-800 focus:outline-none focus-visible:ring-4 focus-visible:ring-[#e85a2d]/25"
+                >
+                    <span className="mr-2 text-lg leading-none">+</span>
+                    Create a challenge
+                </button>
             </div>
         );
     }

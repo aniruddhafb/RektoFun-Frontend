@@ -85,16 +85,19 @@ export function ProfileHeader({
         : walletAddress;
 
     const formattedRektoBalance = formatTokenBalance(balance.rekto);
+    const formattedPnl = Number.isFinite(stats.pnl)
+        ? `${stats.pnl > 0 ? "+" : ""}${stats.pnl.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
+        : "0";
 
     return (
-        <div className="flex flex-col lg:flex-row lg:items-stretch gap-4 sm:gap-6 lg:gap-8 p-4 sm:p-6 bg-white/40 backdrop-blur-xl rounded-2xl sm:rounded-3xl border border-gray-400 items-center sm:items-start">
+        <div className="profile-header-shell flex flex-col lg:flex-row lg:items-stretch gap-4 sm:gap-6 lg:gap-8 p-4 sm:p-6 bg-white/40 backdrop-blur-xl rounded-2xl sm:rounded-3xl items-center sm:items-start">
             {/* Left: Avatar and Info */}
             <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 lg:gap-8 flex-1 min-w-0 items-center sm:items-start w-full">
                 {/* Avatar with glow effect */}
                 <div className="relative flex w-full sm:w-auto flex-col items-center sm:items-start flex-shrink-0 mx-auto sm:mx-0">
                     <div className="absolute inset-0 rounded-full blur-xl pointer-events-none"></div>
                     {/* Image container  */}
-                    <div className="relative z-10 w-24 h-24 sm:w-32 sm:h-32">
+                    <div className="profile-avatar relative z-10 w-24 h-24 sm:w-32 sm:h-32">
                         <div className="absolute inset-0 overflow-hidden rounded-full bg-white ring-4 ring-orange-200">
                             <Image
                                 src={avatar}
@@ -247,43 +250,41 @@ export function ProfileHeader({
             </div>
 
             {/* Right: Balance & Stats Card */}
-            <div className="flex flex-col bg-white/20 backdrop-blur-lg rounded-2xl p-3 sm:p-5 border border-gray-200/40 gap-3 sm:gap-4 w-full lg:w-[480px]">
+            <div className="profile-performance-panel flex w-full flex-col gap-3 rounded-2xl bg-white/55 p-3 shadow-[0_12px_35px_rgba(92,52,30,0.08)] backdrop-blur-lg sm:gap-4 sm:p-4 lg:w-[560px] lg:flex-none">
                 {/* Balance Section */}
-                <div className="grid grid-cols-2 sm:grid-cols-[1fr_auto_1fr] items-stretch sm:items-center gap-2 sm:gap-4 p-3 bg-gradient-to-r from-gray-50 to-gray-100/50 rounded-xl">
+                <div className="profile-balance-panel grid grid-cols-2 gap-2 rounded-xl bg-white/75 p-2 sm:gap-3 sm:p-3">
                     {/* REKTO Balance */}
-                    <div className="flex items-center justify-center sm:justify-start gap-2 sm:gap-3 flex-1 min-w-0">
+                    <div className="flex min-w-0 items-center gap-2 rounded-lg bg-[#fff7ef] px-3 py-3 sm:gap-3 sm:px-4">
                         <Image
                             src="/fav_old.png"
                             alt="REKTO"
                             width={40}
                             height={40}
-                            className="w-8 h-8 sm:w-10 sm:h-10 object-contain"
+                            className="h-9 w-9 shrink-0 object-contain sm:h-11 sm:w-11"
                         />
                         <div className="flex flex-col items-start">
-                            <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">$REKTO</span>
+                            <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 sm:text-xs">$REKTO BALANCE</span>
                             <div className="flex items-baseline gap-1.5">
-                                <span className="text-xl sm:text-2xl font-bold text-gray-900 break-all sm:break-normal">
+                                <span className="truncate text-xl font-black text-gray-950 sm:text-2xl">
                                     {isRektoBalanceLoading ? ".." : formattedRektoBalance}
                                 </span>
                             </div>
                         </div>
                     </div>
 
-                    <div className="hidden sm:block w-px h-10 bg-gray-200/60"></div>
-
                     {/* USDC Balance */}
-                    <div className="flex items-center justify-center sm:justify-start gap-2 flex-1 min-w-0">
+                    <div className="flex min-w-0 items-center gap-2 rounded-lg bg-[#f5fbff] px-3 py-3 sm:gap-3 sm:px-4">
                         <Image
                             src="/scribbles/dollar.png"
                             alt="USDC"
                             width={36}
                             height={36}
-                            className="w-8 h-8 sm:w-9 sm:h-9 object-contain"
+                            className="h-9 w-9 shrink-0 object-contain sm:h-11 sm:w-11"
                         />
                         <div className="flex flex-col items-start">
-                            <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">USDC</span>
+                            <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 sm:text-xs">USDC BALANCE</span>
                             <div className="flex items-baseline gap-1.5">
-                                <span className="text-xl sm:text-2xl font-bold text-gray-900 break-all sm:break-normal">
+                                <span className="truncate text-xl font-black text-gray-950 sm:text-2xl">
                                     {isUsdcBalanceLoading ? ".." : balance.usdc.toFixed(2)}
                                 </span>
                             </div>
@@ -292,37 +293,50 @@ export function ProfileHeader({
                 </div>
 
                 {/* Stats Row - Cleaner design */}
-                <div className="grid grid-cols-3 sm:grid-cols-3 gap-2 p-3 bg-gradient-to-r from-orange-50/50 to-amber-50/50 rounded-xl border border-orange-100/30">
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    {/* Challenges Created */}
+                    <div className="flex min-w-0 items-center gap-2 rounded-xl border border-sky-100 bg-sky-50/80 p-3 sm:flex-col sm:items-start sm:gap-3">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-sky-400 to-sky-500 shadow-sm">
+                            <span className="text-white text-sm">⚔️</span>
+                        </div>
+                        <div className="min-w-0">
+                            <p className="text-xl font-black leading-none text-gray-950">{stats.totalChallenges}</p>
+                            <p className="mt-1 whitespace-nowrap text-[11px] font-bold text-gray-500">Created</p>
+                        </div>
+                    </div>
+
                     {/* Wins */}
-                    <div className="flex items-center justify-start gap-2 px-2 sm:px-3 py-1.5 min-w-0 w-fit mx-auto sm:w-auto sm:mx-0">
-                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-400 to-emerald-500 flex items-center justify-center">
+                    <div className="flex min-w-0 items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50/80 p-3 sm:flex-col sm:items-start sm:gap-3">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-emerald-400 to-emerald-500 shadow-sm">
                             <span className="text-white text-sm">🏆</span>
                         </div>
-                        <div>
-                            <p className="text-lg font-bold text-gray-900 leading-none">{stats.wins}</p>
-                            <p className="text-xs text-gray-500">Wins</p>
+                        <div className="min-w-0">
+                            <p className="text-xl font-black leading-none text-gray-950">{stats.wins}</p>
+                            <p className="mt-1 text-[11px] font-bold text-gray-500">Wins</p>
                         </div>
                     </div>
 
                     {/* Rekts */}
-                    <div className="flex items-center justify-start gap-2 px-2 sm:px-3 py-1.5 min-w-0 w-fit mx-auto sm:w-auto sm:mx-0">
-                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-red-400 to-red-500 flex items-center justify-center">
+                    <div className="flex min-w-0 items-center gap-2 rounded-xl border border-red-100 bg-red-50/80 p-3 sm:flex-col sm:items-start sm:gap-3">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-red-400 to-red-500 shadow-sm">
                             <span className="text-white text-sm">💀</span>
                         </div>
-                        <div>
-                            <p className="text-lg font-bold text-gray-900 leading-none">{stats.rekts}</p>
-                            <p className="text-xs text-gray-500">Rekts</p>
+                        <div className="min-w-0">
+                            <p className="text-xl font-black leading-none text-gray-950">{stats.rekts}</p>
+                            <p className="mt-1 text-[11px] font-bold text-gray-500">Rekts</p>
                         </div>
                     </div>
 
-                    {/* Win Rate */}
-                    <div className="flex items-center justify-start gap-2 px-2 sm:px-3 py-1.5 min-w-0 w-fit mx-auto sm:w-auto sm:mx-0">
-                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-400 to-amber-500 flex items-center justify-center">
-                            <span className="text-white text-sm">📊</span>
+                    {/* Total P&L */}
+                    <div className="flex min-w-0 items-center gap-2 rounded-xl border border-violet-100 bg-violet-50/80 p-3 sm:flex-col sm:items-start sm:gap-3">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-violet-400 to-violet-500 shadow-sm">
+                            <span className="text-white text-sm">💰</span>
                         </div>
-                        <div>
-                            <p className="text-lg font-bold text-gray-900 leading-none">{stats.winRatio}%</p>
-                            <p className="text-xs text-gray-500"> Rate</p>
+                        <div className="min-w-0">
+                            <p className={`truncate text-xl font-black leading-none ${stats.pnl > 0 ? "text-emerald-600" : stats.pnl < 0 ? "text-red-600" : "text-gray-950"}`} title={formattedPnl}>
+                                {formattedPnl}
+                            </p>
+                            <p className="mt-1 whitespace-nowrap text-[11px] font-bold text-gray-500">Total P&amp;L</p>
                         </div>
                     </div>
                 </div>
