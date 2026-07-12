@@ -114,7 +114,10 @@ export default function Navbar() {
                     </div>
                 </div>
 
-                <NavbarNavLinks isActive={isActive} />
+                <NavbarNavLinks
+                    isActive={isActive}
+                    onOpenReferral={() => setIsReferralModalOpen(true)}
+                />
             </nav>
 
             <div className="h-[88px] md:h-[128px]" />

@@ -264,6 +264,7 @@ export default function ProfilePage() {
 
                         {activeTab === "challenges" && (
                             <ProfileChallenges
+                                key={user.id}
                                 challenges={userChallenges}
                                 loading={challengesLoading}
                                 onChallengeClick={handleChallengeClick}
@@ -272,10 +273,12 @@ export default function ProfilePage() {
 
                         {activeTab === "activity" && (
                             <ProfileActivity
+                                key={user.id}
                                 userId={String(user.id)}
                                 username={user.username}
                                 avatar={user.profile_image || "/scribbles/pepe.png"}
                                 isOwnProfile={isOwnProfile}
+                                onActivityClick={handleChallengeClick}
                             />
                         )}
                     </>

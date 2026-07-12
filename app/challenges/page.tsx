@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic';
 
-import { Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { ChallengeHeader } from "../components/challenge-components/ChallengeHeader";
 import { ChallengeFiltersSection } from "../components/challenge-components/ChallengeFiltersSection";
 import { FeedbackBanner } from "../components/challenge-components/FeedbackBanner";
@@ -13,10 +13,11 @@ import { Challenge } from "../lib/challenges-service/challenges";
 import ChallengeDetailModal from "../components/challenge-components/ChallengeDetailModal";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
+const BOOKMARKS_STORAGE_KEY = "rektofun:challenge-bookmarks";
+
 function ChallengesPageContent() {
 
   const CREATE_TOAST_DURATION_MS = 3000;
-  const BOOKMARKS_STORAGE_KEY = "rektofun:challenge-bookmarks";
   const [activeFilter, setActiveFilter] = useState("Latest");
   const [searchQuery, setSearchQuery] = useState("");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -55,18 +56,20 @@ function ChallengesPageContent() {
     } catch (error) {
       console.error("Failed to persist challenge bookmarks to localStorage:", error);
     }
-  }, []);
+  }, [bookmarkedChallengeIds]);
 
-  const toggleBookmark = (challengeId: string) => {
+  const toggleBookmark = useCallback((challengeId: string) => {
     setBookmarkedChallengeIds((prev) =>
       prev.includes(challengeId)
         ? prev.filter((id) => id !== challengeId)
         : [...prev, challengeId]
     );
-  }
+  }, []);
 
-  const isChallengeBookmarked = 
-    (challengeId: string) => bookmarkedChallengeIds.includes(challengeId)
+  const isChallengeBookmarked = useCallback(
+    (challengeId: string) => bookmarkedChallengeIds.includes(challengeId),
+    [bookmarkedChallengeIds],
+  );
 
   
   // Handle challenge card click
@@ -157,7 +160,7 @@ function ChallengesPageContent() {
   }, []);
 
   return (
-    <div className="relative min-h-full overflow-hidden bg-[#f3e1d7]">
+    <div className="relative min-h-[calc(100vh-5rem)] overflow-hidden bg-[#f3e1d7] pb-10 sm:pb-16">
       <div className="pointer-events-none absolute left-0 top-24 h-80 w-80 rounded-full bg-[#5ba8d8]/15 blur-3xl" />
       <div className="pointer-events-none absolute right-0 top-64 h-80 w-80 rounded-full bg-[#e85a2d]/15 blur-3xl" />
       {showCreateSuccessToast && (

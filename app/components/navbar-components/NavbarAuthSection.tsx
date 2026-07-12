@@ -1,6 +1,7 @@
 "use client";
 
 import { NavbarProfileDropdown } from "./NavbarProfileDropdown";
+import { NotificationBell } from "./NotificationBell";
 
 type NavbarAuthSectionProps = {
     authenticated: boolean;
@@ -66,6 +67,8 @@ export function NavbarAuthSection({
                         </svg>
                         <span className="text-sm font-semibold text-gray-900">{balanceDisplay}</span>
                     </button>
+
+                    <NotificationBell />
 
                     <NavbarProfileDropdown
                         displayAddress={displayAddress}

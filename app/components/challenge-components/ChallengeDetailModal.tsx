@@ -95,15 +95,19 @@ export default function ChallengeDetailModal({ challenge, creator, isOpen, onClo
   if (!isOpen || !challenge) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[10010] flex items-center justify-center overflow-hidden bg-black/55 p-2 backdrop-blur-sm animate-in fade-in duration-200 sm:p-4">
+    <div className="fixed inset-0 z-[10010] flex items-center justify-center overflow-hidden bg-black/55 p-2 backdrop-blur-sm sm:p-4">
       <div
         ref={modalRef}
-        className="rekto-modal-panel relative flex max-h-[94vh] w-full max-w-5xl flex-col overflow-hidden bg-[#fff8f4] animate-in zoom-in-95 duration-300"
-        style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+        className="rekto-modal-panel relative flex max-h-[94vh] w-full max-w-5xl flex-col overflow-hidden bg-[#fff8f4]"
+        style={{ animation: "none" }}
       >
         <style>{`
           .no-scrollbar::-webkit-scrollbar { display: none; }
           .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+          .challenge-detail-scrollbar { scrollbar-width: thin; scrollbar-color: #8b7355 transparent; }
+          .challenge-detail-scrollbar::-webkit-scrollbar { width: 4px; }
+          .challenge-detail-scrollbar::-webkit-scrollbar-track { background: transparent; }
+          .challenge-detail-scrollbar::-webkit-scrollbar-thumb { background: #8b7355; border-radius: 999px; }
           @keyframes liveSweep {
             0% { transform: translateX(-100%); }
             100% { transform: translateX(220%); }
@@ -123,7 +127,7 @@ export default function ChallengeDetailModal({ challenge, creator, isOpen, onClo
         </button>
 
         {/* Main Content */}
-        <div className="relative overflow-y-auto overflow-x-hidden p-4 sm:p-6 lg:p-8">
+        <div className="challenge-detail-scrollbar relative overflow-y-auto overflow-x-hidden p-4 sm:p-6 lg:p-8">
           {/* Header Section */}
           <div className="mb-6 rounded-lg border-2 border-black bg-white p-4 shadow-[4px_4px_0_#111] sm:p-5">
             <div className="flex flex-col gap-5 lg:flex-row lg:items-start">

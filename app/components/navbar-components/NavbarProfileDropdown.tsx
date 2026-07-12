@@ -122,9 +122,9 @@ export function NavbarProfileDropdown({
                         className="rounded-full object-cover flex-shrink-0"
                     />
                 )}
-                <span className="hidden sm:block text-sm font-medium text-gray-700 max-w-[100px] m-1 truncate">
+                {/* <span className="hidden sm:block text-sm font-medium text-gray-700 max-w-[100px] m-1 truncate">
                     {displayUsername}
-                </span>
+                </span> */}
                 <svg
                     className="w-4 h-4 text-gray-500"
                     fill="none"

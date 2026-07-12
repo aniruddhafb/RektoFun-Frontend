@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAppKitAccount } from '@reown/appkit/react';
 import { ChallengeCard } from "./ChallengeCard";
 import { getChallenges, Challenge } from "../../lib/challenges-service/challenges";
+import { getPositions } from "../../lib/positions-service/positions";
+import { useUserStore } from "@/app/store/useUserStore";
 
 interface ChallengeGridProps {
     onRekt: (challenge: Challenge) => void;
@@ -31,6 +33,8 @@ export function ChallengeGrid({
     searchQuery,
 }: ChallengeGridProps) {
     const { address } = useAppKitAccount();
+    const { user } = useUserStore();
+    const userId = user?.id;
     const ownerAddress = address || '';
 
     const [challenges, setChallenges] = useState<Challenge[]>([]);
@@ -54,13 +58,28 @@ export function ChallengeGrid({
 
         try {
             const isPinnedFilter = activeFilter === "Pinned";
-            const requestLimit = isPinnedFilter ? 100 : PAGE_SIZE;
-            const requestOffset = isPinnedFilter ? 0 : currentOffset;
+            const isMyBetsFilter = activeFilter === "My Bets";
+            const isCreatedByMeFilter = activeFilter === "Created By Me";
+            const needsCompleteList = isPinnedFilter || isMyBetsFilter || isCreatedByMeFilter || activeFilter === "Expiring Soon";
 
-            const response = await getChallenges({
-                limit: requestLimit,
-                offset: requestOffset,
-            });
+            if ((isMyBetsFilter || isCreatedByMeFilter) && userId == null) {
+                setChallenges([]);
+                setHasMore(false);
+                setOffset(0);
+                return;
+            }
+
+            const requestLimit = needsCompleteList ? 100 : PAGE_SIZE;
+            const requestOffset = needsCompleteList ? 0 : currentOffset;
+
+            const [response, positionsResponse] = await Promise.all([
+                getChallenges({
+                    limit: requestLimit,
+                    offset: requestOffset,
+                    search: searchQuery.trim() || undefined,
+                }),
+                isMyBetsFilter ? getPositions({ limit: 100, offset: 0 }) : Promise.resolve(null),
+            ]);
 
             let nextChunk = response.challenges ?? [];
 
@@ -75,18 +94,23 @@ export function ChallengeGrid({
                 });
             }
 
-            if (activeFilter === "My Bets" && ownerAddress) {
-                nextChunk = nextChunk.filter((challenge) => {
-                    const creatorWallet = challenge.creator?.toString().toLowerCase();
-                    const currentUser = ownerAddress.toLowerCase();
-                    return creatorWallet === currentUser;
-                });
+            if (isMyBetsFilter) {
+                const joinedChallengeIds = new Set(
+                    (positionsResponse?.positions ?? [])
+                        .filter((position) => position.creator === userId)
+                        .map((position) => position.challenge_id),
+                );
+                nextChunk = nextChunk.filter((challenge) => joinedChallengeIds.has(challenge.id));
             }
 
-            // Apply search filter client-side
+            if (isCreatedByMeFilter) {
+                nextChunk = nextChunk.filter((challenge) => challenge.creator === userId);
+            }
+
+            // Keep a client-side search pass for APIs that do not support search yet.
             if (searchQuery.trim()) {
                 const query = searchQuery.toLowerCase();
-                nextChunk = nextChunk.filter((challenge) => 
+                nextChunk = nextChunk.filter((challenge) =>
                     challenge.statement.toLowerCase().includes(query) ||
                     challenge.ticker.toLowerCase().includes(query)
                 );
@@ -94,18 +118,18 @@ export function ChallengeGrid({
 
             // Apply sort filter client-side
             if (activeFilter === "Expiring Soon") {
-                nextChunk = [...nextChunk].sort((a, b) => 
+                nextChunk = [...nextChunk].sort((a, b) =>
                     new Date(a.expiry).getTime() - new Date(b.expiry).getTime()
                 );
             } else if (activeFilter === "Latest") {
-                nextChunk = [...nextChunk].sort((a, b) => 
+                nextChunk = [...nextChunk].sort((a, b) =>
                     new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
                 );
             }
 
             setChallenges((prev) => (append ? [...prev, ...nextChunk] : nextChunk));
-            setHasMore(!isPinnedFilter && nextChunk.length === PAGE_SIZE);
-            setOffset(isPinnedFilter ? nextChunk.length : currentOffset + nextChunk.length);
+            setHasMore(!needsCompleteList && response.challenges.length === PAGE_SIZE);
+            setOffset(needsCompleteList ? nextChunk.length : currentOffset + response.challenges.length);
         } catch (error) {
             console.error('Failed to fetch challenges:', error);
             if (!append) {
@@ -119,7 +143,7 @@ export function ChallengeGrid({
                 setIsLoadingMore(false);
             }
         }
-    }, [activeFilter, isBookmarked, ownerAddress, searchQuery, isLoadingMore]);
+    }, [activeFilter, isBookmarked, searchQuery, isLoadingMore, userId]);
 
     useEffect(() => {
         setIsLoadingMore(false);
@@ -202,16 +226,33 @@ export function ChallengeGrid({
     }
 
     if (challenges.length === 0) {
+        const isFilteredView = activeFilter !== "Latest" || searchQuery.trim().length > 0;
+
         return (
-            <div className="max-w-7xl mx-auto px-6 lg:px-8 pb-16">
-                <div className="mx-auto max-w-xl border-2 border-black bg-white p-8 text-center shadow-[5px_5px_0_#111] animate-pop-in">
-                    <p className="text-gray-800 text-lg font-black mb-4">No challenges found yet.</p>
-                    <button
-                        onClick={onOpenModal}
-                        className="cursor-pointer inline-flex items-center justify-center border-2 border-black bg-black px-6 py-3 text-sm font-black uppercase tracking-[0.08em] text-white shadow-[4px_4px_0_#e85a2d] transition-all hover:-translate-y-1 hover:shadow-[6px_6px_0_#e85a2d]"
-                    >
-                        Be the first to create one!
-                    </button>
+            <div className="mx-auto w-full max-w-7xl px-4 pb-16 sm:px-6 lg:px-8">
+                <div className="mx-auto max-w-2xl text-center">
+                    <div className="px-6 py-10 sm:px-12 sm:py-12">
+                        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-black/15 bg-[#f5d547] shadow-[3px_3px_0_#111]">
+                            <svg className="h-7 w-7 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6l4 2m5-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        </div>
+                        <h2 className="mt-6 text-xl font-black text-gray-950 sm:text-2xl">
+                            No challenges found
+                        </h2>
+                        <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-gray-500 sm:text-base">
+                            {isFilteredView
+                                ? "Try another filter or search term, or start a new challenge of your own."
+                                : "The arena is quiet for now. Start a challenge and be the first one on the board."}
+                        </p>
+                        <button
+                            onClick={onOpenModal}
+                            className="mt-7 inline-flex cursor-pointer items-center justify-center rounded-xl border border-black bg-black px-6 py-3 text-sm font-black uppercase tracking-[0.08em] text-white shadow-[4px_4px_0_#e85a2d] transition-colors hover:bg-gray-800 focus:outline-none focus-visible:ring-4 focus-visible:ring-[#e85a2d]/25"
+                        >
+                            <span className="mr-2 text-lg leading-none">+</span>
+                            Create a challenge
+                        </button>
+                    </div>
                 </div>
             </div>
         );

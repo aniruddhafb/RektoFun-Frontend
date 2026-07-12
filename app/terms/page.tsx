@@ -34,7 +34,7 @@ export default function TermsPage() {
 
                 <div className="prose prose-lg max-w-none text-gray-700">
                     <p className="text-lg mb-6">
-                        Last updated: April 2026
+                        Last updated: 14 July 2026
                     </p>
 
                     <section className="mb-8">
@@ -113,7 +113,7 @@ export default function TermsPage() {
                         </h2>
                         <p className="mb-4">
                             If you have any questions about these Terms of Service, please contact us
-                            through our Twitter DM or Discord ticket support system.
+                            through our twitter or discord ticket support system.
                         </p>
                     </section>
                 </div>

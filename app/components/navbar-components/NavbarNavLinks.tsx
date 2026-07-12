@@ -1,16 +1,18 @@
 import Link from "next/link";
-import { Shield, Sword, Zap } from "lucide-react";
+import { Gift, Shield, Sword, Zap } from "lucide-react";
 import { NAV_LINKS } from "./navbarData";
 
 type NavbarNavLinksProps = {
     isActive: (href: string) => boolean;
+    onOpenReferral: () => void;
 };
 
-export function NavbarNavLinks({ isActive }: NavbarNavLinksProps) {
+export function NavbarNavLinks({ isActive, onOpenReferral }: NavbarNavLinksProps) {
     const navIconByHref = {
         "/challenges": Sword,
         "/leaderboard": Shield,
         "/activity": Zap,
+        "/refer": Gift,
     } as const;
 
     const renderNavIcon = (href: string) => {
@@ -22,6 +24,7 @@ export function NavbarNavLinks({ isActive }: NavbarNavLinksProps) {
             "/challenges": "text-[#cb8a22]",
             "/leaderboard": "text-[#2e9ec3]",
             "/activity": "text-[#d9a31b]",
+            "/refer": "text-[#d9a31b]",
         } as const;
 
         return (
@@ -49,7 +52,10 @@ export function NavbarNavLinks({ isActive }: NavbarNavLinksProps) {
                             {link.label}
                         </Link>
                     ))}
-
+                    <button type="button" onClick={onOpenReferral} className="flex cursor-pointer items-center gap-2 !border-0 !bg-transparent px-3 py-1.5 text-sm font-black uppercase tracking-[0.06em] text-gray-700 !shadow-none outline-none transition-colors hover:text-[#e85a2d]">
+                        {renderNavIcon("/refer")}
+                        Refer &amp; Earn
+                    </button>
                 </div>
 
                 {/* Mobile Nav - Show all links directly */}
@@ -70,6 +76,10 @@ export function NavbarNavLinks({ isActive }: NavbarNavLinksProps) {
                             {link.label}
                         </Link>
                     ))}
+                    <button type="button" onClick={onOpenReferral} className="flex flex-shrink-0 cursor-pointer items-center gap-2 !border-0 !bg-transparent px-2 py-1 text-sm font-black text-gray-700 !shadow-none outline-none transition-colors hover:text-[#e85a2d]">
+                        {renderNavIcon("/refer")}
+                        Refer &amp; Earn
+                    </button>
                 </div>
             </div>
         </div>

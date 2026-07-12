@@ -311,14 +311,22 @@ export async function getLeaderboard(
   };
 }
 
-export async function followUser(targetWalletAddress: string, _viewerWalletAddress: string): Promise<User> {
-  void _viewerWalletAddress;
-  return getUserByWallet(targetWalletAddress);
+async function setFollowing(targetWalletAddress: string, viewerWalletAddress: string, follow: boolean): Promise<User> {
+  const response = await fetch(`${API_BASE_URL}/users/${encodeURIComponent(targetWalletAddress)}/follow`, {
+    method: follow ? "POST" : "DELETE",
+    headers: { accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify({ follower_wallet: viewerWalletAddress }),
+  });
+  if (!response.ok) throw await parseError(response, `Failed to ${follow ? "follow" : "unfollow"} user`);
+  return normalizeUser(await response.json());
 }
 
-export async function unfollowUser(targetWalletAddress: string, _viewerWalletAddress: string): Promise<User> {
-  void _viewerWalletAddress;
-  return getUserByWallet(targetWalletAddress);
+export async function followUser(targetWalletAddress: string, viewerWalletAddress: string): Promise<User> {
+  return setFollowing(targetWalletAddress, viewerWalletAddress, true);
+}
+
+export async function unfollowUser(targetWalletAddress: string, viewerWalletAddress: string): Promise<User> {
+  return setFollowing(targetWalletAddress, viewerWalletAddress, false);
 }
 
 export async function acceptReferral(walletAddress: string, referralCode: string): Promise<User> {

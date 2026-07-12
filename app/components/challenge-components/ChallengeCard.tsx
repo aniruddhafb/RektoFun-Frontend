@@ -13,6 +13,7 @@ interface ChallengeCardProps {
     onToggleBookmark?: (challengeId: string) => void;
     isBookmarked?: boolean;
     ownerAddress?: string;
+    showPin?: boolean;
 }
 
 export function ChallengeCard({
@@ -21,6 +22,7 @@ export function ChallengeCard({
     onRekt,
     onToggleBookmark,
     isBookmarked = false,
+    showPin = true,
 }: ChallengeCardProps) {
     const {
         isLoading,
@@ -188,7 +190,7 @@ export function ChallengeCard({
                         </div>
                     </div>
                     {/* Watchlist Button */}
-                    <button
+                    {showPin && <button
                         type="button"
                         onClick={handleBookmarkClick}
                         aria-label={isBookmarked ? "Remove Pin" : "Pin this"}
@@ -199,7 +201,7 @@ export function ChallengeCard({
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 17v4" />
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 3h8l-1 6 3 3H6l3-3-1-6z" />
                         </svg>
-                    </button>
+                    </button>}
                 </div>
 
                 {/* Divider */}

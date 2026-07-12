@@ -5,16 +5,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import {
-    BadgeDollarSign,
     ChevronDown,
     ChevronRight,
     Clock,
     ListFilter,
     Search,
     Shapes,
-    ShieldCheck,
-    Trophy,
-    Users,
 } from "lucide-react";
 import ChallengeDetailModal from "@/app/components/challenge-components/ChallengeDetailModal";
 import {
@@ -31,38 +27,40 @@ const activityStatusOptions: ActivityStatus[] = ["All Status", "Expired", "Ongoi
 const PAGE_SIZE = 5;
 const SKELETON_CARDS_COUNT = 4;
 
+function getChallengeEndTime(challenge: Challenge): string {
+    const candidates = [
+        challenge.expire_time,
+        challenge.expiry,
+        challenge.resolve_time,
+        challenge.resolution_date,
+    ];
+    return candidates.find((value) => value && !Number.isNaN(new Date(value).getTime())) || "";
+}
+
+function getActivityHeadline(challenge: Challenge, endTime: string): string {
+    const statement = challenge.statement?.trim() || challenge.title?.trim() || "Challenge";
+    if (!endTime || /\bby\s+\d{1,2}\s+[a-z]+\s+\d{4}\b/i.test(statement)) return statement;
+
+    const endDate = new Intl.DateTimeFormat(undefined, {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+    }).format(new Date(endTime));
+
+    return `${statement} by ${endDate}`;
+}
+
 function formatTimeAgo(dateString: string): string {
     const dateMs = new Date(dateString).getTime();
-    if (Number.isNaN(dateMs)) return "recently";
-
-    const diffMs = Date.now() - dateMs;
-    if (diffMs < 0) return "just now";
-
-    const minutes = Math.floor(diffMs / 60000);
-    const hours = Math.floor(diffMs / 3600000);
-    const days = Math.floor(diffMs / 86400000);
-
+    if (Number.isNaN(dateMs)) return "Recently";
+    const elapsed = Math.max(0, Date.now() - dateMs);
+    const minutes = Math.floor(elapsed / 60_000);
+    const hours = Math.floor(elapsed / 3_600_000);
+    const days = Math.floor(elapsed / 86_400_000);
     if (days > 0) return `${days}d ago`;
     if (hours > 0) return `${hours}h ago`;
     if (minutes > 0) return `${minutes}m ago`;
-    return "just now";
-}
-
-function formatResolveCountdown(resolveTime: string): string {
-    const resolveMs = new Date(resolveTime).getTime();
-    if (Number.isNaN(resolveMs)) return "";
-
-    const diffMs = resolveMs - Date.now();
-    if (diffMs <= 0) return "ended";
-
-    const totalMinutes = Math.floor(diffMs / 60000);
-    const days = Math.floor(totalMinutes / (24 * 60));
-    const hours = Math.floor((totalMinutes % (24 * 60)) / 60);
-    const minutes = totalMinutes % 60;
-
-    if (days > 0) return `in ${days}d ${hours}h`;
-    if (hours > 0) return `in ${hours}h ${minutes}m`;
-    return `in ${minutes}m`;
+    return "Just now";
 }
 
 function getShortWallet(address: string): string {
@@ -76,37 +74,40 @@ function getStatusKey(challenge: Challenge): string {
 }
 
 function getModeLabel(mode?: string): string {
-    const normalizedMode = mode?.toLowerCase() ?? "";
-    if (normalizedMode.includes("team") || normalizedMode.includes("multi")) return "Multi Mode";
-    if (normalizedMode.includes("pvp")) return "PVP Mode";
+    const normalizedMode = mode?.toLowerCase() || "";
+    if (normalizedMode.includes("pvp")) return "PVP";
+    if (normalizedMode.includes("team") || normalizedMode.includes("multi")) return "Team";
     return mode || "Challenge";
 }
 
-function getStatusLabel(challenge: Challenge, currentTimeMs: number): string {
-    const status = getStatusKey(challenge);
-    const expireMs = new Date(challenge.expire_time).getTime();
+function getResolutionStatus(challenge: Challenge, currentTimeMs: number): string {
+    const challengeStatus = getStatusKey(challenge);
+    const resolutionStatus = challenge.resolution_status?.trim().toLowerCase();
     const resolveMs = new Date(challenge.resolve_time).getTime();
 
-    if (status === "resolved" || Boolean(challenge.resolved_at)) return "Resolved";
-    if (status === "cancelled") return "Cancelled";
-    if (status === "locked" || status === "pending_resolution") return "Resolving";
-    if (Number.isFinite(resolveMs) && resolveMs <= currentTimeMs) return "Resolving";
-    if (Number.isFinite(expireMs) && expireMs <= currentTimeMs) return "Expired";
-    return "Ongoing";
+    if (challengeStatus === "resolved" || Boolean(challenge.resolved_at)) return "Resolved";
+    if (challengeStatus === "cancelled") return "Cancelled";
+    if (resolutionStatus && !["none", "null", "pending"].includes(resolutionStatus)) {
+        return resolutionStatus
+            .split("_")
+            .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+            .join(" ");
+    }
+    if (
+        challengeStatus === "locked" ||
+        challengeStatus === "pending_resolution" ||
+        (Number.isFinite(resolveMs) && resolveMs <= currentTimeMs)
+    ) {
+        return "Resolving";
+    }
+    return "Pending";
 }
 
-function getStatusClassName(statusLabel: string): string {
-    switch (statusLabel) {
-        case "Resolved":
-            return "border-[#b8dcc8] bg-[#e8f7ee] text-[#246044]";
-        case "Resolving":
-            return "border-[#f2d28f] bg-[#fff3cf] text-[#7a5413]";
-        case "Expired":
-        case "Cancelled":
-            return "border-[#efb9ad] bg-[#fff0ed] text-[#9a3324]";
-        default:
-            return "border-[#b8d6f0] bg-[#edf7ff] text-[#24547a]";
-    }
+function getResolutionStatusClass(status: string): string {
+    if (status === "Resolved") return "border-emerald-200 bg-emerald-50 text-emerald-700";
+    if (status === "Cancelled" || status === "Failed") return "border-red-200 bg-red-50 text-red-700";
+    if (status === "Resolving") return "border-amber-200 bg-amber-50 text-amber-700";
+    return "border-sky-200 bg-sky-50 text-sky-700";
 }
 
 function getActivityCreator(challenge: Challenge) {
@@ -186,6 +187,9 @@ export default function ActivityPage() {
 
     useEffect(() => {
         function handleClickOutside(event: MouseEvent) {
+            const target = event.target as HTMLElement;
+            if (target.closest("[data-activity-filter-menu]")) return;
+
             if (typeDropdownRef.current && !typeDropdownRef.current.contains(event.target as Node)) {
                 setIsTypeDropdownOpen(false);
             }
@@ -215,7 +219,7 @@ export default function ActivityPage() {
                     position: "fixed",
                     top: typeRect.bottom + 8,
                     left: typeRect.left,
-                    width: typeRect.width,
+                    width: Math.max(typeRect.width, 224),
                     zIndex: 9999,
                 });
             } else {
@@ -227,7 +231,7 @@ export default function ActivityPage() {
                     position: "fixed",
                     top: statusRect.bottom + 8,
                     left: statusRect.left,
-                    width: statusRect.width,
+                    width: Math.max(statusRect.width, 224),
                     zIndex: 9999,
                 });
             } else {
@@ -332,6 +336,7 @@ export default function ActivityPage() {
             const mode = activity.mode?.toLowerCase() ?? "";
             const marketName = activity.market?.name?.toLowerCase() ?? "";
             const parentId = activity.market?.parent_id?.toLowerCase() ?? "";
+            const resolutionSource = activity.resolution_source?.toLowerCase() ?? "";
             const resolutionStatus = activity.resolution_status?.toLowerCase() ?? "";
             const normalizedSearch = searchQuery.trim().toLowerCase();
             const expireMs = new Date(activity.expire_time).getTime();
@@ -342,10 +347,13 @@ export default function ActivityPage() {
             const matchesType =
                 activeFilter === "All Activity" ||
                 (activeFilter === "Sports" &&
-                    (marketName.includes("sport") || parentId.includes("sport") || activity.resolution_source === "manual")) ||
-                (activeFilter === "Crypto" && !marketName.includes("sport") && activity.resolution_source !== "manual") ||
+                    (marketName.includes("sport") || parentId.includes("sport") || resolutionSource === "manual")) ||
+                (activeFilter === "Crypto" &&
+                    !marketName.includes("sport") &&
+                    !parentId.includes("sport") &&
+                    resolutionSource !== "manual") ||
                 (activeFilter === "PVP Mode" && mode.includes("pvp")) ||
-                (activeFilter === "Multi Mode" && mode.includes("multi"));
+                (activeFilter === "Multi Mode" && (mode.includes("multi") || mode.includes("team")));
 
             const matchesStatus =
                 activeStatus === "All Status" ||
@@ -504,7 +512,7 @@ export default function ActivityPage() {
                     <button
                         type="button"
                         onClick={() => setIsMobileFiltersOpen(true)}
-                        className="flex w-full cursor-pointer items-center justify-between rounded-xl border border-black/10 bg-white/80 px-4 py-3 text-sm font-medium text-gray-800 transition hover:border-black/20 hover:bg-white sm:hidden"
+                        className="flex w-full cursor-pointer items-center justify-between rounded-2xl border border-black/15 bg-white/75 px-4 py-3 text-sm font-medium text-gray-800 !shadow-none transition hover:border-black/25 hover:bg-white hover:!shadow-none active:!shadow-none sm:hidden"
                     >
                         <span>Filters</span>
                         <span className="max-w-[65%] truncate text-right text-xs text-gray-500">
@@ -512,8 +520,8 @@ export default function ActivityPage() {
                         </span>
                     </button>
 
-                    <div className="hidden w-full items-stretch gap-3 sm:grid sm:grid-cols-2 lg:w-auto">
-                        <div className="relative w-full min-w-0" ref={typeDropdownRef}>
+                    <div className="hidden w-full items-stretch gap-3 sm:flex lg:w-auto">
+                        <div className="relative w-full min-w-0 lg:w-48" ref={typeDropdownRef}>
                             <button
                                 ref={typeButtonRef}
                                 type="button"
@@ -521,9 +529,9 @@ export default function ActivityPage() {
                                     setIsTypeDropdownOpen(!isTypeDropdownOpen);
                                     setIsStatusDropdownOpen(false);
                                 }}
-                                className={`flex w-full cursor-pointer items-center justify-between gap-2 rounded-md border px-4 py-2.5 text-sm font-medium transition ${isTypeDropdownOpen
-                                    ? "border-black/25 bg-white text-gray-950"
-                                    : "border-black/15 bg-[#fffaf6]/90 text-gray-700 hover:border-black/25 hover:bg-white"
+                                className={`flex w-full cursor-pointer items-center justify-between gap-2 rounded-full border px-4 py-2.5 text-sm font-medium transition ${isTypeDropdownOpen
+                                    ? "border-black/25 bg-white text-gray-950 shadow-[3px_3px_0_rgba(0,0,0,0.2)] ring-4 ring-gray-900/[0.04]"
+                                    : "border-black/15 bg-white/70 text-gray-700 hover:border-black/25 hover:bg-white hover:shadow-[3px_3px_0_rgba(0,0,0,0.18)]"
                                     }`}
                             >
                                 <div className="flex min-w-0 items-center gap-2">
@@ -538,7 +546,7 @@ export default function ActivityPage() {
 
                         </div>
 
-                        <div className="relative w-full min-w-0" ref={statusDropdownRef}>
+                        <div className="relative w-full min-w-0 lg:w-48" ref={statusDropdownRef}>
                             <button
                                 ref={statusButtonRef}
                                 type="button"
@@ -546,9 +554,9 @@ export default function ActivityPage() {
                                     setIsStatusDropdownOpen(!isStatusDropdownOpen);
                                     setIsTypeDropdownOpen(false);
                                 }}
-                                className={`flex w-full cursor-pointer items-center justify-between gap-2 rounded-md border px-4 py-2.5 text-sm font-medium transition ${isStatusDropdownOpen
-                                    ? "border-black/25 bg-white text-gray-950"
-                                    : "border-black/15 bg-[#fffaf6]/90 text-gray-700 hover:border-black/25 hover:bg-white"
+                                className={`flex w-full cursor-pointer items-center justify-between gap-2 rounded-full border px-4 py-2.5 text-sm font-medium transition ${isStatusDropdownOpen
+                                    ? "border-black/25 bg-white text-gray-950 shadow-[3px_3px_0_rgba(0,0,0,0.2)] ring-4 ring-gray-900/[0.04]"
+                                    : "border-black/15 bg-white/70 text-gray-700 hover:border-black/25 hover:bg-white hover:shadow-[3px_3px_0_rgba(0,0,0,0.18)]"
                                     }`}
                             >
                                 <div className="flex min-w-0 items-center gap-2">
@@ -567,7 +575,7 @@ export default function ActivityPage() {
             </div>
 
             <div className="relative z-0 mx-auto max-w-5xl px-4 pb-20 sm:px-6 lg:px-8">
-                <div className="space-y-4">
+                <div className="space-y-2.5">
                     {isInitialLoading &&
                         Array.from({ length: SKELETON_CARDS_COUNT }).map((_, index) => (
                             <ActivitySkeleton key={`activity-skeleton-${index}`} />
@@ -588,14 +596,13 @@ export default function ActivityPage() {
                     {!isInitialLoading &&
                         filteredActivities.map((item) => {
                             const creator = getActivityCreator(item);
-                            const timeAgo = formatTimeAgo(item.created_at);
-                            const resolveCountdown = formatResolveCountdown(item.resolve_time);
-                            const statusLabel = getStatusLabel(item, currentTimeMs);
-                            const modeLabel = getModeLabel(item.mode);
-                            const marketName = item.market?.name || item.ticker || "Market";
                             const marketIcon = item.market?.icon || "/scribbles/btc.png";
                             const totalPool = item.total_pool || item.pool_size || item.initial_bet || 0;
                             const participantCount = item.total_challengers || item.participants || 0;
+                            const resolutionStatus = getResolutionStatus(item, currentTimeMs);
+                            const modeLabel = getModeLabel(item.mode);
+                            const endTime = getChallengeEndTime(item);
+                            const activityHeadline = getActivityHeadline(item, endTime);
 
                             return (
                                 <article
@@ -609,99 +616,54 @@ export default function ActivityPage() {
                                             handleActivityClick(item);
                                         }
                                     }}
-                                    className="group relative cursor-pointer overflow-hidden rounded-2xl border border-[#e6cfbf] bg-[#fffaf6] p-4 shadow-[3px_3px_0_rgba(45,31,26,0.10)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[#c99f7f] hover:bg-white hover:shadow-[6px_6px_0_rgba(45,31,26,0.14)] sm:p-5"
+                                    className="group cursor-pointer rounded-xl border border-[#e6d8ce] bg-white px-3 py-3 transition-colors hover:border-[#c9a58b] hover:bg-[#fffcfa] sm:px-4"
                                 >
-                                    <div className="pointer-events-none absolute inset-x-0 top-0 h-1 " />
+                                    <div className="flex items-center gap-3">
+                                        <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-[#e5d6cb] bg-[#f7eee8] sm:h-14 sm:w-14">
+                                            <Image
+                                                src={marketIcon}
+                                                alt={item.ticker || "Asset"}
+                                                width={56}
+                                                height={56}
+                                                className="h-full w-full object-cover"
+                                            />
+                                        </div>
 
-                                    <div className="relative flex flex-col gap-4 sm:flex-row sm:items-start">
-                                        <div className="flex items-start gap-3 sm:min-w-0 sm:flex-1">
-                                            <div className="relative h-14 w-14 flex-shrink-0">
-                                                <div className="h-14 w-14 overflow-hidden rounded-2xl border-2 border-[#d8bca8] bg-white">
-                                                    <Image
-                                                        src={creator.avatar}
-                                                        alt={creator.username}
-                                                        width={56}
-                                                        height={56}
-                                                        className="h-full w-full object-cover"
-                                                    />
-                                                </div>
-                                                <div className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full border border-[#e6cfbf] bg-white">
-                                                    <Image
-                                                        src={marketIcon}
-                                                        alt=""
-                                                        width={18}
-                                                        height={18}
-                                                        className="h-4 w-4 rounded-full object-cover"
-                                                    />
-                                                </div>
-                                            </div>
+                                        <div className="min-w-0 flex-1">
+                                            <h2 className="line-clamp-2 text-sm font-black leading-snug text-[#17110e] sm:text-base">
+                                                {activityHeadline}
+                                            </h2>
 
-                                            <div className="min-w-0 flex-1">
-                                                <div className="flex flex-wrap items-center gap-2">
-                                                    <Link
-                                                        href={`/profile/${creator.profileSlug}`}
-                                                        onClick={(event) => event.stopPropagation()}
-                                                        className="max-w-[12rem] truncate text-sm font-black text-[#2d1f1a] transition-colors hover:text-[#8b5e3c]"
-                                                    >
-                                                        {creator.username}
-                                                    </Link>
-                                                    {creator.wallet && (
-                                                        <span className="text-xs font-medium text-[#9b7b6c]">
-                                                            {getShortWallet(creator.wallet)}
-                                                        </span>
-                                                    )}
-                                                    <span className="text-xs text-[#b99787]">|</span>
-                                                    <span className="inline-flex items-center gap-1 text-xs font-medium text-[#7a665b]">
-                                                        <Clock className="h-3.5 w-3.5" />
-                                                        {timeAgo}
-                                                    </span>
-                                                </div>
-
-                                                <h2 className="mt-2 line-clamp-2 text-base font-black leading-snug text-[#2d1f1a] sm:text-lg">
-                                                    {item.title}
-                                                </h2>
-
-                                                <div className="mt-3 flex flex-wrap items-center gap-2">
-                                                    <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-bold ${getStatusClassName(statusLabel)}`}>
-                                                        <ShieldCheck className="h-3.5 w-3.5" />
-                                                        {statusLabel}
-                                                    </span>
-                                                    <span className="inline-flex items-center gap-1 rounded-full border border-[#e3cab7] bg-white/80 px-2.5 py-1 text-xs font-bold text-[#5c4a42]">
-                                                        <Trophy className="h-3.5 w-3.5" />
-                                                        {modeLabel}
-                                                    </span>
-                                                    <span className="inline-flex items-center gap-1 rounded-full border border-[#e3cab7] bg-white/80 px-2.5 py-1 text-xs font-bold text-[#5c4a42]">
-                                                        <BadgeDollarSign className="h-3.5 w-3.5" />
-                                                        {formatCurrency(item.initial_bet)} entry
-                                                    </span>
-                                                </div>
+                                            <div className="mt-1.5 flex min-w-0 items-center gap-1.5 text-xs text-[#8b7467]">
+                                                <Image src={creator.avatar} alt="" width={20} height={20} className="h-5 w-5 shrink-0 rounded-full object-cover" />
+                                                <Link
+                                                    href={`/profile/${creator.profileSlug}`}
+                                                    onClick={(event) => event.stopPropagation()}
+                                                    className="max-w-28 truncate font-bold text-[#4b382f] hover:text-[#8b5e3c]"
+                                                >
+                                                    {creator.username}
+                                                </Link>
+                                                <span className="hidden shrink-0 sm:inline">created this</span>
+                                                <span className="text-[#c1aa9d]">·</span>
+                                                <span className="shrink-0 font-semibold text-emerald-700">{participantCount} joined</span>
+                                                <span className="hidden text-[#c1aa9d] sm:inline">·</span>
+                                                <span className="hidden shrink-0 sm:inline">{formatCurrency(totalPool)} pool</span>
                                             </div>
                                         </div>
 
-                                        <div className="grid grid-cols-3 gap-2 rounded-xl border border-[#ecd8c9] bg-white/70 p-2 text-center sm:w-64 sm:flex-shrink-0">
-                                            <div className="min-w-0 rounded-lg bg-[#fff7df] px-2 py-2">
-                                                <p className="text-[10px] font-bold uppercase tracking-wide text-[#8a6b18]">Pool</p>
-                                                <p className="truncate text-sm font-black text-[#2d1f1a]">{formatCurrency(totalPool)}</p>
+                                        <div className="flex shrink-0 flex-col items-end gap-1.5">
+                                            <div className="flex items-center gap-1.5">
+                                                <span className="rounded-full border border-[#dfd0c6] bg-[#f8f1ec] px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-[#60483b]">
+                                                    {modeLabel}
+                                                </span>
+                                                <span className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] font-bold ${getResolutionStatusClass(resolutionStatus)}`}>
+                                                    <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                                                    {resolutionStatus}
+                                                </span>
                                             </div>
-                                            <div className="min-w-0 rounded-lg bg-[#eef8f1] px-2 py-2">
-                                                <p className="text-[10px] font-bold uppercase tracking-wide text-[#246044]">Players</p>
-                                                <p className="flex items-center justify-center gap-1 text-sm font-black text-[#2d1f1a]">
-                                                    <Users className="h-3.5 w-3.5" />
-                                                    {participantCount}
-                                                </p>
-                                            </div>
-                                            <div className="min-w-0 rounded-lg bg-[#f8ede7] px-2 py-2">
-                                                <p className="text-[10px] font-bold uppercase tracking-wide text-[#8b5e3c]">Resolves</p>
-                                                <p className="truncate text-sm font-black text-[#2d1f1a]">{resolveCountdown || "soon"}</p>
-                                            </div>
-                                            <div className="col-span-3 flex items-center justify-between gap-2 px-1 pt-1 text-left">
-                                                <div className="min-w-0">
-                                                    <p className="text-[10px] font-bold uppercase tracking-wide text-[#9b7b6c]">Market</p>
-                                                    <p className="truncate text-xs font-semibold text-[#5c4a42]">{marketName}</p>
-                                                </div>
-                                                <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-[#ead7ca] bg-white text-[#5c4a42] transition-all duration-200 group-hover:border-[#2d1f1a] group-hover:bg-[#2d1f1a] group-hover:text-[#f8ede7]">
-                                                    <ChevronRight className="h-4 w-4" />
-                                                </div>
+                                            <div className="flex items-center gap-1 text-[11px] font-medium text-[#9a8274]">
+                                                <span>{formatTimeAgo(item.created_at)}</span>
+                                                <ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
                                             </div>
                                         </div>
                                     </div>
@@ -738,18 +700,21 @@ export default function ActivityPage() {
                     <>
                         {isTypeDropdownOpen && typeDropdownStyle && (
                             <div
+                                data-activity-filter-menu="type"
                                 style={typeDropdownStyle}
-                                className="max-h-64 overflow-y-auto rounded-2xl border border-black/15 bg-white p-1.5"
+                                className="max-h-64 overflow-y-auto rounded-[3px] border-2 border-black bg-white p-1.5 shadow-none"
                             >
                                 {activityTypeOptions.map((option) => (
                                     <button
                                         key={option}
+                                        type="button"
+                                        aria-pressed={activeFilter === option}
                                         onClick={() => {
                                             setActiveFilter(option);
                                             setIsTypeDropdownOpen(false);
                                         }}
-                                        className={`flex w-full cursor-pointer items-center gap-3 rounded-2xl px-3 py-2.5 text-left text-sm transition ${activeFilter === option
-                                            ? "bg-gray-950 font-semibold text-white"
+                                        className={`flex w-full cursor-pointer items-center gap-3 border-b border-black/10 px-3 py-2.5 text-left text-sm transition last:border-b-0 ${activeFilter === option
+                                            ? "rounded-[2px] border-b-transparent bg-gray-950 font-semibold text-white"
                                             : "text-gray-700 hover:bg-gray-50 hover:text-gray-950"
                                             }`}
                                     >
@@ -764,18 +729,21 @@ export default function ActivityPage() {
 
                         {isStatusDropdownOpen && statusDropdownStyle && (
                             <div
+                                data-activity-filter-menu="status"
                                 style={statusDropdownStyle}
-                                className="max-h-64 overflow-y-auto rounded-2xl border border-black/15 bg-white p-1.5"
+                                className="max-h-64 overflow-y-auto rounded-[3px] border-2 border-black bg-white p-1.5 shadow-none"
                             >
                                 {activityStatusOptions.map((option) => (
                                     <button
                                         key={option}
+                                        type="button"
+                                        aria-pressed={activeStatus === option}
                                         onClick={() => {
                                             setActiveStatus(option);
                                             setIsStatusDropdownOpen(false);
                                         }}
-                                        className={`flex w-full cursor-pointer items-center gap-3 rounded-2xl px-3 py-2.5 text-left text-sm transition ${activeStatus === option
-                                            ? "bg-gray-950 font-semibold text-white"
+                                        className={`flex w-full cursor-pointer items-center gap-3 border-b border-black/10 px-3 py-2.5 text-left text-sm transition last:border-b-0 ${activeStatus === option
+                                            ? "rounded-[2px] border-b-transparent bg-gray-950 font-semibold text-white"
                                             : "text-gray-700 hover:bg-gray-50 hover:text-gray-950"
                                             }`}
                                     >
