@@ -281,7 +281,7 @@ export function NavbarDesktopSearch({
                 className="absolute inset-0 h-full w-full bg-black/50 backdrop-blur-sm"
             />
 
-            <div className="relative z-10 mx-2 mt-16 md:mx-auto md:mt-20 w-auto md:w-[86vw] max-w-5xl h-[calc(100vh-9rem)] md:max-h-[calc(100vh-10rem)] border-2 border-black bg-[#fff8f4] shadow-[5px_5px_0_#111] overflow-hidden flex flex-col">
+            <div className="relative z-10 mx-2 mt-16 md:mx-auto md:mt-20 w-auto md:w-[86vw] max-w-5xl h-[calc(100vh-9rem)] md:max-h-[calc(100vh-10rem)] border-2 border-black bg-[#fff8f4] overflow-hidden flex flex-col">
                 <div className="p-3 md:p-5 border-b-2 border-black">
                     <div className="flex items-stretch gap-2 md:gap-3">
                         <div className="relative flex-1">
@@ -494,7 +494,7 @@ export function NavbarDesktopSearch({
                                     return (
                                         <Link
                                             key={user.id}
-                                            href={user.pubkey ? `/profile/${user.pubkey}` : "/settings"}
+                                            href={user.pubkey ? `/profile/${user.pubkey}` : "/"}
                                             onClick={closeModal}
                                             className="group rounded-lg border-2 border-[#eadfd6] bg-white p-3 shadow-[2px_2px_0_rgba(17,17,17,0.08)] transition hover:-translate-y-0.5 hover:border-black hover:bg-[#fffaf6] hover:shadow-[3px_3px_0_#111] focus:outline-none focus:shadow-[0_0_0_4px_rgba(232,90,45,0.18)]"
                                         >

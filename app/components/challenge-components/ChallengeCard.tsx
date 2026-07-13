@@ -5,6 +5,7 @@ import Image from "next/image";
 import { AcceptChallengeModal } from "./AcceptChallengeModal";
 import { useChallengeCard } from "@/app/hooks/useChallengeCard";
 import { Challenge } from "@/app/lib/challenges-service/challenges";
+import { ShareChallengeModal } from "./ShareChallengeModal";
 
 interface ChallengeCardProps {
     challenge: Challenge;
@@ -13,6 +14,7 @@ interface ChallengeCardProps {
     onToggleBookmark?: (challengeId: string) => void;
     isBookmarked?: boolean;
     ownerAddress?: string;
+    showPin?: boolean;
 }
 
 export function ChallengeCard({
@@ -21,7 +23,11 @@ export function ChallengeCard({
     onRekt,
     onToggleBookmark,
     isBookmarked = false,
+    showPin = true,
 }: ChallengeCardProps) {
+    const [isShareModalOpen, setIsShareModalOpen] = React.useState(false);
+    const [viewOverrides, setViewOverrides] = React.useState<Record<number, number>>({});
+    const viewCount = Math.max(challenge.views ?? 0, viewOverrides[challenge.id] ?? 0);
     const {
         isLoading,
         isBetFormOpen,
@@ -35,10 +41,8 @@ export function ChallengeCard({
         closeBetForm,
         openProfile,
         handleJoinChallenge,
-        handleShareChallenge,
         assetIcon,
         assetName,
-        assetSymbol,
         creatorDisplayName,
         creatorProfileImage,
         creatorWalletAddress,
@@ -82,13 +86,44 @@ export function ChallengeCard({
         escrowAddress,
     } = useChallengeCard(challenge);
 
+    React.useEffect(() => {
+        const handleChallengeViewed = (event: Event) => {
+            const { challengeId, views } = (event as CustomEvent<{
+                challengeId: number;
+                views: number;
+            }>).detail;
+
+            if (challengeId === challenge.id) {
+                setViewOverrides((currentOverrides) => ({
+                    ...currentOverrides,
+                    [challengeId]: Math.max(currentOverrides[challengeId] ?? 0, views),
+                }));
+            }
+        };
+
+        window.addEventListener("rektofun:challenge-viewed", handleChallengeViewed);
+        return () => window.removeEventListener("rektofun:challenge-viewed", handleChallengeViewed);
+    }, [challenge.id]);
+
     const handleClick = (e: React.MouseEvent) => {
         e.stopPropagation();
+
+        const target = e.target as HTMLElement;
+        if (target.closest("button, a, input, [role='button'], [data-card-action='true']")) {
+            return;
+        }
+
         if (onClick) {
             window.setTimeout(() => onClick(challenge), 0);
         } else if (onRekt) {
             window.setTimeout(() => onRekt(challenge), 0);
         }
+    };
+
+    const openShareModal = (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsShareModalOpen(true);
     };
 
     const handleJoinChallengeWrapper = async (e: React.SubmitEvent<HTMLFormElement>) => {
@@ -188,7 +223,7 @@ export function ChallengeCard({
                         </div>
                     </div>
                     {/* Watchlist Button */}
-                    <button
+                    {showPin && <button
                         type="button"
                         onClick={handleBookmarkClick}
                         aria-label={isBookmarked ? "Remove Pin" : "Pin this"}
@@ -199,7 +234,7 @@ export function ChallengeCard({
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 17v4" />
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 3h8l-1 6 3 3H6l3-3-1-6z" />
                         </svg>
-                    </button>
+                    </button>}
                 </div>
 
                 {/* Divider */}
@@ -462,6 +497,7 @@ export function ChallengeCard({
                             disabled={ctaState.disabled}
                             onClick={(e) => {
                                 e.preventDefault();
+                                e.stopPropagation();
                                 if (ctaState.disabled) return;
                                 openBetForm(e);
                             }}
@@ -476,32 +512,6 @@ export function ChallengeCard({
                         )}
                     </div>
                 </div>
-
-                <AcceptChallengeModal
-                    isOpen={isBetFormOpen}
-                    isLoading={isLoading}
-                    usdcBalance={usdcBalance}
-                    betInput={betInput}
-                    betError={betError}
-                    betCurrency={betCurrency}
-                    minAcceptBet={modalMinAcceptBet}
-                    maxAcceptBet={modalMaxAcceptBet}
-                    escrowAddress={escrowAddress}
-                    resolveCountdown={exactCountdownDetails.exactCountdown}
-                    resolveLabel={exactCountdownDetails.dayLabel}
-                    resolutionSource={challenge.resolution_source ?? undefined}
-                    isTeam={isTeam}
-                    joinSide={joinSide}
-                    onClose={() => closeBetForm()}
-                    onSubmit={(e) => handleJoinChallengeWrapper(e)}
-                    onBetInputChange={(value) => {
-                        setBetInput(value);
-                        if (betError) {
-                            setBetError("");
-                        }
-                    }}
-                    onJoinSideChange={(side) => setJoinSide(side)}
-                />
 
                 {/* Challenge Expiry */}
                 {!isExpireTimeAchieved && (
@@ -561,7 +571,7 @@ export function ChallengeCard({
                     </div>
                     <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-3">
                         <div
-                            onClick={handleShareChallenge}
+                            onClick={openShareModal}
                             className="flex flex-col items-center p-2 rounded-lg transition-colors cursor-pointer"
                             title="Share challenge link"
                             aria-label="Share challenge link"
@@ -572,7 +582,7 @@ export function ChallengeCard({
                         </div>
                         {/* Eye Icon */}
                         <div className="flex items-center gap-1">
-                            <span className="font-semibold text-gray-900">0</span>
+                            <span className="font-semibold text-gray-900">{viewCount}</span>
                             <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
@@ -581,6 +591,31 @@ export function ChallengeCard({
                     </div>
                 </div>
             </div>
+            <AcceptChallengeModal
+                isOpen={isBetFormOpen}
+                isLoading={isLoading}
+                usdcBalance={usdcBalance}
+                betInput={betInput}
+                betError={betError}
+                betCurrency={betCurrency}
+                minAcceptBet={modalMinAcceptBet}
+                maxAcceptBet={modalMaxAcceptBet}
+                escrowAddress={escrowAddress}
+                resolveCountdown={exactCountdownDetails.exactCountdown}
+                resolveLabel={exactCountdownDetails.dayLabel}
+                resolutionSource={challenge.resolution_source ?? undefined}
+                isTeam={isTeam}
+                joinSide={joinSide}
+                onClose={() => closeBetForm()}
+                onSubmit={(e) => handleJoinChallengeWrapper(e)}
+                onBetInputChange={(value) => {
+                    setBetInput(value);
+                    if (betError) {
+                        setBetError("");
+                    }
+                }}
+                onJoinSideChange={(side) => setJoinSide(side)}
+            />
             <style jsx>{`
                 .opponent-placeholder-bg {
                     animation: opponent-bg-blink 1.5s ease-in-out infinite;
@@ -610,6 +645,7 @@ export function ChallengeCard({
                     }
                 }
             `}</style>
+            <ShareChallengeModal challenge={challenge} isOpen={isShareModalOpen} onClose={() => setIsShareModalOpen(false)} />
         </>
     );
 }

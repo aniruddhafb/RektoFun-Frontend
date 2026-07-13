@@ -1,40 +1,70 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useAppKitAccount, useAppKitProvider } from "@reown/appkit/react";
-import { PublicKey, Transaction } from "@solana/web3.js";
+import { useAppKitAccount, useAppKitNetwork, useAppKitProvider } from "@reown/appkit/react";
+import { solana, solanaDevnet } from "@reown/appkit/networks";
+import QRCode from "qrcode";
+import { Connection, PublicKey, Transaction } from "@solana/web3.js";
 import {
   TOKEN_PROGRAM_ID,
   createAssociatedTokenAccountInstruction,
   createTransferInstruction,
+  getMint,
   getAssociatedTokenAddress,
 } from "@solana/spl-token";
-import { ArrowDownToLine, ArrowUpFromLine, Check, Copy, X } from "lucide-react";
-import { USDC_MINT, USDC_MULTIPLIER, getReadonlyConnection } from "@/app/lib/rektofun-program";
+import { ArrowDownToLine, ArrowUpFromLine, ArrowUpRight, Check, ChevronDown, Copy, X } from "lucide-react";
+import { SOLANA_CLUSTER, getSolanaRpcEndpoint, getSolscanClusterQuery, getTokenMintAddress } from "@/app/lib/solana-config";
 import { useBodyScrollLock } from "@/app/lib/useBodyScrollLock";
 
 type FundsMode = "deposit" | "withdraw";
+type Asset = "usdc" | "rekto";
+type SolanaWalletProvider = {
+  signAndSendTransaction: (transaction: Transaction) => Promise<string>;
+};
+
+const ASSET_CONFIG = {
+  usdc: { mint: new PublicKey(getTokenMintAddress("usdc")) },
+  rekto: { mint: new PublicKey(getTokenMintAddress("rekto")) },
+} as const;
+const activeNetwork = SOLANA_CLUSTER === "devnet" ? solanaDevnet : solana;
+
+function formatAssetBalance(balance: number | null, maximumFractionDigits = 2) {
+  if (balance === null || !Number.isFinite(balance)) return "0";
+
+  if (Math.abs(balance) <= 10_000) {
+    return balance.toLocaleString(undefined, { maximumFractionDigits });
+  }
+
+  return new Intl.NumberFormat(undefined, {
+    notation: "compact",
+    compactDisplay: "short",
+    maximumFractionDigits: 1,
+  }).format(balance);
+}
 
 interface DepositModalProps {
   isOpen: boolean;
   onClose: () => void;
   initialMode?: FundsMode;
   usdcBalance: number | null;
+  rektoBalance: number | null;
 }
 
-export function DepositModal({ isOpen, onClose, initialMode = "deposit", usdcBalance }: DepositModalProps) {
+export function DepositModal({ isOpen, onClose, initialMode = "deposit", usdcBalance, rektoBalance }: DepositModalProps) {
   const { address, isConnected } = useAppKitAccount();
-  const { walletProvider } = useAppKitProvider("solana");
+  const { walletProvider } = useAppKitProvider<SolanaWalletProvider>("solana");
+  const { switchNetwork } = useAppKitNetwork();
 
   const [mode, setMode] = useState<FundsMode>(initialMode);
   const [copied, setCopied] = useState(false);
+  const [asset, setAsset] = useState<Asset>("usdc");
+  const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null);
   const [recipientAddress, setRecipientAddress] = useState("");
   const [amountInput, setAmountInput] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [txSignature, setTxSignature] = useState<string | null>(null);
 
-  const connection = getReadonlyConnection();
   const parsedAmount = parseFloat(amountInput) || 0;
 
   const handleClose = useCallback(() => {
@@ -46,6 +76,35 @@ export function DepositModal({ isOpen, onClose, initialMode = "deposit", usdcBal
   }, [onClose]);
 
   useBodyScrollLock(isOpen);
+
+  useEffect(() => {
+    let isCurrent = true;
+
+    if (!isOpen || mode !== "deposit" || !address) {
+      return;
+    }
+
+    QRCode.toDataURL(address, {
+      errorCorrectionLevel: "H",
+      margin: 2,
+      width: 320,
+      color: {
+        dark: "#111827",
+        light: "#ffffff",
+      },
+    })
+      .then((url) => {
+        if (isCurrent) setQrCodeUrl(url);
+      })
+      .catch((qrError) => {
+        console.error("[DepositModal] QR generation failed:", qrError);
+        if (isCurrent) setQrCodeUrl(null);
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [address, isOpen, mode]);
 
   // Escape key handler
   useEffect(() => {
@@ -60,7 +119,11 @@ export function DepositModal({ isOpen, onClose, initialMode = "deposit", usdcBal
 
   if (!isOpen) return null;
 
-  const displayBalance = usdcBalance !== null ? `$${usdcBalance.toFixed(2)}` : "$0.00";
+  const selectedBalance = asset === "usdc" ? usdcBalance : rektoBalance;
+  const assetLabel = asset.toUpperCase();
+  const solscanUrl = address
+    ? `https://solscan.io/account/${address}${getSolscanClusterQuery()}`
+    : undefined;
 
   const handleModeChange = (nextMode: FundsMode) => {
     setMode(nextMode);
@@ -69,6 +132,7 @@ export function DepositModal({ isOpen, onClose, initialMode = "deposit", usdcBal
     setTxSignature(null);
     setRecipientAddress("");
     setAmountInput("");
+    setAsset("usdc");
   };
 
   const handleCopy = async () => {
@@ -103,47 +167,52 @@ export function DepositModal({ isOpen, onClose, initialMode = "deposit", usdcBal
     }
 
     if (parsedAmount <= 0) {
-      setError("Please enter a valid USDC amount.");
+      setError(`Please enter a valid ${assetLabel} amount.`);
       return;
     }
 
-    const amountMicro = Math.floor(parsedAmount * USDC_MULTIPLIER);
-    if (amountMicro <= 0) {
-      setError("Amount must be at least 0.000001 USDC.");
-      return;
-    }
-
-    if (usdcBalance !== null && parsedAmount > usdcBalance) {
-      setError(`Insufficient USDC balance. You have ${usdcBalance.toFixed(2)} USDC.`);
+    if (selectedBalance !== null && parsedAmount > selectedBalance) {
+      setError(`Insufficient ${assetLabel} balance. You have ${selectedBalance.toLocaleString()} ${assetLabel}.`);
       return;
     }
 
     try {
       setIsSubmitting(true);
+      const config = ASSET_CONFIG[asset];
+      await switchNetwork(activeNetwork);
+      const connection = new Connection(getSolanaRpcEndpoint(), "confirmed");
+      const mintInfo = await getMint(connection, config.mint);
+      const multiplier = 10 ** mintInfo.decimals;
+      const tokenAmount = BigInt(Math.round(parsedAmount * multiplier));
+      if (tokenAmount <= BigInt(0)) {
+        setError(`Amount is below the minimum precision for ${assetLabel}.`);
+        return;
+      }
+
       const senderPubkey = new PublicKey(address);
-      const senderUsdcAta = await getAssociatedTokenAddress(USDC_MINT, senderPubkey, false);
-      const recipientUsdcAta = await getAssociatedTokenAddress(USDC_MINT, recipientPubkey, false);
+      const senderTokenAccount = await getAssociatedTokenAddress(config.mint, senderPubkey, false);
+      const recipientTokenAccount = await getAssociatedTokenAddress(config.mint, recipientPubkey, false);
 
       const tx = new Transaction();
-      const recipientAtaInfo = await connection.getAccountInfo(recipientUsdcAta);
-      
+      const recipientAtaInfo = await connection.getAccountInfo(recipientTokenAccount);
+
       if (!recipientAtaInfo) {
         tx.add(
           createAssociatedTokenAccountInstruction(
             senderPubkey,
-            recipientUsdcAta,
+            recipientTokenAccount,
             recipientPubkey,
-            USDC_MINT
+            config.mint
           )
         );
       }
 
       tx.add(
         createTransferInstruction(
-          senderUsdcAta,
-          recipientUsdcAta,
+          senderTokenAccount,
+          recipientTokenAccount,
           senderPubkey,
-          BigInt(amountMicro),
+          tokenAmount,
           [],
           TOKEN_PROGRAM_ID
         )
@@ -152,11 +221,11 @@ export function DepositModal({ isOpen, onClose, initialMode = "deposit", usdcBal
       tx.feePayer = senderPubkey;
       tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
 
-      const signedTx = await (walletProvider as any).signAndSendTransaction(tx);
+      const signedTx = await walletProvider.signAndSendTransaction(tx);
       setTxSignature(signedTx);
       setAmountInput("");
       setRecipientAddress("");
-      
+
       // Refresh balance after 2 seconds
       setTimeout(() => {
         window.location.reload();
@@ -175,7 +244,7 @@ export function DepositModal({ isOpen, onClose, initialMode = "deposit", usdcBal
         className="absolute inset-0 bg-black/45 backdrop-blur-sm"
         onClick={handleClose}
       />
-      <div className="relative z-10 w-full max-w-md overflow-hidden rounded-lg border border-[#1f2937] bg-[#fff8f4]">
+      <div className="relative z-10 max-h-[calc(100vh-2rem)] w-full max-w-md overflow-y-auto rounded-lg border border-[#1f2937] bg-[#fff8f4]">
         {/* Header */}
         <div className="border-b border-[#ead7cc] bg-white/55 px-5 py-4">
           <div className="flex items-center justify-between gap-4">
@@ -191,7 +260,7 @@ export function DepositModal({ isOpen, onClose, initialMode = "deposit", usdcBal
                 <h2 className="truncate text-lg font-black text-gray-950">
                   {mode === "deposit" ? "Deposit Funds" : "Withdraw Funds"}
                 </h2>
-                <p className="text-xs font-semibold text-[#7c6a60]">USDC</p>
+                <p className="text-xs font-semibold text-[#7c6a60]">Solana · {assetLabel}</p>
               </div>
             </div>
             <button
@@ -218,11 +287,10 @@ export function DepositModal({ isOpen, onClose, initialMode = "deposit", usdcBal
             <button
               type="button"
               onClick={() => handleModeChange("deposit")}
-              className={`flex cursor-pointer items-center justify-center gap-2 rounded px-3 py-2 text-sm font-black transition-colors ${
-                mode === "deposit"
-                  ? "bg-gray-900 text-white"
-                  : "text-gray-600 hover:bg-[#fff1e8] hover:text-gray-950"
-              }`}
+              className={`flex cursor-pointer items-center justify-center gap-2 rounded px-3 py-2 text-sm font-black transition-colors ${mode === "deposit"
+                ? "bg-gray-900 text-white"
+                : "text-gray-600 hover:bg-[#fff1e8] hover:text-gray-950"
+                }`}
             >
               <ArrowDownToLine className="h-4 w-4" strokeWidth={2.6} />
               Deposit
@@ -230,35 +298,92 @@ export function DepositModal({ isOpen, onClose, initialMode = "deposit", usdcBal
             <button
               type="button"
               onClick={() => handleModeChange("withdraw")}
-              className={`flex cursor-pointer items-center justify-center gap-2 rounded px-3 py-2 text-sm font-black transition-colors ${
-                mode === "withdraw"
-                  ? "bg-gray-900 text-white"
-                  : "text-gray-600 hover:bg-[#fff1e8] hover:text-gray-950"
-              }`}
+              className={`flex cursor-pointer items-center justify-center gap-2 rounded px-3 py-2 text-sm font-black transition-colors ${mode === "withdraw"
+                ? "bg-gray-900 text-white"
+                : "text-gray-600 hover:bg-[#fff1e8] hover:text-gray-950"
+                }`}
             >
               <ArrowUpFromLine className="h-4 w-4" strokeWidth={2.6} />
               Withdraw
             </button>
           </div>
 
-          {/* Balance */}
-          <div className="mb-4 rounded-lg border border-[#ead7cc] bg-white p-4">
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-xs font-black uppercase tracking-[0.08em] text-[#7c6a60]">
-                Current USDC Balance
-              </p>
-              <p className="text-xl font-black text-gray-950">{displayBalance}</p>
+          {/* Asset overview */}
+          <div className="mb-4 rounded-lg border border-[#ead7cc] bg-white p-3">
+            <p className="mb-2 text-xs font-black uppercase tracking-[0.08em] text-[#7c6a60]">Current assets</p>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="flex items-center gap-2 rounded-md border border-[#dce7f7] bg-[#f5f9ff] p-2.5">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/Icons/usdc.png" alt="" className="h-8 w-8" />
+                <div className="min-w-0"><p className="text-xs font-bold text-gray-500">USDC</p><p className="truncate font-black text-gray-950" title={usdcBalance?.toLocaleString()}>{formatAssetBalance(usdcBalance)}</p></div>
+              </div>
+              <div className="flex items-center gap-2 rounded-md border border-[#f0dca1] bg-[#fffbea] p-2.5">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/fav_old.png" alt="REKTO" className="h-8 w-8 rounded-full object-cover" />
+                <div className="min-w-0"><p className="text-xs font-bold text-gray-500">REKTO</p><p className="truncate font-black text-gray-950" title={rektoBalance?.toLocaleString()}>{formatAssetBalance(rektoBalance)}</p></div>
+              </div>
             </div>
+          </div>
+
+          {/* Network and asset selectors */}
+          <div className="mb-4 grid grid-cols-2 gap-3">
+            <label className="block text-xs font-black uppercase tracking-[0.08em] text-[#7c6a60]">
+              Network
+              <div className="relative mt-2">
+                <select disabled className="h-11 w-full appearance-none rounded-md border border-[#d7c5ba] bg-white px-3 pr-8 text-sm font-bold normal-case tracking-normal text-gray-900 disabled:opacity-100">
+                  <option>Solana</option>
+                </select><ChevronDown className="pointer-events-none absolute right-3 top-3.5 h-4 w-4" />
+              </div>
+            </label>
+            <label className="block text-xs font-black uppercase tracking-[0.08em] text-[#7c6a60]">
+              Asset
+              <div className="relative mt-2">
+                <select value={asset} onChange={(event) => { setAsset(event.target.value as Asset); setAmountInput(""); setError(null); }} className="h-11 w-full cursor-pointer appearance-none rounded-md border border-[#d7c5ba] bg-white px-3 pr-8 text-sm font-bold normal-case tracking-normal text-gray-900 focus:border-[#e85a2d] focus:outline-none">
+                  <option value="usdc">USDC</option><option value="rekto">REKTO</option>
+                </select><ChevronDown className="pointer-events-none absolute right-3 top-3.5 h-4 w-4" />
+              </div>
+            </label>
           </div>
 
           {/* Deposit Mode */}
           {mode === "deposit" ? (
             <>
-              <div className="mb-4 rounded-lg border border-[#f0cdbc] bg-[#fff1e8] p-3">
+              {/* <div className="mb-4 rounded-lg border border-[#f0cdbc] bg-[#fff1e8] p-3">
                 <p className="text-sm font-bold text-[#5c4035]">
-                  Only deposit Solana USDC to this wallet address.
+                  Send only {assetLabel} on Solana to this address. Other assets or networks may be lost.
                 </p>
-              </div>
+              </div> */}
+
+              {address && (
+                <div className="mb-4 flex justify-center">
+                  <div className="relative overflow-hidden rounded-2xl border-2 border-gray-900 bg-white p-2 shadow-[4px_4px_0_#111827]">
+                    {qrCodeUrl ? (
+                      // Generated from the connected Solana address returned by Reown AppKit.
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={qrCodeUrl}
+                        alt="QR code for your Solana deposit address"
+                        className="h-56 w-56"
+                      />
+                    ) : (
+                      <div className="flex h-56 w-56 items-center justify-center text-sm font-bold text-gray-500">
+                        Generating QR code…
+                      </div>
+                    )}
+                    {qrCodeUrl && (
+                      <div className="pointer-events-none absolute left-1/2 top-1/2 flex h-11 w-11 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-xl border-4 border-white bg-[#2775ca] shadow-sm">
+                        {asset === "usdc" ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src="/Icons/usdc.png" alt="" className="h-7 w-7" />
+                        ) : (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src="/fav_old.png" alt="REKTO" className="h-7 w-7 rounded-lg object-cover" />
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               <div className="mb-4 rounded-lg border border-[#ead7cc] bg-white p-4">
                 <p className="mb-2 text-xs font-black uppercase tracking-[0.08em] text-[#7c6a60]">
@@ -268,12 +393,23 @@ export function DepositModal({ isOpen, onClose, initialMode = "deposit", usdcBal
                   <p className="min-w-0 flex-1 truncate font-mono text-sm font-semibold text-gray-800">
                     {address ? address.substring(0, 8) + "..." + address.substring(32) : "Not connected"}
                   </p>
+                  <a
+                    href={solscanUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label="View wallet address on Solscan"
+                    title="View on Solscan"
+                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-[#d7c5ba] bg-white text-gray-700 transition hover:border-[#111827] hover:bg-[#f5d547] ${address ? "cursor-pointer" : "pointer-events-none cursor-not-allowed opacity-50"
+                      }`}
+                  >
+                    <ArrowUpRight className="h-4 w-4" strokeWidth={2.5} />
+                  </a>
                   <button
                     type="button"
                     onClick={handleCopy}
                     disabled={!address}
                     aria-label="Copy wallet address"
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-[#d7c5ba] bg-white text-gray-700 transition hover:border-[#111827] hover:bg-[#f5d547] disabled:cursor-not-allowed disabled:opacity-50"
+                    className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-md border border-[#d7c5ba] bg-white text-gray-700 transition hover:border-[#111827] hover:bg-[#f5d547] disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {copied ? (
                       <Check className="h-4 w-4 text-green-600" strokeWidth={2.8} />
@@ -305,12 +441,12 @@ export function DepositModal({ isOpen, onClose, initialMode = "deposit", usdcBal
               <div className="mb-4 rounded-lg border border-[#ead7cc] bg-white p-4">
                 <div className="mb-2 flex items-center justify-between gap-3">
                   <label className="block text-xs font-black uppercase tracking-[0.08em] text-[#7c6a60]">
-                    Amount (USDC)
+                    Amount ({assetLabel})
                   </label>
-                  {usdcBalance !== null && usdcBalance > 0 && (
+                  {selectedBalance !== null && selectedBalance > 0 && (
                     <button
                       type="button"
-                      onClick={() => setAmountInput(String(usdcBalance))}
+                      onClick={() => setAmountInput(String(selectedBalance))}
                       className="text-xs font-black text-[#e85a2d] hover:text-gray-950"
                     >
                       Max
@@ -342,7 +478,7 @@ export function DepositModal({ isOpen, onClose, initialMode = "deposit", usdcBal
                 <p className="mb-3 break-all rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm font-semibold text-green-700">
                   ✓ Transaction sent:{" "}
                   <a
-                    href={`https://explorer.solana.com/tx/${txSignature}?cluster=devnet`}
+                    href={`https://solscan.io/tx/${txSignature}${getSolscanClusterQuery()}`}
                     target="_blank"
                     rel="noreferrer"
                     className="underline"
@@ -360,7 +496,7 @@ export function DepositModal({ isOpen, onClose, initialMode = "deposit", usdcBal
                 className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-md bg-gray-900 py-3 text-sm font-black text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:bg-gray-500"
               >
                 <ArrowUpFromLine className="h-4 w-4" strokeWidth={2.6} />
-                {isSubmitting ? "Processing..." : "Withdraw USDC"}
+                {isSubmitting ? "Processing..." : `Withdraw ${assetLabel}`}
               </button>
             </>
           )}

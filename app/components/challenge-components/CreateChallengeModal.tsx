@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { DatePickerModal } from "./DatePickerModal";
 import { DurationPickerModal } from "./DurationPickerModal";
 import { useUserStore } from "@/app/store/useUserStore";
@@ -116,7 +117,14 @@ export function CreateChallengeModal({
         setCategoryError(null);
         try {
             const categories = await getParentCategories();
-            setParentCategories(categories);
+            const cryptoCategory = categories.find(
+                (category) => category.category.trim().toLowerCase() === "crypto"
+            );
+            setParentCategories(cryptoCategory ? [cryptoCategory] : []);
+            if (cryptoCategory) {
+                setSelectedParentCategory(cryptoCategory);
+                setSelectedChildCategory(null);
+            }
         } catch (error) {
             setCategoryError("Failed to load categories. Please try again.");
             console.error("Error fetching parent categories:", error);
@@ -198,7 +206,7 @@ export function CreateChallengeModal({
         //     isValid = false;
         // }
         if (!selectedParentCategory || !selectedChildCategory) {
-            setCategoryError("Please select a category and subcategory.");
+            setCategoryError("Please select a category and asset.");
             isValid = false;
         }
         if (!sportsResolutionConsent) {
@@ -326,15 +334,18 @@ export function CreateChallengeModal({
     };
 
 
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
+    return createPortal(
+        <div className="fixed inset-0 z-[250] flex items-center justify-center p-2 sm:p-4">
             <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={handleModalClose} />
-            <div className="rekto-modal-panel relative w-full max-w-md md:max-w-2xl max-h-[94vh] sm:max-h-[90vh] overflow-hidden flex flex-col">
+            <div
+                className="rekto-modal-panel relative w-full max-w-md md:max-w-2xl max-h-[94vh] sm:max-h-[90vh] overflow-hidden flex flex-col [&_button:not(:disabled)]:cursor-pointer"
+                style={{ animation: "none" }}
+            >
                 <div className="bg-[#f3e1d7] px-4 sm:px-6 pt-4 sm:pt-6 pb-3 sm:pb-4 border-b-2 border-black">
                     <div className="flex items-center justify-between">
                         <div className="w-8" />
-                        <h2 className="text-lg sm:text-xl md:text-2xl font-black text-gray-900 text-center drop-shadow-[2px_2px_0_#f5d547]">Create Challenge</h2>
-                        <button onClick={handleModalClose} className="w-8 h-8 flex items-center justify-center border-2 border-black bg-white shadow-[2px_2px_0_#111] hover:bg-[#f5d54 la7] transition-colors">
+                        <h2 className="text-lg sm:text-xl md:text-2xl font-black text-gray-900 text-center">Create Challenge</h2>
+                        <button type="button" onClick={handleModalClose} aria-label="Close create challenge modal" className="w-8 h-8 flex items-center justify-center border-2 border-black bg-white shadow-[2px_2px_0_#111] hover:bg-[#f5d547] transition-colors">
                             <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                             </svg>
@@ -365,33 +376,33 @@ export function CreateChallengeModal({
 
 
                     {isModeStep && (
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700">Challenge Mode</label>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <button
-                                onClick={() => setChallengeMode("pvp")}
-                                className={`min-h-28 rounded-xl border px-4 py-4 text-left transition-colors ${challengeMode === "pvp"
-                                    ? "border-gray-900 bg-gray-900 text-white shadow-[3px_3px_0_#f5d547]"
-                                    : "border-[#e8d5c8] bg-[#faf0eb] text-gray-700 hover:border-[#d4b8a8]"
-                                    }`}
-                            >
-                                <span className="block text-base font-black">PVP</span>
-                                <span className={`mt-1 block text-sm ${challengeMode === "pvp" ? "text-white/80" : "text-gray-500"}`}>One opponent accepts your exact bet.</span>
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setChallengeMode("Team")}
-                                className={`min-h-28 rounded-xl border px-4 py-4 text-left transition-colors ${challengeMode === "Team"
-                                    ? "border-gray-900 bg-gray-900 text-white shadow-[3px_3px_0_#f5d547]"
-                                    : "border-[#e8d5c8] bg-[#faf0eb] text-gray-700 hover:border-[#d4b8a8]"
-                                    }`}
-                            >
-                                <span className="block text-base font-black">Team</span>
-                                <span className={`mt-1 block text-sm ${challengeMode === "Team" ? "text-white/80" : "text-gray-500"}`}>Multiple players can join the same challenge.</span>
-                            </button>
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium text-gray-700">Challenge Mode</label>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <button
+                                    onClick={() => setChallengeMode("pvp")}
+                                    className={`min-h-28 rounded-xl border px-4 py-4 text-left transition-colors ${challengeMode === "pvp"
+                                        ? "border-gray-900 bg-gray-900 text-white shadow-[3px_3px_0_#f5d547]"
+                                        : "border-[#e8d5c8] bg-[#faf0eb] text-gray-700 hover:border-[#d4b8a8]"
+                                        }`}
+                                >
+                                    <span className="block text-base font-black">PVP</span>
+                                    <span className={`mt-1 block text-sm ${challengeMode === "pvp" ? "text-white/80" : "text-gray-500"}`}>One opponent accepts your exact bet.</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setChallengeMode("Team")}
+                                    className={`min-h-28 rounded-xl border px-4 py-4 text-left transition-colors ${challengeMode === "Team"
+                                        ? "border-gray-900 bg-gray-900 text-white shadow-[3px_3px_0_#f5d547]"
+                                        : "border-[#e8d5c8] bg-[#faf0eb] text-gray-700 hover:border-[#d4b8a8]"
+                                        }`}
+                                >
+                                    <span className="block text-base font-black">Team</span>
+                                    <span className={`mt-1 block text-sm ${challengeMode === "Team" ? "text-white/80" : "text-gray-500"}`}>Multiple players can join the same challenge.</span>
+                                </button>
+                            </div>
+                            <p className="text-xs text-gray-500">You can change this before moving forward.</p>
                         </div>
-                        <p className="text-xs text-gray-500">You can change this before moving forward.</p>
-                    </div>
                     )}
 
                     {isCategoryStep && (
@@ -401,6 +412,7 @@ export function CreateChallengeModal({
                                 <label className="text-sm font-medium text-gray-700">Category</label>
                                 <div className="relative" ref={dropdownRefs.parentCategory}>
                                     <button
+                                        type="button"
                                         onClick={() => setOpenDropdown(prev => prev === 'parentCategory' ? null : 'parentCategory')}
                                         disabled={isLoadingCategories}
                                         className="w-full flex items-center justify-between px-3 sm:px-4 py-3 bg-[#faf0eb] border border-[#e8d5c8] rounded-xl hover:border-[#d4b8a8] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
@@ -420,12 +432,13 @@ export function CreateChallengeModal({
                                         )}
                                     </button>
                                     {openDropdown === 'parentCategory' && (
-                                        <div className="absolute top-full left-0 right-0 mt-1 bg-[#faf0eb] border border-[#e8d5c8] rounded-xl shadow-lg z-10 overflow-hidden max-h-60 overflow-y-auto">
+                                        <div className="mt-1 bg-[#faf0eb] border border-[#e8d5c8] rounded-xl shadow-lg overflow-hidden max-h-60 overflow-y-auto">
                                             {parentCategories.length === 0 ? (
                                                 <div className="px-4 py-3 text-gray-500 text-sm">No categories available</div>
                                             ) : (
                                                 parentCategories.map((category) => (
                                                     <button
+                                                        type="button"
                                                         key={category.id}
                                                         onClick={() => handleParentCategorySelect(category)}
                                                         className="w-full px-4 py-3 text-left hover:bg-[#f3e1d7] transition-colors font-medium text-gray-900 flex items-center gap-2"
@@ -437,6 +450,19 @@ export function CreateChallengeModal({
                                                     </button>
                                                 ))
                                             )}
+                                            <button
+                                                type="button"
+                                                disabled
+                                                className="w-full px-4 py-3 text-left bg-gray-100 text-gray-400 font-medium flex items-center justify-between gap-3 cursor-not-allowed"
+                                            >
+                                                <span className="flex items-center gap-2">
+                                                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                                    </svg>
+                                                    Sports
+                                                </span>
+                                                <span className="text-xs font-bold uppercase tracking-wide">Coming soon</span>
+                                            </button>
                                         </div>
                                     )}
                                 </div>
@@ -446,15 +472,16 @@ export function CreateChallengeModal({
                             {/* Child Category Selection */}
                             {selectedParentCategory && (
                                 <div className="space-y-2">
-                                    <label className="text-sm font-medium text-gray-700">Subcategory</label>
+                                    <label className="text-sm font-medium text-gray-700">Asset</label>
                                     <div className="relative" ref={dropdownRefs.childCategory}>
                                         <button
+                                            type="button"
                                             onClick={() => setOpenDropdown(prev => prev === 'childCategory' ? null : 'childCategory')}
                                             disabled={isLoadingCategories || childCategories.length === 0}
                                             className="w-full flex items-center justify-between px-3 sm:px-4 py-3 bg-[#faf0eb] border border-[#e8d5c8] rounded-xl hover:border-[#d4b8a8] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                                         >
                                             <span className={`font-medium text-sm sm:text-base truncate pr-2 ${selectedChildCategory ? 'text-gray-900' : 'text-gray-500'}`}>
-                                                {selectedChildCategory ? selectedChildCategory.category : childCategories.length === 0 ? "Loading subcategories..." : "Select a subcategory"}
+                                                {selectedChildCategory ? selectedChildCategory.category : childCategories.length === 0 ? "Loading subcategories..." : "Select the asset"}
                                             </span>
                                             {isLoadingCategories ? (
                                                 <svg className="animate-spin w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24">
@@ -468,12 +495,13 @@ export function CreateChallengeModal({
                                             )}
                                         </button>
                                         {openDropdown === 'childCategory' && (
-                                            <div className="absolute top-full left-0 right-0 mt-1 bg-[#faf0eb] border border-[#e8d5c8] rounded-xl shadow-lg z-10 overflow-hidden max-h-60 overflow-y-auto">
+                                            <div className="mt-1 bg-[#faf0eb] border border-[#e8d5c8] rounded-xl shadow-lg overflow-hidden max-h-60 overflow-y-auto">
                                                 {childCategories.length === 0 ? (
                                                     <div className="px-4 py-3 text-gray-500 text-sm">No subcategories available</div>
                                                 ) : (
                                                     childCategories.map((category) => (
                                                         <button
+                                                            type="button"
                                                             key={category.id}
                                                             onClick={() => handleChildCategorySelect(category)}
                                                             className="w-full px-4 py-3 text-left hover:bg-[#f3e1d7] transition-colors font-medium text-gray-900 flex items-center gap-2"
@@ -506,47 +534,47 @@ export function CreateChallengeModal({
                     )}
 
                     {isDetailsStep && (
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700">Bet Amount</label>
-                        <div className="flex items-center gap-2">
-                            <button
-                                onClick={() => {
-                                    const newVal = Math.max(1, betAmount - 1);
-                                    setBetAmount(newVal);
-                                    setBetAmountError(newVal < 1 ? "Min bet should be $1" : null);
-                                }}
-                                className="w-10 h-10 flex items-center justify-center bg-[#faf0eb] border border-[#e8d5c8] rounded-xl hover:bg-[#f3e1d7] transition-colors text-gray-700 font-bold text-lg"
-                            >
-                                -
-                            </button>
-                            <div className="relative flex-1">
-                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 text-sm font-bold">$</span>
-                                <input
-                                    type="number"
-                                    value={betAmount}
-                                    onChange={(e) => {
-                                        const val = Number(e.target.value);
-                                        setBetAmount(val);
-                                        setBetAmountError(val < 1 ? "Min bet should be $1" : null);
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium text-gray-700">Bet Amount</label>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => {
+                                        const newVal = Math.max(1, betAmount - 1);
+                                        setBetAmount(newVal);
+                                        setBetAmountError(newVal < 1 ? "Min bet should be $1" : null);
                                     }}
-                                    step="1"
-                                    min="1"
-                                    className="w-full pl-8 pr-4 py-3 bg-[#faf0eb] border border-[#e8d5c8] rounded-xl text-lg font-semibold text-gray-900 focus:outline-none focus:border-[#d4b8a8]"
-                                />
+                                    className="w-10 h-10 flex items-center justify-center bg-[#faf0eb] border border-[#e8d5c8] rounded-xl hover:bg-[#f3e1d7] transition-colors text-gray-700 font-bold text-lg"
+                                >
+                                    -
+                                </button>
+                                <div className="relative flex-1">
+                                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 text-sm font-bold">$</span>
+                                    <input
+                                        type="number"
+                                        value={betAmount}
+                                        onChange={(e) => {
+                                            const val = Number(e.target.value);
+                                            setBetAmount(val);
+                                            setBetAmountError(val < 1 ? "Min bet should be $1" : null);
+                                        }}
+                                        step="1"
+                                        min="1"
+                                        className="w-full pl-8 pr-4 py-3 bg-[#faf0eb] border border-[#e8d5c8] rounded-xl text-lg font-semibold text-gray-900 focus:outline-none focus:border-[#d4b8a8]"
+                                    />
+                                </div>
+                                <button
+                                    onClick={() => {
+                                        const newVal = betAmount + 1;
+                                        setBetAmount(newVal);
+                                        setBetAmountError(null);
+                                    }}
+                                    className="w-10 h-10 flex items-center justify-center bg-[#faf0eb] border border-[#e8d5c8] rounded-xl hover:bg-[#f3e1d7] transition-colors text-gray-700 font-bold text-lg"
+                                >
+                                    +
+                                </button>
                             </div>
-                            <button
-                                onClick={() => {
-                                    const newVal = betAmount + 1;
-                                    setBetAmount(newVal);
-                                    setBetAmountError(null);
-                                }}
-                                className="w-10 h-10 flex items-center justify-center bg-[#faf0eb] border border-[#e8d5c8] rounded-xl hover:bg-[#f3e1d7] transition-colors text-gray-700 font-bold text-lg"
-                            >
-                                +
-                            </button>
+                            {betAmountError && <p className="text-red-500 text-sm mt-1">{betAmountError}</p>}
                         </div>
-                        {betAmountError && <p className="text-red-500 text-sm mt-1">{betAmountError}</p>}
-                    </div>
                     )}
 
                     {isDetailsStep && (
@@ -554,8 +582,8 @@ export function CreateChallengeModal({
                             <label className="text-sm font-medium text-gray-700">Predict Price Movement</label>
                             <div className="flex flex-col min-[380px]:flex-row gap-2">
                                 <div className="relative flex-1" ref={dropdownRefs.direction}>
-                                    <button 
-                                        onClick={() => setOpenDropdown(prev => prev === 'direction' ? null : 'direction')} 
+                                    <button
+                                        onClick={() => setOpenDropdown(prev => prev === 'direction' ? null : 'direction')}
                                         className="w-full flex items-center justify-between px-3 sm:px-4 py-3 bg-[#faf0eb] border border-[#e8d5c8] rounded-xl hover:border-[#d4b8a8] transition-colors"
                                     >
                                         <span className="font-semibold text-sm sm:text-base text-gray-900 truncate pr-2">Token {predictionDirection}</span>
@@ -566,12 +594,12 @@ export function CreateChallengeModal({
                                     {openDropdown === 'direction' && (
                                         <div className="absolute top-full left-0 right-0 mt-1 bg-[#faf0eb] border border-[#e8d5c8] rounded-xl shadow-lg z-10 overflow-hidden">
                                             {["Above", "Below"].map((dir) => (
-                                                <button 
-                                                    key={dir} 
-                                                    onClick={() => { 
-                                                        setPredictionDirection(dir); 
-                                                        setOpenDropdown(null); 
-                                                    }} 
+                                                <button
+                                                    key={dir}
+                                                    onClick={() => {
+                                                        setPredictionDirection(dir);
+                                                        setOpenDropdown(null);
+                                                    }}
                                                     className="w-full px-4 py-3 text-left hover:bg-[#f3e1d7] transition-colors font-medium text-gray-900"
                                                 >
                                                     Token {dir}
@@ -582,12 +610,12 @@ export function CreateChallengeModal({
                                 </div>
                                 <div className="relative w-full min-[380px]:w-32">
                                     <span className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 text-gray-500 text-base sm:text-lg">$</span>
-                                    <input 
-                                        type="number" 
-                                        value={predictionPrice} 
-                                        onChange={(e) => setPredictionPrice(e.target.value)} 
-                                        className="w-full pl-7 sm:pl-8 pr-3 sm:pr-4 py-3 bg-[#faf0eb] border border-[#e8d5c8] rounded-xl text-base sm:text-lg font-semibold text-gray-900 focus:outline-none focus:border-[#d4b8a8]" 
-                                        placeholder="66500" 
+                                    <input
+                                        type="number"
+                                        value={predictionPrice}
+                                        onChange={(e) => setPredictionPrice(e.target.value)}
+                                        className="w-full pl-7 sm:pl-8 pr-3 sm:pr-4 py-3 bg-[#faf0eb] border border-[#e8d5c8] rounded-xl text-base sm:text-lg font-semibold text-gray-900 focus:outline-none focus:border-[#d4b8a8]"
+                                        placeholder="66500"
                                     />
                                 </div>
                             </div>
@@ -595,76 +623,76 @@ export function CreateChallengeModal({
                     )}
 
                     {isDetailsStep && (
-                    <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                            <label className="text-sm font-medium text-gray-700">Challenge Expires In</label>
-                            <span className="relative group/info">
-                                <svg className="w-4 h-4 text-gray-400 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                                <span className="absolute left-0 bottom-full mb-2 px-3 py-2 text-xs text-white bg-gray-800 rounded-lg opacity-0 group-hover/info:opacity-100 transition-opacity pointer-events-none z-20 w-max max-w-[200px]">
-                                    Your challenge will expire in the selected time. If not accepted, your bet amount will be refunded.
-                                </span>
-                            </span>
-                        </div>
-                        <button onClick={() => setIsDurationPickerOpen(true)} className="w-full flex items-center justify-between px-3 sm:px-4 py-3 bg-[#faf0eb] border border-[#e8d5c8] rounded-xl hover:border-[#d4b8a8] transition-colors">
-                            <span className="font-medium text-sm sm:text-base text-gray-900 pr-2 break-words">{formatDuration(duration)}</span>
-                            <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                            </svg>
-                        </button>
-                    </div>
-                    )}
-
-                    {isDetailsStep && (
-                        <>
                         <div className="space-y-2">
                             <div className="flex items-center gap-2">
-                                <label className="text-sm font-medium text-gray-700">Challenge End Date</label>
+                                <label className="text-sm font-medium text-gray-700">Challenge Expires In</label>
                                 <span className="relative group/info">
                                     <svg className="w-4 h-4 text-gray-400 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                     </svg>
                                     <span className="absolute left-0 bottom-full mb-2 px-3 py-2 text-xs text-white bg-gray-800 rounded-lg opacity-0 group-hover/info:opacity-100 transition-opacity pointer-events-none z-20 w-max max-w-[200px]">
-                                        The challenges will get resolved on this exact selected date and time OR when the price event is triggered whichever comes first.
+                                        Your challenge will expire in the selected time. If not accepted, your bet amount will be refunded.
                                     </span>
                                 </span>
                             </div>
-                            <button onClick={() => setIsDatePickerOpen(true)} className="w-full flex items-center justify-between px-3 sm:px-4 py-3 bg-[#faf0eb] border border-[#e8d5c8] rounded-xl hover:border-[#d4b8a8] transition-colors gap-2">
-                                <span className="font-medium text-sm sm:text-base text-gray-900 break-words text-left">{formatDate(selectedDate)}</span>
+                            <button onClick={() => setIsDurationPickerOpen(true)} className="w-full flex items-center justify-between px-3 sm:px-4 py-3 bg-[#faf0eb] border border-[#e8d5c8] rounded-xl hover:border-[#d4b8a8] transition-colors">
+                                <span className="font-medium text-sm sm:text-base text-gray-900 pr-2 break-words">{formatDuration(duration)}</span>
                                 <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                                 </svg>
                             </button>
                         </div>
-                        <div className="space-y-1">
-                            <label className="flex items-start gap-2 p-3 bg-[#faf0eb] border border-[#e8d5c8] rounded-xl cursor-pointer">
-                                <input
-                                    type="checkbox"
-                                    checked={sportsResolutionConsent}
-                                    onChange={(e) => {
-                                        setSportsResolutionConsent(e.target.checked);
-                                        if (e.target.checked) setSportsResolutionConsentError(null);
+                    )}
 
-                                    }}
-                                    className="mt-0.5 h-4 w-4 rounded border-[#d4b8a8] text-gray-900 focus:ring-gray-700"
-                                />
-                                <span className="text-xs font-medium text-gray-700">
-                                    Challenge will end after the selected sport event is completed and will be resolved by the community based on the outcome of the challenge statement posted by you.
-                                </span>
-                            </label>
-                            {sportsResolutionConsentError && <p className="text-red-500 text-sm mt-1">{sportsResolutionConsentError}</p>}
-                        </div>
+                    {isDetailsStep && (
+                        <>
+                            <div className="space-y-2">
+                                <div className="flex items-center gap-2">
+                                    <label className="text-sm font-medium text-gray-700">Challenge End Date</label>
+                                    <span className="relative group/info">
+                                        <svg className="w-4 h-4 text-gray-400 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        <span className="absolute left-0 bottom-full mb-2 px-3 py-2 text-xs text-white bg-gray-800 rounded-lg opacity-0 group-hover/info:opacity-100 transition-opacity pointer-events-none z-20 w-max max-w-[200px]">
+                                            The challenges will get resolved on this exact selected date and time OR when the price event is triggered whichever comes first.
+                                        </span>
+                                    </span>
+                                </div>
+                                <button onClick={() => setIsDatePickerOpen(true)} className="w-full flex items-center justify-between px-3 sm:px-4 py-3 bg-[#faf0eb] border border-[#e8d5c8] rounded-xl hover:border-[#d4b8a8] transition-colors gap-2">
+                                    <span className="font-medium text-sm sm:text-base text-gray-900 break-words text-left">{formatDate(selectedDate)}</span>
+                                    <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                    </svg>
+                                </button>
+                            </div>
+                            <div className="space-y-1">
+                                <label className="flex items-start gap-2 p-3 bg-[#faf0eb] border border-[#e8d5c8] rounded-xl cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={sportsResolutionConsent}
+                                        onChange={(e) => {
+                                            setSportsResolutionConsent(e.target.checked);
+                                            if (e.target.checked) setSportsResolutionConsentError(null);
+
+                                        }}
+                                        className="mt-0.5 h-4 w-4 rounded border-[#d4b8a8] text-gray-900 focus:ring-gray-700"
+                                    />
+                                    <span className="text-xs font-medium text-gray-700">
+                                        Challenge will end after the selected sport event is completed and will be resolved by the community based on the outcome of the challenge statement posted by you.
+                                    </span>
+                                </label>
+                                {sportsResolutionConsentError && <p className="text-red-500 text-sm mt-1">{sportsResolutionConsentError}</p>}
+                            </div>
                         </>
                     )}
 
                     {isDetailsStep && (
-                    <div className="text-center py-2 px-1 sm:px-2">
-                        <p className="text-sm sm:text-base text-gray-700 break-words">
-                            You win <span className="font-bold text-gray-900">${(betAmount * 2 * 0.975).toFixed(4)}</span> if your statement is correct
-                        </p>
-                        <p className="text-xs text-gray-500 mt-1">6% platform fee applies</p>
-                    </div>
+                        <div className="text-center py-2 px-1 sm:px-2">
+                            <p className="text-sm sm:text-base text-gray-700 break-words">
+                                You win <span className="font-bold text-gray-900">${(betAmount * 2 * 0.975).toFixed(4)}</span> if your statement is correct
+                            </p>
+                            <p className="text-xs text-gray-500 mt-1">6% platform fee applies</p>
+                        </div>
                     )}
 
 
@@ -748,6 +776,7 @@ export function CreateChallengeModal({
 
             <DatePickerModal isOpen={isDatePickerOpen} onClose={() => setIsDatePickerOpen(false)} selectedDate={selectedDate} onSelectDate={setSelectedDate} />
             <DurationPickerModal isOpen={isDurationPickerOpen} onClose={() => setIsDurationPickerOpen(false)} selectedDuration={duration} onSelectDuration={setDuration} />
-        </div>
+        </div>,
+        document.body,
     );
 }

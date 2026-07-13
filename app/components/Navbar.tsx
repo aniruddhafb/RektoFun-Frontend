@@ -3,12 +3,13 @@
 import { useNavbar } from "@/app/hooks/useNavbar";
 import {
     NavbarAuthSection,
-    CreateProfileModal,
     NavbarNavLinks
-    
+
 } from "@/app/components/navbar-components";
 import { DepositModal } from "@/app/components/DepositModal";
 import { ReferralModal } from "@/app/components/ReferralModal";
+import { CreateProfileModal } from "@/app/components/navbar-components/CreateProfileModal";
+import { SettingsModal } from "@/app/components/SettingsModal";
 import { NavbarBrand, NavbarDesktopSearch, NavbarMobileBottomNav } from "@/app/components/navbar-components";
 export default function Navbar() {
     const {
@@ -23,47 +24,38 @@ export default function Navbar() {
         setIsDepositModalOpen,
         fundsModalMode,
         setFundsModalMode,
-        isProfileModalOpen,
         isReferralModalOpen,
         setIsReferralModalOpen,
+        isEditProfileModalOpen,
+        setIsEditProfileModalOpen,
+        isSettingsModalOpen,
+        setIsSettingsModalOpen,
         isMobileViewport,
-
-        // Profile form state
-        editUsername,
-        setEditUsername,
-        editEmail,
-        setEditEmail,
-        editBio,
-        setEditBio,
-        editProfileImageUrl,
-        editInviteCode,
-        setEditInviteCode,
-        profileFormError,
-        setProfileFormError,
 
         // User data
         userProfileData,
+        currentUser,
         displayAddress,
         displayUsername,
         usdcBalance,
+        rektoBalance,
 
         // Connection state
         isConnected,
 
         // Handlers
-        handleProfileSubmit,
-        randomizeProfile,
         handleConnect,
         handleLogout,
         handleMobileCreateClick,
         profileHref,
         isActive,
+        applyUserToState,
     } = useNavbar();
 
     return (
         <>
             {/* Development Mode Banner */}
-            <div className="fixed top-0 left-0 right-0 z-[30] border-b-2 border-black bg-[#f5d547]">
+            {/* <div className="fixed top-0 left-0 right-0 z-[30] border-b-2 border-black bg-[#f5d547]">
                 <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-center gap-2">
                     <svg className="w-4 h-4 text-amber-700 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -75,10 +67,10 @@ export default function Navbar() {
                         Currently In Devnet Mode
                     </p>
                 </div>
-            </div>
+            </div> */}
 
             {/* Main Navbar */}
-            <nav className="fixed top-8 left-0 right-0 z-[40] bg-[#f3e1d7]/95 shadow-[0_2px_0_#111] backdrop-blur-md">
+            <nav className="fixed left-0 right-0 z-[40] bg-[#f3e1d7]/95 shadow-[0_2px_0_#111] backdrop-blur-md">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex items-center justify-between h-20">
                         <NavbarBrand />
@@ -96,6 +88,8 @@ export default function Navbar() {
                             displayAddress={displayAddress || ""}
                             displayUsername={displayUsername}
                             displayProfileImage={userProfileData?.profileImage || null}
+                            isXVerified={Boolean(currentUser?.twitter_username)}
+                            isModerator={currentUser?.user_type === "moderator"}
                             usdcBalance={usdcBalance}
                             isDropdownOpen={isDropdownOpen}
                             onAuth={handleConnect}
@@ -113,13 +107,18 @@ export default function Navbar() {
                                 setIsDepositModalOpen(true);
                             }}
                             onOpenReferral={() => setIsReferralModalOpen(true)}
+                            onOpenEditProfile={() => setIsEditProfileModalOpen(true)}
+                            onOpenSettings={() => setIsSettingsModalOpen(true)}
                             profileHref={profileHref}
                             isMobileViewport={isMobileViewport}
                         />
                     </div>
                 </div>
 
-                <NavbarNavLinks isActive={isActive} />
+                <NavbarNavLinks
+                    isActive={isActive}
+                    onOpenReferral={() => setIsReferralModalOpen(true)}
+                />
             </nav>
 
             <div className="h-[88px] md:h-[128px]" />
@@ -128,43 +127,32 @@ export default function Navbar() {
                 <div className="fixed inset-0 z-[35]" onClick={() => setIsDropdownOpen(false)} />
             )}
 
-            <CreateProfileModal
-                isOpen={isProfileModalOpen}
-                editProfileImageUrl={editProfileImageUrl}
-                editUsername={editUsername}
-                editEmail={editEmail}
-                editBio={editBio}
-                editInviteCode={editInviteCode}
-                profileFormError={profileFormError}
-                onRandomizeProfile={randomizeProfile}
-                onEditUsernameChange={(value) => {
-                    setEditUsername(value);
-                    if (profileFormError) setProfileFormError(null);
-                }}
-                onEditEmailChange={(value) => {
-                    setEditEmail(value);
-                    if (profileFormError) setProfileFormError(null);
-                }}
-                onEditBioChange={(value) => {
-                    setEditBio(value);
-                    if (profileFormError) setProfileFormError(null);
-                }}
-                onEditInviteCodeChange={setEditInviteCode}
-                onSubmit={handleProfileSubmit}
-            />
-
             {isDepositModalOpen && (
                 <DepositModal
                     isOpen={isDepositModalOpen}
                     onClose={() => setIsDepositModalOpen(false)}
                     initialMode={fundsModalMode}
                     usdcBalance={usdcBalance}
+                    rektoBalance={rektoBalance}
                 />
             )}
 
             <ReferralModal
                 isOpen={isReferralModalOpen}
                 onClose={() => setIsReferralModalOpen(false)}
+            />
+
+            <CreateProfileModal
+                key={`${currentUser?.id || "none"}-${currentUser?.username || ""}-${isEditProfileModalOpen}`}
+                isOpen={isEditProfileModalOpen}
+                user={currentUser}
+                onClose={() => setIsEditProfileModalOpen(false)}
+                onSaved={applyUserToState}
+            />
+
+            <SettingsModal
+                isOpen={isSettingsModalOpen}
+                onClose={() => setIsSettingsModalOpen(false)}
             />
 
             <NavbarMobileBottomNav

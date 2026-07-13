@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { getLeaderboard, type LeaderboardUser } from "../lib/users-service/users";
+import { getLeaderboard, type LeaderboardPeriod, type LeaderboardSort, type LeaderboardUser } from "../lib/users-service/users";
 import { Search } from "lucide-react";
 
 const SparkleIcon = ({ className }: { className?: string }) => (
@@ -12,15 +12,13 @@ const SparkleIcon = ({ className }: { className?: string }) => (
     </svg>
 );
 
-const StarBadge = () => (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-        <path d="M8 1L9.5 5.5L14 6L10.5 9L11.5 13.5L8 11L4.5 13.5L5.5 9L2 6L6.5 5.5L8 1Z" fill="#f59e0b" stroke="#d97706" strokeWidth="1" />
-    </svg>
-);
-
-const DiamondIcon = () => (
-    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-        <path d="M6 2L10 6L6 10L2 6L6 2Z" fill="#9ca3af" />
+const VerifiedBadge = ({ isModerator = false }: { isModerator?: boolean }) => (
+    <svg className="h-4 w-4 shrink-0" viewBox="0 0 32 32" aria-hidden="true">
+        <path
+            fill={isModerator ? "#F5B800" : "#378FDB"}
+            d="M16 1.5l2.8 2.2 3.5-1 1.6 3.2 3.6.5.1 3.7 3 2-1.4 3.4 1.4 3.4-3 2-.1 3.7-3.6.5-1.6 3.2-3.5-1L16 30.5l-2.8-2.2-3.5 1-1.6-3.2-3.6-.5-.1-3.7-3-2 1.4-3.4-1.4-3.4 3-2 .1-3.7 3.6-.5 1.6-3.2 3.5 1L16 1.5Z"
+        />
+        <path d="m9.4 16.2 4.2 4.2 9-9" fill="none" stroke="white" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
 );
 
@@ -78,6 +76,8 @@ type LeaderboardRow = {
     walletAddress: string;
     rank: number;
     username: string;
+    twitterUsername: string | null;
+    userType: "user" | "moderator";
     avatar: string;
     winRate: number;
     winRateLabel: string;
@@ -99,20 +99,20 @@ const SortIndicator = ({ active, order }: { active: boolean; order: SortOrder })
 };
 
 function mapUserToRow(user: LeaderboardUser, rank: number): LeaderboardRow {
-    const referralCount = user.referrals?.length ?? 0;
-    const won = referralCount;
-    const rekt = Math.max(0, Math.floor(won * 0.2));
-    const profit = (user.earnings ?? 0).toFixed(1);
-    const volume = (won * 250 + rekt * 100 + Number(profit) * 5).toFixed(1);
-    const totalRounds = won + rekt;
-    const winRate = totalRounds > 0 ? Math.round((won / totalRounds) * 100) : 0;
+    const won = user.won;
+    const rekt = user.lost;
+    const profit = user.pnl.toFixed(2);
+    const volume = user.volume.toFixed(2);
+    const winRate = user.win_rate;
     const winRateLabel = `${winRate}%`;
 
     return {
         id: user.id,
         walletAddress: user.wallet_address,
-        rank,
+        rank: user.rank || rank,
         username: user.username || `user-${user.wallet_address.slice(0, 6)}`,
+        twitterUsername: user.twitter_username,
+        userType: user.user_type,
         avatar: user.profile_image || "/scribbles/pepe.png",
         winRate,
         winRateLabel,
@@ -170,6 +170,7 @@ export default function LeaderboardPage() {
     const [totalCount, setTotalCount] = useState(0);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [period, setPeriod] = useState<LeaderboardPeriod>("all");
 
     useEffect(() => {
         const timer = window.setTimeout(() => {
@@ -187,7 +188,8 @@ export default function LeaderboardPage() {
             try {
                 setIsLoading(true);
                 setError(null);
-                const response = await getLeaderboard(ITEMS_PER_PAGE, offset, debouncedSearchQuery);
+                const apiSort: LeaderboardSort = ({ winRate: "win_rate", rekt: "lost", profit: "pnl" } as const)[sortField as "winRate" | "rekt" | "profit"] || sortField as LeaderboardSort;
+                const response = await getLeaderboard(ITEMS_PER_PAGE, offset, debouncedSearchQuery, period, apiSort, sortOrder);
                 const mapped = response.users.map((user, index) => mapUserToRow(user, offset + index + 1));
                 setRows(mapped);
                 setTotalCount(response.count);
@@ -201,7 +203,7 @@ export default function LeaderboardPage() {
         };
 
         loadUsers();
-    }, [currentPage, debouncedSearchQuery]);
+    }, [currentPage, debouncedSearchQuery, period, sortField, sortOrder]);
 
     const sortedData = useMemo(() => {
         const sorted = [...rows];
@@ -234,6 +236,11 @@ export default function LeaderboardPage() {
         setSortField(field);
         setSortOrder("desc");
     };
+
+    const periods: Array<{ value: LeaderboardPeriod; label: string }> = [
+        { value: "1d", label: "1D" }, { value: "7d", label: "7D" },
+        { value: "30d", label: "30D" }, { value: "all", label: "All Time" },
+    ];
 
     return (
         <div className="rekto-page min-h-screen">
@@ -296,8 +303,8 @@ export default function LeaderboardPage() {
                     </div>
                 </div> */}
 
-                <div className="mb-6 flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
-                    <div className="relative hidden w-full sm:block lg:max-w-md lg:flex-1">
+                <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="relative w-full sm:max-w-md sm:flex-1">
                         <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                         <input
                             type="text"
@@ -309,8 +316,16 @@ export default function LeaderboardPage() {
                             className="w-full rounded-full border border-black/15 bg-white/70 py-2.5 pl-10 pr-4 text-sm text-gray-800 shadow-[2px_2px_0_rgba(0,0,0,0.16)] placeholder:text-gray-400 outline-none transition hover:shadow-[3px_3px_0_rgba(0,0,0,0.18)] focus:border-black/25 focus:bg-white focus:ring-4 focus:ring-gray-900/[0.04]"
                         />
                     </div>
-                    <div className="rounded-full border border-black/10 bg-white/60 px-4 py-2 text-sm font-semibold text-gray-600">
-                        {totalCount} {totalCount === 1 ? "user" : "users"} ranked
+                    <div className="w-full sm:w-auto">
+                        <div className="grid w-full grid-cols-4 rounded-lg border border-black/10 bg-white/70 p-1 shadow-sm backdrop-blur-sm sm:flex sm:w-auto" aria-label="Leaderboard period">
+                            {periods.map((item) => (
+                                <button key={item.value} onClick={() => { setPeriod(item.value); setCurrentPage(1); }}
+                                    aria-pressed={period === item.value}
+                                    className={`min-h-8 cursor-pointer whitespace-nowrap rounded-md border-0 px-3 py-1.5 text-xs font-bold transition-all duration-200 ${period === item.value ? "bg-gray-900 text-white shadow-sm" : "bg-transparent text-gray-500 hover:text-gray-900"}`}>
+                                    {item.label}
+                                </button>
+                            ))}
+                        </div>
                     </div>
                 </div>
 
@@ -318,7 +333,7 @@ export default function LeaderboardPage() {
                     <div className="flex flex-col gap-1 border-b border-black/10 bg-white/80 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                             <h2 className="text-lg font-black text-gray-900">User Rankings</h2>
-                            <p className="text-sm font-medium text-gray-500">Ranked by profit</p>
+                            <p className="text-sm font-medium text-gray-500">Realized performance · {periods.find((item) => item.value === period)?.label}</p>
                         </div>
                         <div className="text-sm font-semibold text-gray-600">
                             Page {Math.min(currentPage, Math.max(totalPages, 1))} of {Math.max(totalPages, 1)}
@@ -341,7 +356,7 @@ export default function LeaderboardPage() {
                                     Rekt <SortIndicator active={sortField === "rekt"} order={sortOrder} />
                                 </div>
                                 <div onClick={() => handleSort("profit")} className="col-span-2 flex cursor-pointer items-center justify-end gap-1 bg-transparent p-0 text-right font-black text-gray-500 transition hover:text-gray-900">
-                                    Profit <SortIndicator active={sortField === "profit"} order={sortOrder} />
+                                    P&amp;L <SortIndicator active={sortField === "profit"} order={sortOrder} />
                                 </div>
                                 <div onClick={() => handleSort("volume")} className="col-span-2 flex cursor-pointer items-center justify-end gap-1 bg-transparent p-0 text-right font-black text-gray-500 transition hover:text-gray-900">
                                     Volume <SortIndicator active={sortField === "volume"} order={sortOrder} />
@@ -371,15 +386,23 @@ export default function LeaderboardPage() {
                                             <span className={`flex h-8 min-w-8 items-center justify-center rounded-full border px-2 text-sm font-black ${getRankBadgeClass(user.rank)}`}>
                                                 {user.rank}
                                             </span>
-                                            {user.rank === 1 ? <StarBadge /> : <DiamondIcon />}
                                         </div>
 
                                         <div className="col-span-3 flex items-center gap-3">
                                             <div className="relative w-10 h-10 rounded-full overflow-hidden bg-gray-200 border-2 border-white shadow-sm flex-shrink-0">
                                                 <Image src={user.avatar} alt={user.username} fill className="object-cover" sizes="40px" />
                                             </div>
-                                            <div className="flex items-center gap-1.5 min-w-0">
-                                                <span className="font-semibold text-gray-900 truncate">{user.username}</span>
+                                            <div className="flex min-w-0 items-center gap-1">
+                                                <span className="truncate font-semibold text-gray-900">{user.username}</span>
+                                                {(user.userType === "moderator" || user.twitterUsername) && (
+                                                    <span
+                                                        className="inline-flex shrink-0"
+                                                        title={user.userType === "moderator" ? "Verified as KOL" : `Verified on X as @${user.twitterUsername}`}
+                                                        aria-label={user.userType === "moderator" ? "Verified as KOL" : `Verified on X as @${user.twitterUsername}`}
+                                                    >
+                                                        <VerifiedBadge isModerator={user.userType === "moderator"} />
+                                                    </span>
+                                                )}
                                             </div>
                                         </div>
 
@@ -396,7 +419,7 @@ export default function LeaderboardPage() {
                                         </div>
 
                                         <div className="col-span-2 text-right">
-                                            <span className="font-black text-gray-900">${user.profit}</span>
+                                            <span className={`font-black ${Number(user.profit) < 0 ? "text-red-600" : "text-emerald-700"}`}>{Number(user.profit) >= 0 ? "+" : "-"}${Math.abs(Number(user.profit)).toFixed(2)}</span>
                                         </div>
 
                                         <div className="col-span-2 text-right">

@@ -724,6 +724,28 @@ body {
   box-shadow: none !important;
 }
 
+/* Profile summary uses soft cards instead of the global pixel outlines. */
+.pixel-shell .profile-header-shell.profile-header-shell,
+.pixel-shell .profile-performance-panel.profile-performance-panel,
+.pixel-shell .profile-balance-panel.profile-balance-panel {
+  border: 0 !important;
+  border-radius: 0 !important;
+}
+
+.pixel-shell .profile-header-shell.profile-header-shell {
+  border: 2px solid #111 !important;
+  border-radius: 0 !important;
+}
+
+.pixel-shell .profile-header-shell :is(div, button, a, span) {
+  border-radius: 0 !important;
+}
+
+.pixel-shell .profile-header-shell .profile-avatar,
+.pixel-shell .profile-header-shell .profile-avatar * {
+  border-radius: 9999px !important;
+}
+
 .pixel-shell .challenge-card-shell.challenge-card-shell {
   box-shadow: none !important;
 }
@@ -812,6 +834,47 @@ body {
   letter-spacing: 0.14em;
   text-transform: uppercase;
   box-shadow: none;
+}
+
+/* Welcome arena opts out of the site's pixelation for crisp mascot artwork. */
+.pixel-shell .welcome-arena,
+.pixel-shell .welcome-arena button {
+  border-radius: 0 !important;
+}
+
+.pixel-shell .welcome-mascot {
+  image-rendering: auto;
+}
+
+.pixel-shell .welcome-arena button:not(:disabled),
+.pixel-shell .welcome-arena a {
+  cursor: pointer !important;
+}
+
+.pixel-shell .welcome-arena button:disabled {
+  cursor: not-allowed !important;
+}
+
+@keyframes welcome-copy-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.welcome-copy {
+  animation: welcome-copy-in 280ms ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .welcome-copy,
+  .welcome-arena {
+    animation: none !important;
+  }
 }
 
 /* Hide scrollbar for filter tabs */

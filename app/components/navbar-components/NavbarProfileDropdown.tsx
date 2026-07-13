@@ -9,6 +9,8 @@ type NavbarProfileDropdownProps = {
     displayAddress: string;
     displayUsername: string;
     displayProfileImage: string | null;
+    isXVerified: boolean;
+    isModerator: boolean;
     usdcBalance: number | null;
     isOpen: boolean;
     onClose: () => void;
@@ -19,6 +21,8 @@ type NavbarProfileDropdownProps = {
     onOpenDeposit: () => void;
     onOpenWithdraw: () => void;
     onOpenReferral: () => void;
+    onOpenEditProfile: () => void;
+    onOpenSettings: () => void;
     profileHref: string;
     isMobileViewport: boolean;
 };
@@ -71,6 +75,8 @@ export function NavbarProfileDropdown({
     displayAddress,
     displayUsername,
     displayProfileImage,
+    isXVerified,
+    isModerator,
     usdcBalance,
     isOpen,
     onClose,
@@ -81,6 +87,8 @@ export function NavbarProfileDropdown({
     onOpenDeposit,
     onOpenWithdraw,
     onOpenReferral,
+    onOpenEditProfile,
+    onOpenSettings,
     profileHref,
     isMobileViewport,
 }: NavbarProfileDropdownProps) {
@@ -116,9 +124,9 @@ export function NavbarProfileDropdown({
                         className="rounded-full object-cover flex-shrink-0"
                     />
                 )}
-                <span className="hidden sm:block text-sm font-medium text-gray-700 max-w-[100px] m-1 truncate">
+                {/* <span className="hidden sm:block text-sm font-medium text-gray-700 max-w-[100px] m-1 truncate">
                     {displayUsername}
-                </span>
+                </span> */}
                 <svg
                     className="w-4 h-4 text-gray-500"
                     fill="none"
@@ -161,9 +169,20 @@ export function NavbarProfileDropdown({
                                     />
                                 )}
                                 <div className="min-w-0">
-                                    <p className="font-black text-gray-900 truncate">
-                                        {displayUsername}
-                                    </p>
+                                    <div className="flex min-w-0 items-center gap-1.5">
+                                        <p className="truncate font-black text-gray-900">
+                                            {displayUsername}
+                                        </p>
+                                        {(isModerator || isXVerified) && (
+                                            <svg className="h-4 w-4 shrink-0" viewBox="0 0 32 32" role="img" aria-label={isModerator ? "Moderator" : "Verified on X"}>
+                                                <path
+                                                    fill={isModerator ? "#F5B800" : "#378FDB"}
+                                                    d="M16 1.5l2.8 2.2 3.5-1 1.6 3.2 3.6.5.1 3.7 3 2-1.4 3.4 1.4 3.4-3 2-.1 3.7-3.6.5-1.6 3.2-3.5-1L16 30.5l-2.8-2.2-3.5 1-1.6-3.2-3.6-.5-.1-3.7-3-2 1.4-3.4-1.4-3.4 3-2 .1-3.7 3.6-.5 1.6-3.2 3.5 1L16 1.5Z"
+                                                />
+                                                <path d="m9.4 16.2 4.2 4.2 9-9" fill="none" stroke="white" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
+                                            </svg>
+                                        )}
+                                    </div>
                                     <p className="text-xs text-gray-500 font-mono truncate">
                                         {displayAddress}
                                     </p>
@@ -256,8 +275,25 @@ export function NavbarProfileDropdown({
                             </MenuAction>
 
                             <MenuAction
-                                href="/settings"
-                                onClick={onClose}
+                                onClick={() => {
+                                    onClose();
+                                    onOpenEditProfile();
+                                }}
+                                icon={
+                                    <svg className="h-5 w-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536M9 11l6.586-6.586a2 2 0 112.828 2.828L11.828 13.828A4 4 0 019 15H7v-2a4 4 0 012-2z" />
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5h5M5 5v14h14v-5" />
+                                    </svg>
+                                }
+                            >
+                                Edit profile
+                            </MenuAction>
+
+                            <MenuAction
+                                onClick={() => {
+                                    onClose();
+                                    onOpenSettings();
+                                }}
                                 icon={
                                     <svg
                                         className="w-5 h-5 text-gray-500"

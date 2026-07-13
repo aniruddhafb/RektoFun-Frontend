@@ -1,4 +1,8 @@
-const DICEBEAR_AVATAAARS_BASE_URL = "https://api.dicebear.com/10.x/avataaars/svg";
+const DICEBEAR_STYLES = ["avataaars", "dylan"] as const;
+
+function getRandomDiceBearStyle() {
+  return DICEBEAR_STYLES[Math.floor(Math.random() * DICEBEAR_STYLES.length)];
+}
 
 export function createDiceBearSeed() {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -9,5 +13,6 @@ export function createDiceBearSeed() {
 }
 
 export function getDiceBearAvatarUrl(seed = createDiceBearSeed()) {
-  return `${DICEBEAR_AVATAAARS_BASE_URL}?seed=${encodeURIComponent(seed)}`;
+  const style = getRandomDiceBearStyle();
+  return `https://api.dicebear.com/10.x/${style}/svg?seed=${encodeURIComponent(seed)}`;
 }

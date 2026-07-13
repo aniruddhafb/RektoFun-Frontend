@@ -2,12 +2,13 @@
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  env: {
+    NEXT_PUBLIC_SOLANA_CLUSTER: process.env.SOLANA_CLUSTER,
+  },
 
   async rewrites() {
     return {
       // fallback: checked AFTER all pages, public files, AND dynamic routes.
-      // This lets app/api/sports/scores/[fixtureId]/route.ts handle its own requests
-      // before Next.js ever considers forwarding to the FastAPI backend.
       fallback: [
         {
           source: '/api/:path*',
@@ -35,6 +36,12 @@ const nextConfig = {
         hostname: 'api.dicebear.com',
         port: '',
         pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'pbs.twimg.com',
+        port: '',
+        pathname: '/profile_images/**',
       },
     ],
     dangerouslyAllowSVG: true,

@@ -34,7 +34,7 @@ export default function PrivacyPage() {
 
                 <div className="prose prose-lg max-w-none text-gray-700">
                     <p className="text-lg mb-6">
-                        Last updated: April 2026
+                        Last updated: 14 July 2026
                     </p>
 
                     <section className="mb-8">
@@ -45,7 +45,7 @@ export default function PrivacyPage() {
                             We collect information that you provide directly to us, including:
                         </p>
                         <ul className="list-disc pl-6 mb-4 space-y-2">
-                            <li>Account information (wallet address, email when provided)</li>
+                            <li>Account information (wallet address, twitter handle when provided)</li>
                             <li>Transaction data related to challenges and predictions</li>
                             <li>Communication preferences and support requests</li>
                             <li>Usage data and analytics to improve our service</li>
@@ -151,7 +151,7 @@ export default function PrivacyPage() {
                         </h2>
                         <p className="mb-4">
                             If you have any questions about this Privacy Policy, please contact us
-                            through our Twitter or email support at rektofun@gmail.com
+                            through our twitter or discord ticket support system.
                         </p>
                     </section>
                 </div>

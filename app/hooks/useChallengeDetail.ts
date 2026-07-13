@@ -354,11 +354,13 @@ export function useChallengeDetail(
   }, [isOpen, onClose]);
 
   // Handlers
-  const handleCtaClick = useCallback(() => {
-    if (ctaState.disabled) return;
+  const handleCtaClick = useCallback((): boolean => {
+    if (ctaState.disabled) return false;
     if (!isConnected) {
       open();
+      return false;
     }
+    return true;
   }, [ctaState.disabled, isConnected, open]);
 
   const handleShareChallenge = useCallback(async () => {

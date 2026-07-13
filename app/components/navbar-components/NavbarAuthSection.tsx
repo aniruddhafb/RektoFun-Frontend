@@ -1,12 +1,15 @@
 "use client";
 
 import { NavbarProfileDropdown } from "./NavbarProfileDropdown";
+import { NotificationBell } from "./NotificationBell";
 
 type NavbarAuthSectionProps = {
     authenticated: boolean;
     displayAddress: string;
     displayUsername: string;
     displayProfileImage: string | null;
+    isXVerified: boolean;
+    isModerator: boolean;
     usdcBalance: number | null;
     isDropdownOpen: boolean;
     onAuth: () => void;
@@ -18,6 +21,8 @@ type NavbarAuthSectionProps = {
     onOpenDeposit: () => void;
     onOpenWithdraw: () => void;
     onOpenReferral: () => void;
+    onOpenEditProfile: () => void;
+    onOpenSettings: () => void;
     profileHref: string;
     isMobileViewport: boolean;
 };
@@ -27,6 +32,8 @@ export function NavbarAuthSection({
     displayAddress,
     displayUsername,
     displayProfileImage,
+    isXVerified,
+    isModerator,
     usdcBalance,
     isDropdownOpen,
     onAuth,
@@ -38,6 +45,8 @@ export function NavbarAuthSection({
     onOpenDeposit,
     onOpenWithdraw,
     onOpenReferral,
+    onOpenEditProfile,
+    onOpenSettings,
     profileHref,
     isMobileViewport,
 }: NavbarAuthSectionProps) {
@@ -61,10 +70,14 @@ export function NavbarAuthSection({
                         <span className="text-sm font-semibold text-gray-900">{balanceDisplay}</span>
                     </button>
 
+                    <NotificationBell />
+
                     <NavbarProfileDropdown
                         displayAddress={displayAddress}
                         displayUsername={displayUsername}
                         displayProfileImage={displayProfileImage}
+                        isXVerified={isXVerified}
+                        isModerator={isModerator}
                         usdcBalance={usdcBalance}
                         isOpen={isDropdownOpen}
                         onClose={onCloseDropdown}
@@ -75,6 +88,8 @@ export function NavbarAuthSection({
                         onOpenDeposit={onOpenDeposit}
                         onOpenWithdraw={onOpenWithdraw}
                         onOpenReferral={onOpenReferral}
+                        onOpenEditProfile={onOpenEditProfile}
+                        onOpenSettings={onOpenSettings}
                         profileHref={profileHref}
                         isMobileViewport={isMobileViewport}
                     />

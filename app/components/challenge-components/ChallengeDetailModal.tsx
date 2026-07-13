@@ -18,9 +18,11 @@ import {
   Clock,
   AlertCircle,
 } from "lucide-react";
-import { Challenge } from "@/app/lib/challenges-service/challenges";
+import { Challenge, incrementChallengeViews } from "@/app/lib/challenges-service/challenges";
 import { User as UserType } from "@/app/lib/users-service/users";
 import { useChallengeDetail } from "@/app/hooks/useChallengeDetail";
+import { useChallengeCard } from "@/app/hooks/useChallengeCard";
+import { AcceptChallengeModal } from "./AcceptChallengeModal";
 
 interface ChallengeDetailModalProps {
   challenge: Challenge | null;
@@ -29,7 +31,109 @@ interface ChallengeDetailModalProps {
   onClose: () => void;
 }
 
+interface ChallengeAcceptActionProps {
+  challenge: Challenge;
+  ctaState: {
+    label: string;
+    disabled: boolean;
+    className: string;
+    showCreatorHint: boolean;
+  };
+  canOpen: () => boolean;
+  onOpenChange: (isOpen: boolean) => void;
+}
+
+function ChallengeAcceptAction({
+  challenge,
+  ctaState,
+  canOpen,
+  onOpenChange,
+}: ChallengeAcceptActionProps) {
+  const {
+    isLoading,
+    isBetFormOpen,
+    betInput,
+    betError,
+    joinSide,
+    usdcBalance,
+    escrowAddress,
+    modalMinAcceptBet,
+    modalMaxAcceptBet,
+    betCurrency,
+    exactCountdownDetails,
+    isTeam,
+    setBetInput,
+    setBetError,
+    setJoinSide,
+    openBetForm,
+    closeBetForm,
+    handleJoinChallenge,
+  } = useChallengeCard(challenge);
+
+  React.useEffect(() => {
+    onOpenChange(isBetFormOpen);
+    return () => onOpenChange(false);
+  }, [isBetFormOpen, onOpenChange]);
+
+  const handleOpen = (event: React.MouseEvent<HTMLButtonElement>) => {
+    if (!canOpen()) return;
+    openBetForm(event);
+  };
+
+  const handleSubmit = async (event: React.SubmitEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    await handleJoinChallenge();
+  };
+
+  return (
+    <>
+      <div className="group relative flex-1">
+        <button
+          type="button"
+          disabled={ctaState.disabled || isLoading}
+          onClick={handleOpen}
+          className={ctaState.className}
+        >
+          {isLoading ? "JOINING..." : ctaState.label}
+        </button>
+        {ctaState.showCreatorHint && (
+          <div className="pointer-events-none absolute left-1/2 bottom-full z-10 mb-1 -translate-x-1/2 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+            You created this challenge
+          </div>
+        )}
+      </div>
+
+      <AcceptChallengeModal
+        isOpen={isBetFormOpen}
+        isLoading={isLoading}
+        usdcBalance={usdcBalance}
+        betInput={betInput}
+        betError={betError}
+        betCurrency={betCurrency}
+        minAcceptBet={modalMinAcceptBet}
+        maxAcceptBet={modalMaxAcceptBet}
+        escrowAddress={escrowAddress}
+        resolveCountdown={exactCountdownDetails.exactCountdown}
+        resolveLabel={exactCountdownDetails.dayLabel}
+        resolutionSource={challenge.resolution_source ?? undefined}
+        isTeam={isTeam}
+        joinSide={joinSide}
+        onClose={() => closeBetForm()}
+        onSubmit={handleSubmit}
+        onBetInputChange={(value) => {
+          setBetInput(value);
+          if (betError) setBetError("");
+        }}
+        onJoinSideChange={setJoinSide}
+      />
+    </>
+  );
+}
+
 export default function ChallengeDetailModal({ challenge, creator, isOpen, onClose }: ChallengeDetailModalProps) {
+  const [isAcceptModalOpen, setIsAcceptModalOpen] = React.useState(false);
+  const lastCountedChallengeIdRef = React.useRef<number | null>(null);
+  const challengeId = challenge?.id;
   const resolvedCreator = creator ?? challenge?.creator_details ?? null;
   const {
     modalRef,
@@ -49,7 +153,6 @@ export default function ChallengeDetailModal({ challenge, creator, isOpen, onClo
     betAmount,
     creatorWalletShort,
     canExpandTitle,
-    displayedTitle,
     targetPrice,
     currentPrice,
     priceChange,
@@ -67,8 +170,6 @@ export default function ChallengeDetailModal({ challenge, creator, isOpen, onClo
     creatorOutcomeText,
     opponentOutcomeText,
     isManualResolution,
-    isResolutionPending,
-    isResolutionResolved,
     showResolvesBox,
     hideExpiresBox,
     isExpireTimeAchieved,
@@ -90,20 +191,44 @@ export default function ChallengeDetailModal({ challenge, creator, isOpen, onClo
     handleShareChallenge,
     openProfile,
     onClose: handleClose,
-  } = useChallengeDetail(challenge, resolvedCreator, isOpen, onClose);
+  } = useChallengeDetail(challenge, resolvedCreator, isOpen && !isAcceptModalOpen, onClose);
+
+  React.useEffect(() => {
+    if (!isOpen || challengeId === undefined) {
+      lastCountedChallengeIdRef.current = null;
+      return;
+    }
+
+    if (lastCountedChallengeIdRef.current === challengeId) return;
+    lastCountedChallengeIdRef.current = challengeId;
+
+    incrementChallengeViews(challengeId)
+      .then((views) => {
+        window.dispatchEvent(new CustomEvent("rektofun:challenge-viewed", {
+          detail: { challengeId, views },
+        }));
+      })
+      .catch((error) => {
+        console.error("Failed to record challenge view:", error);
+      });
+  }, [isOpen, challengeId]);
 
   if (!isOpen || !challenge) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[10010] flex items-center justify-center overflow-hidden bg-black/55 p-2 backdrop-blur-sm animate-in fade-in duration-200 sm:p-4">
+    <div className="fixed inset-0 z-[10010] flex items-center justify-center overflow-hidden bg-black/55 p-2 backdrop-blur-sm sm:p-4">
       <div
         ref={modalRef}
-        className="rekto-modal-panel relative flex max-h-[94vh] w-full max-w-5xl flex-col overflow-hidden bg-[#fff8f4] animate-in zoom-in-95 duration-300"
-        style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+        className="rekto-modal-panel relative flex max-h-[94vh] w-full max-w-5xl flex-col overflow-hidden bg-[#fff8f4]"
+        style={{ animation: "none" }}
       >
         <style>{`
           .no-scrollbar::-webkit-scrollbar { display: none; }
           .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+          .challenge-detail-scrollbar { scrollbar-width: thin; scrollbar-color: #8b7355 transparent; }
+          .challenge-detail-scrollbar::-webkit-scrollbar { width: 4px; }
+          .challenge-detail-scrollbar::-webkit-scrollbar-track { background: transparent; }
+          .challenge-detail-scrollbar::-webkit-scrollbar-thumb { background: #8b7355; border-radius: 999px; }
           @keyframes liveSweep {
             0% { transform: translateX(-100%); }
             100% { transform: translateX(220%); }
@@ -123,7 +248,7 @@ export default function ChallengeDetailModal({ challenge, creator, isOpen, onClo
         </button>
 
         {/* Main Content */}
-        <div className="relative overflow-y-auto overflow-x-hidden p-4 sm:p-6 lg:p-8">
+        <div className="challenge-detail-scrollbar relative overflow-y-auto overflow-x-hidden p-4 sm:p-6 lg:p-8">
           {/* Header Section */}
           <div className="mb-6 rounded-lg border-2 border-black bg-white p-4 shadow-[4px_4px_0_#111] sm:p-5">
             <div className="flex flex-col gap-5 lg:flex-row lg:items-start">
@@ -564,21 +689,12 @@ export default function ChallengeDetailModal({ challenge, creator, isOpen, onClo
 
           {/* Action Buttons */}
           <div className="mt-6 flex flex-col gap-3 border-t-2 border-black bg-[#fff8f4] pt-4 sm:flex-row">
-            <div className="group relative flex-1">
-              <button
-                type="button"
-                disabled={ctaState.disabled}
-                onClick={handleCtaClick}
-                className={ctaState.className}
-              >
-                {ctaState.label}
-              </button>
-              {ctaState.showCreatorHint && (
-                <div className="pointer-events-none absolute left-1/2 bottom-full z-10 mb-1 -translate-x-1/2 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
-                  You created this challenge
-                </div>
-              )}
-            </div>
+            <ChallengeAcceptAction
+              challenge={challenge}
+              ctaState={ctaState}
+              canOpen={handleCtaClick}
+              onOpenChange={setIsAcceptModalOpen}
+            />
             <button
               type="button"
               onClick={handleShareChallenge}

@@ -4,8 +4,10 @@ export interface CreateUserParams {
   pubkey?: string;
   wallet_address?: string;
   profile_image?: string;
+  twitter_profile_image?: string | null;
   bio?: string;
   description?: string;
+  twitter_username?: string | null;
   referrer_code?: string;
 }
 
@@ -15,8 +17,10 @@ export interface UpdateUserParams {
   pubkey?: string;
   wallet_address?: string;
   profile_image?: string;
+  twitter_profile_image?: string | null;
   bio?: string;
   description?: string;
+  twitter_username?: string | null;
 }
 
 export interface User {
@@ -26,8 +30,10 @@ export interface User {
   pubkey: string;
   wallet_address: string;
   profile_image: string;
+  twitter_profile_image: string | null;
   bio: string;
   description: string;
+  twitter_username: string | null;
   created_at: string;
   followers?: Array<number | string>;
   following?: Array<number | string>;
@@ -35,12 +41,22 @@ export interface User {
   referral_code: string;
   referred_by: string | null;
   earnings?: number;
+  user_type: "user" | "moderator";
 }
+
+export type LeaderboardPeriod = "1d" | "7d" | "30d" | "all";
+export type LeaderboardSort = "rank" | "win_rate" | "won" | "lost" | "pnl" | "volume";
 
 export type LeaderboardUser = Omit<User, "id" | "followers" | "following"> & {
   id: string;
   followers: string[];
   following: string[];
+  rank: number;
+  won: number;
+  lost: number;
+  win_rate: number;
+  pnl: number;
+  volume: number;
 };
 
 export interface GetUsersResponse {
@@ -51,6 +67,13 @@ export interface GetUsersResponse {
 export interface LeaderboardResponse {
   users: LeaderboardUser[];
   count: number;
+  period: LeaderboardPeriod;
+  summary: {
+    total_users: number;
+    total_challenges: number;
+    total_volume: number;
+    total_pnl: number;
+  };
 }
 
 export interface GetUsersParams {
@@ -72,8 +95,10 @@ type BackendUser = {
   pubkey?: string | null;
   wallet_address?: string | null;
   profile_image?: string | null;
+  twitter_profile_image?: string | null;
   bio?: string | null;
   description?: string | null;
+  twitter_username?: string | null;
   created_at: string;
   followers?: Array<number | string> | null;
   following?: Array<number | string> | null;
@@ -81,6 +106,7 @@ type BackendUser = {
   referral_code?: string | null;
   referred_by?: string | null;
   earnings?: number | null;
+  user_type?: "user" | "moderator" | null;
 };
 
 function normalizeUser(user: BackendUser): User {
@@ -94,8 +120,10 @@ function normalizeUser(user: BackendUser): User {
     pubkey: user.pubkey || walletAddress,
     wallet_address: walletAddress,
     profile_image: user.profile_image || "",
+    twitter_profile_image: user.twitter_profile_image || null,
     bio,
     description: bio,
+    twitter_username: user.twitter_username || null,
     created_at: user.created_at,
     followers: user.followers || [],
     following: user.following || [],
@@ -103,6 +131,7 @@ function normalizeUser(user: BackendUser): User {
     referral_code: user.referral_code || "",
     referred_by: user.referred_by || null,
     earnings: user.earnings || 0,
+    user_type: user.user_type || "user",
   };
 }
 
@@ -112,7 +141,9 @@ function toBackendUserPayload(params: CreateUserParams | UpdateUserParams) {
     email: params.email,
     pubkey: params.pubkey || params.wallet_address,
     profile_image: params.profile_image,
+    twitter_profile_image: params.twitter_profile_image,
     bio: params.bio ?? params.description,
+    twitter_username: params.twitter_username,
     referrer_code: "referrer_code" in params ? params.referrer_code : undefined,
   };
 }
@@ -240,15 +271,43 @@ export async function getUserByPubkey(pubkey: string): Promise<User> {
 
 export const getUserByWallet = getUserByPubkey;
 
+export type ReferralHistory = {
+  commissions: Array<{ amount: number; created_at: string }>;
+  redemptions: Array<{ amount: number; status: "pending" | "paid" | "rejected"; requested_at: string }>;
+};
+
+export async function getReferralHistory(walletAddress: string): Promise<ReferralHistory> {
+  const response = await fetch(`${API_BASE_URL}/users/referral-history/${encodeURIComponent(walletAddress)}`);
+  if (!response.ok) throw await parseError(response, "Failed to load referral history");
+  return response.json();
+}
+
+export async function requestReferralRedemption(walletAddress: string): Promise<User> {
+  const response = await fetch(`${API_BASE_URL}/users/referral-redemptions`, {
+    method: "POST",
+    headers: { accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify({ wallet_address: walletAddress }),
+  });
+  if (!response.ok) throw await parseError(response, "Failed to create redemption request");
+  return normalizeUser(await response.json());
+}
+
 export async function getLeaderboard(
   limit = 100,
   offset = 0,
   search?: string,
+  period: LeaderboardPeriod = "all",
+  sort: LeaderboardSort = "pnl",
+  order: "asc" | "desc" = "desc",
 ): Promise<LeaderboardResponse> {
   const queryParams = new URLSearchParams();
 
   queryParams.append("limit", limit.toString());
   queryParams.append("offset", offset.toString());
+  queryParams.append("period", period);
+  queryParams.append("sort", sort);
+  queryParams.append("order", order);
+  if (search?.trim()) queryParams.append("search", search.trim());
 
   const response = await fetch(`${API_BASE_URL}/users/leaderboard?${queryParams.toString()}`, {
     method: "GET",
@@ -262,37 +321,39 @@ export async function getLeaderboard(
   }
 
   const data = await response.json();
-  const leaderboardResponse: { users: User[]; total: number } = {
-    users: ((data.users || []) as BackendUser[]).map(normalizeUser),
-    total: data.total || 0,
-  };
-  const normalizedSearch = search?.trim().toLowerCase();
-  const users = normalizedSearch
-    ? leaderboardResponse.users.filter((user) =>
-        user.username.toLowerCase().includes(normalizedSearch) ||
-        user.wallet_address.toLowerCase().includes(normalizedSearch),
-      )
-    : leaderboardResponse.users;
+  const users = (data.users || []).map((rawUser: BackendUser & {
+    rank: number; won: number; lost: number; win_rate: number; pnl: number; volume: number;
+  }) => ({ ...normalizeUser(rawUser), ...rawUser }));
 
   return {
-    users: users.map((user) => ({
+    users: users.map((user: User & { rank: number; won: number; lost: number; win_rate: number; pnl: number; volume: number }) => ({
       ...user,
       id: String(user.id),
       followers: (user.followers || []).map(String),
       following: (user.following || []).map(String),
     })),
-    count: normalizedSearch ? users.length : leaderboardResponse.total,
+    count: data.total || 0,
+    period: data.period || period,
+    summary: data.summary || { total_users: 0, total_challenges: 0, total_volume: 0, total_pnl: 0 },
   };
 }
 
-export async function followUser(targetWalletAddress: string, _viewerWalletAddress: string): Promise<User> {
-  void _viewerWalletAddress;
-  return getUserByWallet(targetWalletAddress);
+async function setFollowing(targetWalletAddress: string, viewerWalletAddress: string, follow: boolean): Promise<User> {
+  const response = await fetch(`${API_BASE_URL}/users/${encodeURIComponent(targetWalletAddress)}/follow`, {
+    method: follow ? "POST" : "DELETE",
+    headers: { accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify({ follower_wallet: viewerWalletAddress }),
+  });
+  if (!response.ok) throw await parseError(response, `Failed to ${follow ? "follow" : "unfollow"} user`);
+  return normalizeUser(await response.json());
 }
 
-export async function unfollowUser(targetWalletAddress: string, _viewerWalletAddress: string): Promise<User> {
-  void _viewerWalletAddress;
-  return getUserByWallet(targetWalletAddress);
+export async function followUser(targetWalletAddress: string, viewerWalletAddress: string): Promise<User> {
+  return setFollowing(targetWalletAddress, viewerWalletAddress, true);
+}
+
+export async function unfollowUser(targetWalletAddress: string, viewerWalletAddress: string): Promise<User> {
+  return setFollowing(targetWalletAddress, viewerWalletAddress, false);
 }
 
 export async function acceptReferral(walletAddress: string, referralCode: string): Promise<User> {
