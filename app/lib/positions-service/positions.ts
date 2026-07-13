@@ -85,3 +85,18 @@ export async function getPositionById(id: number): Promise<Position> {
 
   return response.json();
 }
+
+export async function getPositionsByChallenge(challengeId: number): Promise<Position[]> {
+  const response = await fetch(`${API_BASE_URL}/positions/by-challenge/${encodeURIComponent(challengeId)}`, {
+    method: 'GET',
+    headers: {
+      'accept': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch challenge participants: ${response.statusText}`);
+  }
+
+  return response.json();
+}

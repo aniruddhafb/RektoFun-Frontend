@@ -7,6 +7,7 @@ import { getUserByWallet, createUser, type User } from "@/app/lib/users-service/
 import { useUserStore } from "@/app/store/useUserStore";
 import { useBodyScrollLock } from "@/app/lib/useBodyScrollLock";
 import { getDiceBearAvatarUrl } from "@/app/lib/profile-avatar";
+import { clearPendingReferralCode, getPendingReferralCode } from "@/app/lib/referral-attribution";
 
 export function UserOnboarding() {
   const { address, isConnected } = useAppKitAccount();
@@ -26,16 +27,12 @@ export function UserOnboarding() {
 
   useBodyScrollLock(isOpen);
 
-  const getRefCodeFromUrl = () => {
-    if (typeof window === "undefined") return "";
-    return new URLSearchParams(window.location.search).get("ref") || "";
-  };
-
   const handleUserLoaded = useCallback(
     (loadedUser: User) => {
       setUser(loadedUser);
       setCheckedWallet(loadedUser.wallet_address || null);
       setIsOpen(false);
+      clearPendingReferralCode();
     },
     [setUser]
   );
@@ -98,17 +95,19 @@ export function UserOnboarding() {
     setIsSubmitting(true);
 
     try {
+      const pendingReferralCode = getPendingReferralCode();
       const createdUser = await createUser({
         username: username.trim(),
         wallet_address: address,
         profile_image: profileImageUrl,
         description: bio.trim(),
-        referrer_code: getRefCodeFromUrl() || undefined,
+        referrer_code: pendingReferralCode || undefined,
       });
 
       setUser(createdUser);
       setCheckedWallet(createdUser.wallet_address);
       setIsOpen(false);
+      clearPendingReferralCode();
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to create account.";
       setError(message);

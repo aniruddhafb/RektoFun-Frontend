@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import "./globals.css";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 import { Analytics } from "@vercel/analytics/next";
 import ReownProvider from "./providers/reown-provider";
+import { ReferralAttributionCapture } from "./components/ReferralAttributionCapture";
 
 import { WelcomeTutorialModal } from "./components/homepage-components";
 
@@ -90,6 +92,9 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col">
         <ReownProvider>
           <div className="pixel-shell min-h-screen flex flex-col">
+            <Suspense fallback={null}>
+              <ReferralAttributionCapture />
+            </Suspense>
             <WelcomeTutorialModal />
             <Navbar />
             <main className="flex-1 mt-12 md:mt-8">{children}</main>

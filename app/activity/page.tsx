@@ -18,6 +18,7 @@ import {
     getChallenges,
 } from "@/app/lib/challenges-service/challenges";
 import { useBodyScrollLock } from "@/app/lib/useBodyScrollLock";
+import { stripUsdcQuote } from "@/app/lib/format-market-label";
 
 type ActivityType = "All Activity" | "Sports" | "Crypto" | "PVP Mode" | "Multi Mode";
 type ActivityStatus = "All Status" | "Expired" | "Ongoing" | "Resolved" | "Resolving" | "Completed";
@@ -38,7 +39,7 @@ function getChallengeEndTime(challenge: Challenge): string {
 }
 
 function getActivityHeadline(challenge: Challenge, endTime: string): string {
-    const statement = challenge.statement?.trim() || challenge.title?.trim() || "Challenge";
+    const statement = stripUsdcQuote(challenge.statement?.trim() || challenge.title?.trim()) || "Challenge";
     if (!endTime || /\bby\s+\d{1,2}\s+[a-z]+\s+\d{4}\b/i.test(statement)) return statement;
 
     const endDate = new Intl.DateTimeFormat(undefined, {

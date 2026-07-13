@@ -1,9 +1,26 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { DatePickerModal } from "./DatePickerModal";
-import { DurationPickerModal } from "./DurationPickerModal";
+import {
+    Activity,
+    ArrowLeft,
+    CalendarDays,
+    Check,
+    CircleDollarSign,
+    Clock3,
+    Coins,
+    Loader2,
+    MessageSquareText,
+    ShieldCheck,
+    Swords,
+    Trophy,
+    Eye,
+    Users,
+    Wallet,
+    X,
+    Zap,
+} from "lucide-react";
 import { useUserStore } from "@/app/store/useUserStore";
 import { useBodyScrollLock } from "@/app/lib/useBodyScrollLock";
 import { useAppKit, useAppKitAccount, useAppKitProvider } from "@reown/appkit/react";
@@ -11,6 +28,7 @@ import { getParentCategories, getCategoriesByParent, Category } from "@/app/lib/
 import { createChallenge } from "@/app/lib/challenges-service/challenges";
 import { Transaction } from "@solana/web3.js";
 import { getReadonlyConnection } from "@/app/lib/rektofun-program";
+import { stripUsdcQuote } from "@/app/lib/format-market-label";
 
 interface CreateChallengeModalProps {
     isOpen: boolean;
@@ -19,233 +37,337 @@ interface CreateChallengeModalProps {
 }
 
 type TxStatus = "idle" | "building" | "signing" | "confirming" | "success" | "error";
-type CreateChallengeStep = "mode" | "category" | "details";
+type MarketType = "crypto" | "sports";
+type ChallengeFormat = "price" | "statement";
+type ChallengeMode = "pvp" | "team";
+type ComposerPanel = "topic" | "stake" | "timing" | "players" | null;
+type AssetPriceState = {
+    key: string;
+    asset: string;
+    currentPrice: number | null;
+    status: "ready" | "failed";
+};
 
+const MAX_STATEMENT_LENGTH = 220;
+const MIN_DURATION_MINUTES = 5;
+const MAX_DURATION_MINUTES = 7 * 24 * 60;
 
-export function CreateChallengeModal({
-    isOpen,
-    onClose,
-    onCreated,
-}: CreateChallengeModalProps) {
-    // Step and mode
-    const [currentStep, setCurrentStep] = useState<CreateChallengeStep>("mode");
-    const [challengeMode, setChallengeMode] = useState<"pvp" | "Team">("pvp");
+const formatDuration = (duration: { hours: number; minutes: number }) => {
+    const totalMinutes = duration.hours * 60 + duration.minutes;
+    if (totalMinutes <= 0) return "Set window";
+    const days = Math.floor(totalMinutes / 1440);
+    const hours = Math.floor((totalMinutes % 1440) / 60);
+    const minutes = totalMinutes % 60;
+    return [days ? `${days}d` : "", hours ? `${hours}h` : "", minutes ? `${minutes}m` : ""]
+        .filter(Boolean)
+        .join(" ");
+};
 
-    // Challenge details
+const formatDate = (date: Date) =>
+    date.toLocaleString("en-US", {
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+    });
+
+const toDateTimeLocalValue = (date: Date) => {
+    const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60 * 1000);
+    return localDate.toISOString().slice(0, 16);
+};
+
+const durationFromMinutes = (totalMinutes: number) => ({
+    hours: Math.floor(totalMinutes / 60),
+    minutes: totalMinutes % 60,
+});
+
+const formatPrice = (value: string) => {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed) || parsed <= 0) return "$—";
+    return new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: "USD",
+        maximumFractionDigits: parsed < 1 ? 6 : 2,
+    }).format(parsed);
+};
+
+const targetPriceInputValue = (value: number) => {
+    if (!Number.isFinite(value) || value <= 0) return "";
+    const decimals = value >= 1 ? 2 : value >= 0.01 ? 4 : 8;
+    return value.toFixed(decimals).replace(/\.?0+$/, "");
+};
+
+export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChallengeModalProps) {
+    const [marketType, setMarketType] = useState<MarketType>("crypto");
+    const [challengeFormat, setChallengeFormat] = useState<ChallengeFormat>("price");
+    const [challengeMode, setChallengeMode] = useState<ChallengeMode>("pvp");
+    const [statement, setStatement] = useState("");
     const [betAmount, setBetAmount] = useState(1);
-    const [betAmountError, setBetAmountError] = useState<string | null>(null);
-    const [predictionDirection, setPredictionDirection] = useState("Above");
-    const [predictionPrice, setPredictionPrice] = useState("66500");
+    const [predictionDirection, setPredictionDirection] = useState<"Above" | "Below">("Above");
+    const [predictionPrice, setPredictionPrice] = useState("");
+    const [assetPriceState, setAssetPriceState] = useState<AssetPriceState>({
+        key: "",
+        asset: "",
+        currentPrice: null,
+        status: "failed",
+    });
     const [selectedDate, setSelectedDate] = useState(() => new Date(Date.now() + 24 * 60 * 60 * 1000));
+    const [composerNow] = useState(() => Date.now());
     const [duration, setDuration] = useState({ hours: 4, minutes: 0 });
-    const [sportsResolutionConsent, setSportsResolutionConsent] = useState(false);
-    const [sportsResolutionConsentError, setSportsResolutionConsentError] = useState<string | null>(null);
 
-    // UI state
-    const [openDropdown, setOpenDropdown] = useState<string | null>(null);
-    const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
-    const [isDurationPickerOpen, setIsDurationPickerOpen] = useState(false);
-
-    // Transaction state
-    const [txStatus, setTxStatus] = useState<TxStatus>("idle");
-    const [txSignature, setTxSignature] = useState<string | null>(null);
-    const [isSubmitting, setIsSubmitting] = useState(false);
-
-    // Category state
-    const [parentCategories, setParentCategories] = useState<Category[]>([]);
+    const [activePanel, setActivePanel] = useState<ComposerPanel>(null);
+    const [isPreviewOpen, setIsPreviewOpen] = useState(false);
     const [childCategories, setChildCategories] = useState<Category[]>([]);
-    const [selectedParentCategory, setSelectedParentCategory] = useState<Category | null>(null);
     const [selectedChildCategory, setSelectedChildCategory] = useState<Category | null>(null);
     const [isLoadingCategories, setIsLoadingCategories] = useState(false);
     const [categoryError, setCategoryError] = useState<string | null>(null);
+    const [formError, setFormError] = useState<string | null>(null);
 
+    const [txStatus, setTxStatus] = useState<TxStatus>("idle");
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const statementRef = useRef<HTMLTextAreaElement>(null);
+    const priceRef = useRef<HTMLInputElement>(null);
     const { user } = useUserStore();
     const { open } = useAppKit();
     const { address, isConnected } = useAppKitAccount();
     const { walletProvider } = useAppKitProvider("solana");
 
-    const dropdownRefs = {
-        direction: useRef<HTMLDivElement>(null),
-        parentCategory: useRef<HTMLDivElement>(null),
-        childCategory: useRef<HTMLDivElement>(null),
-    };
-
     useBodyScrollLock(isOpen);
 
-
-
-    // Click outside handler
     useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            const target = event.target as Node;
-            if (dropdownRefs.direction.current && !dropdownRefs.direction.current.contains(target)) {
-                setOpenDropdown(prev => prev === 'direction' ? null : prev);
+        if (!isOpen) return;
+
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key !== "Escape" || isSubmitting) return;
+            if (isPreviewOpen) {
+                setIsPreviewOpen(false);
+                return;
             }
-            if (dropdownRefs.parentCategory.current && !dropdownRefs.parentCategory.current.contains(target)) {
-                setOpenDropdown(prev => prev === 'parentCategory' ? null : prev);
+            if (activePanel) {
+                setActivePanel(null);
+                return;
             }
-            if (dropdownRefs.childCategory.current && !dropdownRefs.childCategory.current.contains(target)) {
-                setOpenDropdown(prev => prev === 'childCategory' ? null : prev);
+            onClose();
+        };
+
+        document.addEventListener("keydown", handleKeyDown);
+        return () => document.removeEventListener("keydown", handleKeyDown);
+    }, [activePanel, isOpen, isPreviewOpen, isSubmitting, onClose]);
+
+    useEffect(() => {
+        if (!isOpen) return;
+        let cancelled = false;
+        const loadCategories = async () => {
+            setIsLoadingCategories(true);
+            setCategoryError(null);
+            try {
+                const parents = await getParentCategories();
+                if (cancelled) return;
+                const currentMarket = marketType;
+                const marketParent = parents.find((category) => category.category.trim().toLowerCase() === currentMarket);
+                const children = await getCategoriesByParent(
+                    marketParent?.category ?? (currentMarket === "crypto" ? "Crypto" : "Sports"),
+                );
+                if (cancelled) return;
+                setChildCategories(children);
+                setSelectedChildCategory((current) =>
+                    current?.parent_category?.trim().toLowerCase() === currentMarket
+                        ? current
+                        : children[0] ?? null,
+                );
+            } catch (error) {
+                if (cancelled) return;
+                console.error("Failed to load challenge categories:", error);
+                setCategoryError("Couldn’t load topics. Try again.");
+            } finally {
+                if (!cancelled) setIsLoadingCategories(false);
             }
         };
-        document.addEventListener("mousedown", handleClickOutside);
-        return () => document.removeEventListener("mousedown", handleClickOutside);
-    }, []);
 
+        loadCategories();
+        return () => {
+            cancelled = true;
+        };
+    }, [isOpen, marketType]);
 
-    const closeAllDropdowns = useCallback(() => setOpenDropdown(null), []);
-
-    // Fetch parent categories when modal opens
-    useEffect(() => {
-        if (isOpen) {
-            fetchParentCategories();
-        }
-    }, [isOpen]);
-
-    // Fetch child categories when parent category is selected
-    useEffect(() => {
-        if (selectedParentCategory) {
-            fetchChildCategories(selectedParentCategory.category);
-        } else {
-            setChildCategories([]);
-            setSelectedChildCategory(null);
-        }
-    }, [selectedParentCategory]);
-
-    const fetchParentCategories = async () => {
-        setIsLoadingCategories(true);
-        setCategoryError(null);
-        try {
-            const categories = await getParentCategories();
-            const cryptoCategory = categories.find(
-                (category) => category.category.trim().toLowerCase() === "crypto"
-            );
-            setParentCategories(cryptoCategory ? [cryptoCategory] : []);
-            if (cryptoCategory) {
-                setSelectedParentCategory(cryptoCategory);
-                setSelectedChildCategory(null);
-            }
-        } catch (error) {
-            setCategoryError("Failed to load categories. Please try again.");
-            console.error("Error fetching parent categories:", error);
-        } finally {
-            setIsLoadingCategories(false);
-        }
-    };
-
-    const fetchChildCategories = async (parentCategory: string) => {
-        setIsLoadingCategories(true);
-        setCategoryError(null);
-        try {
-            const categories = await getCategoriesByParent(parentCategory);
-            setChildCategories(categories);
-        } catch (error) {
-            setCategoryError("Failed to load subcategories. Please try again.");
-            console.error("Error fetching child categories:", error);
-        } finally {
-            setIsLoadingCategories(false);
-        }
-    };
-
-    const handleParentCategorySelect = (category: Category) => {
-        setSelectedParentCategory(category);
+    const switchMarket = (nextMarket: MarketType) => {
+        if (nextMarket === marketType) return;
+        setMarketType(nextMarket);
+        setChallengeFormat(nextMarket === "sports" ? "statement" : "price");
         setSelectedChildCategory(null);
-        setOpenDropdown(null);
+        setChildCategories([]);
+        setFormError(null);
+        setCategoryError(null);
+        setActivePanel("topic");
+        setIsLoadingCategories(true);
     };
 
-    const handleChildCategorySelect = (category: Category) => {
-        setSelectedChildCategory(category);
-        setOpenDropdown(null);
+    const togglePanel = (panel: Exclude<ComposerPanel, null>) => {
+        setActivePanel((current) => current === panel ? null : panel);
+        setFormError(null);
     };
 
-    const handleModalClose = () => {
-        onClose();
-    };
-
-    const getButtonLabel = () => {
-        if (txStatus === "success") return "Created!";
-        if (isSubmitting) return "Creating...";
-        return "Create Challenge";
-    };
-
-    const getButtonStyle = () => {
-        const base =
-            "rekto-button cursor-pointer w-full py-3 sm:py-4 font-black text-base sm:text-lg transition-colors shadow-[2px_2px_0_#111] ";
-        if (txStatus === "success") {
-            return base + "bg-green-600 hover:bg-green-700 text-white";
+    const handleDurationChange = (nextDuration: { hours: number; minutes: number }) => {
+        setDuration(nextDuration);
+        const expiryTime = composerNow + (nextDuration.hours * 60 + nextDuration.minutes) * 60 * 1000;
+        if (selectedDate.getTime() < expiryTime) {
+            setSelectedDate(new Date(expiryTime + 30 * 60 * 1000));
         }
-        if (isSubmitting) {
-            return base + "bg-gray-500 text-white cursor-not-allowed";
-        }
-        return base + "bg-gray-900 hover:bg-gray-700 text-white";
     };
 
-    if (!isOpen) return null;
-
-    const formatDate = (date: Date) => {
-        const options: Intl.DateTimeFormatOptions = { month: "long", day: "numeric", year: "numeric" };
-        const timeOptions: Intl.DateTimeFormatOptions = { hour: "numeric", minute: "2-digit", hour12: true };
-        return `${date.toLocaleDateString("en-US", options)} at ${date.toLocaleTimeString("en-US", timeOptions)}`;
+    const handleResolutionDateChange = (nextDate: Date) => {
+        const expiryTime = composerNow + (duration.hours * 60 + duration.minutes) * 60 * 1000;
+        setSelectedDate(nextDate.getTime() < expiryTime ? new Date(expiryTime) : nextDate);
     };
 
-    const formatDuration = (dur: { hours: number; minutes: number }) => {
-        if (dur.hours === 0 && dur.minutes === 0) return "Select duration";
-        const days = Math.floor(dur.hours / 24);
-        const remainingHours = dur.hours % 24;
-        let result = "";
-        if (days > 0) result += `${days}d `;
-        if (remainingHours > 0) result += `${remainingHours}h `;
-        if (dur.minutes > 0) result += `${dur.minutes}m`;
-        return result.trim();
+    const isPriceFeed = marketType === "crypto" && challengeFormat === "price";
+    const rawTopicLabel = selectedChildCategory?.category ?? (marketType === "sports" ? "All sports" : "Choose asset");
+    const topicLabel = stripUsdcQuote(rawTopicLabel);
+    const selectedAssetSymbol = stripUsdcQuote(selectedChildCategory?.category)
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, "")
+        .slice(0, 10);
+    const assetPriceRequestKey = `${selectedAssetSymbol}:${predictionDirection}`;
+    const isAssetPriceLoading = isPriceFeed
+        && Boolean(selectedAssetSymbol)
+        && assetPriceState.key !== assetPriceRequestKey;
+    const hasAssetPriceError = isPriceFeed
+        && Boolean(selectedAssetSymbol)
+        && assetPriceState.key === assetPriceRequestKey
+        && assetPriceState.status === "failed";
+    const generatedStatement = `${stripUsdcQuote(selectedChildCategory?.category) || "Asset"} ${predictionDirection.toLowerCase()} ${formatPrice(predictionPrice)}`;
+    const totalDurationMinutes = duration.hours * 60 + duration.minutes;
+    const estimatedPvpPool = betAmount * 2;
+    const estimatedPayout = estimatedPvpPool * 0.98;
+
+    useEffect(() => {
+        if (!isOpen || !isPriceFeed || !selectedAssetSymbol) return;
+        let cancelled = false;
+
+        fetch(`/api/market-chart?asset=${encodeURIComponent(selectedAssetSymbol)}&range=24H`)
+            .then(async (response) => {
+                if (!response.ok) throw new Error("Asset price unavailable");
+                return response.json() as Promise<{ candles: Array<{ close: number }> }>;
+            })
+            .then((data) => {
+                const currentPrice = Number(data.candles.at(-1)?.close);
+                if (!Number.isFinite(currentPrice) || currentPrice <= 0) {
+                    throw new Error("Invalid asset price");
+                }
+                if (cancelled) return;
+
+                const targetPrice = currentPrice * (predictionDirection === "Above" ? 1.1 : 0.9);
+                setPredictionPrice(targetPriceInputValue(targetPrice));
+                setAssetPriceState({
+                    key: assetPriceRequestKey,
+                    asset: selectedAssetSymbol,
+                    currentPrice,
+                    status: "ready",
+                });
+            })
+            .catch((error) => {
+                if (cancelled) return;
+                console.error(`Failed to load ${selectedAssetSymbol} price:`, error);
+                setAssetPriceState({
+                    key: assetPriceRequestKey,
+                    asset: selectedAssetSymbol,
+                    currentPrice: null,
+                    status: "failed",
+                });
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [assetPriceRequestKey, isOpen, isPriceFeed, predictionDirection, selectedAssetSymbol]);
+
+    const validateForm = ({ requireProfile = true }: { requireProfile?: boolean } = {}) => {
+        if (marketType === "crypto" && !selectedChildCategory) {
+            setActivePanel("topic");
+            return "Choose a crypto asset.";
+        }
+        if (!isPriceFeed && statement.trim().length < 8) {
+            window.setTimeout(() => statementRef.current?.focus(), 0);
+            return "Write a clear challenge statement.";
+        }
+        if (isPriceFeed && (!Number.isFinite(Number(predictionPrice)) || Number(predictionPrice) <= 0)) {
+            window.setTimeout(() => priceRef.current?.focus(), 0);
+            return "Enter a valid target price.";
+        }
+        if (!Number.isFinite(betAmount) || betAmount < 1) {
+            setActivePanel("stake");
+            return "Minimum stake is 1 USDC.";
+        }
+        if (totalDurationMinutes < MIN_DURATION_MINUTES || totalDurationMinutes > MAX_DURATION_MINUTES) {
+            setActivePanel("timing");
+            return "Join window must be between 5 minutes and 7 days.";
+        }
+        if (requireProfile && !user?.id) return "Finish your profile before creating a challenge.";
+        return null;
     };
 
-    const validateDetails = () => {
-        let isValid = true;
-        // if (betAmount < 5) {
-        //     setBetAmountError("Min bet should be $5");
-        //     isValid = false;
-        // }
-        if (!selectedParentCategory || !selectedChildCategory) {
-            setCategoryError("Please select a category and asset.");
-            isValid = false;
+    const handleOpenPreview = () => {
+        const validationError = validateForm({ requireProfile: false });
+        if (validationError) {
+            setFormError(validationError);
+            return;
         }
-        if (!sportsResolutionConsent) {
-            setSportsResolutionConsentError("You must agree to the resolution terms.");
-            isValid = false;
-        }
-        return isValid;
+
+        setActivePanel(null);
+        setFormError(null);
+        setIsPreviewOpen(true);
+    };
+
+    const getStatusLabel = () => {
+        if (txStatus === "building") return "Preparing challenge";
+        if (txStatus === "signing") return "Confirm in wallet";
+        if (txStatus === "confirming") return "Publishing challenge";
+        return null;
     };
 
     const handleCreateChallenge = async () => {
-        if (!validateDetails()) return;
-        if (!address || !isConnected) { open(); return; }
-        if (!walletProvider) { setTxStatus("error"); return; }
+        const validationError = validateForm();
+        if (validationError) {
+            setFormError(validationError);
+            return;
+        }
+
+        if (!address || !isConnected) {
+            open();
+            return;
+        }
+        if (!walletProvider) {
+            setFormError("Wallet isn’t ready. Reconnect and try again.");
+            return;
+        }
 
         setIsSubmitting(true);
         setTxStatus("building");
-        setTxSignature(null);
+        setFormError(null);
 
         try {
             const nowSec = Math.floor(Date.now() / 1000);
             const expiresAt = nowSec + duration.hours * 3600 + duration.minutes * 60;
             const resolvesAt = Math.max(Math.floor(selectedDate.getTime() / 1000), expiresAt);
-            const targetPriceUsdCents = Math.floor(Number(predictionPrice) * 100);
-            const asset = (selectedChildCategory?.category ?? "").trim().slice(0, 10);
+            const topic = selectedChildCategory?.category?.trim() || (marketType === "sports" ? "SPORTS" : "CRYPTO");
+            const onchainAsset = topic.replace(/[^a-zA-Z0-9/]/g, "").slice(0, 10) || marketType.toUpperCase();
+            const ticker = onchainAsset.split("/", 1)[0].toUpperCase();
+            const targetPrice = isPriceFeed ? Number(predictionPrice) : 0;
+            const challengeStatement = isPriceFeed ? generatedStatement : statement.trim();
 
-            // Build the transaction server-side (admin signs as fee payer) and get it back partially signed
             const response = await fetch("/api/challenges/create", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     userWallet: address,
-                    asset,
+                    asset: onchainAsset,
                     betAmountUsdc: betAmount,
-                    targetPriceUsdCents,
-                    directionAbove: predictionDirection === "Above",
+                    targetPriceUsdCents: Math.floor(targetPrice * 100),
+                    directionAbove: isPriceFeed ? predictionDirection === "Above" : true,
                     expiresAt,
                     resolvesAt,
-                    challengeType: challengeMode === "pvp" ? "pvp" : "team",
-                    // For TEAM: 0 means no limit (capped at 50 on-chain). PVP ignores this.
+                    challengeType: challengeMode,
                     maxTeamSize: 0,
                 }),
             });
@@ -253,41 +375,49 @@ export function CreateChallengeModal({
             const data = await response.json();
             if (!response.ok) throw new Error(data.error || "Failed to create challenge");
 
-            // User signs the partially-signed transaction (authorises USDC transfer from their ATA)
             setTxStatus("signing");
-            const tx = Transaction.from(Buffer.from(data.serializedTx, "base64"));
-            const signedTx = await (walletProvider as any).signTransaction(tx);
+            const transaction = Transaction.from(Buffer.from(data.serializedTx, "base64"));
+            const signedTransaction = await (walletProvider as {
+                signTransaction: (transaction: Transaction) => Promise<Transaction>;
+            }).signTransaction(transaction);
 
-            // Broadcast and confirm
             setTxStatus("confirming");
             const connection = getReadonlyConnection();
-            const signature = await connection.sendRawTransaction(signedTx.serialize(), {
+            const signature = await connection.sendRawTransaction(signedTransaction.serialize(), {
                 skipPreflight: false,
                 preflightCommitment: "confirmed",
             });
             await connection.confirmTransaction(
-                { signature, blockhash: data.blockhash, lastValidBlockHeight: data.lastValidBlockHeight },
-                "confirmed"
+                {
+                    signature,
+                    blockhash: data.blockhash,
+                    lastValidBlockHeight: data.lastValidBlockHeight,
+                },
+                "confirmed",
             );
 
-            // Persist the challenge to the backend database
             await createChallenge({
-                statement: `${selectedChildCategory?.category ?? asset} will be ${predictionDirection} $${predictionPrice}`,
-                ticker: asset,
-                trading_pair: `${asset}`,
-                target: Number(predictionPrice),
+                statement: challengeStatement,
+                ticker,
+                trading_pair: topic,
+                target: targetPrice,
                 initial_bet: betAmount,
                 pool_size: betAmount,
-                resolution_source: "PRICE_FEED",
+                resolution_source: isPriceFeed ? "PRICE_FEED" : "COMMUNITY",
                 metadata: {
                     onchain: {
                         challenge_pda: data.challengePDA,
                         creator_wallet: data.creator,
                         on_chain_challenge_id: data.challengeId,
                     },
+                    composer: {
+                        market: marketType,
+                        format: isPriceFeed ? "price" : "statement",
+                        topic,
+                    },
                 },
-                creator: user?.id ?? 0,
-                resolution_method: "PRICE_FEED",
+                creator: user!.id,
+                resolution_method: isPriceFeed ? "PRICE_FEED" : "COMMUNITY",
                 participants: 1,
                 status: "OPEN",
                 mode: challengeMode === "pvp" ? "PVP" : "TEAM",
@@ -296,487 +426,778 @@ export function CreateChallengeModal({
                 expiry: new Date(expiresAt * 1000).toISOString(),
                 resolution_date: new Date(resolvesAt * 1000).toISOString().split("T")[0],
                 final_price: 0,
+                category: marketType === "crypto" ? "Crypto" : "Sports",
             });
 
-            setTxStatus("success");
-            setTxSignature(signature);
+            setTxStatus("idle");
+            setMarketType("crypto");
+            setChallengeFormat("price");
+            setChallengeMode("pvp");
+            setStatement("");
+            setPredictionPrice("");
+            setBetAmount(1);
+            setSelectedChildCategory(null);
+            setDuration({ hours: 4, minutes: 0 });
+            setSelectedDate(new Date(Date.now() + 24 * 60 * 60 * 1000));
+            setActivePanel(null);
+            setIsPreviewOpen(false);
             onCreated();
-        } catch (error: any) {
+        } catch (error) {
             console.error("Error creating challenge:", error);
             setTxStatus("error");
+            setFormError(error instanceof Error ? error.message : "Something went wrong. Try again.");
         } finally {
             setIsSubmitting(false);
         }
     };
 
-    const stepOrder: CreateChallengeStep[] = ["mode", "category", "details"];
-    const currentStepIndex = stepOrder.indexOf(currentStep);
-    const isModeStep = currentStep === "mode";
-    const isCategoryStep = currentStep === "category";
-    const isDetailsStep = currentStep === "details";
-    const stepTitle = isModeStep ? "Choose challenge mode" : isCategoryStep ? "Pick a category" : "Set the terms";
-    const stepSubtitle = isModeStep
-        ? "Start with how players can join your challenge."
-        : isCategoryStep
-            ? "Choose the asset or event."
-            : "Add the bet, prediction, timing, and review the payout.";
+    if (!isOpen) return null;
 
-    const goToNextStep = () => {
-        const nextStep = stepOrder[Math.min(currentStepIndex + 1, stepOrder.length - 1)];
-        setCurrentStep(nextStep);
-        closeAllDropdowns();
-    };
-
-    const goToPreviousStep = () => {
-        const previousStep = stepOrder[Math.max(currentStepIndex - 1, 0)];
-        setCurrentStep(previousStep);
-        closeAllDropdowns();
-    };
-
+    const statusLabel = getStatusLabel();
 
     return createPortal(
-        <div className="fixed inset-0 z-[250] flex items-center justify-center p-2 sm:p-4">
-            <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={handleModalClose} />
-            <div
-                className="rekto-modal-panel relative w-full max-w-md md:max-w-2xl max-h-[94vh] sm:max-h-[90vh] overflow-hidden flex flex-col [&_button:not(:disabled)]:cursor-pointer"
-                style={{ animation: "none" }}
-            >
-                <div className="bg-[#f3e1d7] px-4 sm:px-6 pt-4 sm:pt-6 pb-3 sm:pb-4 border-b-2 border-black">
-                    <div className="flex items-center justify-between">
-                        <div className="w-8" />
-                        <h2 className="text-lg sm:text-xl md:text-2xl font-black text-gray-900 text-center">Create Challenge</h2>
-                        <button type="button" onClick={handleModalClose} aria-label="Close create challenge modal" className="w-8 h-8 flex items-center justify-center border-2 border-black bg-white shadow-[2px_2px_0_#111] hover:bg-[#f5d547] transition-colors">
-                            <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                        </button>
-                    </div>
-                    <p className="text-center text-gray-600 text-xs sm:text-sm mt-2">Create a challenge in a few quick choices.</p>
-                </div>
+        <div className="create-challenge-overlay fixed inset-0 z-[250] flex items-center justify-center p-3 min-[380px]:p-4 sm:p-5">
+            <button
+                type="button"
+                className="absolute inset-0 h-full w-full cursor-default bg-black/45 backdrop-blur-[2px]"
+                onClick={() => {
+                    if (isSubmitting) return;
+                    setIsPreviewOpen(false);
+                    setActivePanel(null);
+                    onClose();
+                }}
+                aria-label="Close create challenge"
+            />
 
-                <div className="px-4 sm:px-6 py-3 sm:py-4 space-y-4 overflow-y-auto">
-                    <div className="space-y-3">
-                        <div className="flex items-center gap-2">
-                            {stepOrder.map((step, index) => (
-                                <button
-                                    key={step}
-                                    type="button"
-                                    onClick={() => setCurrentStep(step)}
-                                    className={`h-2 flex-1 rounded-full transition-colors ${index <= currentStepIndex ? "bg-gray-900" : "bg-[#e8d5c8]"}`}
-                                    aria-label={`Go to step ${index + 1}`}
-                                />
-                            ))}
+            <section
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="create-challenge-title"
+                className="create-challenge-modal relative flex h-auto max-h-[calc(100dvh-1.5rem)] w-full max-w-2xl flex-col overflow-hidden border-2 border-black bg-[#fffaf6] min-[380px]:max-h-[calc(100dvh-2rem)] sm:max-h-[92vh]"
+            >
+                <header className="flex shrink-0 items-center justify-between border-b-2 border-black px-3 py-2.5 sm:px-5 sm:py-3.5">
+                    <div className="flex items-center gap-2.5">
+                        <div className="flex h-8 w-8 items-center justify-center border-2 border-black bg-[#f5d547] sm:h-9 sm:w-9">
+                            <Zap className="h-4.5 w-4.5 fill-black" />
                         </div>
                         <div>
-                            <p className="text-xs font-bold uppercase tracking-wide text-gray-500">Step {currentStepIndex + 1} of {stepOrder.length}</p>
-                            <h3 className="text-xl font-black text-gray-900">{stepTitle}</h3>
-                            <p className="text-sm text-gray-600">{stepSubtitle}</p>
+                            <h2 id="create-challenge-title" className="text-base font-black tracking-tight text-[#17120f] sm:text-lg">
+                                Create challenge
+                            </h2>
+                            <p className="text-[11px] font-bold text-[#7a6961]">Make your call.</p>
                         </div>
                     </div>
+                    <button
+                        type="button"
+                        onClick={() => {
+                            if (isSubmitting) return;
+                            setIsPreviewOpen(false);
+                            setActivePanel(null);
+                            onClose();
+                        }}
+                        disabled={isSubmitting}
+                        aria-label="Close create challenge"
+                        className="flex h-8 w-8 cursor-pointer items-center justify-center border-2 border-black bg-white text-black transition-colors hover:bg-[#f5d547] disabled:cursor-not-allowed disabled:opacity-50 sm:h-9 sm:w-9"
+                    >
+                        <X className="h-4 w-4" />
+                    </button>
+                </header>
 
-
-                    {isModeStep && (
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium text-gray-700">Challenge Mode</label>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+                    <div className="border-b border-black/15 px-3 py-2.5 sm:px-5 sm:py-3">
+                        <div className="grid grid-cols-1 gap-2 min-[430px]:flex min-[430px]:flex-wrap min-[430px]:items-center">
+                            <div className="grid w-full grid-cols-2 border-2 border-black bg-[#f3e1d7] p-0.5 min-[430px]:inline-flex min-[430px]:w-auto" aria-label="Challenge market">
                                 <button
-                                    onClick={() => setChallengeMode("pvp")}
-                                    className={`min-h-28 rounded-xl border px-4 py-4 text-left transition-colors ${challengeMode === "pvp"
-                                        ? "border-gray-900 bg-gray-900 text-white shadow-[3px_3px_0_#f5d547]"
-                                        : "border-[#e8d5c8] bg-[#faf0eb] text-gray-700 hover:border-[#d4b8a8]"
-                                        }`}
+                                    type="button"
+                                    onClick={() => switchMarket("crypto")}
+                                    className={`inline-flex h-8 items-center justify-center gap-1.5 px-3 text-xs font-black transition-colors ${marketType === "crypto" ? "bg-black text-white" : "text-[#594b44] hover:bg-white/70"}`}
+                                    aria-pressed={marketType === "crypto"}
                                 >
-                                    <span className="block text-base font-black">PVP</span>
-                                    <span className={`mt-1 block text-sm ${challengeMode === "pvp" ? "text-white/80" : "text-gray-500"}`}>One opponent accepts your exact bet.</span>
+                                    <Coins className="h-3.5 w-3.5" /> Crypto
                                 </button>
                                 <button
                                     type="button"
-                                    onClick={() => setChallengeMode("Team")}
-                                    className={`min-h-28 rounded-xl border px-4 py-4 text-left transition-colors ${challengeMode === "Team"
-                                        ? "border-gray-900 bg-gray-900 text-white shadow-[3px_3px_0_#f5d547]"
-                                        : "border-[#e8d5c8] bg-[#faf0eb] text-gray-700 hover:border-[#d4b8a8]"
-                                        }`}
+                                    onClick={() => switchMarket("sports")}
+                                    className={`inline-flex h-8 items-center justify-center gap-1.5 px-3 text-xs font-black transition-colors ${marketType === "sports" ? "bg-black text-white" : "text-[#594b44] hover:bg-white/70"}`}
+                                    aria-pressed={marketType === "sports"}
                                 >
-                                    <span className="block text-base font-black">Team</span>
-                                    <span className={`mt-1 block text-sm ${challengeMode === "Team" ? "text-white/80" : "text-gray-500"}`}>Multiple players can join the same challenge.</span>
+                                    <Trophy className="h-3.5 w-3.5" /> Sports
                                 </button>
                             </div>
-                            <p className="text-xs text-gray-500">You can change this before moving forward.</p>
-                        </div>
-                    )}
 
-                    {isCategoryStep && (
-                        <div className="space-y-4">
-                            {/* Parent Category Selection */}
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium text-gray-700">Category</label>
-                                <div className="relative" ref={dropdownRefs.parentCategory}>
+                            {marketType === "crypto" && (
+                                <div className="grid w-full grid-cols-2 border border-black/20 bg-white p-0.5 min-[430px]:inline-flex min-[430px]:w-auto" aria-label="Challenge format">
                                     <button
                                         type="button"
-                                        onClick={() => setOpenDropdown(prev => prev === 'parentCategory' ? null : 'parentCategory')}
-                                        disabled={isLoadingCategories}
-                                        className="w-full flex items-center justify-between px-3 sm:px-4 py-3 bg-[#faf0eb] border border-[#e8d5c8] rounded-xl hover:border-[#d4b8a8] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-                                    >
-                                        <span className={`font-medium text-sm sm:text-base truncate pr-2 ${selectedParentCategory ? 'text-gray-900' : 'text-gray-500'}`}>
-                                            {selectedParentCategory ? selectedParentCategory.category : "Select a category"}
-                                        </span>
-                                        {isLoadingCategories ? (
-                                            <svg className="animate-spin w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24">
-                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                                            </svg>
-                                        ) : (
-                                            <svg className={`w-5 h-5 text-gray-500 transition-transform ${openDropdown === 'parentCategory' ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                            </svg>
-                                        )}
-                                    </button>
-                                    {openDropdown === 'parentCategory' && (
-                                        <div className="mt-1 bg-[#faf0eb] border border-[#e8d5c8] rounded-xl shadow-lg overflow-hidden max-h-60 overflow-y-auto">
-                                            {parentCategories.length === 0 ? (
-                                                <div className="px-4 py-3 text-gray-500 text-sm">No categories available</div>
-                                            ) : (
-                                                parentCategories.map((category) => (
-                                                    <button
-                                                        type="button"
-                                                        key={category.id}
-                                                        onClick={() => handleParentCategorySelect(category)}
-                                                        className="w-full px-4 py-3 text-left hover:bg-[#f3e1d7] transition-colors font-medium text-gray-900 flex items-center gap-2"
-                                                    >
-                                                        {category.image_url && (
-                                                            <img src={category.image_url} alt="" className="w-5 h-5 rounded-full object-cover" />
-                                                        )}
-                                                        <span>{category.category}</span>
-                                                    </button>
-                                                ))
-                                            )}
-                                            <button
-                                                type="button"
-                                                disabled
-                                                className="w-full px-4 py-3 text-left bg-gray-100 text-gray-400 font-medium flex items-center justify-between gap-3 cursor-not-allowed"
-                                            >
-                                                <span className="flex items-center gap-2">
-                                                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                                                    </svg>
-                                                    Sports
-                                                </span>
-                                                <span className="text-xs font-bold uppercase tracking-wide">Coming soon</span>
-                                            </button>
-                                        </div>
-                                    )}
-                                </div>
-                                {categoryError && <p className="text-red-500 text-sm mt-1">{categoryError}</p>}
-                            </div>
-
-                            {/* Child Category Selection */}
-                            {selectedParentCategory && (
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium text-gray-700">Asset</label>
-                                    <div className="relative" ref={dropdownRefs.childCategory}>
-                                        <button
-                                            type="button"
-                                            onClick={() => setOpenDropdown(prev => prev === 'childCategory' ? null : 'childCategory')}
-                                            disabled={isLoadingCategories || childCategories.length === 0}
-                                            className="w-full flex items-center justify-between px-3 sm:px-4 py-3 bg-[#faf0eb] border border-[#e8d5c8] rounded-xl hover:border-[#d4b8a8] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-                                        >
-                                            <span className={`font-medium text-sm sm:text-base truncate pr-2 ${selectedChildCategory ? 'text-gray-900' : 'text-gray-500'}`}>
-                                                {selectedChildCategory ? selectedChildCategory.category : childCategories.length === 0 ? "Loading subcategories..." : "Select the asset"}
-                                            </span>
-                                            {isLoadingCategories ? (
-                                                <svg className="animate-spin w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24">
-                                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                                                </svg>
-                                            ) : (
-                                                <svg className={`w-5 h-5 text-gray-500 transition-transform ${openDropdown === 'childCategory' ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                                </svg>
-                                            )}
-                                        </button>
-                                        {openDropdown === 'childCategory' && (
-                                            <div className="mt-1 bg-[#faf0eb] border border-[#e8d5c8] rounded-xl shadow-lg overflow-hidden max-h-60 overflow-y-auto">
-                                                {childCategories.length === 0 ? (
-                                                    <div className="px-4 py-3 text-gray-500 text-sm">No subcategories available</div>
-                                                ) : (
-                                                    childCategories.map((category) => (
-                                                        <button
-                                                            type="button"
-                                                            key={category.id}
-                                                            onClick={() => handleChildCategorySelect(category)}
-                                                            className="w-full px-4 py-3 text-left hover:bg-[#f3e1d7] transition-colors font-medium text-gray-900 flex items-center gap-2"
-                                                        >
-                                                            {category.image_url && (
-                                                                <img src={category.image_url} alt="" className="w-5 h-5 rounded-full object-cover" />
-                                                            )}
-                                                            <span>{category.category}</span>
-                                                        </button>
-                                                    ))
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Selected Category Summary */}
-                            {selectedParentCategory && selectedChildCategory && (
-                                <div className="bg-[#faf0eb] border border-[#e8d5c8] rounded-xl p-3 sm:p-4">
-                                    <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Selected</p>
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                        <span className="font-semibold text-gray-900">{selectedParentCategory.category}</span>
-                                        <span className="text-gray-400">→</span>
-                                        <span className="font-semibold text-gray-900">{selectedChildCategory.category}</span>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-                    {isDetailsStep && (
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium text-gray-700">Bet Amount</label>
-                            <div className="flex items-center gap-2">
-                                <button
-                                    onClick={() => {
-                                        const newVal = Math.max(1, betAmount - 1);
-                                        setBetAmount(newVal);
-                                        setBetAmountError(newVal < 1 ? "Min bet should be $1" : null);
-                                    }}
-                                    className="w-10 h-10 flex items-center justify-center bg-[#faf0eb] border border-[#e8d5c8] rounded-xl hover:bg-[#f3e1d7] transition-colors text-gray-700 font-bold text-lg"
-                                >
-                                    -
-                                </button>
-                                <div className="relative flex-1">
-                                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 text-sm font-bold">$</span>
-                                    <input
-                                        type="number"
-                                        value={betAmount}
-                                        onChange={(e) => {
-                                            const val = Number(e.target.value);
-                                            setBetAmount(val);
-                                            setBetAmountError(val < 1 ? "Min bet should be $1" : null);
+                                        onClick={() => {
+                                            setChallengeFormat("price");
+                                            setFormError(null);
                                         }}
-                                        step="1"
-                                        min="1"
-                                        className="w-full pl-8 pr-4 py-3 bg-[#faf0eb] border border-[#e8d5c8] rounded-xl text-lg font-semibold text-gray-900 focus:outline-none focus:border-[#d4b8a8]"
-                                    />
-                                </div>
-                                <button
-                                    onClick={() => {
-                                        const newVal = betAmount + 1;
-                                        setBetAmount(newVal);
-                                        setBetAmountError(null);
-                                    }}
-                                    className="w-10 h-10 flex items-center justify-center bg-[#faf0eb] border border-[#e8d5c8] rounded-xl hover:bg-[#f3e1d7] transition-colors text-gray-700 font-bold text-lg"
-                                >
-                                    +
-                                </button>
-                            </div>
-                            {betAmountError && <p className="text-red-500 text-sm mt-1">{betAmountError}</p>}
-                        </div>
-                    )}
-
-                    {isDetailsStep && (
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium text-gray-700">Predict Price Movement</label>
-                            <div className="flex flex-col min-[380px]:flex-row gap-2">
-                                <div className="relative flex-1" ref={dropdownRefs.direction}>
+                                        className={`inline-flex h-8 items-center justify-center gap-1.5 px-2.5 text-[11px] font-black transition-colors ${challengeFormat === "price" ? "bg-[#e85a2d] text-white" : "text-[#6d5d55] hover:bg-[#f3e1d7]"}`}
+                                        aria-pressed={challengeFormat === "price"}
+                                    >
+                                        <Activity className="h-3.5 w-3.5" /> Price
+                                    </button>
                                     <button
-                                        onClick={() => setOpenDropdown(prev => prev === 'direction' ? null : 'direction')}
-                                        className="w-full flex items-center justify-between px-3 sm:px-4 py-3 bg-[#faf0eb] border border-[#e8d5c8] rounded-xl hover:border-[#d4b8a8] transition-colors"
-                                    >
-                                        <span className="font-semibold text-sm sm:text-base text-gray-900 truncate pr-2">Token {predictionDirection}</span>
-                                        <svg className={`w-5 h-5 text-gray-500 transition-transform ${openDropdown === 'direction' ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                        </svg>
-                                    </button>
-                                    {openDropdown === 'direction' && (
-                                        <div className="absolute top-full left-0 right-0 mt-1 bg-[#faf0eb] border border-[#e8d5c8] rounded-xl shadow-lg z-10 overflow-hidden">
-                                            {["Above", "Below"].map((dir) => (
-                                                <button
-                                                    key={dir}
-                                                    onClick={() => {
-                                                        setPredictionDirection(dir);
-                                                        setOpenDropdown(null);
-                                                    }}
-                                                    className="w-full px-4 py-3 text-left hover:bg-[#f3e1d7] transition-colors font-medium text-gray-900"
-                                                >
-                                                    Token {dir}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                                <div className="relative w-full min-[380px]:w-32">
-                                    <span className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 text-gray-500 text-base sm:text-lg">$</span>
-                                    <input
-                                        type="number"
-                                        value={predictionPrice}
-                                        onChange={(e) => setPredictionPrice(e.target.value)}
-                                        className="w-full pl-7 sm:pl-8 pr-3 sm:pr-4 py-3 bg-[#faf0eb] border border-[#e8d5c8] rounded-xl text-base sm:text-lg font-semibold text-gray-900 focus:outline-none focus:border-[#d4b8a8]"
-                                        placeholder="66500"
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {isDetailsStep && (
-                        <div className="space-y-2">
-                            <div className="flex items-center gap-2">
-                                <label className="text-sm font-medium text-gray-700">Challenge Expires In</label>
-                                <span className="relative group/info">
-                                    <svg className="w-4 h-4 text-gray-400 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    </svg>
-                                    <span className="absolute left-0 bottom-full mb-2 px-3 py-2 text-xs text-white bg-gray-800 rounded-lg opacity-0 group-hover/info:opacity-100 transition-opacity pointer-events-none z-20 w-max max-w-[200px]">
-                                        Your challenge will expire in the selected time. If not accepted, your bet amount will be refunded.
-                                    </span>
-                                </span>
-                            </div>
-                            <button onClick={() => setIsDurationPickerOpen(true)} className="w-full flex items-center justify-between px-3 sm:px-4 py-3 bg-[#faf0eb] border border-[#e8d5c8] rounded-xl hover:border-[#d4b8a8] transition-colors">
-                                <span className="font-medium text-sm sm:text-base text-gray-900 pr-2 break-words">{formatDuration(duration)}</span>
-                                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                </svg>
-                            </button>
-                        </div>
-                    )}
-
-                    {isDetailsStep && (
-                        <>
-                            <div className="space-y-2">
-                                <div className="flex items-center gap-2">
-                                    <label className="text-sm font-medium text-gray-700">Challenge End Date</label>
-                                    <span className="relative group/info">
-                                        <svg className="w-4 h-4 text-gray-400 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                        </svg>
-                                        <span className="absolute left-0 bottom-full mb-2 px-3 py-2 text-xs text-white bg-gray-800 rounded-lg opacity-0 group-hover/info:opacity-100 transition-opacity pointer-events-none z-20 w-max max-w-[200px]">
-                                            The challenges will get resolved on this exact selected date and time OR when the price event is triggered whichever comes first.
-                                        </span>
-                                    </span>
-                                </div>
-                                <button onClick={() => setIsDatePickerOpen(true)} className="w-full flex items-center justify-between px-3 sm:px-4 py-3 bg-[#faf0eb] border border-[#e8d5c8] rounded-xl hover:border-[#d4b8a8] transition-colors gap-2">
-                                    <span className="font-medium text-sm sm:text-base text-gray-900 break-words text-left">{formatDate(selectedDate)}</span>
-                                    <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                    </svg>
-                                </button>
-                            </div>
-                            <div className="space-y-1">
-                                <label className="flex items-start gap-2 p-3 bg-[#faf0eb] border border-[#e8d5c8] rounded-xl cursor-pointer">
-                                    <input
-                                        type="checkbox"
-                                        checked={sportsResolutionConsent}
-                                        onChange={(e) => {
-                                            setSportsResolutionConsent(e.target.checked);
-                                            if (e.target.checked) setSportsResolutionConsentError(null);
-
+                                        type="button"
+                                        onClick={() => {
+                                            setChallengeFormat("statement");
+                                            setFormError(null);
+                                            window.setTimeout(() => statementRef.current?.focus(), 0);
                                         }}
-                                        className="mt-0.5 h-4 w-4 rounded border-[#d4b8a8] text-gray-900 focus:ring-gray-700"
-                                    />
-                                    <span className="text-xs font-medium text-gray-700">
-                                        Challenge will end after the selected sport event is completed and will be resolved by the community based on the outcome of the challenge statement posted by you.
-                                    </span>
-                                </label>
-                                {sportsResolutionConsentError && <p className="text-red-500 text-sm mt-1">{sportsResolutionConsentError}</p>}
-                            </div>
-                        </>
-                    )}
-
-                    {isDetailsStep && (
-                        <div className="text-center py-2 px-1 sm:px-2">
-                            <p className="text-sm sm:text-base text-gray-700 break-words">
-                                You win <span className="font-bold text-gray-900">${(betAmount * 2 * 0.975).toFixed(4)}</span> if your statement is correct
-                            </p>
-                            <p className="text-xs text-gray-500 mt-1">6% platform fee applies</p>
-                        </div>
-                    )}
-
-
-                    {/* {isDetailsStep && txStatus === "success" && txSignature && (
-                        <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 text-sm text-green-700">
-                            <p className="font-semibold">✅ Challenge created on-chain!</p>
-                            <a
-                                href={`https://explorer.solana.com/tx/${txSignature}?cluster=devnet`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-green-600 underline break-all text-xs mt-1 block"
-                            >
-                                View on Solana Explorer ↗
-                            </a>
-                        </div>
-                    )} */}
-
-                    {isDetailsStep && txStatus !== "idle" && txStatus !== "success" && (
-                        <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-sm text-blue-700 flex items-center gap-2">
-                            {isSubmitting && (
-                                <svg className="animate-spin w-4 h-4 text-blue-500 flex-shrink-0" fill="none" viewBox="0 0 24 24">
-                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                                </svg>
+                                        className={`inline-flex h-8 items-center justify-center gap-1.5 px-2.5 text-[11px] font-black transition-colors ${challengeFormat === "statement" ? "bg-[#e85a2d] text-white" : "text-[#6d5d55] hover:bg-[#f3e1d7]"}`}
+                                        aria-pressed={challengeFormat === "statement"}
+                                    >
+                                        <MessageSquareText className="h-3.5 w-3.5" /> Statement
+                                    </button>
+                                </div>
                             )}
-                            <span>
-                                {txStatus === "building" && "Preparing challenge transaction..."}
-                                {txStatus === "signing" && "Waiting for wallet signature..."}
-                                {txStatus === "confirming" && "Confirming on-chain..."}
-                                {txStatus === "error" && "Something went wrong. Please try again."}
+
+                            <span className="ml-auto hidden items-center gap-1 text-[10px] font-bold uppercase tracking-[0.08em] text-[#8b7a72] sm:inline-flex">
+                                {isPriceFeed ? <><Activity className="h-3 w-3" /> Auto resolved</> : <><ShieldCheck className="h-3 w-3" /> Community resolved</>}
                             </span>
                         </div>
-                    )}
+                    </div>
 
-                    {isDetailsStep && txStatus === "success" && txSignature && (
-                        <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 text-sm text-green-700">
-                            <p className="font-semibold">Challenge created on-chain!</p>
-                            <a
-                                href={`https://explorer.solana.com/tx/${txSignature}?cluster=devnet`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-green-600 underline break-all text-xs mt-1 block"
-                            >
-                                View on Solana Explorer ↗
-                            </a>
+                    <div className="px-3 pb-3 pt-3 sm:px-5 sm:pb-5 sm:pt-5">
+                        <div className="min-w-0">
+                            <div className="flex min-w-0 items-center gap-3">
+                                <div className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-black bg-[#f5d547] text-sm font-black text-black">
+                                    <span>{(user?.username || "Y").charAt(0).toUpperCase()}</span>
+                                    {(user?.profile_image || user?.twitter_profile_image) && (
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        <img
+                                            src={user.profile_image || user.twitter_profile_image || ""}
+                                            alt={`${user.username || "User"} profile`}
+                                            className="absolute inset-0 h-full w-full object-cover"
+                                            onError={(event) => { event.currentTarget.style.display = "none"; }}
+                                        />
+                                    )}
+                                </div>
+                                <div className="min-w-0">
+                                    <div className="flex min-w-0 items-center gap-1.5">
+                                        <span className="truncate text-sm font-black text-[#17120f]">{user?.username || "You"}</span>
+                                        {(user?.user_type === "moderator" || user?.twitter_username) && (
+                                            <VerifiedBadge
+                                                isModerator={user.user_type === "moderator"}
+                                                twitterUsername={user.twitter_username}
+                                            />
+                                        )}
+                                    </div>
+                                    <p className="mt-0.5 text-[11px] font-semibold text-[#8b7a72]">challenges everyone</p>
+                                </div>
+                            </div>
+
+                            <div className="mt-3 min-w-0 pl-0 sm:pl-[52px]">
+
+                                {isPriceFeed ? (
+                                    <div className="min-h-28 py-1 sm:min-h-32 sm:py-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => setActivePanel("topic")}
+                                            className="mb-3 inline-flex items-center gap-1.5 border border-black/20 bg-[#f3e1d7] px-2 py-1 text-[11px] font-black text-[#594b44] hover:border-black"
+                                        >
+                                            <Coins className="h-3 w-3" /> {rawTopicLabel}
+                                        </button>
+                                        <div className="grid min-w-0 grid-cols-1 items-center gap-2 text-lg font-black leading-tight text-[#17120f] min-[430px]:flex min-[430px]:flex-wrap min-[430px]:gap-x-2 min-[430px]:gap-y-3 sm:text-2xl">
+                                            <span className="min-w-0 truncate">{topicLabel || "This asset"}</span>
+                                            <div className="grid w-full grid-cols-2 border-2 border-black bg-white p-0.5 min-[430px]:inline-flex min-[430px]:w-auto">
+                                                {(["Above", "Below"] as const).map((direction) => (
+                                                    <button
+                                                        key={direction}
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setPredictionDirection(direction);
+                                                            if (assetPriceState.asset === selectedAssetSymbol && assetPriceState.currentPrice) {
+                                                                const targetPrice = assetPriceState.currentPrice * (direction === "Above" ? 1.1 : 0.9);
+                                                                setPredictionPrice(targetPriceInputValue(targetPrice));
+                                                            }
+                                                        }}
+                                                        className={`px-2.5 py-1.5 text-sm font-black ${predictionDirection === direction ? direction === "Above" ? "bg-emerald-600 text-white" : "bg-[#e85a2d] text-white" : "text-[#77675f]"}`}
+                                                    >
+                                                        {direction.toLowerCase()}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                            <label className="relative inline-flex w-full min-w-0 max-w-none flex-1 items-center border-b-2 border-black min-[430px]:min-w-32 min-[430px]:max-w-48">
+                                                <span className="text-[#8b7a72]">$</span>
+                                                <input
+                                                    ref={priceRef}
+                                                    type="number"
+                                                    inputMode="decimal"
+                                                    min="0"
+                                                    step="any"
+                                                    value={predictionPrice}
+                                                    onChange={(event) => {
+                                                        setPredictionPrice(event.target.value);
+                                                        setFormError(null);
+                                                    }}
+                                                    className="create-challenge-composer-input min-w-0 flex-1 border-0 bg-transparent px-1 py-1 text-xl font-black text-black outline-none placeholder:text-[#b7a9a2] sm:text-2xl"
+                                                    placeholder={isAssetPriceLoading ? "loading" : "target"}
+                                                    aria-label="Target price"
+                                                />
+                                                {isAssetPriceLoading && <Loader2 className="h-4 w-4 shrink-0 animate-spin text-[#8b7a72]" />}
+                                                {hasAssetPriceError && <span className="shrink-0 text-xs font-black text-[#e85a2d]" title="Price unavailable">!</span>}
+                                            </label>
+                                        </div>
+                                        <p className="mt-4 inline-flex items-center gap-1.5 text-xs font-bold text-[#7c6b63]">
+                                            <CalendarDays className="h-3.5 w-3.5 text-[#e85a2d]" /> by {formatDate(selectedDate)}
+                                        </p>
+                                    </div>
+                                ) : (
+                                    <div>
+                                        <textarea
+                                            ref={statementRef}
+                                            value={statement}
+                                            onChange={(event) => {
+                                                setStatement(event.target.value);
+                                                setFormError(null);
+                                            }}
+                                            maxLength={MAX_STATEMENT_LENGTH}
+                                            rows={5}
+                                            autoFocus
+                                            placeholder={marketType === "sports" ? "India wins the next match..." : "ETH flips BTC this cycle..."}
+                                            className="create-challenge-composer-input min-h-28 w-full resize-none border-0 bg-transparent p-0 text-base font-bold leading-relaxed text-[#17120f] outline-none placeholder:font-semibold placeholder:text-[#a99991] sm:min-h-32 sm:text-xl"
+                                            aria-label="Challenge statement"
+                                        />
+                                        <div className="flex justify-end text-[10px] font-bold text-[#9a8981]">
+                                            {statement.length}/{MAX_STATEMENT_LENGTH}
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="-mr-3 mt-2 flex items-center gap-1.5 overflow-x-auto border-t border-black/10 pb-1 pr-3 pt-2.5 scrollbar-hide sm:mr-0 sm:mt-3 sm:pb-0 sm:pr-0 sm:pt-3" aria-label="Customize challenge">
+                                    <ComposerButton
+                                        icon={marketType === "crypto" ? Coins : Trophy}
+                                        label={topicLabel}
+                                        isActive={activePanel === "topic"}
+                                        onClick={() => togglePanel("topic")}
+                                    />
+                                    <ComposerButton
+                                        icon={CircleDollarSign}
+                                        label={`${betAmount || 0} USDC`}
+                                        isActive={activePanel === "stake"}
+                                        onClick={() => togglePanel("stake")}
+                                    />
+                                    <ComposerButton
+                                        icon={Clock3}
+                                        label={formatDuration(duration)}
+                                        isActive={activePanel === "timing"}
+                                        onClick={() => togglePanel("timing")}
+                                    />
+                                    <ComposerButton
+                                        icon={challengeMode === "pvp" ? Swords : Users}
+                                        label={challengeMode === "pvp" ? "1 vs 1" : "Teams"}
+                                        isActive={activePanel === "players"}
+                                        onClick={() => togglePanel("players")}
+                                    />
+                                </div>
+                            </div>
                         </div>
-                    )}
 
-                    <div className="flex flex-col sm:flex-row gap-3 pt-1">
-                        {!isModeStep && (
-                            <button
-                                type="button"
-                                onClick={goToPreviousStep}
-                                // disabled={}
-                                className="w-full sm:w-32 py-3 border-2 border-black bg-white text-gray-900 font-black text-base shadow-[2px_2px_0_#111] hover:bg-[#f3e1d7] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-                            >
-                                Back
-                            </button>
+                        {activePanel && (
+                            <div className="mt-3 border-2 border-black bg-[#f8ede7] p-3 sm:mt-4 sm:p-4">
+                                {activePanel === "topic" && (
+                                    <div>
+                                        <PanelHeading>{marketType === "crypto" ? "Asset" : "Sport"}</PanelHeading>
+                                        {isLoadingCategories ? (
+                                            <div className="flex h-16 items-center justify-center text-[#7b6a62]">
+                                                <Loader2 className="h-5 w-5 animate-spin" />
+                                            </div>
+                                        ) : childCategories.length > 0 ? (
+                                            <div className="flex max-h-36 flex-wrap gap-2 overflow-y-auto">
+                                                {childCategories.map((category) => {
+                                                    const isSelected = selectedChildCategory?.id === category.id;
+                                                    return (
+                                                        <button
+                                                            key={category.id}
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setSelectedChildCategory(category);
+                                                                if (marketType === "crypto" && category.id !== selectedChildCategory?.id) {
+                                                                    setPredictionPrice("");
+                                                                }
+                                                                setFormError(null);
+                                                                setActivePanel(null);
+                                                            }}
+                                                            className={`inline-flex max-w-full items-center gap-1.5 break-words border-2 px-3 py-2 text-left text-xs font-black transition-all ${isSelected ? "border-black bg-[#f5d547] text-black shadow-[2px_2px_0_#111]" : "border-black/20 bg-white text-[#594b44] hover:border-black"}`}
+                                                        >
+                                                            {isSelected && <Check className="h-3.5 w-3.5" />}
+                                                            {stripUsdcQuote(category.category)}
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        ) : (
+                                            <p className="py-3 text-xs font-bold text-[#7b6a62]">
+                                                {marketType === "sports" ? "Your statement can cover any sport." : categoryError || "No assets available."}
+                                            </p>
+                                        )}
+                                    </div>
+                                )}
+
+                                {activePanel === "stake" && (
+                                    <div>
+                                        <PanelHeading>Stake</PanelHeading>
+                                        <div className="grid grid-cols-4 items-center gap-2">
+                                            {[1, 5, 10, 25].map((amount) => (
+                                                <button
+                                                    key={amount}
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setBetAmount(amount);
+                                                        setFormError(null);
+                                                    }}
+                                                    className={`h-10 min-w-0 border-2 px-1 text-xs font-black sm:px-3 ${betAmount === amount ? "border-black bg-[#f5d547] shadow-[2px_2px_0_#111]" : "border-black/20 bg-white hover:border-black"}`}
+                                                >
+                                                    ${amount}
+                                                </button>
+                                            ))}
+                                            <label className="relative col-span-4 min-w-0 sm:col-span-4">
+                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-black text-[#75645c]">$</span>
+                                                <input
+                                                    type="number"
+                                                    min="1"
+                                                    step="1"
+                                                    value={betAmount}
+                                                    onChange={(event) => {
+                                                        setBetAmount(Number(event.target.value));
+                                                        setFormError(null);
+                                                    }}
+                                                    className="h-11 w-full border-2 border-black bg-white pl-7 pr-14 text-base font-black outline-none sm:h-10 sm:text-sm"
+                                                    aria-label="Custom stake"
+                                                />
+                                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-[#8b7a72]">USDC</span>
+                                            </label>
+                                        </div>
+                                        <p className="mt-3 text-[11px] font-bold text-[#77675f]">
+                                            {challengeMode === "pvp"
+                                                ? `${estimatedPvpPool.toFixed(2)} USDC pot · ${estimatedPayout.toFixed(2)} to winner`
+                                                : `Pool starts at ${Number.isFinite(betAmount) ? betAmount : 0} USDC`}
+                                        </p>
+                                    </div>
+                                )}
+
+                                {activePanel === "timing" && (
+                                    <div>
+                                        <PanelHeading>Timing</PanelHeading>
+                                        <div className="space-y-3">
+                                            <div>
+                                                <p className="mb-2 text-[9px] font-black uppercase tracking-[0.1em] text-[#8b7a72]">Join window</p>
+                                                <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
+                                                    {[
+                                                        { label: "15m", minutes: 15 },
+                                                        { label: "1h", minutes: 60 },
+                                                        { label: "4h", minutes: 240 },
+                                                        { label: "1d", minutes: 1440 },
+                                                        { label: "3d", minutes: 4320 },
+                                                        { label: "7d", minutes: 10080 },
+                                                    ].map((option) => (
+                                                        <button
+                                                            key={option.minutes}
+                                                            type="button"
+                                                            onClick={() => handleDurationChange(durationFromMinutes(option.minutes))}
+                                                            className={`h-9 min-w-0 border-2 px-2 text-xs font-black sm:min-w-12 sm:px-3 ${totalDurationMinutes === option.minutes ? "border-black bg-[#f5d547] shadow-[2px_2px_0_#111]" : "border-black/20 bg-white hover:border-black"}`}
+                                                        >
+                                                            {option.label}
+                                                        </button>
+                                                    ))}
+                            </div>
+                        </div>
+                                            <label className="block">
+                                                <span className="mb-2 block text-[9px] font-black uppercase tracking-[0.1em] text-[#8b7a72]">Resolves</span>
+                                                <span className="flex items-center gap-2 border-2 border-black/20 bg-white px-3 focus-within:border-black">
+                                                    <CalendarDays className="h-4 w-4 shrink-0 text-[#e85a2d]" />
+                                                    <input
+                                                        type="datetime-local"
+                                                        value={toDateTimeLocalValue(selectedDate)}
+                                                        min={toDateTimeLocalValue(new Date(composerNow + totalDurationMinutes * 60 * 1000))}
+                                                        onChange={(event) => handleResolutionDateChange(new Date(event.target.value))}
+                                                        className="create-challenge-date-input h-12 w-full min-w-0 flex-1 border-0 bg-transparent text-base font-black text-black outline-none sm:h-11 sm:text-xs"
+                                                    />
+                                                </span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {activePanel === "players" && (
+                                    <div>
+                                        <PanelHeading>Players</PanelHeading>
+                                        <div className="grid grid-cols-1 gap-2 min-[380px]:grid-cols-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setChallengeMode("pvp");
+                                                    setActivePanel(null);
+                                                }}
+                                                className={`flex items-center gap-3 border-2 p-3 text-left ${challengeMode === "pvp" ? "border-black bg-black text-white shadow-[3px_3px_0_#f5d547]" : "border-black/20 bg-white text-black hover:border-black"}`}
+                                            >
+                                                <Swords className="h-5 w-5 shrink-0" />
+                                                <span>
+                                                    <span className="block text-xs font-black">1 vs 1</span>
+                                                    <span className={`text-[10px] font-bold ${challengeMode === "pvp" ? "text-white/65" : "text-[#8b7a72]"}`}>One rival</span>
+                                                </span>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setChallengeMode("team");
+                                                    setActivePanel(null);
+                                                }}
+                                                className={`flex items-center gap-3 border-2 p-3 text-left ${challengeMode === "team" ? "border-black bg-black text-white shadow-[3px_3px_0_#f5d547]" : "border-black/20 bg-white text-black hover:border-black"}`}
+                                            >
+                                                <Users className="h-5 w-5 shrink-0" />
+                                                <span>
+                                                    <span className="block text-xs font-black">Teams</span>
+                                                    <span className={`text-[10px] font-bold ${challengeMode === "team" ? "text-white/65" : "text-[#8b7a72]"}`}>Crowd vs crowd</span>
+                                                </span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
                         )}
-                        {!isDetailsStep ? (
+
+                        {formError && (
+                            <div role="alert" className="mt-3 flex items-start gap-2 border border-red-300 bg-red-50 px-3 py-2 text-xs font-bold text-red-700">
+                                <span className="mt-1 h-1.5 w-1.5 shrink-0 bg-red-600" />
+                                {formError}
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                <footer className="flex shrink-0 items-center gap-3 border-t-2 border-black bg-[#f3e1d7] px-3 py-2.5 sm:px-5 sm:py-3">
+                    <div className="hidden min-w-0 flex-1 sm:block">
+                        <p className="truncate text-xs font-black text-[#17120f]">
+                            {marketType === "crypto" ? "Crypto" : "Sports"} · {isPriceFeed ? "Price" : "Statement"} · {challengeMode === "pvp" ? "1 vs 1" : "Teams"}
+                        </p>
+                        <p className="mt-0.5 text-[10px] font-bold text-[#7b6a62]">
+                            {betAmount || 0} USDC · closes in {formatDuration(duration)}
+                        </p>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={handleOpenPreview}
+                        disabled={isSubmitting}
+                        className="inline-flex h-11 shrink-0 cursor-pointer items-center justify-center gap-1.5 border-2 border-black bg-white px-3 text-xs font-black text-black transition-colors hover:bg-[#f5d547] disabled:cursor-not-allowed disabled:opacity-60 sm:px-4"
+                    >
+                        <Eye className="h-4 w-4" />
+                        <span>Preview</span>
+                    </button>
+                    <button
+                        type="button"
+                        onClick={handleCreateChallenge}
+                        disabled={isSubmitting || txStatus === "success"}
+                        className="rekto-button ml-auto inline-flex h-11 min-w-0 flex-1 cursor-pointer items-center justify-center gap-2 border-2 border-black bg-black px-3 text-sm font-black text-white transition-all hover:-translate-y-0.5 hover:bg-[#27211e] hover:shadow-[3px_3px_0_#e85a2d] disabled:cursor-not-allowed disabled:opacity-60 sm:flex-none sm:px-5 sm:min-w-44"
+                    >
+                        {isSubmitting ? (
+                            <><Loader2 className="h-4 w-4 animate-spin" /> {statusLabel}</>
+                        ) : !isConnected ? (
+                            <><Wallet className="h-4 w-4" /> Connect & create</>
+                        ) : (
+                            <><Zap className="h-4 w-4 fill-white" /> Create challenge</>
+                        )}
+                    </button>
+                </footer>
+
+                {isPreviewOpen && (
+                    <div className="absolute inset-0 z-30 flex min-h-0 flex-col bg-[#fffaf6]">
+                        <header className="flex shrink-0 items-center justify-between border-b-2 border-black px-3 py-2.5 sm:px-5 sm:py-3.5">
+                            <div className="flex items-center gap-2.5">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsPreviewOpen(false)}
+                                    className="flex h-8 w-8 cursor-pointer items-center justify-center border-2 border-black bg-white transition-colors hover:bg-[#f5d547] sm:h-9 sm:w-9"
+                                    aria-label="Back to editor"
+                                >
+                                    <ArrowLeft className="h-4 w-4" />
+                                </button>
+                                <div>
+                                    <h2 className="text-base font-black text-[#17120f] sm:text-lg">Challenge preview</h2>
+                                    <p className="text-[11px] font-bold text-[#7a6961]">This is how your call will appear.</p>
+                                </div>
+                            </div>
+                            <span className="border border-black/20 bg-[#f5d547] px-2 py-1 text-[9px] font-black uppercase tracking-[0.1em]">Preview</span>
+                        </header>
+
+                        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 sm:p-5">
+                            <ChallengePreview
+                                username={user?.username || "You"}
+                                isModerator={user?.user_type === "moderator"}
+                                twitterUsername={user?.twitter_username ?? null}
+                                marketType={marketType}
+                                isPriceFeed={isPriceFeed}
+                                challengeMode={challengeMode}
+                                pairTag={rawTopicLabel}
+                                title={isPriceFeed ? generatedStatement : statement.trim()}
+                                betAmount={betAmount}
+                                duration={duration}
+                                resolutionDate={selectedDate}
+                            />
+                        </div>
+
+                        <footer className="flex shrink-0 gap-2 border-t-2 border-black bg-[#f3e1d7] px-3 py-2.5 sm:gap-3 sm:px-5 sm:py-3">
                             <button
                                 type="button"
-                                onClick={goToNextStep}
-                                className="rekto-button cursor-pointer w-full py-3 sm:py-4 bg-gray-900 hover:bg-gray-700 text-white font-black text-base sm:text-lg transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+                                onClick={() => setIsPreviewOpen(false)}
+                                disabled={isSubmitting}
+                                className="inline-flex h-11 min-w-24 cursor-pointer items-center justify-center gap-2 border-2 border-black bg-white px-3 text-xs font-black text-black hover:bg-[#f5d547] disabled:opacity-60"
                             >
-                                Continue
+                                <ArrowLeft className="h-4 w-4" /> Edit
                             </button>
-                        ) : (
                             <button
                                 type="button"
                                 onClick={handleCreateChallenge}
-                                disabled={isSubmitting || txStatus === "success" || !selectedParentCategory || !selectedChildCategory}
-                                className={getButtonStyle()}
+                                disabled={isSubmitting}
+                                className="rekto-button inline-flex h-11 min-w-0 flex-1 cursor-pointer items-center justify-center gap-2 border-2 border-black bg-black px-3 text-sm font-black text-white hover:bg-[#27211e] disabled:cursor-not-allowed disabled:opacity-60 sm:flex-none sm:px-5 sm:min-w-48"
                             >
-                                {getButtonLabel()}
+                                {isSubmitting ? (
+                                    <><Loader2 className="h-4 w-4 animate-spin" /> {statusLabel}</>
+                                ) : !isConnected ? (
+                                    <><Wallet className="h-4 w-4" /> Connect & create</>
+                                ) : (
+                                    <><Zap className="h-4 w-4 fill-white" /> Create challenge</>
+                                )}
                             </button>
-                        )}
+                        </footer>
                     </div>
-                </div>
-            </div>
+                )}
+            </section>
 
-            <DatePickerModal isOpen={isDatePickerOpen} onClose={() => setIsDatePickerOpen(false)} selectedDate={selectedDate} onSelectDate={setSelectedDate} />
-            <DurationPickerModal isOpen={isDurationPickerOpen} onClose={() => setIsDurationPickerOpen(false)} selectedDuration={duration} onSelectDuration={setDuration} />
+            <style jsx global>{`
+                .pixel-shell .create-challenge-modal .create-challenge-composer-input,
+                .pixel-shell .create-challenge-modal .create-challenge-date-input {
+                    border: 0 !important;
+                    border-radius: 0 !important;
+                    background: transparent !important;
+                    box-shadow: none !important;
+                }
+
+                .pixel-shell .create-challenge-modal .create-challenge-composer-input:focus,
+                .pixel-shell .create-challenge-modal .create-challenge-date-input:focus {
+                    border: 0 !important;
+                    box-shadow: none !important;
+                }
+
+                .create-challenge-modal {
+                    min-width: 0;
+                }
+
+                .create-challenge-date-input::-webkit-date-and-time-value {
+                    min-width: 0;
+                    text-align: left;
+                }
+
+                @media (max-width: 639px) {
+                    .create-challenge-modal {
+                        max-height: calc(100vh - 1.5rem);
+                    }
+
+                    @supports (height: 100dvh) {
+                        .create-challenge-modal {
+                            max-height: calc(100dvh - 1.5rem);
+                        }
+                    }
+                }
+
+                @media (min-width: 380px) and (max-width: 639px) {
+                    .create-challenge-modal {
+                        max-height: calc(100vh - 2rem);
+                    }
+
+                    @supports (height: 100dvh) {
+                        .create-challenge-modal {
+                            max-height: calc(100dvh - 2rem);
+                        }
+                    }
+                }
+            `}</style>
+
         </div>,
         document.body,
+    );
+}
+
+function ComposerButton({
+    icon: Icon,
+    label,
+    isActive,
+    onClick,
+}: {
+    icon: typeof Coins;
+    label: string;
+    isActive: boolean;
+    onClick: () => void;
+}) {
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            aria-pressed={isActive}
+            title={label}
+            className={`inline-flex h-8 shrink-0 items-center gap-1.5 border px-2.5 text-[10px] font-black transition-colors ${isActive ? "border-black bg-[#f5d547] text-black" : "border-black/15 bg-white text-[#6d5d55] hover:border-black hover:text-black"}`}
+        >
+            <Icon className="h-3.5 w-3.5" />
+            <span className="max-w-24 truncate">{label}</span>
+        </button>
+    );
+}
+
+function VerifiedBadge({
+    isModerator,
+    twitterUsername,
+}: {
+    isModerator: boolean;
+    twitterUsername: string | null;
+}) {
+    const label = isModerator ? "Verified creator" : `Verified on X as @${twitterUsername}`;
+
+    return (
+        <span className="inline-flex shrink-0" title={label} aria-label={label}>
+            <svg className="h-4 w-4" viewBox="0 0 32 32" aria-hidden="true">
+                <path
+                    fill={isModerator ? "#F5B800" : "#378FDB"}
+                    d="M16 1.5l2.8 2.2 3.5-1 1.6 3.2 3.6.5.1 3.7 3 2-1.4 3.4 1.4 3.4-3 2-.1 3.7-3.6.5-1.6 3.2-3.5-1L16 30.5l-2.8-2.2-3.5 1-1.6-3.2-3.6-.5-.1-3.7-3-2 1.4-3.4-1.4-3.4 3-2 .1-3.7 3.6-.5 1.6-3.2 3.5 1L16 1.5Z"
+                />
+                <path
+                    d="m9.4 16.2 4.2 4.2 9-9"
+                    fill="none"
+                    stroke="white"
+                    strokeWidth="3.4"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                />
+            </svg>
+        </span>
+    );
+}
+
+function ChallengePreview({
+    username,
+    isModerator,
+    twitterUsername,
+    marketType,
+    isPriceFeed,
+    challengeMode,
+    pairTag,
+    title,
+    betAmount,
+    duration,
+    resolutionDate,
+}: {
+    username: string;
+    isModerator: boolean;
+    twitterUsername: string | null;
+    marketType: MarketType;
+    isPriceFeed: boolean;
+    challengeMode: ChallengeMode;
+    pairTag: string;
+    title: string;
+    betAmount: number;
+    duration: { hours: number; minutes: number };
+    resolutionDate: Date;
+}) {
+    const isVerified = isModerator || Boolean(twitterUsername);
+    const poolAmount = challengeMode === "pvp" ? betAmount * 2 : betAmount;
+
+    return (
+        <div className="mx-auto w-full max-w-lg">
+            <p className="mb-2 text-center text-[10px] font-black uppercase tracking-[0.12em] text-[#8b7a72]">Card preview</p>
+            <article className="overflow-hidden border-2 border-black bg-white shadow-[4px_4px_0_#111]">
+                <div className="h-1.5 bg-emerald-500" />
+                <div className="p-4 sm:p-5">
+                    <div className="flex items-start justify-between gap-3">
+                        <div className="flex min-w-0 items-center gap-2.5">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 border-black bg-[#f5d547] text-sm font-black text-black">
+                                {username.charAt(0).toUpperCase()}
+                            </div>
+                            <div className="min-w-0">
+                                <div className="flex min-w-0 items-center gap-1.5">
+                                    <span className="truncate text-sm font-black text-[#17120f]">{username}</span>
+                                    {isVerified && <VerifiedBadge isModerator={isModerator} twitterUsername={twitterUsername} />}
+                                </div>
+                                <p className="text-[10px] font-bold text-[#8b7a72]">challenges everyone</p>
+                            </div>
+                        </div>
+                        <span className="shrink-0 border border-emerald-300 bg-emerald-50 px-2 py-1 text-[9px] font-black uppercase tracking-[0.08em] text-emerald-800">
+                            Open
+                        </span>
+                    </div>
+
+                    <div className="mt-4">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="inline-flex items-center gap-1 border border-black/20 bg-[#f3e1d7] px-2 py-1 text-[10px] font-black text-[#594b44]">
+                                {marketType === "crypto" ? <Coins className="h-3 w-3" /> : <Trophy className="h-3 w-3" />}
+                                {pairTag}
+                            </span>
+                            <span className="border border-black/15 bg-white px-2 py-1 text-[9px] font-black uppercase tracking-[0.08em] text-[#75645c]">
+                                {isPriceFeed ? "Price" : "Statement"}
+                            </span>
+                            <span className="border border-black/15 bg-white px-2 py-1 text-[9px] font-black uppercase tracking-[0.08em] text-[#75645c]">
+                                {challengeMode === "pvp" ? "1 vs 1" : "Teams"}
+                            </span>
+                        </div>
+                        <h3 className="mt-3 break-words text-xl font-black leading-tight tracking-[-0.02em] text-[#17120f] sm:text-2xl">
+                            {title}
+                        </h3>
+                    </div>
+
+                    <div className="mt-4 grid grid-cols-[1fr_auto_1fr] items-center gap-2 border-2 border-black bg-[#f8ede7] p-3">
+                        <div className="min-w-0 text-center">
+                            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border-2 border-black bg-[#f5d547] text-sm font-black">
+                                {username.charAt(0).toUpperCase()}
+                            </div>
+                            <p className="mt-1.5 truncate text-[11px] font-black text-[#17120f]">{username}</p>
+                            <p className="text-[9px] font-bold uppercase tracking-[0.08em] text-[#75645c]">Your side</p>
+                        </div>
+                        <div className="text-center">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-black bg-black text-[11px] font-black italic text-white shadow-[2px_2px_0_#e85a2d]">
+                                VS
+                            </div>
+                            <p className="mt-2 text-[9px] font-black uppercase tracking-[0.08em] text-[#75645c]">Pool</p>
+                            <p className="text-sm font-black text-emerald-700">${Number.isFinite(poolAmount) ? poolAmount.toFixed(2) : "0.00"}</p>
+                        </div>
+                        <div className="min-w-0 text-center">
+                            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border-2 border-dashed border-black/50 bg-white text-[#8b7a72]">
+                                {challengeMode === "pvp" ? <Swords className="h-5 w-5" /> : <Users className="h-5 w-5" />}
+                            </div>
+                            <p className="mt-1.5 text-[11px] font-black text-[#594b44]">Waiting...</p>
+                            <p className="text-[9px] font-bold uppercase tracking-[0.08em] text-[#75645c]">
+                                {challengeMode === "pvp" ? "Opponent" : "Rival team"}
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="mt-3 grid grid-cols-3 divide-x divide-black/10 border-y border-black/10 py-2.5 text-center">
+                        <div className="px-1">
+                            <p className="text-[9px] font-black uppercase tracking-[0.08em] text-[#8b7a72]">Stake</p>
+                            <p className="mt-0.5 text-xs font-black text-black">{betAmount} USDC</p>
+                        </div>
+                        <div className="px-1">
+                            <p className="text-[9px] font-black uppercase tracking-[0.08em] text-[#8b7a72]">Joins close</p>
+                            <p className="mt-0.5 text-xs font-black text-black">{formatDuration(duration)}</p>
+                        </div>
+                        <div className="min-w-0 px-1">
+                            <p className="text-[9px] font-black uppercase tracking-[0.08em] text-[#8b7a72]">Resolves</p>
+                            <p className="mt-0.5 truncate text-xs font-black text-black">{formatDate(resolutionDate)}</p>
+                        </div>
+                    </div>
+
+                    <div className="mt-3 flex h-10 items-center justify-center gap-2 border-2 border-black bg-[#246044] text-xs font-black uppercase tracking-[0.06em] text-white">
+                        <Swords className="h-4 w-4" /> Join challenge
+                    </div>
+                </div>
+            </article>
+        </div>
+    );
+}
+
+function PanelHeading({ children }: { children: React.ReactNode }) {
+    return (
+        <h3 className="mb-3 text-[10px] font-black uppercase tracking-[0.12em] text-[#75645c]">
+            {children}
+        </h3>
     );
 }

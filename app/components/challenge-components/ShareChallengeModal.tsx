@@ -7,6 +7,7 @@ import Image from "next/image";
 import { Challenge } from "@/app/lib/challenges-service/challenges";
 import { useBodyScrollLock } from "@/app/lib/useBodyScrollLock";
 import { useUserStore } from "@/app/store/useUserStore";
+import { stripUsdcQuote } from "@/app/lib/format-market-label";
 
 type ShareChallengeModalProps = { challenge: Challenge; isOpen: boolean; onClose: () => void };
 
@@ -55,7 +56,7 @@ function getPredictionLine(challenge: Challenge) {
   const dateText = resolutionDate && !Number.isNaN(resolutionDate.getTime())
     ? resolutionDate.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })
     : "";
-  const prediction = challenge.statement || challenge.title || `${challenge.ticker} ${challenge.direction.toLowerCase()} ${challenge.target}`;
+  const prediction = stripUsdcQuote(challenge.statement || challenge.title) || `${challenge.ticker} ${challenge.direction.toLowerCase()} ${challenge.target}`;
   return dateText ? `${prediction} by ${dateText}` : prediction;
 }
 
@@ -142,7 +143,7 @@ export function ShareChallengeModal({ challenge, isOpen, onClose }: ShareChallen
     roundedRect(ctx, 150, panelY + 194, 895, 48, 24);
     ctx.fillStyle = "#181513";
     ctx.font = "800 22px Arial, sans-serif";
-    ctx.fillText(`${challenge.trading_pair || challenge.ticker || "MARKET"}  •  ${challenge.status.replaceAll("_", " ")}`, 185, panelY + 226);
+    ctx.fillText(`${stripUsdcQuote(challenge.trading_pair || challenge.ticker) || "MARKET"}  •  ${challenge.status.replaceAll("_", " ")}`, 185, panelY + 226);
 
     ctx.fillStyle = "#181513";
     ctx.font = "900 31px Arial, sans-serif";

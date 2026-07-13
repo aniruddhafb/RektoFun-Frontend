@@ -17,6 +17,7 @@ interface ChallengeGridProps {
     refreshKey?: number;
     activeFilter: string;
     searchQuery: string;
+    resolutionSource?: string;
 }
 
 const PAGE_SIZE = 6;
@@ -31,6 +32,7 @@ export function ChallengeGrid({
     refreshKey = 0,
     activeFilter,
     searchQuery,
+    resolutionSource,
 }: ChallengeGridProps) {
     const { address } = useAppKitAccount();
     const { user } = useUserStore();
@@ -60,7 +62,7 @@ export function ChallengeGrid({
             const isPinnedFilter = activeFilter === "Pinned";
             const isMyBetsFilter = activeFilter === "My Bets";
             const isCreatedByMeFilter = activeFilter === "Created By Me";
-            const needsCompleteList = isPinnedFilter || isMyBetsFilter || isCreatedByMeFilter || activeFilter === "Expiring Soon";
+            const needsCompleteList = Boolean(resolutionSource) || isPinnedFilter || isMyBetsFilter || isCreatedByMeFilter || activeFilter === "Expiring Soon";
 
             if ((isMyBetsFilter || isCreatedByMeFilter) && userId == null) {
                 setChallenges([]);
@@ -69,7 +71,7 @@ export function ChallengeGrid({
                 return;
             }
 
-            const requestLimit = needsCompleteList ? 100 : PAGE_SIZE;
+            const requestLimit = resolutionSource ? 1000 : needsCompleteList ? 100 : PAGE_SIZE;
             const requestOffset = needsCompleteList ? 0 : currentOffset;
 
             const [response, positionsResponse] = await Promise.all([
@@ -77,11 +79,19 @@ export function ChallengeGrid({
                     limit: requestLimit,
                     offset: requestOffset,
                     search: searchQuery.trim() || undefined,
+                    resolution_source: resolutionSource,
                 }),
                 isMyBetsFilter ? getPositions({ limit: 100, offset: 0 }) : Promise.resolve(null),
             ]);
 
             let nextChunk = response.challenges ?? [];
+
+            if (resolutionSource) {
+                const normalizedSource = resolutionSource.trim().toUpperCase().replace(/[\s-]+/g, "_");
+                nextChunk = nextChunk.filter((challenge) =>
+                    String(challenge.resolution_source ?? "").trim().toUpperCase().replace(/[\s-]+/g, "_") === normalizedSource
+                );
+            }
 
             if (isPinnedFilter) {
                 nextChunk = nextChunk.filter((challenge) => isBookmarked(challenge.id.toString()));
@@ -143,7 +153,7 @@ export function ChallengeGrid({
                 setIsLoadingMore(false);
             }
         }
-    }, [activeFilter, isBookmarked, searchQuery, isLoadingMore, userId]);
+    }, [activeFilter, isBookmarked, searchQuery, isLoadingMore, resolutionSource, userId]);
 
     useEffect(() => {
         setIsLoadingMore(false);
