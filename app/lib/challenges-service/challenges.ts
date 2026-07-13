@@ -53,6 +53,7 @@ export interface BetInfo {
 
 export interface Challenge {
   id: number;
+  views: number;
   title: string;
   statement: string;
   ticker: string;
@@ -204,6 +205,22 @@ export async function getChallengeById(id: number): Promise<Challenge> {
   }
 
   return response.json();
+}
+
+export async function incrementChallengeViews(id: number): Promise<number> {
+  const response = await fetch(`${API_BASE_URL}/challenges/${id}/view`, {
+    method: 'POST',
+    headers: {
+      'accept': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to record challenge view: ${response.statusText}`);
+  }
+
+  const data: { views: number } = await response.json();
+  return data.views;
 }
 
 export async function updateChallengeMetadata(

@@ -26,6 +26,8 @@ export function ChallengeCard({
     showPin = true,
 }: ChallengeCardProps) {
     const [isShareModalOpen, setIsShareModalOpen] = React.useState(false);
+    const [viewOverrides, setViewOverrides] = React.useState<Record<number, number>>({});
+    const viewCount = Math.max(challenge.views ?? 0, viewOverrides[challenge.id] ?? 0);
     const {
         isLoading,
         isBetFormOpen,
@@ -84,8 +86,33 @@ export function ChallengeCard({
         escrowAddress,
     } = useChallengeCard(challenge);
 
+    React.useEffect(() => {
+        const handleChallengeViewed = (event: Event) => {
+            const { challengeId, views } = (event as CustomEvent<{
+                challengeId: number;
+                views: number;
+            }>).detail;
+
+            if (challengeId === challenge.id) {
+                setViewOverrides((currentOverrides) => ({
+                    ...currentOverrides,
+                    [challengeId]: Math.max(currentOverrides[challengeId] ?? 0, views),
+                }));
+            }
+        };
+
+        window.addEventListener("rektofun:challenge-viewed", handleChallengeViewed);
+        return () => window.removeEventListener("rektofun:challenge-viewed", handleChallengeViewed);
+    }, [challenge.id]);
+
     const handleClick = (e: React.MouseEvent) => {
         e.stopPropagation();
+
+        const target = e.target as HTMLElement;
+        if (target.closest("button, a, input, [role='button'], [data-card-action='true']")) {
+            return;
+        }
+
         if (onClick) {
             window.setTimeout(() => onClick(challenge), 0);
         } else if (onRekt) {
@@ -470,6 +497,7 @@ export function ChallengeCard({
                             disabled={ctaState.disabled}
                             onClick={(e) => {
                                 e.preventDefault();
+                                e.stopPropagation();
                                 if (ctaState.disabled) return;
                                 openBetForm(e);
                             }}
@@ -484,32 +512,6 @@ export function ChallengeCard({
                         )}
                     </div>
                 </div>
-
-                <AcceptChallengeModal
-                    isOpen={isBetFormOpen}
-                    isLoading={isLoading}
-                    usdcBalance={usdcBalance}
-                    betInput={betInput}
-                    betError={betError}
-                    betCurrency={betCurrency}
-                    minAcceptBet={modalMinAcceptBet}
-                    maxAcceptBet={modalMaxAcceptBet}
-                    escrowAddress={escrowAddress}
-                    resolveCountdown={exactCountdownDetails.exactCountdown}
-                    resolveLabel={exactCountdownDetails.dayLabel}
-                    resolutionSource={challenge.resolution_source ?? undefined}
-                    isTeam={isTeam}
-                    joinSide={joinSide}
-                    onClose={() => closeBetForm()}
-                    onSubmit={(e) => handleJoinChallengeWrapper(e)}
-                    onBetInputChange={(value) => {
-                        setBetInput(value);
-                        if (betError) {
-                            setBetError("");
-                        }
-                    }}
-                    onJoinSideChange={(side) => setJoinSide(side)}
-                />
 
                 {/* Challenge Expiry */}
                 {!isExpireTimeAchieved && (
@@ -580,7 +582,7 @@ export function ChallengeCard({
                         </div>
                         {/* Eye Icon */}
                         <div className="flex items-center gap-1">
-                            <span className="font-semibold text-gray-900">0</span>
+                            <span className="font-semibold text-gray-900">{viewCount}</span>
                             <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
@@ -589,6 +591,31 @@ export function ChallengeCard({
                     </div>
                 </div>
             </div>
+            <AcceptChallengeModal
+                isOpen={isBetFormOpen}
+                isLoading={isLoading}
+                usdcBalance={usdcBalance}
+                betInput={betInput}
+                betError={betError}
+                betCurrency={betCurrency}
+                minAcceptBet={modalMinAcceptBet}
+                maxAcceptBet={modalMaxAcceptBet}
+                escrowAddress={escrowAddress}
+                resolveCountdown={exactCountdownDetails.exactCountdown}
+                resolveLabel={exactCountdownDetails.dayLabel}
+                resolutionSource={challenge.resolution_source ?? undefined}
+                isTeam={isTeam}
+                joinSide={joinSide}
+                onClose={() => closeBetForm()}
+                onSubmit={(e) => handleJoinChallengeWrapper(e)}
+                onBetInputChange={(value) => {
+                    setBetInput(value);
+                    if (betError) {
+                        setBetError("");
+                    }
+                }}
+                onJoinSideChange={(side) => setJoinSide(side)}
+            />
             <style jsx>{`
                 .opponent-placeholder-bg {
                     animation: opponent-bg-blink 1.5s ease-in-out infinite;

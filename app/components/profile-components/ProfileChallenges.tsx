@@ -65,7 +65,7 @@ export function ProfileChallenges({
                 <button
                     type="button"
                     onClick={onCreateChallenge}
-                    className="mt-7 inline-flex cursor-pointer items-center justify-center border border-black bg-black px-6 py-3 text-sm font-black uppercase tracking-[0.08em] text-white shadow-[4px_4px_0_#e85a2d] transition-colors hover:bg-gray-800 focus:outline-none focus-visible:ring-4 focus-visible:ring-[#e85a2d]/25"
+                    className="mt-7 inline-flex cursor-pointer items-center justify-center border-2 border-black bg-white/70 px-6 py-3 text-sm font-black uppercase tracking-[0.08em] text-gray-800 shadow-[4px_4px_0_#e85a2d] transition-colors hover:bg-white focus:outline-none focus-visible:ring-4 focus-visible:ring-[#e85a2d]/25"
                 >
                     <span className="mr-2 text-lg leading-none">+</span>
                     Create a challenge

@@ -9,8 +9,6 @@ const nextConfig = {
   async rewrites() {
     return {
       // fallback: checked AFTER all pages, public files, AND dynamic routes.
-      // This lets app/api/sports/scores/[fixtureId]/route.ts handle its own requests
-      // before Next.js ever considers forwarding to the FastAPI backend.
       fallback: [
         {
           source: '/api/:path*',

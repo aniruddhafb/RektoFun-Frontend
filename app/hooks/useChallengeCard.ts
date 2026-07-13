@@ -28,6 +28,8 @@ interface CTAButtonState {
   showCreatorHint: boolean;
 }
 
+const GENERIC_ACCEPT_ERROR = "Something went wrong. Please try again.";
+
 // Helper functions for date parsing and formatting
 function parseDateValue(value: string | number | null | undefined): number | null {
   if (typeof value === "number") {
@@ -257,12 +259,12 @@ export function useChallengeCard(challenge: Challenge) {
 
   const handleJoinChallenge = async () => {
     if (!isConnected || !address || !walletProvider) {
-      setBetError("Connect your Solana wallet before joining this challenge.");
+      setBetError(GENERIC_ACCEPT_ERROR);
       return;
     }
 
     if (!user?.id) {
-      setBetError("Your user profile is not ready yet. Please try again.");
+      setBetError(GENERIC_ACCEPT_ERROR);
       return;
     }
 
@@ -305,12 +307,16 @@ export function useChallengeCard(challenge: Challenge) {
       const challengePDA = new PublicKey(challengePdaStr);
       const creatorPubkey = new PublicKey(creatorWalletStr);
       const challengerPubkey = new PublicKey(address);
+      const signingProvider = walletProvider as {
+        signTransaction: (transaction: Transaction) => Promise<Transaction>;
+        signAllTransactions: (transactions: Transaction[]) => Promise<Transaction[]>;
+      };
 
       const walletAdapter = {
         publicKey: challengerPubkey,
-        signTransaction: async (tx: Transaction) => (walletProvider as any).signTransaction(tx),
+        signTransaction: async (tx: Transaction) => signingProvider.signTransaction(tx),
         signAllTransactions: async (txs: Transaction[]) =>
-          (walletProvider as any).signAllTransactions(txs),
+          signingProvider.signAllTransactions(txs),
       };
 
       const program = getRektoProgram(walletAdapter);
@@ -350,10 +356,8 @@ export function useChallengeCard(challenge: Challenge) {
 
       setIsBetFormOpen(false);
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Failed to join challenge. Please try again.";
-      setBetError(message);
-      alert(message);
+      console.error("Failed to accept challenge:", error);
+      setBetError(GENERIC_ACCEPT_ERROR);
     } finally {
       setIsLoading(false);
     }
