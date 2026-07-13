@@ -18,7 +18,7 @@ import {
   Clock,
   AlertCircle,
 } from "lucide-react";
-import { Challenge, getChallengeTicker, incrementChallengeViews } from "@/app/lib/challenges-service/challenges";
+import { Challenge, incrementChallengeViews } from "@/app/lib/challenges-service/challenges";
 import { User as UserType } from "@/app/lib/users-service/users";
 import { useChallengeDetail } from "@/app/hooks/useChallengeDetail";
 import { useChallengeCard } from "@/app/hooks/useChallengeCard";
@@ -134,7 +134,6 @@ export default function ChallengeDetailModal({ challenge, creator, isOpen, onClo
   const [isAcceptModalOpen, setIsAcceptModalOpen] = React.useState(false);
   const lastCountedChallengeIdRef = React.useRef<number | null>(null);
   const challengeId = challenge?.id;
-  const displayTicker = getChallengeTicker(challenge?.ticker) || "Market";
   const resolvedCreator = creator ?? challenge?.creator_details ?? null;
   const {
     modalRef,
@@ -257,7 +256,7 @@ export default function ChallengeDetailModal({ challenge, creator, isOpen, onClo
                 <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-lg border-2 border-black bg-[#fffaf6] p-3 shadow-[2px_2px_0_#111] sm:h-24 sm:w-24">
                   <Image
                     src={assetLogo}
-                    alt={displayTicker}
+                    alt={challenge.ticker || "Market"}
                     width={80}
                     height={80}
                     className="h-full w-full object-contain"
@@ -269,7 +268,7 @@ export default function ChallengeDetailModal({ challenge, creator, isOpen, onClo
                       {statusLabel}
                     </span>
                     <span className="inline-flex items-center rounded-full border border-black/15 bg-[#f7efe9] px-2.5 py-1 text-xs font-bold text-[#5c4a42]">
-                      {displayTicker}
+                      {challenge.ticker || "Market"}
                     </span>
                   </div>
                   <h2 className="break-words text-2xl font-black leading-tight text-[#201a16]">
@@ -284,7 +283,7 @@ export default function ChallengeDetailModal({ challenge, creator, isOpen, onClo
                     {statusLabel}
                   </span>
                   <span className="inline-flex items-center rounded-full border border-black/15 bg-[#f7efe9] px-2.5 py-1 text-xs font-bold text-[#5c4a42]">
-                    {displayTicker}
+                    {challenge.ticker || "Market"}
                   </span>
                   <span className="inline-flex items-center rounded-full border border-black/15 bg-white px-2.5 py-1 text-xs font-bold text-[#5c4a42]">
                     {modeLabel}
@@ -373,7 +372,7 @@ export default function ChallengeDetailModal({ challenge, creator, isOpen, onClo
               <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <p className="text-xs font-black uppercase tracking-[0.12em] text-white/70">Market Snapshot</p>
-                  <h3 className="mt-1 text-2xl font-black text-white sm:text-3xl">{displayTicker}</h3>
+                  <h3 className="mt-1 text-2xl font-black text-white sm:text-3xl">{challenge.ticker || "Market"}</h3>
                 </div>
                 <div className="rounded-lg border border-white/20 bg-white/10 px-4 py-3 text-left sm:text-right">
                   <div className="flex items-center gap-1.5 sm:justify-end">

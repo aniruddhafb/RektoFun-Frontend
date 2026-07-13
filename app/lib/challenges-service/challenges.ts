@@ -93,24 +93,6 @@ export interface Challenge {
   };
 }
 
-export function getChallengeTicker(ticker: string | null | undefined): string {
-  return ticker?.trim().split("/", 1)[0].toUpperCase() || "";
-}
-
-export function getChallengePredictionTitle(
-  challenge: Pick<Challenge, "ticker" | "direction" | "target" | "statement" | "title">
-): string {
-  const ticker = getChallengeTicker(challenge.ticker);
-  const direction = String(challenge.direction || "").toUpperCase();
-  const hasTarget = challenge.target !== null && challenge.target !== undefined && String(challenge.target).trim() !== "";
-
-  if (ticker && hasTarget && (direction === "UP" || direction === "DOWN")) {
-    return `${ticker} ${direction === "DOWN" ? "Below" : "Above"} $${challenge.target}`;
-  }
-
-  return challenge.statement?.trim() || challenge.title?.trim() || ticker || "Challenge";
-}
-
 export interface GetChallengesResponse {
   challenges: Challenge[];
   total: number;
