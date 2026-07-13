@@ -1,11 +1,12 @@
 "use client";
 
 import Image from "next/image";
+import type { ReactNode } from "react";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { useBodyScrollLock } from "@/app/lib/useBodyScrollLock";
 
 type Slide = {
-    description: string;
+    description: ReactNode;
     accent: string;
     cta: string;
     image: string;
@@ -16,7 +17,7 @@ const slides: Slide[] = [
         description:
             "welcome to rektofun, your social prediction arena for crypto and sports. this quick guided flow gets you battle ready in seconds.",
         accent: "Quick start for new users",
-        cta: "Start Tutorial",
+        cta: "Next",
         image: "/welcome/111.jpg",
     },
     {
@@ -34,19 +35,24 @@ const slides: Slide[] = [
         image: "/welcome/3.jpg",
     },
     {
-        description:
-            "Earn Rekto Points by referring friends and creating challenges. stay active, grow your network, and climb the ranks faster.",
-        accent: "Referral + creator rewards",
-        cta: "Next",
-        image: "/welcome/44.jpg",
-    },
-    {
-        description:
-            "RektoFun is currently live on Solana Devnet. Connect your wallet and try the full experience right now.",
-        accent: "Test it safely on Devnet",
-        cta: "Try RektoFun",
-        image: "/welcome/5.jpg",
-    },
+        description: (
+            <>
+                The{" "}
+                <a
+                    href="https://dexscreener.com/solana/w8og36xbxpk1xsmvg4bff2uwhnuyinuxct7btfjaz1n"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-bold underline underline-offset-2 transition hover:text-black"
+                >
+                    $REKTO↗
+                </a>{" "}
+                token serves as the primary utility within the ecosystem, enabling users to create and resolve challenges.
+            </>
+        ),
+        accent: "$REKTO as utility",
+        cta: "Get Started",
+        image: "/welcome/55.jpg",
+    }
 ];
 
 const TUTORIAL_COMPLETED_KEY = "rektofun_tutorial_completed";
@@ -107,7 +113,7 @@ export function WelcomeTutorialModal() {
             <div className="rekto-modal-panel relative w-full max-w-[38rem] overflow-hidden rounded-[24px] border-2 border-black bg-[#eedcd2] shadow-[0_20px_60px_rgba(0,0,0,0.35)]">
                 <button
                     type="button"
-                    onClick={() => setIsDismissedForSession(true)}
+                    onClick={handleFinishTutorial}
                     className="rekto-button absolute right-3 top-3 z-20 rounded-full border border-[#eedcd2]/80 bg-black/80 px-4 py-1.5 text-sm font-bold text-[#eedcd2] shadow-[0_8px_20px_rgba(0,0,0,0.35)] transition hover:bg-black hover:text-white cursor-pointer"
                     aria-label="Close tutorial"
                 >

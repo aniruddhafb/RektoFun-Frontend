@@ -285,6 +285,7 @@ export default function ProfilePage() {
                             bio={user.description || "No bio yet"}
                             showSettingsIcon={isOwnProfile}
                             twitterUsername={user.twitter_username}
+                            userType={user.user_type}
                             isOwnProfile={isOwnProfile}
                             isFollowing={isFollowing}
                             followersCount={user.followers?.length ?? 0}

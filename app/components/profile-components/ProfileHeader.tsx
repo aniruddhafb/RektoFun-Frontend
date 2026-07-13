@@ -25,6 +25,7 @@ interface ProfileHeaderProps {
         volume: number;
     };
     twitterUsername?: string | null;
+    userType?: "user" | "moderator";
     isOwnProfile?: boolean;
     isFollowing?: boolean;
     followersCount?: number;
@@ -61,6 +62,7 @@ export function ProfileHeader({
     balance,
     stats,
     twitterUsername,
+    userType = "user",
     isOwnProfile = false,
     isFollowing = false,
     followersCount = 0,
@@ -107,15 +109,15 @@ export function ProfileHeader({
                                 className="object-cover"
                             />
                         </div>
-                        {twitterUsername && (
+                        {(userType === "moderator" || twitterUsername) && (
                             <span
                                 className="absolute -bottom-1 -right-1 z-20 flex h-8 w-8 items-center justify-center text-white drop-shadow-sm sm:h-9 sm:w-9"
-                                title="Verified on X"
-                                aria-label="Verified on X"
+                                title={userType === "moderator" ? "Verified as KOL" : `Verified on X as @${twitterUsername}`}
+                                aria-label={userType === "moderator" ? "Verified as KOL" : `Verified on X as @${twitterUsername}`}
                             >
                                 <svg className="h-full w-full" viewBox="0 0 32 32" aria-hidden="true">
                                     <path
-                                        fill="#378FDB"
+                                        fill={userType === "moderator" ? "#F5B800" : "#378FDB"}
                                         stroke="white"
                                         strokeWidth="1.5"
                                         strokeLinejoin="round"
@@ -341,7 +343,7 @@ export function ProfileHeader({
                     </div>
                 </div>
             </div>
-            <ShareProfileModal isOpen={isShareModalOpen} onClose={() => setIsShareModalOpen(false)} username={username} avatar={avatar} verified={!!twitterUsername} stats={stats} />
+            <ShareProfileModal isOpen={isShareModalOpen} onClose={() => setIsShareModalOpen(false)} username={username} avatar={avatar} verified={!!twitterUsername} isModerator={userType === "moderator"} stats={stats} />
         </div>
     );
 }

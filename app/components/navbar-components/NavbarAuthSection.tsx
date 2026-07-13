@@ -9,6 +9,7 @@ type NavbarAuthSectionProps = {
     displayUsername: string;
     displayProfileImage: string | null;
     isXVerified: boolean;
+    isModerator: boolean;
     usdcBalance: number | null;
     isDropdownOpen: boolean;
     onAuth: () => void;
@@ -32,6 +33,7 @@ export function NavbarAuthSection({
     displayUsername,
     displayProfileImage,
     isXVerified,
+    isModerator,
     usdcBalance,
     isDropdownOpen,
     onAuth,
@@ -75,6 +77,7 @@ export function NavbarAuthSection({
                         displayUsername={displayUsername}
                         displayProfileImage={displayProfileImage}
                         isXVerified={isXVerified}
+                        isModerator={isModerator}
                         usdcBalance={usdcBalance}
                         isOpen={isDropdownOpen}
                         onClose={onCloseDropdown}

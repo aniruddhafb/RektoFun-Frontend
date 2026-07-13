@@ -12,6 +12,7 @@ type Props = {
     username: string;
     avatar: string;
     verified: boolean;
+    isModerator?: boolean;
     stats: { wins: number; rekts: number; winRatio: number; pnl: number; volume: number };
 };
 
@@ -25,7 +26,13 @@ function formatMoney(value: number) {
     return `$${Math.abs(value).toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
 }
 
-async function loadImage(src: string) {
+const imageCache = new Map<string, Promise<HTMLImageElement>>();
+
+function loadImage(src: string) {
+    const cached = imageCache.get(src);
+    if (cached) return cached;
+
+    const promise = new Promise<HTMLImageElement>((resolve) => {
     const image = new window.Image();
     let imageSource = src;
     try {
@@ -41,11 +48,14 @@ async function loadImage(src: string) {
         // Local asset paths are already safe to load directly.
     }
     image.src = /^https:\/\//i.test(imageSource) ? `/api/image-proxy?url=${encodeURIComponent(imageSource)}` : imageSource;
-    await new Promise<void>((resolve) => { image.onload = () => resolve(); image.onerror = () => resolve(); });
-    return image;
+        image.onload = () => resolve(image);
+        image.onerror = () => resolve(image);
+    });
+    imageCache.set(src, promise);
+    return promise;
 }
 
-export function ShareProfileModal({ isOpen, onClose, username, avatar, verified, stats }: Props) {
+export function ShareProfileModal({ isOpen, onClose, username, avatar, verified, isModerator = false, stats }: Props) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [preview, setPreview] = useState("");
     const [feedback, setFeedback] = useState<"link" | "image" | null>(null);
@@ -66,11 +76,13 @@ export function ShareProfileModal({ isOpen, onClose, username, avatar, verified,
         ctx.fillStyle = "#fff8f4"; roundedRect(ctx, 55, 48, 1090, 1104, 48);
         ctx.fillStyle = "#e85a2d"; roundedRect(ctx, 55, 48, 18, 1104, 9);
 
-        const logo = await loadImage("/rektologo.png");
+        const [logo, profileImage] = await Promise.all([
+            loadImage("/rektologo.png"),
+            loadImage(avatar),
+        ]);
         if (logo.naturalWidth) ctx.drawImage(logo, 105, 88, 330, 66);
         ctx.strokeStyle = "#ead7cc"; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(105, 190); ctx.lineTo(1090, 190); ctx.stroke();
 
-        const profileImage = await loadImage(avatar);
         ctx.save(); ctx.beginPath(); ctx.arc(260, 385, 130, 0, Math.PI * 2); ctx.clip();
         if (profileImage.naturalWidth) {
             const side = Math.min(profileImage.naturalWidth, profileImage.naturalHeight);
@@ -79,9 +91,9 @@ export function ShareProfileModal({ isOpen, onClose, username, avatar, verified,
         ctx.restore(); ctx.strokeStyle = "#e85a2d"; ctx.lineWidth = 12; ctx.beginPath(); ctx.arc(260, 385, 136, 0, Math.PI * 2); ctx.stroke();
 
         ctx.fillStyle = "#181513"; ctx.font = "900 58px Arial, sans-serif"; ctx.fillText(`@${username}`, 450, 370);
-        if (verified) {
+        if (verified || isModerator) {
             const textWidth = ctx.measureText(`@${username}`).width;
-            const x = Math.min(1060, 480 + textWidth); ctx.fillStyle = "#378FDB"; ctx.beginPath(); ctx.arc(x, 350, 30, 0, Math.PI * 2); ctx.fill();
+            const x = Math.min(1060, 480 + textWidth); ctx.fillStyle = isModerator ? "#F5B800" : "#378FDB"; ctx.beginPath(); ctx.arc(x, 350, 30, 0, Math.PI * 2); ctx.fill();
             ctx.strokeStyle = "white"; ctx.lineWidth = 7; ctx.lineCap = "round"; ctx.beginPath(); ctx.moveTo(x - 13, 350); ctx.lineTo(x - 3, 361); ctx.lineTo(x + 16, 338); ctx.stroke();
         }
         ctx.fillStyle = "#806f65"; ctx.font = "700 27px Arial, sans-serif"; ctx.fillText("REKTOFUN TRADER PROFILE", 450, 425);
@@ -99,10 +111,17 @@ export function ShareProfileModal({ isOpen, onClose, username, avatar, verified,
         });
         ctx.fillStyle = "#181513"; ctx.font = "900 31px Arial, sans-serif"; ctx.fillText("CALLS MADE. RESULTS PROVEN.", 105, 1068);
         ctx.fillStyle = "#806f65"; ctx.font = "600 23px Arial, sans-serif"; ctx.fillText(`rekto.fun  •  @${username}`, 105, 1115);
-        try { setPreview(canvas.toDataURL("image/png")); } catch { setPreview(""); }
-    }, [avatar, stats, username, verified]);
+        canvas.toBlob(blob => {
+            if (!blob) return setPreview("");
+            setPreview(previous => {
+                if (previous.startsWith("blob:")) URL.revokeObjectURL(previous);
+                return URL.createObjectURL(blob);
+            });
+        }, "image/png");
+    }, [avatar, isModerator, stats, username, verified]);
 
     useEffect(() => { if (isOpen) requestAnimationFrame(drawCard); }, [drawCard, isOpen]);
+    useEffect(() => () => { if (preview.startsWith("blob:")) URL.revokeObjectURL(preview); }, [preview]);
     useEffect(() => { if (!isOpen) return; const close = (event: KeyboardEvent) => event.key === "Escape" && onClose(); window.addEventListener("keydown", close); return () => window.removeEventListener("keydown", close); }, [isOpen, onClose]);
     const canvasBlob = () => new Promise<Blob>((resolve, reject) => canvasRef.current?.toBlob(blob => blob ? resolve(blob) : reject(new Error("Image unavailable")), "image/png"));
     const copyLink = async () => { await navigator.clipboard.writeText(shareUrl); setFeedback("link"); setTimeout(() => setFeedback(null), 1600); };

@@ -10,6 +10,7 @@ type NavbarProfileDropdownProps = {
     displayUsername: string;
     displayProfileImage: string | null;
     isXVerified: boolean;
+    isModerator: boolean;
     usdcBalance: number | null;
     isOpen: boolean;
     onClose: () => void;
@@ -75,6 +76,7 @@ export function NavbarProfileDropdown({
     displayUsername,
     displayProfileImage,
     isXVerified,
+    isModerator,
     usdcBalance,
     isOpen,
     onClose,
@@ -171,10 +173,10 @@ export function NavbarProfileDropdown({
                                         <p className="truncate font-black text-gray-900">
                                             {displayUsername}
                                         </p>
-                                        {isXVerified && (
-                                            <svg className="h-4 w-4 shrink-0" viewBox="0 0 32 32" role="img" aria-label="Verified on X">
+                                        {(isModerator || isXVerified) && (
+                                            <svg className="h-4 w-4 shrink-0" viewBox="0 0 32 32" role="img" aria-label={isModerator ? "Moderator" : "Verified on X"}>
                                                 <path
-                                                    fill="#378FDB"
+                                                    fill={isModerator ? "#F5B800" : "#378FDB"}
                                                     d="M16 1.5l2.8 2.2 3.5-1 1.6 3.2 3.6.5.1 3.7 3 2-1.4 3.4 1.4 3.4-3 2-.1 3.7-3.6.5-1.6 3.2-3.5-1L16 30.5l-2.8-2.2-3.5 1-1.6-3.2-3.6-.5-.1-3.7-3-2 1.4-3.4-1.4-3.4 3-2 .1-3.7 3.6-.5 1.6-3.2 3.5 1L16 1.5Z"
                                                 />
                                                 <path d="m9.4 16.2 4.2 4.2 9-9" fill="none" stroke="white" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />

@@ -12,10 +12,10 @@ const SparkleIcon = ({ className }: { className?: string }) => (
     </svg>
 );
 
-const VerifiedBadge = () => (
+const VerifiedBadge = ({ isModerator = false }: { isModerator?: boolean }) => (
     <svg className="h-4 w-4 shrink-0" viewBox="0 0 32 32" aria-hidden="true">
         <path
-            fill="#378FDB"
+            fill={isModerator ? "#F5B800" : "#378FDB"}
             d="M16 1.5l2.8 2.2 3.5-1 1.6 3.2 3.6.5.1 3.7 3 2-1.4 3.4 1.4 3.4-3 2-.1 3.7-3.6.5-1.6 3.2-3.5-1L16 30.5l-2.8-2.2-3.5 1-1.6-3.2-3.6-.5-.1-3.7-3-2 1.4-3.4-1.4-3.4 3-2 .1-3.7 3.6-.5 1.6-3.2 3.5 1L16 1.5Z"
         />
         <path d="m9.4 16.2 4.2 4.2 9-9" fill="none" stroke="white" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
@@ -77,6 +77,7 @@ type LeaderboardRow = {
     rank: number;
     username: string;
     twitterUsername: string | null;
+    userType: "user" | "moderator";
     avatar: string;
     winRate: number;
     winRateLabel: string;
@@ -111,6 +112,7 @@ function mapUserToRow(user: LeaderboardUser, rank: number): LeaderboardRow {
         rank: user.rank || rank,
         username: user.username || `user-${user.wallet_address.slice(0, 6)}`,
         twitterUsername: user.twitter_username,
+        userType: user.user_type,
         avatar: user.profile_image || "/scribbles/pepe.png",
         winRate,
         winRateLabel,
@@ -390,12 +392,15 @@ export default function LeaderboardPage() {
                                             <div className="relative w-10 h-10 rounded-full overflow-hidden bg-gray-200 border-2 border-white shadow-sm flex-shrink-0">
                                                 <Image src={user.avatar} alt={user.username} fill className="object-cover" sizes="40px" />
                                             </div>
-                                            <div className="flex min-w-0 flex-col">
-                                                <span className="font-semibold text-gray-900 truncate">{user.username}</span>
-                                                {user.twitterUsername && (
-                                                    <span className="flex min-w-0 items-center gap-1 text-xs font-semibold text-gray-500" title={`Verified on X as @${user.twitterUsername}`}>
-                                                        <span className="truncate">@{user.twitterUsername}</span>
-                                                        <VerifiedBadge />
+                                            <div className="flex min-w-0 items-center gap-1">
+                                                <span className="truncate font-semibold text-gray-900">{user.username}</span>
+                                                {(user.userType === "moderator" || user.twitterUsername) && (
+                                                    <span
+                                                        className="inline-flex shrink-0"
+                                                        title={user.userType === "moderator" ? "Verified as KOL" : `Verified on X as @${user.twitterUsername}`}
+                                                        aria-label={user.userType === "moderator" ? "Verified as KOL" : `Verified on X as @${user.twitterUsername}`}
+                                                    >
+                                                        <VerifiedBadge isModerator={user.userType === "moderator"} />
                                                     </span>
                                                 )}
                                             </div>
