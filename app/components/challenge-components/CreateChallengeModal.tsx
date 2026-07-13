@@ -231,6 +231,7 @@ export function CreateChallengeModal({
             const resolvesAt = Math.max(Math.floor(selectedDate.getTime() / 1000), expiresAt);
             const targetPriceUsdCents = Math.floor(Number(predictionPrice) * 100);
             const asset = (selectedChildCategory?.category ?? "").trim().slice(0, 10);
+            const ticker = asset.split("/", 1)[0].trim().toUpperCase();
 
             // Build the transaction server-side (admin signs as fee payer) and get it back partially signed
             const response = await fetch("/api/challenges/create", {
@@ -272,8 +273,8 @@ export function CreateChallengeModal({
 
             // Persist the challenge to the backend database
             await createChallenge({
-                statement: `${selectedChildCategory?.category ?? asset} will be ${predictionDirection} $${predictionPrice}`,
-                ticker: asset,
+                statement: `${asset} ${predictionDirection} $${predictionPrice}`,
+                ticker,
                 trading_pair: `${asset}`,
                 target: Number(predictionPrice),
                 initial_bet: betAmount,

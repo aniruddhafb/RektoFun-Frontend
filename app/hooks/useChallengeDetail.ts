@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useAppKit, useAppKitAccount } from "@reown/appkit/react";
-import { Challenge } from "@/app/lib/challenges-service/challenges";
+import {
+  Challenge,
+  getChallengePredictionTitle,
+  getChallengeTicker,
+} from "@/app/lib/challenges-service/challenges";
 import { User } from "@/app/lib/users-service/users";
 import { useUserStore } from "@/app/store/useUserStore";
 import { useBodyScrollLock } from "@/app/lib/useBodyScrollLock";
@@ -101,11 +105,11 @@ export function useChallengeDetail(
   const expiryTimestamp = challenge?.expiry ? new Date(challenge.expiry).getTime() : null;
   const resolveTimestamp = challenge?.resolution_date ? new Date(challenge.resolution_date).getTime() : null;
 
-  // Title expansion (backed by `statement`, the only challenge-text field available)
-  const titleWords = (challenge?.statement || "").trim().split(/\s+/).filter(Boolean);
+  const challengeTitle = challenge ? getChallengePredictionTitle(challenge) : "";
+  const titleWords = challengeTitle.trim().split(/\s+/).filter(Boolean);
   const canExpandTitle = titleWords.length > 6;
   const displayedTitle = isTitleExpanded || !canExpandTitle
-    ? challenge?.statement || ""
+    ? challengeTitle
     : `${titleWords.slice(0, 6).join(" ")}...`;
 
   // Price calculations
@@ -222,7 +226,7 @@ export function useChallengeDetail(
         : "border-[#b9dec9] bg-[#f1fbf5] text-[#246044]";
 
   // Description
-  const challengeTicker = challenge?.ticker?.trim().toLowerCase() || "this asset";
+  const challengeTicker = getChallengeTicker(challenge?.ticker).toLowerCase() || "this asset";
   const challengeDescriptionText = isManualResolution
     ? `The challenger has a conviction, ${challenge?.statement}. If you don't think so you can counter it and win $${betAmount} if you are right.`
     : `The challenger thinks ${challengeTicker} will ${isDirectionalBelow ? "fall below" : "rise above"} $${targetPrice.toLocaleString()} by the resolution time. If you think opposite you can counter it and win the total pool of $${betAmount} if you're right.`;

@@ -2,7 +2,12 @@ import React from "react";
 import { useRouter } from "next/navigation";
 import { useAppKitAccount, useAppKitProvider } from "@reown/appkit/react";
 import { PublicKey, Transaction } from "@solana/web3.js";
-import { Challenge, getChallengeById } from "@/app/lib/challenges-service/challenges";
+import {
+  Challenge,
+  getChallengeById,
+  getChallengePredictionTitle,
+  getChallengeTicker,
+} from "@/app/lib/challenges-service/challenges";
 import { createPosition } from "@/app/lib/positions-service/positions";
 import { useUserStore } from "@/app/store/useUserStore";
 import {
@@ -392,7 +397,7 @@ export function useChallengeCard(challenge: Challenge) {
   };
 
   // Computed values
-  const assetSymbol = challenge.ticker;
+  const assetSymbol = getChallengeTicker(challenge.ticker);
   const assetIcon = "/scribbles/btc.png";
   const assetName = challenge.trading_pair || assetSymbol;
 
@@ -429,7 +434,7 @@ export function useChallengeCard(challenge: Challenge) {
     ? totalPooledAmount
     : (challenge.pool_size || challenge.initial_bet || 0);
 
-  const title = challenge.statement || `Bet on ${assetSymbol}`;
+  const title = getChallengePredictionTitle(challenge);
   const betCurrency = "USDC";
   const poolDisplay = `$${resolvedPoolAmount}`;
 
