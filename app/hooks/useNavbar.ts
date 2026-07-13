@@ -8,6 +8,7 @@ import { createUser, getUserByPubkey } from '@/app/lib/users-service/users';
 import { getDiceBearAvatarUrl } from '@/app/lib/profile-avatar';
 import { User } from '@/app/lib/users-service/users';
 import { fetchRektoBalance, fetchUsdcBalance as fetchUsdcTokenBalance } from '@/app/lib/token-balances';
+import { clearPendingReferralCode, getPendingReferralCode } from '@/app/lib/referral-attribution';
 
 export function useNavbar() {
   // AppKit hooks
@@ -37,13 +38,6 @@ export function useNavbar() {
   const [initializedAddress, setInitializedAddress] = useState<string | null>(null);
   const [usdcBalance, setUsdcBalance] = useState<number | null>(null);
   const [rektoBalance, setRektoBalance] = useState<number | null>(null);
-
-  // Helper: Get URL referral code
-  const getRefCodeFromUrl = () => {
-    if (typeof window === 'undefined') return '';
-    const params = new URLSearchParams(window.location.search);
-    return params.get('referral_code') || params.get('ref') || '';
-  };
 
   const createRandomUsername = (walletAddress: string) => {
     const adjectives = ['Lucky', 'Brave', 'Swift', 'Cosmic', 'Rekto', 'Mighty', 'Sunny', 'Wild'];
@@ -128,16 +122,19 @@ export function useNavbar() {
       try {
         const userData = await getUserByPubkey(address);
         applyUserToState(userData);
+        clearPendingReferralCode();
       } catch (error) {
         console.info('[Navbar] No account found; creating a generated profile.', error);
         try {
+          const pendingReferralCode = getPendingReferralCode();
           const userData = await createUser({
             pubkey: address,
             username: createRandomUsername(address),
             profile_image: getDiceBearAvatarUrl(),
-            referrer_code: getRefCodeFromUrl() || undefined,
+            referrer_code: pendingReferralCode || undefined,
           });
           applyUserToState(userData);
+          clearPendingReferralCode();
         } catch (createError) {
           console.error('[Navbar] Automatic account creation failed:', createError);
         }
