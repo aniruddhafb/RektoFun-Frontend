@@ -21,6 +21,7 @@ export interface CreateChallengeParams {
   expiry: string;
   resolution_date: string;
   final_price: number;
+  category?: string;
 }
 
 export interface HighestBetEntry {
@@ -82,6 +83,7 @@ export interface Challenge {
   resolve_time: string;
   resolved_at: string;
   final_price: number;
+  category?: string;
   created_at: string;
   bet_info?: BetInfo | null;
   market: {
@@ -105,6 +107,7 @@ export interface GetChallengesParams {
   created_by?: number | string;
   search?: string;
   sort?: string;
+  resolution_source?: string;
 }
 
 export interface GetChallengesOptions {
@@ -136,6 +139,7 @@ export async function getChallenges(
   params?: GetChallengesParams,
   _options?: GetChallengesOptions
 ): Promise<GetChallengesResponse> {
+  void _options;
   if (params?.created_by !== undefined) {
     const response = await fetch(`${API_BASE_URL}/challenges/by-creator/${params.created_by}`, {
       method: 'GET',
@@ -168,6 +172,10 @@ export async function getChallenges(
 
   if (params?.search) {
     queryParams.append('search', params.search);
+  }
+
+  if (params?.resolution_source) {
+    queryParams.append('resolution_source', params.resolution_source);
   }
   
   const queryString = queryParams.toString();

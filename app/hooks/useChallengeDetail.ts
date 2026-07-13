@@ -5,6 +5,7 @@ import { Challenge } from "@/app/lib/challenges-service/challenges";
 import { User } from "@/app/lib/users-service/users";
 import { useUserStore } from "@/app/store/useUserStore";
 import { useBodyScrollLock } from "@/app/lib/useBodyScrollLock";
+import { stripUsdcQuote } from "@/app/lib/format-market-label";
 
 // Types
 interface CTAState {
@@ -102,10 +103,11 @@ export function useChallengeDetail(
   const resolveTimestamp = challenge?.resolution_date ? new Date(challenge.resolution_date).getTime() : null;
 
   // Title expansion (backed by `statement`, the only challenge-text field available)
-  const titleWords = (challenge?.statement || "").trim().split(/\s+/).filter(Boolean);
+  const challengeStatement = stripUsdcQuote(challenge?.statement);
+  const titleWords = challengeStatement.trim().split(/\s+/).filter(Boolean);
   const canExpandTitle = titleWords.length > 6;
   const displayedTitle = isTitleExpanded || !canExpandTitle
-    ? challenge?.statement || ""
+    ? challengeStatement
     : `${titleWords.slice(0, 6).join(" ")}...`;
 
   // Price calculations
@@ -224,7 +226,7 @@ export function useChallengeDetail(
   // Description
   const challengeTicker = challenge?.ticker?.trim().toLowerCase() || "this asset";
   const challengeDescriptionText = isManualResolution
-    ? `The challenger has a conviction, ${challenge?.statement}. If you don't think so you can counter it and win $${betAmount} if you are right.`
+    ? `The challenger has a conviction, ${challengeStatement}. If you don't think so you can counter it and win $${betAmount} if you are right.`
     : `The challenger thinks ${challengeTicker} will ${isDirectionalBelow ? "fall below" : "rise above"} $${targetPrice.toLocaleString()} by the resolution time. If you think opposite you can counter it and win the total pool of $${betAmount} if you're right.`;
 
   const challengeDescriptionWords = challengeDescriptionText.trim().split(/\s+/).filter(Boolean);
@@ -367,12 +369,12 @@ export function useChallengeDetail(
     if (!challenge) return;
 
     const shareUrl = `${window.location.origin}/challenges?challengeId=${encodeURIComponent(challenge.id)}`;
-    const shareText = `Check out this challenge: ${challenge.statement}`;
+    const shareText = `Check out this challenge: ${stripUsdcQuote(challenge.statement)}`;
 
     try {
       if (navigator.share) {
         await navigator.share({
-          title: challenge.statement,
+          title: stripUsdcQuote(challenge.statement),
           text: shareText,
           url: shareUrl,
         });

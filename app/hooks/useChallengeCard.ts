@@ -13,6 +13,7 @@ import {
   getReadonlyConnection,
 } from "@/app/lib/rektofun-program";
 import { fetchUsdcBalance as fetchUsdcTokenBalance } from "@/app/lib/token-balances";
+import { stripUsdcQuote } from "@/app/lib/format-market-label";
 
 interface ExactCountdownDetails {
   exactCountdown: string;
@@ -370,12 +371,13 @@ export function useChallengeCard(challenge: Challenge) {
     const shareUrl = `${window.location.origin}/challenges?challengeId=${encodeURIComponent(
       challenge.id
     )}`;
-    const shareText = `Check out this challenge: ${challenge.statement ?? ""}`;
+    const shareStatement = stripUsdcQuote(challenge.statement);
+    const shareText = `Check out this challenge: ${shareStatement}`;
 
     try {
       if (navigator.share) {
         await navigator.share({
-          title: challenge.statement ?? "RektoFun challenge",
+          title: shareStatement || "RektoFun challenge",
           text: shareText,
           url: shareUrl,
         });
@@ -394,7 +396,7 @@ export function useChallengeCard(challenge: Challenge) {
   // Computed values
   const assetSymbol = challenge.ticker;
   const assetIcon = "/scribbles/btc.png";
-  const assetName = challenge.trading_pair || assetSymbol;
+  const assetName = stripUsdcQuote(challenge.trading_pair || assetSymbol);
 
   const isPvpMode = challenge.mode !== "TEAM";
   const isTeam = challenge.mode === "TEAM";
@@ -429,7 +431,7 @@ export function useChallengeCard(challenge: Challenge) {
     ? totalPooledAmount
     : (challenge.pool_size || challenge.initial_bet || 0);
 
-  const title = challenge.statement || `Bet on ${assetSymbol}`;
+  const title = stripUsdcQuote(challenge.statement) || `Bet on ${assetSymbol}`;
   const betCurrency = "USDC";
   const poolDisplay = `$${resolvedPoolAmount}`;
 
@@ -484,52 +486,52 @@ export function useChallengeCard(challenge: Challenge) {
 
     if (isPvpMode) {
       if (isResolveTimeAchieved && hasOpponents && isResolutionResolved) {
-        ctaLabel = "COMPLETED ✅";
+        ctaLabel = "Completed";
         ctaDisabled = true;
         ctaClassName = completedCtaClassName;
       } else if (isResolveTimeAchieved && hasOpponents && isResolutionPending) {
-        ctaLabel = "RESOLVING ⌛";
+        ctaLabel = "Resolving";
         ctaDisabled = true;
         ctaClassName = resolvingCtaClassName;
       } else if (!isResolveTimeAchieved && hasOpponents) {
-        ctaLabel = "ONGOING ⚔️";
+        ctaLabel = "Battle live";
         ctaDisabled = true;
         ctaClassName = ongoingCtaClassName;
       } else if (isExpireTimeAchieved && !hasOpponents) {
-        ctaLabel = "EXPIRED!";
+        ctaLabel = "Expired";
         ctaDisabled = true;
         ctaClassName = expiredCtaClassName;
       } else {
-        ctaLabel = "Join Challenge ⚔️";
+        ctaLabel = "Join challenge";
         ctaDisabled = isLoading || isCreator;
         ctaClassName = activePvpCtaClassName;
       }
     } else if (isTeam) {
       if (isResolveTimeAchieved && hasOpponents && isResolutionResolved) {
-        ctaLabel = "COMPLETED ✅";
+        ctaLabel = "Completed";
         ctaDisabled = true;
         ctaClassName = completedCtaClassName;
       } else if (isResolveTimeAchieved && hasOpponents && isResolutionPending) {
-        ctaLabel = "RESOLVING ⌛";
+        ctaLabel = "Resolving";
         ctaDisabled = true;
         ctaClassName = resolvingCtaClassName;
       } else if (isExpireTimeAchieved && !hasOpponents) {
-        ctaLabel = "EXPIRED";
+        ctaLabel = "Expired";
         ctaDisabled = true;
         ctaClassName = expiredCtaClassName;
       } else if (!isExpireTimeAchieved) {
-        ctaLabel = "JOIN CHALLENGE ⚔️";
-        ctaDisabled = isLoading;
+        ctaLabel = "Join challenge";
+        ctaDisabled = isLoading || isCreator;
         ctaClassName = activeCtaClassName;
       } else {
-        ctaLabel = "ONGOING ⚔️";
+        ctaLabel = "Battle live";
         ctaDisabled = true;
         ctaClassName = ongoingCtaClassName;
       }
     }
 
-    const isOngoing = ctaLabel.startsWith("ONGOING");
-    const showCreatorHint = isCreator && ctaLabel === "Join Challenge";
+    const isOngoing = ctaLabel === "Battle live";
+    const showCreatorHint = isCreator && ctaLabel === "Join challenge";
 
     return {
       label: ctaLabel,

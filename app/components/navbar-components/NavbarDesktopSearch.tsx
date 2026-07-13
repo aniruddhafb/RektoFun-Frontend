@@ -9,6 +9,7 @@ import { Search, X } from "lucide-react";
 import { getChallenges, type Challenge } from "@/app/lib/challenges-service/challenges";
 import { getUsers, type User } from "@/app/lib/users-service/users";
 import { useBodyScrollLock } from "@/app/lib/useBodyScrollLock";
+import { stripUsdcQuote } from "@/app/lib/format-market-label";
 
 type SearchTab = "all" | "challenges" | "users";
 const CHALLENGE_RESULT_LIMIT = 8;
@@ -439,11 +440,11 @@ export function NavbarDesktopSearch({
                                                             {statusMeta.label}
                                                         </span>
                                                         <span className="truncate text-[11px] font-bold uppercase tracking-[0.08em] text-[#8a7468]">
-                                                            {challenge.trading_pair || challenge.ticker || "General"}
+                                                            {stripUsdcQuote(challenge.trading_pair || challenge.ticker) || "General"}
                                                         </span>
                                                     </div>
                                                     <p className="mt-1 line-clamp-2 text-sm font-black leading-snug text-[#111827] group-hover:text-[#e85a2d]">
-                                                        {challenge.statement}
+                                                        {stripUsdcQuote(challenge.statement)}
                                                     </p>
                                                 </div>
                                             </div>
