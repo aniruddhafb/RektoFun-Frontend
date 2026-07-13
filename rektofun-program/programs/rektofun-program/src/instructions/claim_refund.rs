@@ -4,14 +4,23 @@ use anchor_spl::token_interface::{self, CloseAccount, Mint, TokenAccount, TokenI
 use crate::{
     constants::*,
     error::RektoError,
-    state::{ChallengeAccount, ChallengeStatus, ChallengeType, ClaimRecord},
+    state::{ChallengeAccount, ChallengeStatus, ChallengeType, ClaimRecord, Config},
 };
 
-/// TEAM mode only: a creator-side participant claims their bet back after the creator
-/// has cancelled a challenge where no opponents ever joined.
+/// Any non-creator depositor on a Cancelled challenge claims their stake back — a PVP
+/// challenger, or a TEAM `creator_team`/`opponent_team` member.
 ///
-/// The creator's own refund is handled in `cancel_challenge`; this instruction is for
-/// everyone who joined the creator's side (`creator_team` vec).
+/// Two cancellation paths lead here:
+///   - Self-cancel (`cancel_challenge`): creator cancels before any opponent has joined;
+///     only TEAM `creator_team` members (who joined the creator's own side) can have
+///     deposits to reclaim.
+///   - Admin cancel (`admin_cancel_challenge`): admin force-cancels an Open or Active
+///     challenge regardless of who has joined; PVP challengers and TEAM
+///     `opponent_team` members may also have deposits to reclaim.
+///
+/// The creator's own refund is always handled directly in whichever instruction
+/// cancelled the challenge (`cancel_challenge` / `admin_cancel_challenge`); this
+/// instruction never pays out the creator.
 ///
 /// A `ClaimRecord` PDA (same seeds as `claim_winnings`) is created on first call and
 /// acts as the double-claim guard — a second call fails because the account already exists.
@@ -33,7 +42,6 @@ pub struct ClaimRefund<'info> {
         ],
         bump = challenge.bump,
         constraint = challenge.status == ChallengeStatus::Cancelled @ RektoError::NotCancelled,
-        constraint = challenge.challenge_type == ChallengeType::Team @ RektoError::WrongChallengeType,
         constraint = challenge.creator == creator.key() @ RektoError::UnauthorizedSettle,
     )]
     pub challenge: Account<'info, ChallengeAccount>,
@@ -73,6 +81,13 @@ pub struct ClaimRefund<'info> {
     pub usdc_mint: InterfaceAccount<'info, Mint>,
     pub token_program: Interface<'info, TokenInterface>,
     pub system_program: Program<'info, System>,
+
+    #[account(seeds = [CONFIG_SEED], bump = config.bump)]
+    pub config: Account<'info, Config>,
+
+    /// Platform wallet — receives reclaimed vault rent (it originally paid it).
+    #[account(mut, address = config.admin @ RektoError::Unauthorized)]
+    pub admin: SystemAccount<'info>,
 }
 
 pub(crate) fn handler(ctx: Context<ClaimRefund>) -> Result<()> {
@@ -80,15 +95,29 @@ pub(crate) fn handler(ctx: Context<ClaimRefund>) -> Result<()> {
     let participant_key = ctx.accounts.participant.key();
     let decimals = ctx.accounts.usdc_mint.decimals;
 
-    // Only creator_team members are eligible — the creator was already refunded in cancel_challenge.
-    // Refund this participant their own deposited amount, not a uniform bet_amount —
-    // creator_team members may have joined with different custom amounts.
-    let idx = challenge
+    // The creator's own refund is always paid out directly by whichever instruction
+    // cancelled the challenge — never here. Everyone else's refund is their own
+    // deposited amount, which may differ from the creator's bet_amount.
+    let refund_amount = if challenge.challenge_type == ChallengeType::Pvp {
+        require!(
+            challenge.challenger != Pubkey::default() && participant_key == challenge.challenger,
+            RektoError::NotEligibleForRefund
+        );
+        challenge.challenger_bet_amount
+    } else if let Some(idx) = challenge
         .creator_team
         .iter()
         .position(|p| *p == participant_key)
-        .ok_or(RektoError::NotEligibleForRefund)?;
-    let refund_amount = challenge.creator_team_amounts[idx];
+    {
+        challenge.creator_team_amounts[idx]
+    } else {
+        let idx = challenge
+            .opponent_team
+            .iter()
+            .position(|p| *p == participant_key)
+            .ok_or(RektoError::NotEligibleForRefund)?;
+        challenge.opponent_team_amounts[idx]
+    };
 
     // PDA signer seeds
     let challenge_bump = challenge.bump;
@@ -122,13 +151,13 @@ pub(crate) fn handler(ctx: Context<ClaimRefund>) -> Result<()> {
         decimals,
     )?;
 
-    // Close the now-empty vault and return its rent to whoever triggered the last claim
+    // Close the now-empty vault and return its rent to the admin wallet (it originally paid it)
     if is_last_claim {
         token_interface::close_account(CpiContext::new_with_signer(
             ctx.accounts.token_program.key(),
             CloseAccount {
                 account: ctx.accounts.vault.to_account_info(),
-                destination: ctx.accounts.participant.to_account_info(),
+                destination: ctx.accounts.admin.to_account_info(),
                 authority: ctx.accounts.challenge.to_account_info(),
             },
             signer_seeds,
@@ -143,7 +172,7 @@ pub(crate) fn handler(ctx: Context<ClaimRefund>) -> Result<()> {
     claim_record.bump = ctx.bumps.claim_record;
 
     msg!(
-        "TEAM Challenge #{}: {} refunded {} USDC micro-units (cancelled challenge)",
+        "Challenge #{}: {} refunded {} USDC micro-units (cancelled challenge)",
         challenge.challenge_id,
         participant_key,
         refund_amount,

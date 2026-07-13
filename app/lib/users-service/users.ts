@@ -86,7 +86,7 @@ export interface UsernameCheckResponse {
   exists: boolean;
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+const API_BASE_URL = process.env.NEXT_PUBLIC_BE_API_URL || "http://localhost:8000/api";
 
 type BackendUser = {
   id: number;

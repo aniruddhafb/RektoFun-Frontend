@@ -4,14 +4,18 @@ use anchor_spl::token_interface::{self, Mint, TokenAccount, TokenInterface, Tran
 use crate::{
     constants::*,
     error::RektoError,
-    state::{ChallengeAccount, ChallengeStatus, ChallengeType, WinningSide},
+    state::{ChallengeAccount, ChallengeStatus, ChallengeType, Config, WinningSide},
 };
 
 #[derive(Accounts)]
+#[instruction(creator_wins: bool)]
 pub struct SettleChallenge<'info> {
+    #[account(seeds = [CONFIG_SEED], bump = config.bump)]
+    pub config: Account<'info, Config>,
+
     /// The admin/oracle wallet that is authorised to settle challenges.
     /// In production this should be a multisig or a Switchboard/Pyth oracle CPI.
-    #[account(mut)]
+    #[account(mut, address = config.admin @ RektoError::UnauthorizedSettle)]
     pub admin: Signer<'info>,
 
     // ── PVP-only accounts (still required in the struct; for TEAM they are unused
@@ -49,12 +53,16 @@ pub struct SettleChallenge<'info> {
     )]
     pub vault: InterfaceAccount<'info, TokenAccount>,
 
-    /// PVP only: winner's USDC token account (creator or challenger depending on outcome).
+    /// PVP only: winner's USDC token account — must actually belong to whichever
+    /// side `creator_wins` declares as the winner (creator or challenger).
     /// For TEAM challenges pass any valid USDC token account — it won't be written to.
     #[account(
         mut,
         token::mint = usdc_mint,
         token::token_program = token_program,
+        constraint = challenge.challenge_type != ChallengeType::Pvp
+            || winner_usdc_account.owner == if creator_wins { creator.key() } else { challenger.key() }
+            @ RektoError::UnauthorizedSettle,
     )]
     pub winner_usdc_account: InterfaceAccount<'info, TokenAccount>,
 
@@ -66,6 +74,18 @@ pub struct SettleChallenge<'info> {
     )]
     pub treasury_usdc_account: InterfaceAccount<'info, TokenAccount>,
 
+    /// Creator-revenue USDC token account — receives creator_fee_bps of the pot
+    /// for BOTH PVP and TEAM, regardless of who wins. Required in both cases
+    /// (unlike winner_usdc_account's "dummy for TEAM" pattern), since this cut
+    /// is paid unconditionally on every settlement.
+    #[account(
+        mut,
+        token::mint = usdc_mint,
+        token::token_program = token_program,
+        constraint = creator_usdc_account.owner == challenge.creator @ RektoError::UnauthorizedSettle,
+    )]
+    pub creator_usdc_account: InterfaceAccount<'info, TokenAccount>,
+
     /// USDC mint — validated by token account constraints above
     pub usdc_mint: InterfaceAccount<'info, Mint>,
 
@@ -76,6 +96,8 @@ pub struct SettleChallenge<'info> {
 pub(crate) fn handler(ctx: Context<SettleChallenge>, creator_wins: bool) -> Result<()> {
     let challenge = &ctx.accounts.challenge;
     let decimals = ctx.accounts.usdc_mint.decimals;
+    let platform_fee_bps = ctx.accounts.config.platform_fee_bps;
+    let creator_fee_bps = ctx.accounts.config.creator_fee_bps;
 
     // PDA signer seeds for the challenge PDA (vault authority)
     let challenge_bump = challenge.bump;
@@ -105,12 +127,22 @@ pub(crate) fn handler(ctx: Context<SettleChallenge>, creator_wins: bool) -> Resu
                 .ok_or(RektoError::Overflow)?;
 
             let fee = total_pot
-                .checked_mul(PLATFORM_FEE_BPS)
+                .checked_mul(platform_fee_bps)
                 .ok_or(RektoError::Overflow)?
                 .checked_div(10_000)
                 .ok_or(RektoError::Overflow)?;
 
-            let winner_payout = total_pot.checked_sub(fee).ok_or(RektoError::Overflow)?;
+            let creator_fee = total_pot
+                .checked_mul(creator_fee_bps)
+                .ok_or(RektoError::Overflow)?
+                .checked_div(10_000)
+                .ok_or(RektoError::Overflow)?;
+
+            let winner_payout = total_pot
+                .checked_sub(fee)
+                .ok_or(RektoError::Overflow)?
+                .checked_sub(creator_fee)
+                .ok_or(RektoError::Overflow)?;
 
             // Validate the challenger account matches the stored challenger pubkey.
             // winner_usdc_account ownership is enforced off-chain / by the admin oracle;
@@ -152,6 +184,22 @@ pub(crate) fn handler(ctx: Context<SettleChallenge>, creator_wins: bool) -> Resu
                 decimals,
             )?;
 
+            // Pay creator-revenue fee (paid regardless of who wins)
+            token_interface::transfer_checked(
+                CpiContext::new_with_signer(
+                    ctx.accounts.token_program.key(),
+                    TransferChecked {
+                        from: ctx.accounts.vault.to_account_info(),
+                        mint: ctx.accounts.usdc_mint.to_account_info(),
+                        to: ctx.accounts.creator_usdc_account.to_account_info(),
+                        authority: ctx.accounts.challenge.to_account_info(),
+                    },
+                    signer_seeds,
+                ),
+                creator_fee,
+                decimals,
+            )?;
+
             let challenge = &mut ctx.accounts.challenge;
             challenge.status = ChallengeStatus::Settled;
             challenge.winning_side = if creator_wins {
@@ -161,11 +209,12 @@ pub(crate) fn handler(ctx: Context<SettleChallenge>, creator_wins: bool) -> Resu
             };
 
             msg!(
-                "PVP Challenge #{} settled — {} wins {} USDC micro-units (fee: {})",
+                "PVP Challenge #{} settled — {} wins {} USDC micro-units (platform fee: {}, creator fee: {})",
                 challenge.challenge_id,
                 if creator_wins { "creator" } else { "challenger" },
                 winner_payout,
                 fee,
+                creator_fee,
             );
         }
 
@@ -206,9 +255,15 @@ pub(crate) fn handler(ctx: Context<SettleChallenge>, creator_wins: bool) -> Resu
                 .checked_add(opponent_team_sum)
                 .ok_or(RektoError::Overflow)?;
 
-            // Deduct platform fee from the total pot
+            // Deduct platform fee and creator-revenue fee from the total pot
             let fee = total_pot
-                .checked_mul(PLATFORM_FEE_BPS)
+                .checked_mul(platform_fee_bps)
+                .ok_or(RektoError::Overflow)?
+                .checked_div(10_000)
+                .ok_or(RektoError::Overflow)?;
+
+            let creator_fee = total_pot
+                .checked_mul(creator_fee_bps)
                 .ok_or(RektoError::Overflow)?
                 .checked_div(10_000)
                 .ok_or(RektoError::Overflow)?;
@@ -229,7 +284,27 @@ pub(crate) fn handler(ctx: Context<SettleChallenge>, creator_wins: bool) -> Resu
                 decimals,
             )?;
 
-            let net_pot = total_pot.checked_sub(fee).ok_or(RektoError::Overflow)?;
+            // Pay creator-revenue fee now (paid regardless of who wins)
+            token_interface::transfer_checked(
+                CpiContext::new_with_signer(
+                    ctx.accounts.token_program.key(),
+                    TransferChecked {
+                        from: ctx.accounts.vault.to_account_info(),
+                        mint: ctx.accounts.usdc_mint.to_account_info(),
+                        to: ctx.accounts.creator_usdc_account.to_account_info(),
+                        authority: ctx.accounts.challenge.to_account_info(),
+                    },
+                    signer_seeds,
+                ),
+                creator_fee,
+                decimals,
+            )?;
+
+            let net_pot = total_pot
+                .checked_sub(fee)
+                .ok_or(RektoError::Overflow)?
+                .checked_sub(creator_fee)
+                .ok_or(RektoError::Overflow)?;
 
             // Winning side's combined stake — each winner's claim_winnings payout is
             // their own stake's proportional share of net_pot (participants staked
@@ -255,12 +330,13 @@ pub(crate) fn handler(ctx: Context<SettleChallenge>, creator_wins: bool) -> Resu
             challenge.settled_net_pot = net_pot;
 
             msg!(
-                "TEAM Challenge #{} settled — {} team wins — net pot {} USDC micro-units split proportionally across {} USDC micro-units of winning stake (fee: {})",
+                "TEAM Challenge #{} settled — {} team wins — net pot {} USDC micro-units split proportionally across {} USDC micro-units of winning stake (platform fee: {}, creator fee: {})",
                 challenge.challenge_id,
                 if creator_wins { "creator's" } else { "opponent's" },
                 net_pot,
                 winning_side_total_amount,
                 fee,
+                creator_fee,
             );
         }
     }

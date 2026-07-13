@@ -5,7 +5,7 @@ import { SolanaAdapter } from '@reown/appkit-adapter-solana/react'
 import { solana, solanaTestnet, solanaDevnet } from '@reown/appkit/networks'
 import React, { type ReactNode } from 'react'
 
-const projectId = process.env.NEXT_PUBLIC_PROJECT_ID || "" // localhost testing only
+const projectId = process.env.NEXT_PUBLIC_REOWN_PROJECT_ID || "" // localhost testing only
 
 const solanaAdapter = new SolanaAdapter()
 

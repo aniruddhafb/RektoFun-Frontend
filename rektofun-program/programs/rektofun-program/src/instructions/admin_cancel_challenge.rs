@@ -4,29 +4,36 @@ use anchor_spl::token_interface::{self, CloseAccount, Mint, TokenAccount, TokenI
 use crate::{
     constants::*,
     error::RektoError,
-    state::{ChallengeAccount, ChallengeStatus, Config},
+    state::{ChallengeAccount, ChallengeStatus, ChallengeType, Config},
 };
 
+/// Admin-only: force-cancel any Open or Active challenge (PVP or TEAM), regardless
+/// of whether a PVP challenger has accepted or TEAM opponents have joined.
+///
+/// The creator's own bet is refunded here, immediately. Every other depositor —
+/// a PVP challenger, or TEAM `creator_team`/`opponent_team` members — reclaims
+/// their own stake afterward via `claim_refund`, since a single transaction can't
+/// pay out an unbounded number of TEAM participants.
 #[derive(Accounts)]
-pub struct CancelChallenge<'info> {
-    #[account(
-        mut,
-        constraint = creator.key() == challenge.creator @ RektoError::UnauthorizedCancel,
-    )]
-    pub creator: Signer<'info>,
+pub struct AdminCancelChallenge<'info> {
+    #[account(seeds = [CONFIG_SEED], bump = config.bump)]
+    pub config: Account<'info, Config>,
+
+    /// The admin wallet — only `Config::admin` may force-cancel a challenge.
+    #[account(mut, address = config.admin @ RektoError::Unauthorized)]
+    pub admin: Signer<'info>,
 
     #[account(
         mut,
         seeds = [
             CHALLENGE_SEED,
-            creator.key().as_ref(),
+            challenge.creator.as_ref(),
             &challenge.challenge_id.to_le_bytes(),
         ],
         bump = challenge.bump,
-        // Must still be Open (no PVP challenger accepted, no opponent-side member joined)
-        constraint = challenge.status == ChallengeStatus::Open @ RektoError::NotOpen,
-        // Block cancellation if any opponent has joined — pot is contested at that point
-        constraint = challenge.opponent_team.is_empty() @ RektoError::OpponentsJoined,
+        constraint = (challenge.status == ChallengeStatus::Open
+            || challenge.status == ChallengeStatus::Active)
+            @ RektoError::NotOpenOrActive,
     )]
     pub challenge: Account<'info, ChallengeAccount>,
 
@@ -41,38 +48,38 @@ pub struct CancelChallenge<'info> {
     )]
     pub vault: InterfaceAccount<'info, TokenAccount>,
 
-    /// Creator's USDC token account (refund destination)
+    /// Creator's USDC token account (refund destination for their own bet)
     #[account(
         mut,
         token::mint = usdc_mint,
-        token::authority = creator,
         token::token_program = token_program,
+        constraint = creator_usdc_account.owner == challenge.creator @ RektoError::UnauthorizedSettle,
     )]
     pub creator_usdc_account: InterfaceAccount<'info, TokenAccount>,
 
     /// USDC mint — validated by token account constraints above
     pub usdc_mint: InterfaceAccount<'info, Mint>,
 
-    #[account(seeds = [CONFIG_SEED], bump = config.bump)]
-    pub config: Account<'info, Config>,
-
-    /// Platform wallet — receives reclaimed vault rent (it originally paid it).
-    #[account(mut, address = config.admin @ RektoError::Unauthorized)]
-    pub admin: SystemAccount<'info>,
-
     pub token_program: Interface<'info, TokenInterface>,
     pub system_program: Program<'info, System>,
 }
 
-pub(crate) fn handler(ctx: Context<CancelChallenge>) -> Result<()> {
+pub(crate) fn handler(ctx: Context<AdminCancelChallenge>) -> Result<()> {
     let challenge = &ctx.accounts.challenge;
     let bet_amount = challenge.bet_amount;
     let challenge_id = challenge.challenge_id;
     let challenge_bump = challenge.bump;
     let challenge_id_bytes = challenge_id.to_le_bytes();
     let creator_key = challenge.creator;
-    let has_creator_side_members = !challenge.creator_team.is_empty();
     let decimals = ctx.accounts.usdc_mint.decimals;
+
+    // Whether anyone besides the creator still has funds in the vault to claim.
+    let other_depositors_remain = match challenge.challenge_type {
+        ChallengeType::Pvp => challenge.challenger != Pubkey::default(),
+        ChallengeType::Team => {
+            !challenge.creator_team.is_empty() || !challenge.opponent_team.is_empty()
+        }
+    };
 
     // PDA signer seeds for the challenge PDA (vault authority)
     let signer_seeds: &[&[u8]] = &[
@@ -83,7 +90,7 @@ pub(crate) fn handler(ctx: Context<CancelChallenge>) -> Result<()> {
     ];
     let signer_seeds_nested = &[signer_seeds];
 
-    // Refund the creator's bet
+    // Refund the creator's own bet immediately
     token_interface::transfer_checked(
         CpiContext::new_with_signer(
             ctx.accounts.token_program.key(),
@@ -99,9 +106,8 @@ pub(crate) fn handler(ctx: Context<CancelChallenge>) -> Result<()> {
         decimals,
     )?;
 
-    // Close the vault only when no creator-side participants remain to claim refunds.
-    // If creator_team is non-empty, the vault stays open so they can call claim_refund.
-    if !has_creator_side_members {
+    // Close the vault only when no one else remains to claim a refund via claim_refund.
+    if !other_depositors_remain {
         token_interface::close_account(CpiContext::new_with_signer(
             ctx.accounts.token_program.key(),
             CloseAccount {
@@ -118,11 +124,11 @@ pub(crate) fn handler(ctx: Context<CancelChallenge>) -> Result<()> {
     challenge.status = ChallengeStatus::Cancelled;
 
     msg!(
-        "Challenge #{} cancelled by creator — {} USDC micro-units refunded{}",
+        "Challenge #{} force-cancelled by admin — {} USDC micro-units refunded to creator{}",
         challenge_id,
         bet_amount,
-        if has_creator_side_members {
-            "; creator-side participants may claim their refunds via claim_refund"
+        if other_depositors_remain {
+            "; remaining participants may claim their refunds via claim_refund"
         } else {
             ""
         },
