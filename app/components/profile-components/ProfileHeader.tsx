@@ -109,31 +109,20 @@ export function ProfileHeader({
                                 className="object-cover"
                             />
                         </div>
-                        {(userType === "moderator" || twitterUsername) && (
-                            <span
-                                className="absolute -bottom-1 -right-1 z-20 flex h-8 w-8 items-center justify-center text-white drop-shadow-sm sm:h-9 sm:w-9"
-                                title={userType === "moderator" ? "Verified as KOL" : `Verified on X as @${twitterUsername}`}
-                                aria-label={userType === "moderator" ? "Verified as KOL" : `Verified on X as @${twitterUsername}`}
+                        {twitterUsername ? (
+                            <a
+                                href={`https://x.com/${twitterUsername}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="absolute -bottom-1 -right-1 z-20 inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border-2 border-white bg-black text-white shadow-sm transition-colors hover:bg-gray-800 sm:h-9 sm:w-9"
+                                title={`@${twitterUsername} on X`}
+                                aria-label={`Open @${twitterUsername} on X`}
                             >
-                                <svg className="h-full w-full" viewBox="0 0 32 32" aria-hidden="true">
-                                    <path
-                                        fill={userType === "moderator" ? "#F5B800" : "#378FDB"}
-                                        stroke="white"
-                                        strokeWidth="1.5"
-                                        strokeLinejoin="round"
-                                        d="M16 1.5l2.8 2.2 3.5-1 1.6 3.2 3.6.5.1 3.7 3 2-1.4 3.4 1.4 3.4-3 2-.1 3.7-3.6.5-1.6 3.2-3.5-1L16 30.5l-2.8-2.2-3.5 1-1.6-3.2-3.6-.5-.1-3.7-3-2 1.4-3.4-1.4-3.4 3-2 .1-3.7 3.6-.5 1.6-3.2 3.5 1L16 1.5Z"
-                                    />
-                                    <path
-                                        d="m9.4 16.2 4.2 4.2 9-9"
-                                        fill="none"
-                                        stroke="white"
-                                        strokeWidth="3.4"
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                    />
+                                <svg className="h-3.5 w-3.5 sm:h-4 sm:w-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path d="M18.244 2H21.5l-7.1 8.114L22.75 22h-6.542l-5.122-6.65L5.27 22H2l7.592-8.682L1.75 2h6.708l4.63 6.08L18.244 2zm-1.146 18.06h1.804L7.48 3.84H5.55l11.548 16.22z" />
                                 </svg>
-                            </span>
-                        )}
+                            </a>
+                        ) : null}
                     </div>
                     <div className="mt-3 flex w-full min-w-[180px] max-w-[280px] sm:max-w-[220px] flex-col items-center gap-2">
                         <div className="grid w-full grid-cols-2 gap-2 rounded-xl border border-orange-200/60 bg-orange-50/70 p-2 text-center">
@@ -168,20 +157,31 @@ export function ProfileHeader({
                         <h1 className="text-xl sm:text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent break-words sm:break-normal">
                             {username}
                         </h1>
-                        {twitterUsername ? (
-                            <a
-                                href={`https://x.com/${twitterUsername}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex h-6 w-6 cursor-pointer items-center justify-center rounded-full bg-black text-white transition-colors hover:bg-gray-800 sm:h-7 sm:w-7 flex-shrink-0"
-                                title={`@${twitterUsername} on X`}
-                                aria-label={`Open @${twitterUsername} on X`}
+                        {(userType === "moderator" || twitterUsername) && (
+                            <span
+                                className="inline-flex h-6 w-6 shrink-0 items-center justify-center text-white drop-shadow-sm sm:h-7 sm:w-7"
+                                title={userType === "moderator" ? "Verified as KOL" : `Verified on X as @${twitterUsername}`}
+                                aria-label={userType === "moderator" ? "Verified as KOL" : `Verified on X as @${twitterUsername}`}
                             >
-                                <svg className="h-3 w-3 sm:h-3.5 sm:w-3.5" fill="currentColor" viewBox="0 0 24 24">
-                                    <path d="M18.244 2H21.5l-7.1 8.114L22.75 22h-6.542l-5.122-6.65L5.27 22H2l7.592-8.682L1.75 2h6.708l4.63 6.08L18.244 2zm-1.146 18.06h1.804L7.48 3.84H5.55l11.548 16.22z" />
+                                <svg className="h-full w-full" viewBox="0 0 32 32" aria-hidden="true">
+                                    <path
+                                        fill={userType === "moderator" ? "#F5B800" : "#378FDB"}
+                                        stroke="white"
+                                        strokeWidth="1.5"
+                                        strokeLinejoin="round"
+                                        d="M16 1.5l2.8 2.2 3.5-1 1.6 3.2 3.6.5.1 3.7 3 2-1.4 3.4 1.4 3.4-3 2-.1 3.7-3.6.5-1.6 3.2-3.5-1L16 30.5l-2.8-2.2-3.5 1-1.6-3.2-3.6-.5-.1-3.7-3-2 1.4-3.4-1.4-3.4 3-2 .1-3.7 3.6-.5 1.6-3.2 3.5 1L16 1.5Z"
+                                    />
+                                    <path
+                                        d="m9.4 16.2 4.2 4.2 9-9"
+                                        fill="none"
+                                        stroke="white"
+                                        strokeWidth="3.4"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                    />
                                 </svg>
-                            </a>
-                        ) : null}
+                            </span>
+                        )}
                         {showSettingsIcon ? (
                             <button
                                 type="button"
