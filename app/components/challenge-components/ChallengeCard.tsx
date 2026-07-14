@@ -77,6 +77,9 @@ export function ChallengeCard({
         isExpireTimeAchieved,
         isResolveTimeAchieved,
         ctaState,
+        challengeAction,
+        actionError,
+        handleChallengeAction,
         isBattleOnState,
         isResolvingState,
         isCompletedState,
@@ -542,7 +545,7 @@ export function ChallengeCard({
                 </div>
 
                 {/* CTA Button */}
-                <div className="flex gap-2">
+                <div>
                     <div className="group relative w-full">
                         <button
                             type="button"
@@ -551,11 +554,15 @@ export function ChallengeCard({
                                 e.preventDefault();
                                 e.stopPropagation();
                                 if (ctaState.disabled) return;
-                                openBetForm(e);
+                                if (challengeAction) {
+                                    void handleChallengeAction(e);
+                                } else {
+                                    openBetForm(e);
+                                }
                             }}
                             className={ctaState.className}
                         >
-                            {isLoading && isTeam ? "JOINING..." : ctaState.label}
+                            {isLoading ? (challengeAction ? "PROCESSING..." : isTeam ? "JOINING..." : ctaState.label) : ctaState.label}
                         </button>
                         {ctaState.showCreatorHint && (
                             <div className="pointer-events-none absolute left-1/2 bottom-full z-10 mb-1 -translate-x-1/2 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
@@ -563,6 +570,7 @@ export function ChallengeCard({
                             </div>
                         )}
                     </div>
+                    {actionError ? <p className="mt-2 text-center text-xs font-bold text-red-600">{actionError}</p> : null}
                 </div>
 
                 {/* Challenge Expiry */}
@@ -655,7 +663,6 @@ export function ChallengeCard({
                 escrowAddress={escrowAddress}
                 resolveCountdown={exactCountdownDetails.exactCountdown}
                 resolveLabel={exactCountdownDetails.dayLabel}
-                resolutionSource={challenge.resolution_source ?? undefined}
                 isTeam={isTeam}
                 joinSide={joinSide}
                 onClose={() => closeBetForm()}

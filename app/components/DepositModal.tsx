@@ -447,7 +447,7 @@ export function DepositModal({ isOpen, onClose, initialMode = "deposit", usdcBal
                     <button
                       type="button"
                       onClick={() => setAmountInput(String(selectedBalance))}
-                      className="text-xs font-black text-[#e85a2d] hover:text-gray-950"
+                      className="cursor-pointer text-xs font-black text-[#e85a2d] hover:text-gray-950"
                     >
                       Max
                     </button>
@@ -481,7 +481,7 @@ export function DepositModal({ isOpen, onClose, initialMode = "deposit", usdcBal
                     href={`https://solscan.io/tx/${txSignature}${getSolscanClusterQuery()}`}
                     target="_blank"
                     rel="noreferrer"
-                    className="underline"
+                    className="cursor-pointer underline"
                   >
                     View on explorer
                   </a>

@@ -53,6 +53,7 @@ const CHALLENGE_SEED = Buffer.from("challenge");
 const VAULT_SEED = Buffer.from("vault");
 const COUNTER_SEED = Buffer.from("creator_counter");
 const CONFIG_SEED = Buffer.from("config");
+const CLAIM_SEED = Buffer.from("claim");
 
 // ─── PDA Derivation ───────────────────────────────────────────────────────────
 
@@ -91,6 +92,13 @@ export function deriveVaultPDA(challengePDA: PublicKey): [PublicKey, number] {
   );
 }
 
+export function deriveClaimPDA(challengePDA: PublicKey, participant: PublicKey): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [CLAIM_SEED, challengePDA.toBuffer(), participant.toBuffer()],
+    PROGRAM_ID
+  );
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface CreateChallengeArgs {
@@ -116,6 +124,10 @@ export interface OnChainChallenge {
   expiresAt: number;
   resolvesAt: number;
   status: "Open" | "Active" | "Settled" | "Cancelled";
+  challengeType: "Pvp" | "Team";
+  creatorTeam: PublicKey[];
+  opponentTeam: PublicKey[];
+  winningSide: "None" | "CreatorTeam" | "OpponentTeam";
   vaultBump: number;
   bump: number;
 }
@@ -349,6 +361,60 @@ export async function buildCancelChallengeTx(
   return tx;
 }
 
+function enumVariant(value: Record<string, unknown>): string {
+  const key = Object.keys(value)[0] ?? "";
+  return key ? `${key[0].toUpperCase()}${key.slice(1)}` : "";
+}
+
+async function getPayoutAccountSetup(participant: PublicKey) {
+  const connection = getReadonlyConnection();
+  const participantUsdcAccount = await getAssociatedTokenAddress(USDC_MINT, participant, false);
+  const preInstructions = [];
+  if (!(await connection.getAccountInfo(participantUsdcAccount))) {
+    preInstructions.push(createAssociatedTokenAccountInstruction(
+      participant,
+      participantUsdcAccount,
+      participant,
+      USDC_MINT
+    ));
+  }
+  return { participantUsdcAccount, preInstructions };
+}
+
+export async function buildClaimWinningsTx(
+  program: Program,
+  participant: PublicKey,
+  creator: PublicKey,
+  challengePDA: PublicKey
+): Promise<Transaction> {
+  const [vault] = deriveVaultPDA(challengePDA);
+  const [claimRecord] = deriveClaimPDA(challengePDA, participant);
+  const { participantUsdcAccount, preInstructions } = await getPayoutAccountSetup(participant);
+  return (program.methods as any).claimWinnings().accounts({
+    participant, creator, challenge: challengePDA, vault, participantUsdcAccount,
+    claimRecord, usdcMint: USDC_MINT, tokenProgram: TOKEN_PROGRAM_ID,
+    systemProgram: SystemProgram.programId,
+  }).preInstructions(preInstructions).transaction();
+}
+
+export async function buildClaimRefundTx(
+  program: Program,
+  participant: PublicKey,
+  creator: PublicKey,
+  challengePDA: PublicKey
+): Promise<Transaction> {
+  const [vault] = deriveVaultPDA(challengePDA);
+  const [claimRecord] = deriveClaimPDA(challengePDA, participant);
+  const [config] = deriveConfigPDA();
+  const configAccount = await (program.account as any).config.fetch(config);
+  const { participantUsdcAccount, preInstructions } = await getPayoutAccountSetup(participant);
+  return (program.methods as any).claimRefund().accounts({
+    participant, creator, challenge: challengePDA, vault, participantUsdcAccount,
+    claimRecord, usdcMint: USDC_MINT, tokenProgram: TOKEN_PROGRAM_ID,
+    systemProgram: SystemProgram.programId, config, admin: configAccount.admin,
+  }).preInstructions(preInstructions).transaction();
+}
+
 // ─── Read Helpers ─────────────────────────────────────────────────────────────
 
 /**
@@ -374,7 +440,11 @@ export async function fetchAllChallenges(
         direction: d.direction.above !== undefined ? "Above" : "Below",
         expiresAt: Number(d.expiresAt),
         resolvesAt: Number(d.resolvesAt),
-        status: Object.keys(d.status)[0] as OnChainChallenge["status"],
+        status: enumVariant(d.status) as OnChainChallenge["status"],
+        challengeType: enumVariant(d.challengeType) as OnChainChallenge["challengeType"],
+        creatorTeam: d.creatorTeam as PublicKey[],
+        opponentTeam: d.opponentTeam as PublicKey[],
+        winningSide: enumVariant(d.winningSide) as OnChainChallenge["winningSide"],
         vaultBump: d.vaultBump,
         bump: d.bump,
       } as OnChainChallenge;
@@ -407,7 +477,11 @@ export async function fetchChallenge(
       direction: d.direction.above !== undefined ? "Above" : "Below",
       expiresAt: Number(d.expiresAt),
       resolvesAt: Number(d.resolvesAt),
-      status: Object.keys(d.status)[0] as OnChainChallenge["status"],
+      status: enumVariant(d.status) as OnChainChallenge["status"],
+      challengeType: enumVariant(d.challengeType) as OnChainChallenge["challengeType"],
+      creatorTeam: d.creatorTeam as PublicKey[],
+      opponentTeam: d.opponentTeam as PublicKey[],
+      winningSide: enumVariant(d.winningSide) as OnChainChallenge["winningSide"],
       vaultBump: d.vaultBump,
       bump: d.bump,
     };
