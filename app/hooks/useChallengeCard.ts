@@ -42,6 +42,14 @@ function parseDateValue(value: string | number | null | undefined): number | nul
   return Number.isNaN(parsed) ? null : parsed;
 }
 
+function parseResolutionDateValue(value: string | number | null | undefined): number | null {
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return parseDateValue(`${value}T23:59:59.999Z`);
+  }
+
+  return parseDateValue(value);
+}
+
 function formatCreatedTimeAgo(timestamp: number | null): string {
   if (!timestamp) return "recently";
 
@@ -86,6 +94,25 @@ function formatEndsByCountdown(timestamp: number | null, nowMs: number): string 
   if (days > 0) return `${days}d ${hours}h`;
   if (hours > 0) return `${hours}h ${minutes}m`;
   return `${minutes}m`;
+}
+
+function formatTitleCountdown(timestamp: number | null, nowMs: number): string {
+  if (!timestamp) return "unknown time";
+
+  const diffMs = timestamp - nowMs;
+  if (diffMs <= 0) return "ended";
+
+  const totalMinutes = Math.max(1, Math.ceil(diffMs / 60000));
+  const days = Math.floor(totalMinutes / (24 * 60));
+  const hours = Math.floor((totalMinutes % (24 * 60)) / 60);
+  const minutes = totalMinutes % 60;
+  const parts: string[] = [];
+
+  if (days > 0) parts.push(`${days} day${days === 1 ? "" : "s"}`);
+  if (hours > 0) parts.push(`${hours} hour${hours === 1 ? "" : "s"}`);
+  if (minutes > 0 || parts.length === 0) parts.push(`${minutes} min`);
+
+  return parts.join(" ");
 }
 
 function formatExpiryCountdown(timestamp: number | null, nowMs: number): string {
@@ -444,7 +471,13 @@ export function useChallengeCard(challenge: Challenge) {
   );
 
   const createdTimeText = formatCreatedTimeAgo(parseDateValue(challenge.created_at));
-  const resolveTimestamp = parseDateValue(challenge.resolution_date);
+  const composerMetadata = challenge.metadata?.composer;
+  const composerResolvesAt = typeof composerMetadata?.resolves_at === "string"
+    ? composerMetadata.resolves_at
+    : null;
+  const resolveTimestamp = parseDateValue(composerResolvesAt)
+    ?? parseDateValue(challenge.resolve_time)
+    ?? parseResolutionDateValue(challenge.resolution_date);
   const challengeEndTimeText = formatUtcDateTime(resolveTimestamp);
   const resolveDateByText = resolveTimestamp
     ? new Date(resolveTimestamp).toLocaleDateString("en-GB", {
@@ -454,6 +487,7 @@ export function useChallengeCard(challenge: Challenge) {
       })
     : "";
   const endsByCountdown = formatEndsByCountdown(resolveTimestamp, currentTime);
+  const titleCountdown = formatTitleCountdown(resolveTimestamp, currentTime);
   const exactCountdownDetails = formatExactCountdownDetails(resolveTimestamp, currentTime);
   const isManualResolution = challenge.resolution_method !== "PRICE_FEED";
   const totalOpponents = Math.max((challenge.participants ?? 0) - 1, 0);
@@ -618,7 +652,7 @@ export function useChallengeCard(challenge: Challenge) {
     createdTimeText,
     challengeEndTimeText,
     resolveDateByText,
-    endsByCountdown,
+    titleCountdown,
     exactCountdownDetails,
     isCreator,
     isPvpMode,

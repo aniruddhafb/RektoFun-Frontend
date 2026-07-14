@@ -10,7 +10,9 @@ import {
     CircleDollarSign,
     Clock3,
     Coins,
+    Info,
     Loader2,
+    Lock,
     MessageSquareText,
     ShieldCheck,
     Swords,
@@ -40,7 +42,7 @@ type TxStatus = "idle" | "building" | "signing" | "confirming" | "success" | "er
 type MarketType = "crypto" | "sports";
 type ChallengeFormat = "price" | "statement";
 type ChallengeMode = "pvp" | "team";
-type ComposerPanel = "topic" | "stake" | "timing" | "players" | null;
+type ComposerPanel = "topic" | "stake" | "window" | "resolution" | "players" | null;
 type AssetPriceState = {
     key: string;
     asset: string;
@@ -300,7 +302,7 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
             return "Minimum stake is 1 USDC.";
         }
         if (totalDurationMinutes < MIN_DURATION_MINUTES || totalDurationMinutes > MAX_DURATION_MINUTES) {
-            setActivePanel("timing");
+            setActivePanel("window");
             return "Join window must be between 5 minutes and 7 days.";
         }
         if (requireProfile && !user?.id) return "Finish your profile before creating a challenge.";
@@ -414,6 +416,7 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
                         market: marketType,
                         format: isPriceFeed ? "price" : "statement",
                         topic,
+                        resolves_at: new Date(resolvesAt * 1000).toISOString(),
                     },
                 },
                 creator: user!.id,
@@ -515,14 +518,28 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
                                 >
                                     <Coins className="h-3.5 w-3.5" /> Crypto
                                 </button>
-                                <button
-                                    type="button"
-                                    onClick={() => switchMarket("sports")}
-                                    className={`inline-flex h-8 items-center justify-center gap-1.5 px-3 text-xs font-black transition-colors ${marketType === "sports" ? "bg-black text-white" : "text-[#594b44] hover:bg-white/70"}`}
-                                    aria-pressed={marketType === "sports"}
+                                <span
+                                    className="group relative h-8"
+                                    tabIndex={0}
+                                    aria-label="Sports, coming soon"
                                 >
-                                    <Trophy className="h-3.5 w-3.5" /> Sports
-                                </button>
+                                    <button
+                                        type="button"
+                                        disabled
+                                        aria-describedby="sports-coming-soon"
+                                        className="inline-flex h-full w-full cursor-not-allowed items-center justify-center gap-1.5 px-3 text-xs font-black text-[#594b44] opacity-45"
+                                    >
+                                        <Lock className="h-3 w-3" aria-hidden="true" />
+                                        <Trophy className="h-3.5 w-3.5" /> Sports
+                                    </button>
+                                    <span
+                                        id="sports-coming-soon"
+                                        role="tooltip"
+                                        className="pointer-events-none absolute left-1/2 top-full z-20 mt-2 -translate-x-1/2 whitespace-nowrap border border-black bg-black px-2 py-1 text-[9px] font-black uppercase tracking-[0.08em] text-white opacity-0 shadow-[2px_2px_0_#e85a2d] transition-opacity group-hover:opacity-100 group-focus:opacity-100"
+                                    >
+                                        Coming soon
+                                    </span>
+                                </span>
                             </div>
 
                             {marketType === "crypto" && (
@@ -538,18 +555,28 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
                                     >
                                         <Activity className="h-3.5 w-3.5" /> Price
                                     </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setChallengeFormat("statement");
-                                            setFormError(null);
-                                            window.setTimeout(() => statementRef.current?.focus(), 0);
-                                        }}
-                                        className={`inline-flex h-8 items-center justify-center gap-1.5 px-2.5 text-[11px] font-black transition-colors ${challengeFormat === "statement" ? "bg-[#e85a2d] text-white" : "text-[#6d5d55] hover:bg-[#f3e1d7]"}`}
-                                        aria-pressed={challengeFormat === "statement"}
+                                    <span
+                                        className="group relative h-8"
+                                        tabIndex={0}
+                                        aria-label="Statement, coming soon"
                                     >
-                                        <MessageSquareText className="h-3.5 w-3.5" /> Statement
-                                    </button>
+                                        <button
+                                            type="button"
+                                            disabled
+                                            aria-describedby="statement-coming-soon"
+                                            className="inline-flex h-full w-full cursor-not-allowed items-center justify-center gap-1.5 px-2.5 text-[11px] font-black text-[#6d5d55] opacity-45"
+                                        >
+                                            <Lock className="h-3 w-3" aria-hidden="true" />
+                                            <MessageSquareText className="h-3.5 w-3.5" /> Statement
+                                        </button>
+                                        <span
+                                            id="statement-coming-soon"
+                                            role="tooltip"
+                                            className="pointer-events-none absolute left-1/2 top-full z-20 mt-2 -translate-x-1/2 whitespace-nowrap border border-black bg-black px-2 py-1 text-[9px] font-black uppercase tracking-[0.08em] text-white opacity-0 shadow-[2px_2px_0_#e85a2d] transition-opacity group-hover:opacity-100 group-focus:opacity-100"
+                                        >
+                                            Coming soon
+                                        </span>
+                                    </span>
                                 </div>
                             )}
 
@@ -669,24 +696,35 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
                                 <div className="-mr-3 mt-2 flex items-center gap-1.5 overflow-x-auto border-t border-black/10 pb-1 pr-3 pt-2.5 scrollbar-hide sm:mr-0 sm:mt-3 sm:pb-0 sm:pr-0 sm:pt-3" aria-label="Customize challenge">
                                     <ComposerButton
                                         icon={marketType === "crypto" ? Coins : Trophy}
+                                        caption="Asset"
                                         label={topicLabel}
                                         isActive={activePanel === "topic"}
                                         onClick={() => togglePanel("topic")}
                                     />
                                     <ComposerButton
                                         icon={CircleDollarSign}
+                                        caption="Stake"
                                         label={`${betAmount || 0} USDC`}
                                         isActive={activePanel === "stake"}
                                         onClick={() => togglePanel("stake")}
                                     />
                                     <ComposerButton
                                         icon={Clock3}
+                                        caption="Window"
                                         label={formatDuration(duration)}
-                                        isActive={activePanel === "timing"}
-                                        onClick={() => togglePanel("timing")}
+                                        isActive={activePanel === "window"}
+                                        onClick={() => togglePanel("window")}
+                                    />
+                                    <ComposerButton
+                                        icon={CalendarDays}
+                                        caption="Resolves by"
+                                        label={formatDate(selectedDate)}
+                                        isActive={activePanel === "resolution"}
+                                        onClick={() => togglePanel("resolution")}
                                     />
                                     <ComposerButton
                                         icon={challengeMode === "pvp" ? Swords : Users}
+                                        caption="Mode"
                                         label={challengeMode === "pvp" ? "1 vs 1" : "Teams"}
                                         isActive={activePanel === "players"}
                                         onClick={() => togglePanel("players")}
@@ -770,60 +808,65 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
                                                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-[#8b7a72]">USDC</span>
                                             </label>
                                         </div>
-                                        <p className="mt-3 text-[11px] font-bold text-[#77675f]">
+                                        {/* <p className="mt-3 text-[11px] font-bold text-[#77675f]">
                                             {challengeMode === "pvp"
                                                 ? `${estimatedPvpPool.toFixed(2)} USDC pot · ${estimatedPayout.toFixed(2)} to winner`
                                                 : `Pool starts at ${Number.isFinite(betAmount) ? betAmount : 0} USDC`}
-                                        </p>
+                                        </p> */}
                                     </div>
                                 )}
 
-                                {activePanel === "timing" && (
+                                {activePanel === "window" && (
                                     <div>
-                                        <PanelHeading>Timing</PanelHeading>
-                                        <div className="space-y-3">
-                                            <div>
-                                                <p className="mb-2 text-[9px] font-black uppercase tracking-[0.1em] text-[#8b7a72]">Join window</p>
-                                                <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
-                                                    {[
-                                                        { label: "15m", minutes: 15 },
-                                                        { label: "1h", minutes: 60 },
-                                                        { label: "4h", minutes: 240 },
-                                                        { label: "1d", minutes: 1440 },
-                                                        { label: "3d", minutes: 4320 },
-                                                        { label: "7d", minutes: 10080 },
-                                                    ].map((option) => (
-                                                        <button
-                                                            key={option.minutes}
-                                                            type="button"
-                                                            onClick={() => handleDurationChange(durationFromMinutes(option.minutes))}
-                                                            className={`h-9 min-w-0 border-2 px-2 text-xs font-black sm:min-w-12 sm:px-3 ${totalDurationMinutes === option.minutes ? "border-black bg-[#f5d547] shadow-[2px_2px_0_#111]" : "border-black/20 bg-white hover:border-black"}`}
-                                                        >
-                                                            {option.label}
-                                                        </button>
-                                                    ))}
-                            </div>
-                        </div>
-                                            <label className="block">
-                                                <span className="mb-2 block text-[9px] font-black uppercase tracking-[0.1em] text-[#8b7a72]">Resolves</span>
-                                                <span className="flex items-center gap-2 border-2 border-black/20 bg-white px-3 focus-within:border-black">
-                                                    <CalendarDays className="h-4 w-4 shrink-0 text-[#e85a2d]" />
-                                                    <input
-                                                        type="datetime-local"
-                                                        value={toDateTimeLocalValue(selectedDate)}
-                                                        min={toDateTimeLocalValue(new Date(composerNow + totalDurationMinutes * 60 * 1000))}
-                                                        onChange={(event) => handleResolutionDateChange(new Date(event.target.value))}
-                                                        className="create-challenge-date-input h-12 w-full min-w-0 flex-1 border-0 bg-transparent text-base font-black text-black outline-none sm:h-11 sm:text-xs"
-                                                    />
-                                                </span>
-                                            </label>
+                                        <PanelHeading info="The challenge expires in the selected window time, no participant can join and you will get refunded.">
+                                            Join window
+                                        </PanelHeading>
+                                        <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
+                                            {[
+                                                { label: "15m", minutes: 15 },
+                                                { label: "1h", minutes: 60 },
+                                                { label: "4h", minutes: 240 },
+                                                { label: "1d", minutes: 1440 },
+                                                { label: "3d", minutes: 4320 },
+                                                { label: "7d", minutes: 10080 },
+                                            ].map((option) => (
+                                                <button
+                                                    key={option.minutes}
+                                                    type="button"
+                                                    onClick={() => handleDurationChange(durationFromMinutes(option.minutes))}
+                                                    className={`h-9 min-w-0 border-2 px-2 text-xs font-black sm:min-w-12 sm:px-3 ${totalDurationMinutes === option.minutes ? "border-black bg-[#f5d547] shadow-[2px_2px_0_#111]" : "border-black/20 bg-white hover:border-black"}`}
+                                                >
+                                                    {option.label}
+                                                </button>
+                                            ))}
                                         </div>
+                                    </div>
+                                )}
+
+                                {activePanel === "resolution" && (
+                                    <div>
+                                        <PanelHeading info="The challenge will resolve on or before the selected time.">
+                                            Resolves by
+                                        </PanelHeading>
+                                        <label className="block">
+                                            <span className="sr-only">Resolution date and time</span>
+                                            <span className="flex items-center gap-2 border-2 border-black/20 bg-white px-3 focus-within:border-black">
+                                                <CalendarDays className="h-4 w-4 shrink-0 text-[#e85a2d]" />
+                                                <input
+                                                    type="datetime-local"
+                                                    value={toDateTimeLocalValue(selectedDate)}
+                                                    min={toDateTimeLocalValue(new Date(composerNow + totalDurationMinutes * 60 * 1000))}
+                                                    onChange={(event) => handleResolutionDateChange(new Date(event.target.value))}
+                                                    className="create-challenge-date-input h-12 w-full min-w-0 flex-1 border-0 bg-transparent text-base font-black text-black outline-none sm:h-11 sm:text-xs"
+                                                />
+                                            </span>
+                                        </label>
                                     </div>
                                 )}
 
                                 {activePanel === "players" && (
                                     <div>
-                                        <PanelHeading>Players</PanelHeading>
+                                        <PanelHeading>Select mode</PanelHeading>
                                         <div className="grid grid-cols-1 gap-2 min-[380px]:grid-cols-2">
                                             <button
                                                 type="button"
@@ -836,7 +879,7 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
                                                 <Swords className="h-5 w-5 shrink-0" />
                                                 <span>
                                                     <span className="block text-xs font-black">1 vs 1</span>
-                                                    <span className={`text-[10px] font-bold ${challengeMode === "pvp" ? "text-white/65" : "text-[#8b7a72]"}`}>One rival</span>
+                                                    <span className={`text-[10px] font-bold ${challengeMode === "pvp" ? "text-white/65" : "text-[#8b7a72]"}`}>PvP Mode</span>
                                                 </span>
                                             </button>
                                             <button
@@ -849,8 +892,8 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
                                             >
                                                 <Users className="h-5 w-5 shrink-0" />
                                                 <span>
-                                                    <span className="block text-xs font-black">Teams</span>
-                                                    <span className={`text-[10px] font-bold ${challengeMode === "team" ? "text-white/65" : "text-[#8b7a72]"}`}>Crowd vs crowd</span>
+                                                    <span className="block text-xs font-black">Team</span>
+                                                    <span className={`text-[10px] font-bold ${challengeMode === "team" ? "text-white/65" : "text-[#8b7a72]"}`}>Multiplayer Mode</span>
                                                 </span>
                                             </button>
                                         </div>
@@ -1022,11 +1065,13 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
 
 function ComposerButton({
     icon: Icon,
+    caption,
     label,
     isActive,
     onClick,
 }: {
     icon: typeof Coins;
+    caption: string;
     label: string;
     isActive: boolean;
     onClick: () => void;
@@ -1036,11 +1081,18 @@ function ComposerButton({
             type="button"
             onClick={onClick}
             aria-pressed={isActive}
-            title={label}
-            className={`inline-flex h-8 shrink-0 items-center gap-1.5 border px-2.5 text-[10px] font-black transition-colors ${isActive ? "border-black bg-[#f5d547] text-black" : "border-black/15 bg-white text-[#6d5d55] hover:border-black hover:text-black"}`}
+            title={`${caption}: ${label}`}
+            className={`inline-flex h-11 shrink-0 items-center gap-2 border px-2.5 text-left transition-colors ${isActive ? "border-black bg-[#f5d547] text-black" : "border-black/15 bg-white text-[#6d5d55] hover:border-black hover:text-black"}`}
         >
-            <Icon className="h-3.5 w-3.5" />
-            <span className="max-w-24 truncate">{label}</span>
+            <Icon className="h-3.5 w-3.5 shrink-0" />
+            <span className="min-w-0">
+                <span className="block text-[8px] font-black uppercase leading-none tracking-[0.08em] opacity-60">
+                    {caption}
+                </span>
+                <span className="mt-1 block max-w-32 truncate text-[10px] font-black leading-none">
+                    {label}
+                </span>
+            </span>
         </button>
     );
 }
@@ -1194,10 +1246,25 @@ function ChallengePreview({
     );
 }
 
-function PanelHeading({ children }: { children: React.ReactNode }) {
+function PanelHeading({ children, info }: { children: React.ReactNode; info?: string }) {
     return (
-        <h3 className="mb-3 text-[10px] font-black uppercase tracking-[0.12em] text-[#75645c]">
-            {children}
+        <h3 className="mb-3 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-[#75645c]">
+            {info && (
+                <span
+                    className="group relative inline-flex shrink-0 cursor-help"
+                    tabIndex={0}
+                    aria-label={info}
+                >
+                    <Info className="h-3.5 w-3.5" aria-hidden="true" />
+                    <span
+                        role="tooltip"
+                        className="pointer-events-none absolute left-0 top-full z-30 mt-2 w-64 max-w-[calc(100vw-4rem)] border border-black bg-black px-2.5 py-2 text-[10px] font-bold normal-case leading-relaxed tracking-normal text-white opacity-0 shadow-[2px_2px_0_#e85a2d] transition-opacity group-hover:opacity-100 group-focus:opacity-100"
+                    >
+                        {info}
+                    </span>
+                </span>
+            )}
+            <span>{children}</span>
         </h3>
     );
 }

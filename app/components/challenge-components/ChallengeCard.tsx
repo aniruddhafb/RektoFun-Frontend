@@ -62,7 +62,7 @@ export function ChallengeCard({
         createdTimeText,
         challengeEndTimeText,
         resolveDateByText,
-        endsByCountdown,
+        titleCountdown,
         exactCountdownDetails,
         isCreator,
         isPvpMode,
@@ -183,41 +183,33 @@ export function ChallengeCard({
                                         {title} by {resolveDateByText}
                                     </span>
                                 ) : (
-                                    <>
-                                        <span
-                                            onClick={handleClick}
-                                            className="block cursor-pointer break-words text-[15px] font-black tracking-tight text-black transition-colors sm:text-[16px]"
-                                            style={{
-                                                display: "-webkit-box",
-                                                WebkitLineClamp: 1,
-                                                WebkitBoxOrient: "vertical",
-                                                overflow: "hidden",
-                                                textOverflow: "ellipsis",
-                                            }}
-                                        >
-                                            {title} In
+                                    <span
+                                        onClick={handleClick}
+                                        className="block cursor-pointer break-words text-[15px] font-black tracking-tight text-black transition-colors sm:text-[16px]"
+                                        style={{
+                                            display: "-webkit-box",
+                                            WebkitLineClamp: 2,
+                                            WebkitBoxOrient: "vertical",
+                                            overflow: "hidden",
+                                            textOverflow: "ellipsis",
+                                        }}
+                                    >
+                                        {title}{" "}
+                                        <span className="text-[12px] font-bold text-emerald-500 sm:text-[13px]">
+                                            in next {titleCountdown}
                                         </span>
-                                        <span
-                                            onClick={handleClick}
-                                            className="block cursor-pointer break-words text-[15px] font-black tracking-tight text-black transition-colors sm:text-[16px]"
-                                        >
-                                            Next
-                                            <span className="ml-1 inline-flex items-center gap-1 sm:ml-2 sm:gap-1.5">
-                                                <span className="text-sm font-bold text-emerald-900">{endsByCountdown}</span>
-                                                <span className="group relative inline-flex items-center">
-                                                    <svg className="w-3.5 h-3.5 text-emerald-600 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                    </svg>
-                                                    <span className="absolute left-1/2 top-full z-10 mt-2 w-60 -translate-x-1/2 rounded-lg bg-gray-900 p-2 text-[11px] font-medium text-white opacity-0 invisible transition-all duration-200 group-hover:opacity-100 group-hover:visible normal-case leading-relaxed shadow-lg">
-                                                        <span className="block">Exact countdown: {exactCountdownDetails.exactCountdown}</span>
-                                                        <span className="block">Time left: {exactCountdownDetails.timeLeftText}</span>
-                                                        <span className="block">Resolves on: {exactCountdownDetails.dayLabel}</span>
-                                                        <span className="absolute left-1/2 top-0 -translate-x-1/2 -translate-y-full border-4 border-transparent border-b-gray-900"></span>
-                                                    </span>
-                                                </span>
+                                        <span className="group relative ml-1 inline-flex align-middle">
+                                            <svg className="h-3.5 w-3.5 cursor-help text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            </svg>
+                                            <span className="invisible absolute left-1/2 top-full z-10 mt-2 w-60 -translate-x-1/2 rounded-lg bg-gray-900 p-2 text-[11px] font-medium normal-case leading-relaxed text-white opacity-0 shadow-lg transition-all duration-200 group-hover:visible group-hover:opacity-100">
+                                                <span className="block">Exact countdown: {exactCountdownDetails.exactCountdown}</span>
+                                                <span className="block">Time left: {exactCountdownDetails.timeLeftText}</span>
+                                                <span className="block">Resolves on: {exactCountdownDetails.dayLabel}</span>
+                                                <span className="absolute left-1/2 top-0 -translate-x-1/2 -translate-y-full border-4 border-transparent border-b-gray-900"></span>
                                             </span>
                                         </span>
-                                    </>
+                                    </span>
                                 )}
                             </h3>
                         </div>
@@ -453,8 +445,19 @@ export function ChallengeCard({
                             /* Placeholder for pending state */
                             <div className="flex flex-col items-center">
                                 <div className="challenge-card-profile-tile relative flex h-[132px] w-[98px] max-w-full flex-col items-center justify-center rounded-xl border-2 border-dashed border-[#d4a574]/30 p-2 opponent-placeholder-bg sm:h-[140px] sm:w-[120px] sm:p-3">
-                                    <div className="opponent-placeholder-icon flex h-11 w-11 items-center justify-center rounded-full border-2 border-[#d4a574]/50 bg-gradient-to-br from-gray-200 to-gray-300 sm:h-14 sm:w-14">
-                                        <span className="text-xl">❓</span>
+                                    <div
+                                        className="flex h-11 w-11 items-center justify-center rounded-full border-2 border-[#d4a574]/50 bg-gradient-to-br from-gray-200 to-gray-300 sm:h-14 sm:w-14"
+                                        aria-label={isExpireTimeAchieved ? "No opponent joined" : "Searching for an opponent"}
+                                    >
+                                        <span className="inline-flex animate-pulse [animation-duration:1800ms]">
+                                            <Image
+                                                src="/Icons/search.png"
+                                                alt=""
+                                                width={40}
+                                                height={40}
+                                                className="h-8 w-8 object-contain sm:h-10 sm:w-10"
+                                            />
+                                        </span>
                                     </div>
                                     <div className="mt-1 px-1.5 py-0.5 bg-[#2d1f1a] text-white text-[9px] font-bold rounded-full">
                                         {isTeam ? " OPPONENTS" : "OPPONENT"}
@@ -621,10 +624,6 @@ export function ChallengeCard({
                     animation: opponent-bg-blink 1.5s ease-in-out infinite;
                 }
 
-                .opponent-placeholder-icon {
-                    animation: opponent-icon-blink 1.5s ease-in-out infinite;
-                }
-
                 @keyframes opponent-bg-blink {
                     0%,
                     100% {
@@ -635,13 +634,9 @@ export function ChallengeCard({
                     }
                 }
 
-                @keyframes opponent-icon-blink {
-                    0%,
-                    100% {
-                        opacity: 1;
-                    }
-                    50% {
-                        opacity: 0.65;
+                @media (prefers-reduced-motion: reduce) {
+                    .opponent-placeholder-bg {
+                        animation: none;
                     }
                 }
             `}</style>
