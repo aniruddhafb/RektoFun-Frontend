@@ -266,3 +266,12 @@ export async function updateChallengeMetadata(
     throw new Error(`Failed to update challenge metadata: ${response.statusText}`);
   }
 }
+
+export async function updateChallengeStatus(challengeId: number, status: Challenge["status"]): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/challenges/${challengeId}`, {
+    method: 'PATCH',
+    headers: { 'accept': 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status }),
+  });
+  if (!response.ok) throw new Error(`Failed to update challenge status: ${response.statusText}`);
+}

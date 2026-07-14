@@ -2,11 +2,15 @@ import React from "react";
 import { useRouter } from "next/navigation";
 import { useAppKitAccount, useAppKitProvider } from "@reown/appkit/react";
 import { PublicKey, Transaction } from "@solana/web3.js";
-import { Challenge, getChallengeById, getChallengeCategoryImage } from "@/app/lib/challenges-service/challenges";
-import { createPosition } from "@/app/lib/positions-service/positions";
+import { Challenge, getChallengeById, getChallengeCategoryImage, updateChallengeStatus } from "@/app/lib/challenges-service/challenges";
+import { createPosition, getPositions } from "@/app/lib/positions-service/positions";
 import { useUserStore } from "@/app/store/useUserStore";
 import {
   buildAcceptChallengeTx,
+  buildCancelChallengeTx,
+  buildClaimRefundTx,
+  buildClaimWinningsTx,
+  deriveClaimPDA,
   fetchChallenge,
   getRektoProgram,
   USDC_MULTIPLIER,
@@ -28,6 +32,25 @@ interface CTAButtonState {
   className: string;
   isOngoing: boolean;
   showCreatorHint: boolean;
+}
+
+type ChallengeAction = "cancel" | "refund" | "winnings" | null;
+
+const joinedChallengeRequests = new Map<number, Promise<Set<number>>>();
+
+function loadJoinedChallengeIds(userId: number): Promise<Set<number>> {
+  const pending = joinedChallengeRequests.get(userId);
+  if (pending) return pending;
+  const request = getPositions({ limit: 1000, offset: 0 })
+    .then(({ positions }) => new Set(
+      positions.filter((position) => position.creator === userId).map((position) => position.challenge_id)
+    ))
+    .catch((error) => {
+      joinedChallengeRequests.delete(userId);
+      throw error;
+    });
+  joinedChallengeRequests.set(userId, request);
+  return request;
 }
 
 const GENERIC_ACCEPT_ERROR = "Something went wrong. Please try again.";
@@ -246,6 +269,8 @@ export function useChallengeCard(challenge: Challenge) {
   const [currentTime, setCurrentTime] = React.useState(() => Date.now());
   const [escrowAddress, setEscrowAddress] = React.useState<string | undefined>(undefined);
   const [usdcBalance, setUsdcBalance] = React.useState<number | null>(null);
+  const [challengeAction, setChallengeAction] = React.useState<ChallengeAction>(null);
+  const [actionError, setActionError] = React.useState("");
 
   const connection = getReadonlyConnection();
 
@@ -351,6 +376,12 @@ export function useChallengeCard(challenge: Challenge) {
       return;
     }
 
+    const minimumAcceptBet = Math.max(Number(challenge.initial_bet) || 0, 0);
+    if (parsedBetAmount < minimumAcceptBet) {
+      setBetError(`Minimum bet is ${minimumAcceptBet} USDC.`);
+      return;
+    }
+
     if (
       typeof usdcBalance === "number" &&
       Number.isFinite(usdcBalance) &&
@@ -429,6 +460,7 @@ export function useChallengeCard(challenge: Challenge) {
         side: joinSide,
         creator: user.id,
       });
+      void joinedChallengeRequests.get(user.id)?.then((ids) => ids.add(challenge.id));
 
       setIsBetFormOpen(false);
     } catch (error) {
@@ -554,6 +586,148 @@ export function useChallengeCard(challenge: Challenge) {
   const isResolutionPending = challenge.status === "PENDING_RESOLUTION";
   const isResolutionResolved = challenge.status === "RESOLVED";
 
+  React.useEffect(() => {
+    if (!address || !walletProvider || !isConnected) {
+      return;
+    }
+
+    const isPotentialClaim = challenge.status === "CANCELLED"
+      || (challenge.status === "RESOLVED" && isTeam);
+    if (!isCreator && (!isPotentialClaim || user?.id == null)) return;
+
+    const onchain = (challenge.metadata as Record<string, unknown> | undefined)?.onchain as
+      | { challenge_pda?: string; creator_wallet?: string }
+      | undefined;
+    if (!onchain?.challenge_pda || !onchain.creator_wallet) {
+      return;
+    }
+    const challengePdaAddress = onchain.challenge_pda;
+
+    let cancelled = false;
+    const loadAction = async () => {
+      try {
+        if (!isCreator && user?.id != null) {
+          const joinedChallengeIds = await loadJoinedChallengeIds(user.id);
+          if (!joinedChallengeIds.has(challenge.id) || cancelled) return;
+        }
+        const participant = new PublicKey(address);
+        const signer = walletProvider as {
+          signTransaction: (transaction: Transaction) => Promise<Transaction>;
+          signAllTransactions: (transactions: Transaction[]) => Promise<Transaction[]>;
+        };
+        const program = getRektoProgram({
+          publicKey: participant,
+          signTransaction: signer.signTransaction.bind(signer),
+          signAllTransactions: signer.signAllTransactions.bind(signer),
+        });
+        const challengePDA = new PublicKey(challengePdaAddress);
+        const chainChallenge = await fetchChallenge(program, challengePDA);
+        if (!chainChallenge || cancelled) return;
+
+        const isChainCreator = chainChallenge.creator.equals(participant);
+        const isCreatorTeamMember = chainChallenge.creatorTeam.some((wallet) => wallet.equals(participant));
+        const isOpponentTeamMember = chainChallenge.opponentTeam.some((wallet) => wallet.equals(participant));
+        const isPvpChallenger = !chainChallenge.challenger.equals(PublicKey.default)
+          && chainChallenge.challenger.equals(participant);
+        const hasChainOpponent = isPvpMode
+          ? !chainChallenge.challenger.equals(PublicKey.default)
+          : chainChallenge.opponentTeam.length > 0;
+
+        if (isChainCreator && chainChallenge.status === "Open" && !hasChainOpponent) {
+          setChallengeAction("cancel");
+          return;
+        }
+
+        const [claimPDA] = deriveClaimPDA(challengePDA, participant);
+        if (await connection.getAccountInfo(claimPDA)) {
+          setChallengeAction(null);
+          return;
+        }
+
+        if (chainChallenge.status === "Cancelled" && !isChainCreator
+          && (isPvpChallenger || isCreatorTeamMember || isOpponentTeamMember)) {
+          setChallengeAction("refund");
+          return;
+        }
+
+        const isWinner = chainChallenge.winningSide === "CreatorTeam"
+          ? isChainCreator || isCreatorTeamMember
+          : chainChallenge.winningSide === "OpponentTeam" && isOpponentTeamMember;
+        setChallengeAction(
+          chainChallenge.status === "Settled" && chainChallenge.challengeType === "Team" && isWinner
+            ? "winnings"
+            : null
+        );
+      } catch (error) {
+        console.error("Failed to determine challenge action:", error);
+        if (!cancelled) setChallengeAction(null);
+      }
+    };
+    void loadAction();
+    return () => { cancelled = true; };
+  }, [address, challenge.id, challenge.metadata, challenge.status, connection, isConnected, isCreator, isPvpMode, isTeam, user?.id, walletProvider]);
+
+  const availableChallengeAction = isConnected ? challengeAction : null;
+
+  const handleChallengeAction = async (event?: React.MouseEvent) => {
+    event?.preventDefault();
+    event?.stopPropagation();
+    if (!availableChallengeAction || !address || !walletProvider || isLoading) return;
+    if (availableChallengeAction === "cancel" && !window.confirm(
+      isExpireTimeAchieved
+        ? "Claim your refund and close this expired challenge?"
+        : "Cancel this challenge? Your stake will be returned to your wallet."
+    )) return;
+
+    try {
+      setActionError("");
+      setIsLoading(true);
+      const details = await getChallengeById(challenge.id);
+      const onchain = (details.metadata as Record<string, unknown> | undefined)?.onchain as
+        | { challenge_pda?: string; creator_wallet?: string }
+        | undefined;
+      if (!onchain?.challenge_pda || !onchain.creator_wallet) throw new Error("Missing on-chain challenge details.");
+
+      const participant = new PublicKey(address);
+      const creatorPubkey = new PublicKey(onchain.creator_wallet);
+      const challengePDA = new PublicKey(onchain.challenge_pda);
+      const signer = walletProvider as {
+        signTransaction: (transaction: Transaction) => Promise<Transaction>;
+        signAllTransactions: (transactions: Transaction[]) => Promise<Transaction[]>;
+      };
+      const walletAdapter = {
+        publicKey: participant,
+        signTransaction: (tx: Transaction) => signer.signTransaction(tx),
+        signAllTransactions: (txs: Transaction[]) => signer.signAllTransactions(txs),
+      };
+      const program = getRektoProgram(walletAdapter);
+      const tx = availableChallengeAction === "cancel"
+        ? await buildCancelChallengeTx(program, participant, challengePDA)
+        : availableChallengeAction === "refund"
+          ? await buildClaimRefundTx(program, participant, creatorPubkey, challengePDA)
+          : await buildClaimWinningsTx(program, participant, creatorPubkey, challengePDA);
+      tx.feePayer = participant;
+      tx.recentBlockhash = (await connection.getLatestBlockhash("confirmed")).blockhash;
+      const signedTx = await walletAdapter.signTransaction(tx);
+      const signature = await connection.sendRawTransaction(signedTx.serialize());
+      await connection.confirmTransaction(signature, "confirmed");
+      if (availableChallengeAction === "cancel") {
+        try {
+          await updateChallengeStatus(challenge.id, "CANCELLED");
+        } catch (syncError) {
+          console.error("Challenge cancelled on-chain but backend status sync failed:", syncError);
+        }
+      }
+      setChallengeAction(null);
+      router.refresh();
+    } catch (error) {
+      console.error("Challenge action failed:", error);
+      setActionError("Transaction failed. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // CTA Button logic
   const ctaBaseClassName =
     "w-full h-11 px-4 border-2 border-black font-black text-sm flex items-center justify-center gap-2 uppercase tracking-[0.06em]";
@@ -575,7 +749,13 @@ export function useChallengeCard(challenge: Challenge) {
     let ctaDisabled = false;
     let ctaClassName = "";
 
-    if (isPvpMode) {
+    if (availableChallengeAction) {
+      ctaLabel = availableChallengeAction === "cancel"
+        ? (isExpireTimeAchieved ? "Claim refund" : "Cancel challenge")
+        : availableChallengeAction === "refund" ? "Claim refund" : "Claim winnings";
+      ctaDisabled = isLoading;
+      ctaClassName = activeCtaClassName;
+    } else if (isPvpMode) {
       if (isResolveTimeAchieved && hasOpponents && isResolutionResolved) {
         ctaLabel = "Completed";
         ctaDisabled = true;
@@ -668,7 +848,7 @@ export function useChallengeCard(challenge: Challenge) {
     joinSide,
     usdcBalance,
     escrowAddress,
-    modalMinAcceptBet: undefined as number | undefined,
+    modalMinAcceptBet: Math.max(Number(challenge.initial_bet) || 0, 0),
     modalMaxAcceptBet: undefined as number | undefined,
 
     // Setters
@@ -683,6 +863,7 @@ export function useChallengeCard(challenge: Challenge) {
     openProfile,
     handleJoinChallenge,
     handleShareChallenge,
+    handleChallengeAction,
 
     // Computed values
     creator,
@@ -724,6 +905,8 @@ export function useChallengeCard(challenge: Challenge) {
     isExpireTimeAchieved,
     isResolveTimeAchieved,
     ctaState,
+    challengeAction: availableChallengeAction,
+    actionError,
     isBattleOnState,
     isResolvingState,
     isCompletedState,

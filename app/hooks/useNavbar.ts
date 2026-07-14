@@ -170,11 +170,17 @@ export function useNavbar() {
   useEffect(() => {
     const openSettings = () => setIsSettingsModalOpen(true);
     const openEditProfile = () => setIsEditProfileModalOpen(true);
+    const openDeposit = () => {
+      setFundsModalMode('deposit');
+      setIsDepositModalOpen(true);
+    };
     window.addEventListener('rektofun:open-settings', openSettings);
     window.addEventListener('rektofun:open-edit-profile', openEditProfile);
+    window.addEventListener('rektofun:open-deposit', openDeposit);
     return () => {
       window.removeEventListener('rektofun:open-settings', openSettings);
       window.removeEventListener('rektofun:open-edit-profile', openEditProfile);
+      window.removeEventListener('rektofun:open-deposit', openDeposit);
     };
   }, []);
 

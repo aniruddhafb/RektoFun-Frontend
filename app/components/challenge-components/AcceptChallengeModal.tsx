@@ -4,6 +4,8 @@ import React from "react";
 import { createPortal } from "react-dom";
 import {
     Clock3,
+    CircleAlert,
+    CircleDollarSign,
     ExternalLink,
     LoaderCircle,
     ShieldCheck,
@@ -25,7 +27,6 @@ interface AcceptChallengeModalProps {
     escrowAddress?: string;
     resolveCountdown: string;
     resolveLabel: string;
-    resolutionSource?: string;
     isTeam: boolean;
     joinSide: "TEAM_A" | "TEAM_B";
     onClose: () => void;
@@ -49,7 +50,6 @@ export function AcceptChallengeModal({
     escrowAddress,
     resolveCountdown,
     resolveLabel,
-    resolutionSource,
     isTeam,
     joinSide,
     onClose,
@@ -59,8 +59,15 @@ export function AcceptChallengeModal({
 }: AcceptChallengeModalProps) {
     useBodyScrollLock(isOpen);
 
-    const isPriceFeedResolution = String(resolutionSource ?? "").toLowerCase() === "price_feed";
     const parsedBet = Number(betInput);
+    const hasKnownBalance = typeof usdcBalance === "number" && Number.isFinite(usdcBalance);
+    const requiredStake = Number.isFinite(parsedBet) && parsedBet > 0
+        ? Math.max(parsedBet, minAcceptBet ?? 0)
+        : (minAcceptBet ?? 0);
+    const balanceShortfall = hasKnownBalance
+        ? Math.max(requiredStake - (usdcBalance as number), 0)
+        : 0;
+    const hasLowBalance = balanceShortfall > 0;
     const formattedBalance =
         typeof usdcBalance === "number" && Number.isFinite(usdcBalance)
             ? usdcBalance.toLocaleString(undefined, { maximumFractionDigits: 2 })
@@ -125,6 +132,13 @@ export function AcceptChallengeModal({
         }
     };
 
+    const handleDeposit = () => {
+        onClose();
+        window.setTimeout(() => {
+            window.dispatchEvent(new Event("rektofun:open-deposit"));
+        }, 0);
+    };
+
     const isPresetDisabled = (amount: number) => {
         if (typeof minAcceptBet === "number" && amount < minAcceptBet) return true;
         if (typeof maxAcceptBet === "number" && amount > maxAcceptBet) return true;
@@ -157,7 +171,7 @@ export function AcceptChallengeModal({
             <button
                 type="button"
                 onClick={handleClose}
-                className="absolute inset-0 cursor-default bg-black/55 backdrop-blur-[3px]"
+                className="absolute inset-0 cursor-pointer bg-black/55 backdrop-blur-[3px]"
                 aria-label="Close accept challenge dialog"
             />
 
@@ -193,25 +207,25 @@ export function AcceptChallengeModal({
                 </header>
 
                 <form onSubmit={onSubmit} className="overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
-                    <div className="grid grid-cols-2 divide-x divide-[#eadbd2] rounded-xl border border-[#e4d4ca] bg-white">
-                        <div className="min-w-0 px-3 py-3.5 sm:px-4">
+                    <div className="grid gap-0 overflow-hidden rounded-xl border border-[#e4d4ca] bg-white sm:grid-cols-[1.35fr_1fr] sm:divide-x sm:divide-[#eadbd2]">
+                        <div className="min-w-0 border-b border-[#eadbd2] px-4 py-3.5 sm:border-b-0">
                             <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.08em] text-[#8a776b]">
                                 <Clock3 className="h-3.5 w-3.5" />
                                 Resolves
                             </div>
-                            <p className="mt-1 truncate text-base font-black text-[#201a16] sm:text-lg">
-                                {isPriceFeedResolution ? resolveCountdown : "After the match"}
+                            <p className="mt-1 text-base font-black leading-tight text-[#201a16] sm:text-lg">
+                                {resolveCountdown || "Resolution pending"}
                             </p>
-                            <p className="mt-0.5 truncate text-xs font-medium text-[#786a61]" title={resolveLabel}>
-                                {isPriceFeedResolution ? resolveLabel : "Community verified"}
+                            <p className="mt-1 text-xs font-medium leading-snug text-[#786a61]">
+                                {resolveLabel || "The result will be verified after the challenge ends."}
                             </p>
                         </div>
-                        <div className="px-3 py-3.5 sm:px-4">
+                        <div className="px-4 py-3.5">
                             <p className="text-xs font-bold uppercase tracking-[0.08em] text-[#8a776b]">Minimum</p>
                             <p className="mt-1 text-base font-black text-[#201a16] sm:text-lg">
                                 {minAcceptBet ?? 0} {betCurrency}
                             </p>
-                            <p className="mt-0.5 text-xs font-medium text-[#786a61]">per entry</p>
+                            <p className="mt-0.5 text-xs font-medium text-[#786a61]">Match or raise the challenger&apos;s stake</p>
                         </div>
                     </div>
 
@@ -253,7 +267,7 @@ export function AcceptChallengeModal({
                                         type="button"
                                         onClick={() => onBetInputChange(String(amount))}
                                         disabled={isDisabled}
-                                        className={`rounded-lg border px-1 py-2 text-xs font-bold transition sm:text-sm ${isActive
+                                        className={`cursor-pointer rounded-lg border px-1 py-2 text-xs font-bold transition sm:text-sm ${isActive
                                             ? "border-[#11895a] bg-emerald-50 text-[#08764b]"
                                             : "border-[#e1d3ca] bg-white text-[#5d5048] hover:border-[#9d887b]"
                                             } disabled:cursor-not-allowed disabled:bg-[#f4efec] disabled:text-[#b5a8a0]`}
@@ -265,7 +279,7 @@ export function AcceptChallengeModal({
                             <button
                                 type="button"
                                 onClick={handleMaxClick}
-                                className="rounded-lg border border-[#e1d3ca] bg-white px-1 py-2 text-xs font-bold text-[#5d5048] transition hover:border-[#9d887b] sm:text-sm"
+                                className="cursor-pointer rounded-lg border border-[#e1d3ca] bg-white px-1 py-2 text-xs font-bold text-[#5d5048] transition hover:border-[#9d887b] sm:text-sm"
                             >
                                 Max
                             </button>
@@ -275,6 +289,26 @@ export function AcceptChallengeModal({
                             <p id="accept-challenge-error" className="mt-2 text-xs font-semibold text-red-600" role="alert">
                                 {displayedError}
                             </p>
+                        ) : null}
+
+                        {hasLowBalance ? (
+                            <div className="mt-3 flex flex-col gap-3 rounded-xl border border-amber-300 bg-amber-50 px-3.5 py-3 sm:flex-row sm:items-center">
+                                <CircleAlert className="h-5 w-5 shrink-0 text-amber-700" />
+                                <div className="min-w-0 flex-1">
+                                    <p className="text-sm font-black text-amber-950">More USDC needed</p>
+                                    <p className="text-xs font-medium text-amber-800">
+                                        Deposit at least {balanceShortfall.toLocaleString(undefined, { maximumFractionDigits: 6 })} more {betCurrency} to join with this stake.
+                                    </p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={handleDeposit}
+                                    className="inline-flex shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-[#201a16] px-3 py-2 text-xs font-black text-white transition hover:bg-black"
+                                >
+                                    <CircleDollarSign className="h-4 w-4" />
+                                    Deposit USDC
+                                </button>
+                            </div>
                         ) : null}
                     </div>
 
@@ -286,7 +320,7 @@ export function AcceptChallengeModal({
                                     type="button"
                                     onClick={() => onJoinSideChange("TEAM_A")}
                                     aria-pressed={joinSide === "TEAM_A"}
-                                    className={`rounded-lg px-3 py-2.5 text-sm font-bold transition ${joinSide === "TEAM_A"
+                                    className={`cursor-pointer rounded-lg px-3 py-2.5 text-sm font-bold transition ${joinSide === "TEAM_A"
                                         ? "bg-white text-[#08764b] shadow-sm ring-1 ring-black/5"
                                         : "text-[#6f6158] hover:text-[#302722]"
                                         }`}
@@ -297,7 +331,7 @@ export function AcceptChallengeModal({
                                     type="button"
                                     onClick={() => onJoinSideChange("TEAM_B")}
                                     aria-pressed={joinSide === "TEAM_B"}
-                                    className={`rounded-lg px-3 py-2.5 text-sm font-bold transition ${joinSide === "TEAM_B"
+                                    className={`cursor-pointer rounded-lg px-3 py-2.5 text-sm font-bold transition ${joinSide === "TEAM_B"
                                         ? "bg-white text-[#08764b] shadow-sm ring-1 ring-black/5"
                                         : "text-[#6f6158] hover:text-[#302722]"
                                         }`}
@@ -323,7 +357,7 @@ export function AcceptChallengeModal({
                                 href={escrowHref}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="inline-flex shrink-0 items-center gap-1 text-xs font-black text-[#08764b] hover:underline"
+                                className="inline-flex shrink-0 cursor-pointer items-center gap-1 text-xs font-black text-[#08764b] hover:underline"
                                 title={`View escrow ${escrowAddressDisplay}`}
                             >
                                 View escrow

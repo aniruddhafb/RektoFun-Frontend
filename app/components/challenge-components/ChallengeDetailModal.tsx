@@ -150,6 +150,10 @@ function ChallengeAcceptAction({ challenge, ctaState, canOpen, onOpenChange }: C
     openBetForm,
     closeBetForm,
     handleJoinChallenge,
+    challengeAction,
+    actionError,
+    handleChallengeAction,
+    ctaState: actionCtaState,
   } = useChallengeCard(challenge);
 
   React.useEffect(() => {
@@ -161,27 +165,33 @@ function ChallengeAcceptAction({ challenge, ctaState, canOpen, onOpenChange }: C
     event.preventDefault();
     await handleJoinChallenge();
   };
+  const displayedCtaState = challengeAction ? actionCtaState : ctaState;
 
   return (
     <>
       <div className="group relative flex-[2]">
         <button
           type="button"
-          disabled={ctaState.disabled || isLoading}
+          disabled={displayedCtaState.disabled || isLoading}
           onClick={(event) => {
-            if (!canOpen()) return;
-            openBetForm(event);
+            if (challengeAction) {
+              void handleChallengeAction(event);
+            } else {
+              if (!canOpen()) return;
+              openBetForm(event);
+            }
           }}
-          className={`${ctaState.className} detail-primary-action`}
+          className={`${displayedCtaState.className} detail-primary-action`}
         >
-          <span>{isLoading ? "Joining..." : cleanCtaLabel(ctaState.label)}</span>
-          {!ctaState.disabled && !isLoading && <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" strokeWidth={3} />}
+          <span>{isLoading ? "Processing..." : cleanCtaLabel(displayedCtaState.label)}</span>
+          {!displayedCtaState.disabled && !isLoading && <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" strokeWidth={3} />}
         </button>
-        {ctaState.showCreatorHint && (
+        {displayedCtaState.showCreatorHint && (
           <div className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 w-max -translate-x-1/2 border border-black bg-white px-2 py-1 text-[10px] font-bold text-black opacity-0 shadow-[2px_2px_0_#111] transition-opacity group-hover:opacity-100">
             Your challenge
           </div>
         )}
+        {actionError ? <p className="mt-1 text-center text-xs font-bold text-red-700">{actionError}</p> : null}
       </div>
 
       <AcceptChallengeModal
@@ -196,7 +206,6 @@ function ChallengeAcceptAction({ challenge, ctaState, canOpen, onOpenChange }: C
         escrowAddress={escrowAddress}
         resolveCountdown={exactCountdownDetails.exactCountdown}
         resolveLabel={exactCountdownDetails.dayLabel}
-        resolutionSource={challenge.resolution_source ?? undefined}
         isTeam={isTeam}
         joinSide={joinSide}
         onClose={() => closeBetForm()}
