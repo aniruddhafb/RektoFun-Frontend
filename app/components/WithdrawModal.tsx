@@ -11,6 +11,7 @@ import {
 } from "@solana/spl-token";
 import { ArrowUpFromLine, X } from "lucide-react";
 import { USDC_MINT, USDC_MULTIPLIER, getReadonlyConnection } from "@/app/lib/rektofun-program";
+import { getSolscanClusterQuery } from "@/app/lib/solana-config";
 import { fetchUsdcBalance as fetchUsdcTokenBalance } from "@/app/lib/token-balances";
 import { useBodyScrollLock } from "@/app/lib/useBodyScrollLock";
 
@@ -245,7 +246,7 @@ export function WithdrawModal({ isOpen, onClose }: WithdrawModalProps) {
             <p className="mb-3 break-all rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm font-semibold text-green-700">
               ✓ Transaction sent:{" "}
               <a
-                href={`https://explorer.solana.com/tx/${txSignature}?cluster=devnet`}
+                href={`https://explorer.solana.com/tx/${txSignature}${getSolscanClusterQuery()}`}
                 target="_blank"
                 rel="noreferrer"
                 className="underline"

@@ -17,7 +17,7 @@ import { Connection, Keypair, PublicKey, SystemProgram } from "@solana/web3.js";
 import bs58 from "bs58";
 import idl from "../target/idl/rektofun_program.json";
 
-const RPC_URL = process.env.RPC_URL || "https://api.devnet.solana.com";
+const RPC_URL = process.env.NEXT_PUBLIC_SOLANA_RPC_URL || "https://api.devnet.solana.com";
 const CONFIG_SEED = Buffer.from("config");
 const PROGRAM_ID = new PublicKey(idl.address);
 
@@ -26,7 +26,7 @@ async function main() {
   if (!privateKeyBase58) {
     throw new Error(
       "Set ADMIN_PRIVATE_KEY (base58 secret for the genesis admin wallet, " +
-        "same as used by app/lib/admin-signer.ts) to run this script."
+      "same as used by app/lib/admin-signer.ts) to run this script."
     );
   }
   const admin = Keypair.fromSecretKey(bs58.decode(privateKeyBase58));

@@ -1,3 +1,5 @@
+import { getSolscanClusterQuery } from "@/app/lib/solana-config";
+
 interface FeedbackBannerProps {
     rektTxSig: string | null;
     rektError: string | null;
@@ -17,7 +19,7 @@ export function FeedbackBanner({
                 <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-sm text-emerald-700">
                     ✅ You just REKT {targetCreator}…!{" "}
                     <a
-                        href={`https://explorer.solana.com/tx/${rektTxSig}?cluster=devnet`}
+                        href={`https://explorer.solana.com/tx/${rektTxSig}${getSolscanClusterQuery()}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="underline"
