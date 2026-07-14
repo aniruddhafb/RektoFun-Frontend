@@ -6,6 +6,7 @@ const RANGE_CONFIG = {
     "24H": { interval: "1h", limit: 24 },
     "7D": { interval: "4h", limit: 42 },
     "30D": { interval: "1d", limit: 30 },
+    "3M": { interval: "1d", limit: 90 },
 } as const;
 
 type ChartRange = keyof typeof RANGE_CONFIG;

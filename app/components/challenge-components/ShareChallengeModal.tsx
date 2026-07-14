@@ -180,7 +180,7 @@ export function ShareChallengeModal({ challenge, isOpen, onClose }: ShareChallen
 
   if (!isOpen) return null;
   return createPortal(
-    <div className="fixed inset-0 z-[300] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="share-challenge-title">
+    <div className="fixed inset-0 z-[10100] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="share-challenge-title">
       <button type="button" className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} aria-label="Close share card" />
       <div className="relative z-10 max-h-[94vh] w-full max-w-xl overflow-y-auto border-2 border-black bg-[#fff8f4] p-4 sm:p-5">
         <div className="mb-4 flex items-center justify-between">

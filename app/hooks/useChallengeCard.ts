@@ -2,7 +2,7 @@ import React from "react";
 import { useRouter } from "next/navigation";
 import { useAppKitAccount, useAppKitProvider } from "@reown/appkit/react";
 import { PublicKey, Transaction } from "@solana/web3.js";
-import { Challenge, getChallengeById } from "@/app/lib/challenges-service/challenges";
+import { Challenge, getChallengeById, getChallengeCategoryImage } from "@/app/lib/challenges-service/challenges";
 import { createPosition } from "@/app/lib/positions-service/positions";
 import { useUserStore } from "@/app/store/useUserStore";
 import {
@@ -14,6 +14,7 @@ import {
 } from "@/app/lib/rektofun-program";
 import { fetchUsdcBalance as fetchUsdcTokenBalance } from "@/app/lib/token-balances";
 import { stripUsdcQuote } from "@/app/lib/format-market-label";
+import { getUserByWallet } from "@/app/lib/users-service/users";
 
 interface ExactCountdownDetails {
   exactCountdown: string;
@@ -31,6 +32,72 @@ interface CTAButtonState {
 
 const GENERIC_ACCEPT_ERROR = "Something went wrong. Please try again.";
 
+type ProfileVerification = {
+  isVerified: boolean;
+  isModerator: boolean;
+};
+
+const verificationCache = new Map<string, ProfileVerification>();
+const verificationRequests = new Map<string, Promise<ProfileVerification>>();
+
+async function loadProfileVerification(walletAddress: string): Promise<ProfileVerification> {
+  const key = walletAddress.trim().toLowerCase();
+  const cached = verificationCache.get(key);
+  if (cached) return cached;
+
+  const pending = verificationRequests.get(key);
+  if (pending) return pending;
+
+  const request = getUserByWallet(walletAddress)
+    .then((profile) => {
+      const verification = {
+        isVerified: Boolean(profile.twitter_username || profile.user_type === "moderator"),
+        isModerator: profile.user_type === "moderator",
+      };
+      verificationCache.set(key, verification);
+      return verification;
+    })
+    .finally(() => verificationRequests.delete(key));
+
+  verificationRequests.set(key, request);
+  return request;
+}
+
+function useProfileVerification(
+  walletAddress: string,
+  twitterUsername?: string | null,
+  userType?: "user" | "moderator",
+): ProfileVerification {
+  const key = walletAddress.trim().toLowerCase();
+  const isKnownModerator = userType === "moderator";
+  const isKnownVerified = Boolean(twitterUsername || isKnownModerator);
+  const hasKnownVerificationData = twitterUsername !== undefined || userType !== undefined;
+  const cachedVerification = key ? verificationCache.get(key) : undefined;
+  const [resolvedVerification, setResolvedVerification] = React.useState<
+    (ProfileVerification & { key: string }) | null
+  >(null);
+
+  React.useEffect(() => {
+    if (!walletAddress || hasKnownVerificationData || cachedVerification) return;
+    let cancelled = false;
+    loadProfileVerification(walletAddress)
+      .then((verification) => {
+        if (!cancelled) setResolvedVerification({ key, ...verification });
+      })
+      .catch(() => {
+        if (!cancelled) setResolvedVerification({ key, isVerified: false, isModerator: false });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [cachedVerification, hasKnownVerificationData, key, walletAddress]);
+
+  return (hasKnownVerificationData ? { isVerified: isKnownVerified, isModerator: isKnownModerator } : null)
+    ?? cachedVerification
+    ?? (resolvedVerification?.key === key ? resolvedVerification : null)
+    ?? { isVerified: false, isModerator: false };
+}
+
 // Helper functions for date parsing and formatting
 function parseDateValue(value: string | number | null | undefined): number | null {
   if (typeof value === "number") {
@@ -40,6 +107,14 @@ function parseDateValue(value: string | number | null | undefined): number | nul
 
   const parsed = new Date(value).getTime();
   return Number.isNaN(parsed) ? null : parsed;
+}
+
+function parseResolutionDateValue(value: string | number | null | undefined): number | null {
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return parseDateValue(`${value}T23:59:59.999Z`);
+  }
+
+  return parseDateValue(value);
 }
 
 function formatCreatedTimeAgo(timestamp: number | null): string {
@@ -395,7 +470,7 @@ export function useChallengeCard(challenge: Challenge) {
 
   // Computed values
   const assetSymbol = challenge.ticker;
-  const assetIcon = "/scribbles/btc.png";
+  const assetIcon = getChallengeCategoryImage(challenge);
   const assetName = stripUsdcQuote(challenge.trading_pair || assetSymbol);
 
   const isPvpMode = challenge.mode !== "TEAM";
@@ -422,6 +497,16 @@ export function useChallengeCard(challenge: Challenge) {
   const hasOpponentInfo = Boolean(teamBHighestBet);
   const opponentProfileImage = teamBHighestBet?.profile_image || assetIcon;
   const opponentDisplayName = teamBHighestBet?.username || "Opponent";
+  const creatorVerification = useProfileVerification(
+    creatorWalletAddress,
+    teamAHighestBet ? teamAHighestBet.twitter_username : creatorDetails?.twitter_username,
+    teamAHighestBet ? teamAHighestBet.user_type : creatorDetails?.user_type,
+  );
+  const opponentVerification = useProfileVerification(
+    teamBHighestBet?.pubkey || "",
+    teamBHighestBet?.twitter_username,
+    teamBHighestBet?.user_type,
+  );
 
   const hasWon = false;
   const hasLost = false;
@@ -444,7 +529,13 @@ export function useChallengeCard(challenge: Challenge) {
   );
 
   const createdTimeText = formatCreatedTimeAgo(parseDateValue(challenge.created_at));
-  const resolveTimestamp = parseDateValue(challenge.resolution_date);
+  const composerMetadata = challenge.metadata?.composer;
+  const composerResolvesAt = typeof composerMetadata?.resolves_at === "string"
+    ? composerMetadata.resolves_at
+    : null;
+  const resolveTimestamp = parseDateValue(composerResolvesAt)
+    ?? parseDateValue(challenge.resolve_time)
+    ?? parseResolutionDateValue(challenge.resolution_date);
   const challengeEndTimeText = formatUtcDateTime(resolveTimestamp);
   const resolveDateByText = resolveTimestamp
     ? new Date(resolveTimestamp).toLocaleDateString("en-GB", {
@@ -601,10 +692,14 @@ export function useChallengeCard(challenge: Challenge) {
     creatorDisplayName,
     creatorProfileImage,
     creatorWalletAddress,
+    creatorIsVerified: creatorVerification.isVerified,
+    creatorIsModerator: creatorVerification.isModerator,
     opponentInfo,
     hasOpponentInfo,
     opponentProfileImage,
     opponentDisplayName,
+    opponentIsVerified: opponentVerification.isVerified,
+    opponentIsModerator: opponentVerification.isModerator,
     teamATotalBets,
     teamATotalAmount,
     teamBTotalBets,

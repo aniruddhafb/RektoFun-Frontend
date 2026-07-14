@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useAppKit, useAppKitAccount } from "@reown/appkit/react";
-import { Challenge } from "@/app/lib/challenges-service/challenges";
+import { Challenge, getChallengeCategoryImage } from "@/app/lib/challenges-service/challenges";
 import { User } from "@/app/lib/users-service/users";
 import { useUserStore } from "@/app/store/useUserStore";
 import { useBodyScrollLock } from "@/app/lib/useBodyScrollLock";
@@ -15,6 +15,30 @@ interface CTAState {
   isOngoing: boolean;
   showCreatorHint: boolean;
 }
+
+const parseTimestamp = (value: unknown): number | null => {
+  if (value === null || value === undefined || value === "") return null;
+  if (typeof value === "number" && Number.isFinite(value)) return value < 1e12 ? value * 1000 : value;
+  if (typeof value !== "string") return null;
+  const numeric = Number(value);
+  if (Number.isFinite(numeric) && value.trim() !== "") return numeric < 1e12 ? numeric * 1000 : numeric;
+  const parsed = new Date(value).getTime();
+  return Number.isNaN(parsed) ? null : parsed;
+};
+
+const parseCardDateValue = (value: unknown): number | null => {
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (typeof value !== "string" || !value) return null;
+  const parsed = new Date(value).getTime();
+  return Number.isNaN(parsed) ? null : parsed;
+};
+
+const parseCardResolutionDateValue = (value: unknown): number | null => {
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return parseCardDateValue(`${value}T23:59:59.999Z`);
+  }
+  return parseCardDateValue(value);
+};
 
 // Formatting utilities
 const formatEndsByCountdown = (timestamp: number | null, nowMs: number): string => {
@@ -83,7 +107,7 @@ export function useChallengeDetail(
   const [isTitleExpanded, setIsTitleExpanded] = useState(true);
 
   // Derived values
-  const assetLogo = "/scribbles/btc.png";
+  const assetLogo = challenge ? getChallengeCategoryImage(challenge) : "/scribbles/btc.png";
   const teamAHighestBet = challenge?.bet_info?.highest_bet?.TEAM_A;
   const teamBHighestBet = challenge?.bet_info?.highest_bet?.TEAM_B;
   const creatorName = teamAHighestBet?.username || creator?.username || "Creator";
@@ -98,12 +122,15 @@ export function useChallengeDetail(
   const hasOpponents = Boolean(teamBHighestBet) || Number(challenge?.participants ?? 0) > 1;
   const isTeam= challenge?.mode === "TEAM";
   const betAmount = challenge?.initial_bet ?? 0;
-  const createdTimestamp = challenge?.created_at ? new Date(challenge.created_at).getTime() : null;
-  const expiryTimestamp = challenge?.expiry ? new Date(challenge.expiry).getTime() : null;
-  const resolveTimestamp = challenge?.resolution_date ? new Date(challenge.resolution_date).getTime() : null;
+  const composerResolvesAt = challenge?.metadata?.composer?.resolves_at;
+  const createdTimestamp = parseTimestamp(challenge?.created_at);
+  const expiryTimestamp = parseTimestamp(challenge?.expiry) ?? parseTimestamp(challenge?.expire_time);
+  const resolveTimestamp = parseCardDateValue(composerResolvesAt)
+    ?? parseCardDateValue(challenge?.resolve_time)
+    ?? parseCardResolutionDateValue(challenge?.resolution_date);
 
   // Title expansion (backed by `statement`, the only challenge-text field available)
-  const challengeStatement = stripUsdcQuote(challenge?.statement);
+  const challengeStatement = stripUsdcQuote(challenge?.statement) || `Bet on ${challenge?.ticker || "this market"}`;
   const titleWords = challengeStatement.trim().split(/\s+/).filter(Boolean);
   const canExpandTitle = titleWords.length > 6;
   const displayedTitle = isTitleExpanded || !canExpandTitle
@@ -167,7 +194,8 @@ export function useChallengeDetail(
         ? "Trailing now"
         : "Neck and neck";
 
-  const isManualResolution = String(challenge?.resolution_source ?? "").toLowerCase() === "manual";
+  const resolutionMethod = String(challenge?.resolution_method || challenge?.resolution_source || "").toUpperCase();
+  const isManualResolution = resolutionMethod !== "PRICE_FEED";
   const isResolutionPending = challenge?.status === "PENDING_RESOLUTION";
   const isResolutionResolved = challenge?.status === "RESOLVED";
   const isAccepted = isResolutionPending || isResolutionResolved || hasOpponents;
@@ -438,6 +466,7 @@ export function useChallengeDetail(
     priceLabelThemeClass,
     isCreator,
     isExpireTimeAchieved,
+    isResolveTimeAchieved,
     hasWon,
     hasLost,
     isFinalOutcome,
@@ -450,6 +479,7 @@ export function useChallengeDetail(
     hideExpiresBox,
     timelineColumns,
     createdTimeText,
+    endsInText,
     resolvesInText,
     resolvesInSubtext,
     expiresInTextForBox,

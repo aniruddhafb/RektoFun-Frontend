@@ -30,6 +30,8 @@ export interface HighestBetEntry {
   profile_image: string;
   pubkey: string;
   bet: number;
+  twitter_username?: string | null;
+  user_type?: "user" | "moderator";
 }
 
 export interface HighestBets {
@@ -84,6 +86,7 @@ export interface Challenge {
   resolved_at: string;
   final_price: number;
   category?: string;
+  category_image?: string | null;
   created_at: string;
   bet_info?: BetInfo | null;
   market: {
@@ -93,6 +96,21 @@ export interface Challenge {
     parent_market_id: string;
     parent_id: string;
   };
+}
+
+export function getChallengeCategoryImage(challenge: Challenge): string {
+  const composer = challenge.metadata?.composer;
+  const metadataImage = typeof composer?.category_image === "string"
+    ? composer.category_image
+    : typeof composer?.image_url === "string"
+      ? composer.image_url
+      : "";
+
+  return challenge.category_image
+    || metadataImage
+    || challenge.market?.image
+    || challenge.market?.icon
+    || "/scribbles/btc.png";
 }
 
 export interface GetChallengesResponse {

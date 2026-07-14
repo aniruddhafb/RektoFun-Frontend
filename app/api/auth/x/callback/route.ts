@@ -77,7 +77,7 @@ export async function GET(request: NextRequest) {
     // variant so profile pages remain sharp at larger display sizes.
     const profileImage = xUser.data?.profile_image_url?.replace("_normal.", ".");
 
-    const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+    const apiBase = process.env.NEXT_PUBLIC_BE_API_URL || "http://localhost:8000/api";
     const updateResponse = await fetch(`${apiBase}/users/${session.userId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },

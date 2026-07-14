@@ -6,6 +6,7 @@ import { AcceptChallengeModal } from "./AcceptChallengeModal";
 import { useChallengeCard } from "@/app/hooks/useChallengeCard";
 import { Challenge } from "@/app/lib/challenges-service/challenges";
 import { ShareChallengeModal } from "./ShareChallengeModal";
+import { ProfileHoverPreview } from "./ProfileHoverPreview";
 
 interface ChallengeCardProps {
     challenge: Challenge;
@@ -26,6 +27,7 @@ export function ChallengeCard({
     showPin = true,
 }: ChallengeCardProps) {
     const [isShareModalOpen, setIsShareModalOpen] = React.useState(false);
+    const [activeProfilePreview, setActiveProfilePreview] = React.useState<"creator" | "opponent" | null>(null);
     const [viewOverrides, setViewOverrides] = React.useState<Record<number, number>>({});
     const viewCount = Math.max(challenge.views ?? 0, viewOverrides[challenge.id] ?? 0);
     const {
@@ -39,17 +41,20 @@ export function ChallengeCard({
         setJoinSide,
         openBetForm,
         closeBetForm,
-        openProfile,
         handleJoinChallenge,
         assetIcon,
         assetName,
         creatorDisplayName,
         creatorProfileImage,
         creatorWalletAddress,
+        creatorIsVerified,
+        creatorIsModerator,
         opponentInfo,
         hasOpponentInfo,
         opponentProfileImage,
         opponentDisplayName,
+        opponentIsVerified,
+        opponentIsModerator,
         teamATotalBets,
         teamATotalAmount,
         teamBTotalBets,
@@ -140,7 +145,7 @@ export function ChallengeCard({
     return (
         <>
             <div onClick={handleClick}
-                className="challenge-card-shell cursor-pointer group/card block overflow-hidden rounded-xl border border-gray-200 bg-[#fffaf6] p-3 transition-all duration-300 hover:-translate-y-0.5 hover:border-gray-300 hover:shadow-md sm:p-4"
+                className="challenge-card-shell group/card relative block cursor-pointer overflow-visible rounded-xl border border-gray-200 bg-[#fffaf6] p-3 transition-all duration-300 hover:z-40 hover:-translate-y-0.5 hover:border-gray-300 hover:shadow-md focus-within:z-40 sm:p-4"
             >
                 {/* Header */}
                 <div className="mb-3 flex items-start justify-between gap-2">
@@ -148,9 +153,10 @@ export function ChallengeCard({
                         <Image
                             src={assetIcon}
                             alt={assetName}
-                            width={32}
-                            height={32}
-                            className="w-8 h-8 object-contain"
+                            width={64}
+                            height={64}
+                            unoptimized
+                            className="h-10 w-10 shrink-0 object-contain sm:h-11 sm:w-11"
                         />
                         <div className="min-w-0">
                             <h3 className="break-words text-gray-900 leading-tight">
@@ -205,10 +211,10 @@ export function ChallengeCard({
                                             <span className="ml-1 inline-flex items-center gap-1 sm:ml-2 sm:gap-1.5">
                                                 <span className="text-sm font-bold text-emerald-900">{endsByCountdown}</span>
                                                 <span className="group relative inline-flex items-center">
-                                                    <svg className="w-3.5 h-3.5 text-emerald-600 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <svg className="h-3.5 w-3.5 cursor-help text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                                     </svg>
-                                                    <span className="absolute left-1/2 top-full z-10 mt-2 w-60 -translate-x-1/2 rounded-lg bg-gray-900 p-2 text-[11px] font-medium text-white opacity-0 invisible transition-all duration-200 group-hover:opacity-100 group-hover:visible normal-case leading-relaxed shadow-lg">
+                                                    <span className="invisible absolute left-1/2 top-full z-10 mt-2 w-60 -translate-x-1/2 rounded-lg bg-gray-900 p-2 text-[11px] font-medium normal-case leading-relaxed text-white opacity-0 shadow-lg transition-all duration-200 group-hover:visible group-hover:opacity-100">
                                                         <span className="block">Exact countdown: {exactCountdownDetails.exactCountdown}</span>
                                                         <span className="block">Time left: {exactCountdownDetails.timeLeftText}</span>
                                                         <span className="block">Resolves on: {exactCountdownDetails.dayLabel}</span>
@@ -241,7 +247,7 @@ export function ChallengeCard({
                 <div className="border-t border-gray-200 my-3"></div>
 
                 {/* Challenge Mode Info */}
-                <div  className="mb-4 flex items-center justify-center">
+                <div className="mb-4 flex items-center justify-center">
                     <div className="group relative inline-flex cursor-pointer">
                         <h2 className="border border-black bg-[#f5d547] px-3 py-1 text-xs font-black uppercase tracking-[0.12em] text-black hover:shadow-[2px_2px_0_#111]">
                             {isPvpMode ? "PVP Mode" : "Team Mode"}
@@ -261,8 +267,15 @@ export function ChallengeCard({
                     <div className="flex flex-row items-center justify-center gap-1.5 sm:gap-4">
                         {/* Challenger Profile */}
                         <div
-                            onClick={(e) => openProfile(e, creatorWalletAddress)}
-                            className="relative group flex flex-col items-center cursor-pointer"
+                            onMouseEnter={() => setActiveProfilePreview("creator")}
+                            onMouseLeave={() => setActiveProfilePreview(null)}
+                            onFocusCapture={() => setActiveProfilePreview("creator")}
+                            onBlurCapture={(event) => {
+                                if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                                    setActiveProfilePreview(null);
+                                }
+                            }}
+                            className={`relative group flex flex-col items-center ${activeProfilePreview === "creator" ? "z-30" : ""}`}
                         >
                             <div className={`challenge-card-profile-tile relative flex h-[132px] w-[98px] max-w-full flex-col items-center justify-center rounded-xl p-2 transition-all duration-300 sm:h-[140px] sm:w-[120px] sm:p-3 ${hasWon
                                 ? "bg-gradient-to-br from-amber-100 to-yellow-50 border-2 border-amber-400"
@@ -285,15 +298,17 @@ export function ChallengeCard({
                                 )}
 
                                 {/* Avatar */}
-                                <div className={`h-11 w-11 overflow-hidden rounded-full border-2 sm:h-14 sm:w-14 ${hasWon ? "border-amber-400" : "border-[#d4a574]"
-                                    } hover:shadow-md`}>
-                                    <Image
-                                        src={creatorProfileImage}
-                                        alt={creatorDisplayName}
-                                        width={56}
-                                        height={56}
-                                        className="w-full h-full object-cover"
-                                    />
+                                <div className="relative">
+                                    <div className={`h-11 w-11 overflow-hidden rounded-full border-2 sm:h-14 sm:w-14 ${hasWon ? "border-amber-400" : "border-[#d4a574]"}`}>
+                                        <Image
+                                            src={creatorProfileImage}
+                                            alt={creatorDisplayName}
+                                            width={56}
+                                            height={56}
+                                            className="w-full h-full object-cover"
+                                        />
+                                    </div>
+                                    {creatorIsVerified && <AvatarVerifiedBadge isModerator={creatorIsModerator} name={creatorDisplayName} />}
                                 </div>
                                 {/* Label */}
                                 <div className="mt-1 px-1.5 py-0.5 bg-[#2d1f1a] text-white text-[9px] font-bold rounded-full">
@@ -314,6 +329,15 @@ export function ChallengeCard({
                                     )}
                                 </div>
                             </div>
+
+                            {activeProfilePreview === "creator" && (
+                                <ProfileHoverPreview
+                                    walletAddress={creatorWalletAddress}
+                                    fallbackAvatar={creatorProfileImage}
+                                    fallbackName={creatorDisplayName}
+                                    align="left"
+                                />
+                            )}
 
                             {/* <button
                                 type="button"
@@ -380,8 +404,15 @@ export function ChallengeCard({
                         {/* opponent Profile */}
                         {hasOpponentInfo ? (
                             <div
-                                onClick={(e) => openProfile(e, opponentInfo?.wallet_address)}
-                                className="relative group flex flex-col items-center cursor-pointer"
+                                onMouseEnter={() => setActiveProfilePreview("opponent")}
+                                onMouseLeave={() => setActiveProfilePreview(null)}
+                                onFocusCapture={() => setActiveProfilePreview("opponent")}
+                                onBlurCapture={(event) => {
+                                    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                                        setActiveProfilePreview(null);
+                                    }
+                                }}
+                                className={`relative group flex flex-col items-center ${activeProfilePreview === "opponent" ? "z-30" : ""}`}
                             >
                                 <div className={`challenge-card-profile-tile flex h-[132px] w-[98px] max-w-full flex-col items-center justify-center rounded-xl p-2 transition-all duration-300 sm:h-[140px] sm:w-[120px] sm:p-3 ${hasLost
                                     ? "bg-gradient-to-br from-amber-100 to-yellow-50 border-2 border-amber-400"
@@ -397,15 +428,17 @@ export function ChallengeCard({
                                     )}
 
                                     {/* Avatar */}
-                                    <div className={`h-11 w-11 overflow-hidden rounded-full border-2 sm:h-14 sm:w-14 ${hasLost ? "border-amber-400" : "border-[#d4a574]"
-                                        } hover:shadow-md`}>
-                                        <Image
-                                            src={opponentProfileImage}
-                                            alt={opponentDisplayName}
-                                            width={56}
-                                            height={56}
-                                            className="w-full h-full object-cover"
-                                        />
+                                    <div className="relative">
+                                        <div className={`h-11 w-11 overflow-hidden rounded-full border-2 sm:h-14 sm:w-14 ${hasLost ? "border-amber-400" : "border-[#d4a574]"}`}>
+                                            <Image
+                                                src={opponentProfileImage}
+                                                alt={opponentDisplayName}
+                                                width={56}
+                                                height={56}
+                                                className="w-full h-full object-cover"
+                                            />
+                                        </div>
+                                        {opponentIsVerified && <AvatarVerifiedBadge isModerator={opponentIsModerator} name={opponentDisplayName} />}
                                     </div>
                                     {/* Count Badge */}
                                     {isTeam && teamBTotalBets > 1 && (
@@ -432,6 +465,14 @@ export function ChallengeCard({
                                         )}
                                     </div>
                                 </div>
+                                {activeProfilePreview === "opponent" && (
+                                    <ProfileHoverPreview
+                                        walletAddress={opponentInfo?.wallet_address}
+                                        fallbackAvatar={opponentProfileImage}
+                                        fallbackName={opponentDisplayName}
+                                        align="right"
+                                    />
+                                )}
                                 {!isExpireTimeAchieved && !isCreator && isTeam && (
                                     <button
                                         type="button"
@@ -452,9 +493,20 @@ export function ChallengeCard({
                         ) : (
                             /* Placeholder for pending state */
                             <div className="flex flex-col items-center">
-                                <div className="challenge-card-profile-tile relative flex h-[132px] w-[98px] max-w-full flex-col items-center justify-center rounded-xl border-2 border-dashed border-[#d4a574]/30 p-2 opponent-placeholder-bg sm:h-[140px] sm:w-[120px] sm:p-3">
-                                    <div className="opponent-placeholder-icon flex h-11 w-11 items-center justify-center rounded-full border-2 border-[#d4a574]/50 bg-gradient-to-br from-gray-200 to-gray-300 sm:h-14 sm:w-14">
-                                        <span className="text-xl">❓</span>
+                                <div className="challenge-card-profile-tile relative flex h-[132px] w-[98px] max-w-full flex-col items-center justify-center rounded-xl border-2 border-dashed border-[#d4a574]/30 p-2 transition-colors hover:border-[#e85a2d] hover:bg-[#fff1e8] hover:!shadow-none sm:h-[140px] sm:w-[120px] sm:p-3">
+                                    <div
+                                        className="flex h-11 w-11 items-center justify-center rounded-full border-2 border-[#d4a574]/50 bg-gradient-to-br from-gray-200 to-gray-300 sm:h-14 sm:w-14"
+                                        aria-label={isExpireTimeAchieved ? "No opponent joined" : "Searching for an opponent"}
+                                    >
+                                        <span className="inline-flex animate-pulse [animation-duration:1800ms]">
+                                            <Image
+                                                src="/Icons/search.png"
+                                                alt=""
+                                                width={40}
+                                                height={40}
+                                                className="h-8 w-8 object-contain sm:h-10 sm:w-10"
+                                            />
+                                        </span>
                                     </div>
                                     <div className="mt-1 px-1.5 py-0.5 bg-[#2d1f1a] text-white text-[9px] font-bold rounded-full">
                                         {isTeam ? " OPPONENTS" : "OPPONENT"}
@@ -616,36 +668,37 @@ export function ChallengeCard({
                 }}
                 onJoinSideChange={(side) => setJoinSide(side)}
             />
-            <style jsx>{`
-                .opponent-placeholder-bg {
-                    animation: opponent-bg-blink 1.5s ease-in-out infinite;
-                }
-
-                .opponent-placeholder-icon {
-                    animation: opponent-icon-blink 1.5s ease-in-out infinite;
-                }
-
-                @keyframes opponent-bg-blink {
-                    0%,
-                    100% {
-                        background-color: rgba(255, 255, 255, 0.4);
-                    }
-                    50% {
-                        background-color: rgba(255, 255, 255, 0.2);
-                    }
-                }
-
-                @keyframes opponent-icon-blink {
-                    0%,
-                    100% {
-                        opacity: 1;
-                    }
-                    50% {
-                        opacity: 0.65;
-                    }
-                }
-            `}</style>
             <ShareChallengeModal challenge={challenge} isOpen={isShareModalOpen} onClose={() => setIsShareModalOpen(false)} />
         </>
+    );
+}
+
+function AvatarVerifiedBadge({ isModerator, name }: { isModerator: boolean; name: string }) {
+    const label = isModerator ? `${name} is a verified KOL` : `${name} is verified on X`;
+
+    return (
+        <span
+            className="absolute -bottom-1 -right-1 z-10 flex h-4 w-4 items-center justify-center drop-shadow-sm sm:h-5 sm:w-5"
+            title={label}
+            aria-label={label}
+        >
+            <svg className="h-full w-full" viewBox="0 0 32 32" aria-hidden="true">
+                <path
+                    fill={isModerator ? "#F5B800" : "#378FDB"}
+                    stroke="white"
+                    strokeWidth="1.5"
+                    strokeLinejoin="round"
+                    d="M16 1.5l2.8 2.2 3.5-1 1.6 3.2 3.6.5.1 3.7 3 2-1.4 3.4 1.4 3.4-3 2-.1 3.7-3.6.5-1.6 3.2-3.5-1L16 30.5l-2.8-2.2-3.5 1-1.6-3.2-3.6-.5-.1-3.7-3-2 1.4-3.4-1.4-3.4 3-2 .1-3.7 3.6-.5 1.6-3.2 3.5 1L16 1.5Z"
+                />
+                <path
+                    d="m9.4 16.2 4.2 4.2 9-9"
+                    fill="none"
+                    stroke="white"
+                    strokeWidth="3.4"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                />
+            </svg>
+        </span>
     );
 }

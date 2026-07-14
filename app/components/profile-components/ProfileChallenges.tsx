@@ -8,7 +8,7 @@ interface ProfileChallengesProps {
     challenges: Challenge[];
     loading?: boolean;
     onChallengeClick: (challenge: Challenge) => void;
-    onCreateChallenge: () => void;
+    onCreateChallenge?: () => void;
 }
 
 export function ProfileChallenges({
@@ -62,14 +62,16 @@ export function ProfileChallenges({
                     </svg>
                 </div>
                 <h2 className="mt-6 text-xl font-black text-gray-950 sm:text-2xl">No challenges found</h2>
-                <button
-                    type="button"
-                    onClick={onCreateChallenge}
-                    className="mt-7 inline-flex cursor-pointer items-center justify-center border-2 border-black bg-white/70 px-6 py-3 text-sm font-black uppercase tracking-[0.08em] text-gray-800 shadow-[4px_4px_0_#e85a2d] transition-colors hover:bg-white focus:outline-none focus-visible:ring-4 focus-visible:ring-[#e85a2d]/25"
-                >
-                    <span className="mr-2 text-lg leading-none">+</span>
-                    Create a challenge
-                </button>
+                {onCreateChallenge && (
+                    <button
+                        type="button"
+                        onClick={onCreateChallenge}
+                        className="mt-7 inline-flex cursor-pointer items-center justify-center border-2 border-black bg-white/70 px-6 py-3 text-sm font-black uppercase tracking-[0.08em] text-gray-800 shadow-[4px_4px_0_#e85a2d] transition-colors hover:bg-white focus:outline-none focus-visible:ring-4 focus-visible:ring-[#e85a2d]/25"
+                    >
+                        <span className="mr-2 text-lg leading-none">+</span>
+                        Create a challenge
+                    </button>
+                )}
             </div>
         );
     }

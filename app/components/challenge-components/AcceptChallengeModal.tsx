@@ -11,6 +11,7 @@ import {
     X,
 } from "lucide-react";
 import { useBodyScrollLock } from "@/app/lib/useBodyScrollLock";
+import { getSolscanClusterQuery } from "@/app/lib/solana-config";
 
 interface AcceptChallengeModalProps {
     isOpen: boolean;
@@ -137,7 +138,7 @@ export function AcceptChallengeModal({
     }, [escrowAddress]);
     const escrowHref = React.useMemo(() => {
         if (!escrowAddress) return null;
-        return `https://solscan.io/account/${encodeURIComponent(escrowAddress)}?cluster=devnet`;
+        return `https://solscan.io/account/${encodeURIComponent(escrowAddress)}${getSolscanClusterQuery()}`;
     }, [escrowAddress]);
 
     if (!isOpen) return null;

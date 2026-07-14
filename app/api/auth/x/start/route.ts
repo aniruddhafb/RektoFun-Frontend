@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid wallet verification." }, { status: 401 });
   }
 
-  const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+  const apiBase = process.env.NEXT_PUBLIC_BE_API_URL || "http://localhost:8000/api";
   const userResponse = await fetch(`${apiBase}/users/${userId}`, { cache: "no-store" });
   if (!userResponse.ok) return NextResponse.json({ error: "User was not found." }, { status: 404 });
   const backendUser = await userResponse.json();

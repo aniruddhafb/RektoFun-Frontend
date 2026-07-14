@@ -325,7 +325,7 @@ export default function ProfilePage() {
                                 challenges={filteredChallenges}
                                 loading={challengesLoading}
                                 onChallengeClick={handleChallengeClick}
-                                onCreateChallenge={() => setIsCreateModalOpen(true)}
+                                onCreateChallenge={isOwnProfile ? () => setIsCreateModalOpen(true) : undefined}
                             />
                         )}
 
@@ -351,7 +351,7 @@ export default function ProfilePage() {
                 onClose={closeModal}
             />
             <CreateChallengeModal
-                isOpen={isCreateModalOpen}
+                isOpen={Boolean(isOwnProfile && isCreateModalOpen)}
                 onClose={() => setIsCreateModalOpen(false)}
                 onCreated={() => {
                     setIsCreateModalOpen(false);

@@ -5,8 +5,10 @@ import { createPortal } from "react-dom";
 import Image from "next/image";
 import {
   Activity,
+  ArrowRight,
   CalendarDays,
   Clock3,
+  Crosshair,
   Loader2,
   Share2,
   ShieldCheck,
@@ -18,12 +20,22 @@ import {
   Users,
   X,
 } from "lucide-react";
+import {
+  CandlestickSeries,
+  ColorType,
+  createChart,
+  CrosshairMode,
+  LineStyle,
+  type UTCTimestamp,
+} from "lightweight-charts";
 import { Challenge, incrementChallengeViews } from "@/app/lib/challenges-service/challenges";
 import { getUserById, User as UserType } from "@/app/lib/users-service/users";
 import { getPositionsByChallenge, Position } from "@/app/lib/positions-service/positions";
 import { useChallengeDetail } from "@/app/hooks/useChallengeDetail";
 import { useChallengeCard } from "@/app/hooks/useChallengeCard";
 import { AcceptChallengeModal } from "./AcceptChallengeModal";
+import { ProfileHoverPreview } from "./ProfileHoverPreview";
+import { ShareChallengeModal } from "./ShareChallengeModal";
 
 interface ChallengeDetailModalProps {
   challenge: Challenge | null;
@@ -58,6 +70,17 @@ type ParticipantView = {
   isModerator: boolean;
 };
 
+type BetActivityView = {
+  key: string;
+  name: string;
+  avatar: string;
+  wallet: string;
+  side: "TEAM_A" | "TEAM_B";
+  bet: number;
+  createdAt: string;
+  isCreator: boolean;
+};
+
 type MarketCandle = {
   time: number;
   open: number;
@@ -66,7 +89,7 @@ type MarketCandle = {
   close: number;
 };
 
-type ChartRange = "24H" | "7D" | "30D";
+type ChartRange = "24H" | "7D" | "30D" | "3M";
 
 const FALLBACK_AVATAR = "/scribbles/btc.png";
 
@@ -94,6 +117,16 @@ function formatPrice(value: number) {
     currency: "USD",
     maximumFractionDigits: value < 1 ? 6 : 2,
   }).format(Number.isFinite(value) ? value : 0);
+}
+
+function formatBetPlacedAt(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Time unavailable";
+  const today = new Date();
+  const sameDay = date.toDateString() === today.toDateString();
+  return date.toLocaleString("en-IN", sameDay
+    ? { hour: "numeric", minute: "2-digit" }
+    : { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
 }
 
 function ChallengeAcceptAction({ challenge, ctaState, canOpen, onOpenChange }: ChallengeAcceptActionProps) {
@@ -140,7 +173,8 @@ function ChallengeAcceptAction({ challenge, ctaState, canOpen, onOpenChange }: C
           }}
           className={`${ctaState.className} detail-primary-action`}
         >
-          {isLoading ? "Joining..." : cleanCtaLabel(ctaState.label)}
+          <span>{isLoading ? "Joining..." : cleanCtaLabel(ctaState.label)}</span>
+          {!ctaState.disabled && !isLoading && <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" strokeWidth={3} />}
         </button>
         {ctaState.showCreatorHint && (
           <div className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 w-max -translate-x-1/2 border border-black bg-white px-2 py-1 text-[10px] font-bold text-black opacity-0 shadow-[2px_2px_0_#111] transition-opacity group-hover:opacity-100">
@@ -178,6 +212,7 @@ function ChallengeAcceptAction({ challenge, ctaState, canOpen, onOpenChange }: C
 
 export default function ChallengeDetailModal({ challenge, creator, isOpen, onClose }: ChallengeDetailModalProps) {
   const [isAcceptModalOpen, setIsAcceptModalOpen] = React.useState(false);
+  const [isShareModalOpen, setIsShareModalOpen] = React.useState(false);
   const [participantState, setParticipantState] = React.useState<{
     key: string;
     rows: ParticipantRecord[];
@@ -189,7 +224,6 @@ export default function ChallengeDetailModal({ challenge, creator, isOpen, onClo
 
   const {
     modalRef,
-    shareFeedback,
     assetLogo,
     creatorName,
     creatorAvatar,
@@ -199,9 +233,11 @@ export default function ChallengeDetailModal({ challenge, creator, isOpen, onClo
     isDirectionalBelow,
     isManualResolution,
     isExpireTimeAchieved,
+    isResolveTimeAchieved,
     isResolutionPending,
     isResolutionResolved,
     createdTimeText,
+    endsInText,
     resolvesInText,
     expiresInTextForBox,
     statusLabel,
@@ -211,10 +247,9 @@ export default function ChallengeDetailModal({ challenge, creator, isOpen, onClo
     resolutionLabel,
     ctaState,
     handleCtaClick,
-    handleShareChallenge,
     openProfile,
     onClose: handleClose,
-  } = useChallengeDetail(challenge, resolvedCreator, isOpen && !isAcceptModalOpen, onClose);
+  } = useChallengeDetail(challenge, resolvedCreator, isOpen && !isAcceptModalOpen && !isShareModalOpen, onClose);
 
   React.useEffect(() => {
     if (!isOpen || challengeId === undefined) {
@@ -324,6 +359,41 @@ export default function ChallengeDetailModal({ challenge, creator, isOpen, onClo
     return [...grouped.values()].sort((a, b) => Number(b.isCreator) - Number(a.isCreator) || b.bet - a.bet);
   }, [challenge, creatorAvatar, creatorName, creatorWalletAddress, participantState, resolvedCreator]);
 
+  const betActivity = React.useMemo<BetActivityView[]>(() => {
+    if (!challenge) return [];
+    const creatorId = Number(challenge.creator_id ?? challenge.creator ?? 0);
+    const currentRows = participantState.key === String(challenge.id) ? participantState.rows : [];
+    const rows = currentRows.map(({ position, user }) => {
+      const isCreator = position.creator === creatorId;
+      const resolvedUser = user ?? (isCreator ? resolvedCreator : null);
+      return {
+        key: String(position.id),
+        name: resolvedUser?.username || (isCreator ? creatorName : `Player ${position.creator}`),
+        avatar: resolvedUser?.profile_image || (isCreator ? creatorAvatar : FALLBACK_AVATAR),
+        wallet: resolvedUser?.pubkey || resolvedUser?.wallet_address || (isCreator ? creatorWalletAddress : ""),
+        side: position.side === "TEAM_B" ? "TEAM_B" as const : "TEAM_A" as const,
+        bet: Number(position.bet || 0),
+        createdAt: position.created_at,
+        isCreator,
+      };
+    });
+
+    if (!rows.some((row) => row.isCreator) && Number(challenge.initial_bet || 0) > 0) {
+      rows.push({
+        key: `initial:${challenge.id}`,
+        name: creatorName,
+        avatar: creatorAvatar || FALLBACK_AVATAR,
+        wallet: creatorWalletAddress,
+        side: "TEAM_A",
+        bet: Number(challenge.initial_bet || 0),
+        createdAt: challenge.created_at,
+        isCreator: true,
+      });
+    }
+
+    return rows.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }, [challenge, creatorAvatar, creatorName, creatorWalletAddress, participantState, resolvedCreator]);
+
   if (!isOpen || !challenge) return null;
 
   const teamA = participants.filter((participant) => participant.side === "TEAM_A");
@@ -359,18 +429,41 @@ export default function ChallengeDetailModal({ challenge, creator, isOpen, onClo
 
         <div className="challenge-detail-scrollbar min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-3 pb-4 sm:p-5 sm:pb-5">
           <section className="border-2 border-black bg-white p-4 shadow-[3px_3px_0_#111] sm:p-5">
-            <div className="flex items-start gap-3 pr-11 sm:gap-4 sm:pr-12">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center border-2 border-black bg-[#fffaf6] p-2 sm:h-16 sm:w-16 sm:p-3">
-                <Image src={assetLogo} alt="" width={48} height={48} className="h-full w-full object-contain" />
-              </div>
+            <div className="flex flex-wrap items-center gap-1.5 pr-11 sm:pr-12">
+              <span className={`border px-2 py-1 text-[9px] font-black uppercase tracking-[0.08em] ${statusClassName}`}>{statusLabel}</span>
+              <span className="border border-black/15 bg-[#f7efe9] px-2 py-1 text-[9px] font-black uppercase tracking-[0.08em] text-[#5c4a42]">{challenge.ticker || (isSports ? "Sports" : "Market")}</span>
+              <span className="border border-black/15 bg-white px-2 py-1 text-[9px] font-black uppercase tracking-[0.08em] text-[#5c4a42]">{modeLabel}</span>
+            </div>
+
+            <div className="mt-3 flex items-center gap-3 pr-11 sm:gap-4 sm:pr-12">
+              <Image src={assetLogo} alt={challenge.ticker || "Challenge asset"} width={48} height={48} unoptimized className="h-10 w-10 shrink-0 object-contain sm:h-12 sm:w-12" />
               <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <span className={`border px-2 py-1 text-[9px] font-black uppercase tracking-[0.08em] ${statusClassName}`}>{statusLabel}</span>
-                  <span className="border border-black/15 bg-[#f7efe9] px-2 py-1 text-[9px] font-black uppercase tracking-[0.08em] text-[#5c4a42]">{challenge.ticker || (isSports ? "Sports" : "Market")}</span>
-                  <span className="border border-black/15 bg-white px-2 py-1 text-[9px] font-black uppercase tracking-[0.08em] text-[#5c4a42]">{modeLabel}</span>
-                </div>
-                <h2 id="challenge-detail-title" className="mt-2 break-words text-xl font-black leading-tight tracking-[-0.02em] text-[#17120f] sm:text-3xl">
-                  {primaryTitle}
+                <h2 id="challenge-detail-title" className="whitespace-nowrap text-lg font-black leading-tight tracking-tight text-gray-900 sm:text-xl">
+                  {isManualResolution || isResolveTimeAchieved ? (
+                    <span className="text-black">
+                      {primaryTitle}
+                    </span>
+                  ) : (
+                    <>
+                      <span className="text-black">
+                        {primaryTitle} In
+                      </span>
+                      <span className="ml-1 text-black">
+                        Next
+                        <span className="ml-1 inline-flex items-center gap-1 sm:ml-2 sm:gap-1.5">
+                          <span className="text-base font-bold text-emerald-900 sm:text-lg">{endsInText}</span>
+                          <span className="group relative inline-flex items-center">
+                            <svg className="h-3.5 w-3.5 cursor-help text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-label={`Challenge resolves in ${endsInText}`}>
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <span className="invisible absolute left-1/2 top-full z-40 mt-2 w-44 -translate-x-1/2 bg-gray-900 p-2 text-[10px] font-medium normal-case leading-relaxed text-white opacity-0 shadow-lg transition-all group-hover:visible group-hover:opacity-100">
+                              Resolves in {endsInText}
+                            </span>
+                          </span>
+                        </span>
+                      </span>
+                    </>
+                  )}
                 </h2>
               </div>
             </div>
@@ -396,7 +489,7 @@ export default function ChallengeDetailModal({ challenge, creator, isOpen, onClo
               </span>
               <span className="min-w-0">
                 <span className="block truncate text-xs font-black text-[#17120f]">{creatorName}</span>
-                <span className="block text-[9px] font-bold uppercase tracking-[0.08em] text-[#8b7a72]">Creator · {createdTimeText}</span>
+                <span className="block text-[9px] font-bold uppercase tracking-[0.08em] text-[#8b7a72]">{isTeam ? "Creator" : "Challenger"} · {createdTimeText}</span>
               </span>
             </button>
           </section>
@@ -422,7 +515,7 @@ export default function ChallengeDetailModal({ challenge, creator, isOpen, onClo
             <div className="mb-3 flex items-center justify-between gap-3">
               <h3 className="text-xs font-black uppercase tracking-[0.12em] text-[#8b7355] sm:text-sm">Participants</h3>
               <span className="inline-flex items-center gap-1 rounded-full border border-black/20 bg-[#fffaf6] px-2.5 py-1 text-[9px] font-bold text-[#5c4a42] sm:text-xs">
-                <Users className="h-3 w-3" /> {teamB.length ? (isTeam ? `${participants.length} joined` : "Matched") : "Waiting"}
+                <Users className="h-3 w-3" /> {participants.length} {participants.length === 1 ? "player" : "players"}
               </span>
             </div>
 
@@ -431,46 +524,56 @@ export default function ChallengeDetailModal({ challenge, creator, isOpen, onClo
                 <Loader2 className="h-5 w-5 animate-spin" />
               </div>
             ) : (
-              <div className="flex w-full items-center justify-center gap-2.5 py-1 max-[350px]:gap-1.5 sm:gap-5">
-                <ClassicParticipantCard
-                  participants={teamA}
-                  label={isTeam ? "Challengers" : "Challenger"}
-                  emptyTitle="Creator"
-                  subtitle={isTeam ? `${teamA.length} joined · ${formatMoney(teamAStake)}` : "Created challenge"}
-                  onOpenProfile={openProfile}
-                />
-
-                <div className="flex w-16 shrink-0 flex-col items-center justify-center sm:w-20">
-                  <span className={`flex h-10 w-10 items-center justify-center rounded-full border-2 text-[11px] font-black shadow-[2px_2px_0_rgba(0,0,0,.12)] sm:h-12 sm:w-12 ${teamB.length ? "border-black bg-[#2d1f1a] text-white" : "border-white bg-[#cbd0d8] text-white/70"}`}>
-                    {teamB.length ? "VS" : <User className="h-5 w-5 sm:h-6 sm:w-6" />}
-                  </span>
-                  <span className="mt-2 rounded-full bg-[#eee7df] px-2 py-1 text-center text-[9px] font-bold text-[#8b7355] sm:text-[10px]">
-                    {teamB.length ? "Live" : isExpireTimeAchieved ? "Expired" : "Seeking"}
+              <>
+                <div className="mb-3 flex items-center justify-center">
+                  <span className="border border-black bg-[#f5d547] px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-black shadow-[2px_2px_0_#111]">
+                    {modeLabel}
                   </span>
                 </div>
 
-                <ClassicParticipantCard
-                  participants={teamB}
-                  label={isTeam ? "Opponent side" : "Opponent"}
-                  emptyTitle="No one yet"
-                  subtitle={teamB.length ? (isTeam ? `${teamB.length} joined · ${formatMoney(teamBStake)}` : `${formatMoney(teamBStake)} staked`) : isExpireTimeAchieved ? "No opponent joined" : "Be the first to accept"}
-                  onOpenProfile={openProfile}
-                  dashed={!teamB.length}
-                />
-              </div>
+                <div className="flex w-full items-center justify-center gap-2.5 py-1 max-[350px]:gap-1.5 sm:gap-5">
+                  <ClassicParticipantCard
+                    participants={teamA}
+                    label={isTeam ? "Challengers" : "Challenger"}
+                    emptyTitle={isTeam ? "Creator" : "Challenger"}
+                    subtitle={isTeam ? `${teamA.length} joined · ${formatMoney(teamAStake)}` : formatMoney(teamAStake)}
+                    onOpenProfile={openProfile}
+                    align="left"
+                  />
+
+                  <div className="flex w-16 shrink-0 items-center justify-center sm:w-20">
+                    {teamB.length ? (
+                      <video
+                        src="/animations/Sword%20Battle.webm"
+                        autoPlay
+                        loop
+                        muted
+                        playsInline
+                        className="h-10 w-10 rounded-full bg-gradient-to-br from-[#2d1f1a] to-[#4a3830] object-contain p-1 sm:h-12 sm:w-12"
+                      />
+                    ) : (
+                      <Image src="/animations/versus.png" alt="Versus" width={60} height={60} className="h-14 w-14 object-contain" />
+                    )}
+                  </div>
+
+                  <ClassicParticipantCard
+                    participants={teamB}
+                    label={isTeam ? "Opponent side" : "Opponent"}
+                    emptyTitle="No one yet"
+                    subtitle={teamB.length ? (isTeam ? `${teamB.length} joined · ${formatMoney(teamBStake)}` : formatMoney(teamBStake)) : isExpireTimeAchieved ? "No opponent joined" : "Be the first to accept"}
+                    onOpenProfile={openProfile}
+                    dashed={!teamB.length}
+                    align="right"
+                  />
+                </div>
+
+                <BetActivityList activity={betActivity} onOpenProfile={openProfile} creatorLabel={isTeam ? "Creator" : "Challenger"} />
+              </>
             )}
           </section>
-
-          <div className="mt-3 flex items-center justify-between gap-3 border border-black/15 bg-[#fffaf6] px-3 py-2 text-[10px] font-bold text-[#75645c] sm:mt-4">
-            <span className="inline-flex items-center gap-1.5">
-              {isManualResolution ? <ShieldCheck className="h-3.5 w-3.5" /> : <Activity className="h-3.5 w-3.5" />}
-              {resolutionLabel}
-            </span>
-            <span>{challenge.views ?? 0} views</span>
-          </div>
         </div>
 
-        <footer className="flex shrink-0 gap-2 border-t-2 border-black bg-[#f3e1d7] p-3 sm:gap-3 sm:px-5">
+        <footer className="flex shrink-0 items-stretch gap-2 border-t-2 border-black bg-[#f3e1d7] p-3 sm:gap-3 sm:px-5">
           <ChallengeAcceptAction
             challenge={challenge}
             ctaState={cleanCtaState}
@@ -479,19 +582,25 @@ export default function ChallengeDetailModal({ challenge, creator, isOpen, onClo
           />
           <button
             type="button"
-            onClick={handleShareChallenge}
-            className="inline-flex h-11 flex-1 cursor-pointer items-center justify-center gap-2 border-2 border-black bg-white px-3 text-xs font-black text-black transition-colors hover:bg-[#f5d547] sm:max-w-44 sm:text-sm"
+            onClick={() => setIsShareModalOpen(true)}
+            className="group inline-flex h-14 flex-1 cursor-pointer items-center justify-center gap-2 border-2 border-black bg-white px-3 text-xs font-black uppercase tracking-[0.06em] text-black shadow-[2px_2px_0_#111] transition-all hover:-translate-y-0.5 hover:bg-[#f5d547] sm:max-w-48 sm:text-sm"
           >
-            <Share2 className="h-4 w-4" /> {shareFeedback ?? "Share"}
+            <Share2 className="h-4 w-4 transition-transform group-hover:rotate-[-8deg]" strokeWidth={2.5} /> Share
           </button>
         </footer>
+
+        <ShareChallengeModal
+          challenge={challenge}
+          isOpen={isShareModalOpen}
+          onClose={() => setIsShareModalOpen(false)}
+        />
 
         <style jsx global>{`
           .challenge-detail-scrollbar { scrollbar-width: thin; scrollbar-color: #8b7355 transparent; }
           .challenge-detail-scrollbar::-webkit-scrollbar { width: 4px; }
           .challenge-detail-scrollbar::-webkit-scrollbar-thumb { background: #8b7355; }
-          .pixel-shell .challenge-detail-modal .detail-primary-action {
-            height: 2.75rem !important;
+          .challenge-detail-modal .detail-primary-action {
+            height: 3.5rem !important;
             padding: 0 0.75rem !important;
             font-size: 0.875rem !important;
           }
@@ -523,7 +632,7 @@ function CryptoMarketPanel({ asset, target, direction }: {
   target?: number;
   direction: "above" | "below";
 }) {
-  const [range, setRange] = React.useState<ChartRange>("24H");
+  const [range, setRange] = React.useState<ChartRange>("3M");
   const [state, setState] = React.useState<{
     key: string;
     candles: MarketCandle[];
@@ -558,16 +667,15 @@ function CryptoMarketPanel({ asset, target, direction }: {
   const currentPrice = candles.at(-1)?.close ?? 0;
   const priceChange = firstPrice > 0 ? ((currentPrice - firstPrice) / firstPrice) * 100 : 0;
   const isPositive = priceChange >= 0;
-  const chart = React.useMemo(() => buildChart(candles, target), [candles, target]);
 
   return (
     <section className="overflow-hidden border-2 border-black bg-[#163f31] text-white shadow-[3px_3px_0_#111]">
       <div className="flex flex-wrap items-start justify-between gap-3 border-b border-white/15 px-4 py-3 sm:px-5">
         <div>
           <div className="flex items-center gap-2">
-            <span className="flex h-8 w-8 items-center justify-center border border-white/20 bg-white/10"><Activity className="h-4 w-4" /></span>
+            <span className="flex h-8 w-8 items-center justify-center border border-white/20 bg-white/10"><Crosshair className="h-4 w-4" /></span>
             <div>
-              <p className="text-[9px] font-black uppercase tracking-[0.12em] text-white/60">Market</p>
+              <p className="text-[9px] font-black uppercase tracking-[0.12em] text-white/60">Analyze market</p>
               <h3 className="text-lg font-black">{asset}</h3>
             </div>
           </div>
@@ -582,7 +690,7 @@ function CryptoMarketPanel({ asset, target, direction }: {
           )}
         </div>
         <div className="flex border border-white/20 bg-black/10 p-0.5">
-          {(["24H", "7D", "30D"] as const).map((option) => (
+          {(["24H", "7D", "30D", "3M"] as const).map((option) => (
             <button
               key={option}
               type="button"
@@ -595,70 +703,158 @@ function CryptoMarketPanel({ asset, target, direction }: {
         </div>
       </div>
 
-      <div className="relative h-48 p-3 sm:h-56 sm:p-4">
+      <div className="relative h-64 sm:h-72">
         {isLoading ? (
           <div className="flex h-full items-center justify-center text-white/60"><Loader2 className="h-5 w-5 animate-spin" /></div>
-        ) : state.failed || !chart ? (
+        ) : state.failed || candles.length < 2 ? (
           <div className="flex h-full flex-col items-center justify-center text-center text-white/60">
             <Activity className="h-6 w-6" />
             <p className="mt-2 text-xs font-bold">Chart unavailable for this asset</p>
           </div>
         ) : (
-          <>
-            <svg viewBox="0 0 640 190" preserveAspectRatio="none" className="h-full w-full" aria-label={`${asset} ${range} price chart`}>
-              <defs>
-                <linearGradient id="market-chart-area" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={isPositive ? "#34d399" : "#fb7185"} stopOpacity="0.38" />
-                  <stop offset="100%" stopColor={isPositive ? "#34d399" : "#fb7185"} stopOpacity="0" />
-                </linearGradient>
-              </defs>
-              {[25, 50, 75].map((y) => <line key={y} x1="0" x2="640" y1={y * 1.9} y2={y * 1.9} stroke="rgba(255,255,255,.1)" strokeWidth="1" />)}
-              <path d={chart.areaPath} fill="url(#market-chart-area)" />
-              {chart.targetY !== null && (
-                <line x1="0" x2="640" y1={chart.targetY} y2={chart.targetY} stroke="#f5d547" strokeWidth="1.5" strokeDasharray="6 5" />
-              )}
-              <path d={chart.linePath} fill="none" stroke={isPositive ? "#6ee7b7" : "#fda4af"} strokeWidth="3" vectorEffect="non-scaling-stroke" />
-              <circle cx={chart.lastX} cy={chart.lastY} r="5" fill="white" stroke={isPositive ? "#10b981" : "#f43f5e"} strokeWidth="3" vectorEffect="non-scaling-stroke" />
-            </svg>
-            {target && target > 0 && chart.targetY !== null && (
-              <span className="absolute right-3 border border-[#f5d547]/40 bg-[#f5d547] px-2 py-1 text-[9px] font-black text-black" style={{ top: `calc(${(chart.targetY / 190) * 100}% - 8px)` }}>
-                Target {direction} {formatPrice(target)}
-              </span>
-            )}
-          </>
+          <MarketCandlestickChart key={requestKey} candles={candles} asset={asset} target={target} direction={direction} />
         )}
       </div>
       <div className="flex items-center justify-between border-t border-white/15 px-4 py-2 text-[9px] font-bold uppercase tracking-[0.08em] text-white/50">
-        <span>Binance market data</span><span>{range}</span>
+        <span>Pan, zoom and hover to inspect · Binance data</span><span>{range}</span>
       </div>
     </section>
   );
 }
 
-function buildChart(candles: MarketCandle[], target?: number) {
-  if (candles.length < 2) return null;
-  const prices = candles.map((candle) => candle.close);
-  if (target && target > 0) prices.push(target);
-  const min = Math.min(...prices);
-  const max = Math.max(...prices);
-  const spread = max - min || Math.max(max * 0.01, 1);
-  const paddedMin = min - spread * 0.12;
-  const paddedMax = max + spread * 0.12;
-  const yFor = (price: number) => 180 - ((price - paddedMin) / (paddedMax - paddedMin)) * 170;
-  const points = candles.map((candle, index) => ({
-    x: (index / (candles.length - 1)) * 640,
-    y: yFor(candle.close),
-  }));
-  const linePath = points.map((point, index) => `${index === 0 ? "M" : "L"}${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(" ");
-  const areaPath = `${linePath} L640,190 L0,190 Z`;
-  const last = points.at(-1)!;
-  return {
-    linePath,
-    areaPath,
-    lastX: last.x,
-    lastY: last.y,
-    targetY: target && target > 0 ? yFor(target) : null,
+function MarketCandlestickChart({ candles, asset, target, direction }: {
+  candles: MarketCandle[];
+  asset: string;
+  target?: number;
+  direction: "above" | "below";
+}) {
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const chartApiRef = React.useRef<ReturnType<typeof createChart> | null>(null);
+  const [inspected, setInspected] = React.useState<MarketCandle>(() => candles.at(-1)!);
+
+  React.useEffect(() => {
+    const container = containerRef.current;
+    const validCandles = candles
+      .filter((candle) => [candle.time, candle.open, candle.high, candle.low, candle.close].every(Number.isFinite))
+      .map((candle) => ({
+        time: Math.floor(candle.time / 1000) as UTCTimestamp,
+        open: candle.open,
+        high: candle.high,
+        low: candle.low,
+        close: candle.close,
+      }));
+    if (!container || validCandles.length < 2) return;
+
+    const chartApi = createChart(container, {
+      autoSize: true,
+      layout: {
+        background: { type: ColorType.Solid, color: "#163f31" },
+        textColor: "rgba(255,255,255,.58)",
+        fontFamily: "inherit",
+        attributionLogo: true,
+      },
+      grid: {
+        vertLines: { color: "rgba(255,255,255,.07)" },
+        horzLines: { color: "rgba(255,255,255,.09)" },
+      },
+      crosshair: {
+        mode: CrosshairMode.Normal,
+        vertLine: { color: "rgba(255,255,255,.35)", labelBackgroundColor: "#246044" },
+        horzLine: { color: "rgba(255,255,255,.35)", labelBackgroundColor: "#246044" },
+      },
+      rightPriceScale: { borderColor: "rgba(255,255,255,.15)" },
+      timeScale: {
+        borderColor: "rgba(255,255,255,.15)",
+        timeVisible: true,
+        secondsVisible: false,
+        rightOffset: 1,
+        barSpacing: 10,
+        minBarSpacing: 1,
+      },
+      handleScroll: true,
+      handleScale: true,
+      localization: { priceFormatter: formatPrice },
+    });
+    chartApiRef.current = chartApi;
+    const series = chartApi.addSeries(CandlestickSeries, {
+      upColor: "#34d399",
+      downColor: "#fb7185",
+      borderUpColor: "#a7f3d0",
+      borderDownColor: "#fecdd3",
+      wickUpColor: "#6ee7b7",
+      wickDownColor: "#fda4af",
+      priceLineVisible: false,
+      lastValueVisible: true,
+    });
+    series.setData(validCandles);
+    series.createPriceLine({
+      price: validCandles.at(-1)!.close,
+      color: "rgba(255,255,255,.48)",
+      lineWidth: 1,
+      lineStyle: LineStyle.Dashed,
+      axisLabelVisible: true,
+      title: "CURRENT",
+    });
+    if (target && target > 0) {
+      series.createPriceLine({
+        price: target,
+        color: "#f5d547",
+        lineWidth: 2,
+        lineStyle: LineStyle.Dashed,
+        axisLabelVisible: true,
+        title: `${direction.toUpperCase()} TARGET`,
+      });
+    }
+
+    chartApi.subscribeCrosshairMove((param) => {
+      const point = param.seriesData.get(series) as { time?: number; open?: number; high?: number; low?: number; close?: number } | undefined;
+      if (!point || ![point.open, point.high, point.low, point.close].every((value) => typeof value === "number")) return;
+      setInspected({
+        time: Number(point.time || validCandles.at(-1)!.time) * 1000,
+        open: point.open!,
+        high: point.high!,
+        low: point.low!,
+        close: point.close!,
+      });
+    });
+    chartApi.timeScale().fitContent();
+
+    return () => {
+      chartApiRef.current = null;
+      chartApi.remove();
+    };
+  }, [candles, direction, target]);
+
+  const zoomChart = (factor: number) => {
+    const timeScale = chartApiRef.current?.timeScale();
+    const range = timeScale?.getVisibleLogicalRange();
+    if (!timeScale || !range) return;
+    const center = (range.from + range.to) / 2;
+    const halfRange = ((range.to - range.from) * factor) / 2;
+    timeScale.setVisibleLogicalRange({ from: center - halfRange, to: center + halfRange });
   };
+
+  const inspectedTime = new Date(inspected.time).toLocaleString("en-IN", {
+    day: "numeric",
+    month: "short",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+
+  return (
+    <div className="relative h-full w-full select-none" aria-label={`${asset} interactive candlestick chart`}>
+      <div ref={containerRef} className="h-full w-full" />
+      <div className="pointer-events-none absolute left-2 top-2 z-10 max-w-[calc(100%-8rem)] border border-white/20 bg-[#163f31]/90 px-2 py-1.5 text-[8px] font-bold text-white/65 shadow-sm sm:text-[9px]">
+        <span className="mr-2 text-white/90">{inspectedTime}</span>
+        <span>O {formatPrice(inspected.open)} · H {formatPrice(inspected.high)} · L {formatPrice(inspected.low)} · C {formatPrice(inspected.close)}</span>
+      </div>
+      <div className="absolute right-14 top-2 z-20 flex border border-white/20 bg-[#163f31]/90 p-0.5 shadow-sm" aria-label="Chart zoom controls">
+        <button type="button" onClick={() => zoomChart(1.35)} className="flex h-7 w-7 items-center justify-center text-sm font-black text-white/70 hover:bg-white/10 hover:text-white" aria-label="Zoom out">−</button>
+        <button type="button" onClick={() => zoomChart(0.72)} className="flex h-7 w-7 items-center justify-center border-x border-white/15 text-sm font-black text-white/70 hover:bg-white/10 hover:text-white" aria-label="Zoom in">+</button>
+        <button type="button" onClick={() => chartApiRef.current?.timeScale().fitContent()} className="flex h-7 items-center justify-center px-2 text-[8px] font-black uppercase text-white/70 hover:bg-white/10 hover:text-white" aria-label="Fit all candles">Fit</button>
+      </div>
+    </div>
+  );
 }
 
 function SportsOutcomePanel({ statusLabel, resolvesIn, isResolved, isResolving }: {
@@ -681,44 +877,58 @@ function SportsOutcomePanel({ statusLabel, resolvesIn, isResolved, isResolving }
   );
 }
 
-function ClassicParticipantCard({ participants, label, emptyTitle, subtitle, onOpenProfile, dashed = false }: {
+function ClassicParticipantCard({ participants, label, emptyTitle, subtitle, onOpenProfile, align, dashed = false }: {
   participants: ParticipantView[];
   label: string;
   emptyTitle: string;
   subtitle: string;
   onOpenProfile: (wallet: string | null | undefined) => void;
+  align: "left" | "right";
   dashed?: boolean;
 }) {
   const primary = participants[0];
   const visibleParticipants = participants.slice(0, 3);
+  const [activeParticipantKey, setActiveParticipantKey] = React.useState<string | null>(null);
+  const activeParticipant = participants.find((participant) => participant.key === activeParticipantKey);
 
   return (
-    <button
-      type="button"
-      disabled={!primary?.wallet}
-      onClick={() => onOpenProfile(primary?.wallet)}
-      className={`flex h-[132px] w-[98px] max-w-full shrink-0 flex-col items-center justify-center rounded-xl p-2 text-center transition-transform hover:-translate-y-0.5 disabled:cursor-default disabled:hover:translate-y-0 sm:h-[140px] sm:w-[120px] sm:p-3 ${dashed ? "border-2 border-dashed border-[#ead2c4] bg-[#fffaf6]" : "border-2 border-[#d4a574]/35 bg-white shadow-[0_5px_16px_rgba(77,48,32,.05)]"}`}
+    <div
+      onMouseLeave={() => setActiveParticipantKey(null)}
+      onBlurCapture={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setActiveParticipantKey(null);
+      }}
+      className={`relative flex h-[132px] w-[98px] max-w-full shrink-0 flex-col items-center justify-center rounded-xl p-2 text-center transition-transform hover:-translate-y-0.5 sm:h-[140px] sm:w-[120px] sm:p-3 ${activeParticipant ? "z-[70]" : ""} ${dashed ? "border-2 border-dashed border-[#ead2c4] bg-[#fffaf6]" : "border-2 border-[#d4a574]/35 bg-white shadow-[0_5px_16px_rgba(77,48,32,.05)]"}`}
     >
       {primary ? (
         <>
           <span className="relative flex h-12 w-full items-center justify-center sm:h-14">
             {visibleParticipants.map((participant, index) => (
-              <span
+              <button
                 key={participant.key}
-                className="absolute h-11 w-11 overflow-hidden rounded-full border-2 border-[#d4a574] bg-[#f5d547] shadow-sm sm:h-14 sm:w-14"
-                style={{ transform: `translateX(${(index - (visibleParticipants.length - 1) / 2) * 18}px)`, zIndex: 3 - index }}
+                type="button"
+                disabled={!participant.wallet}
+                onClick={() => onOpenProfile(participant.wallet)}
+                onMouseEnter={() => participant.wallet && setActiveParticipantKey(participant.key)}
+                onFocus={() => participant.wallet && setActiveParticipantKey(participant.key)}
+                aria-label={`Open ${participant.name}'s profile`}
+                className="absolute h-11 w-11 cursor-pointer rounded-full border-2 border-[#d4a574] bg-[#f5d547] shadow-sm transition-transform hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black disabled:cursor-default sm:h-14 sm:w-14"
+                style={{ transform: `translateX(${(index - (visibleParticipants.length - 1) / 2) * 18}px)`, zIndex: activeParticipantKey === participant.key ? 20 : 3 - index }}
               >
-                <Image src={participant.avatar || FALLBACK_AVATAR} alt="" width={56} height={56} className="h-full w-full object-cover" />
-              </span>
+                <span className="block h-full w-full overflow-hidden rounded-full">
+                  <Image src={participant.avatar || FALLBACK_AVATAR} alt={participant.name} width={56} height={56} className="h-full w-full object-cover" />
+                </span>
+                {participant.isVerified && (
+                  <span className="absolute -bottom-1 -right-1 z-10"><SmallVerifiedBadge isModerator={participant.isModerator} /></span>
+                )}
+              </button>
             ))}
-            {participants.length > 3 && <span className="absolute -right-1 -top-1 z-10 rounded-full border border-black bg-[#f5d547] px-1.5 py-0.5 text-[8px] font-black">+{participants.length - 3}</span>}
+            {participants.length > 3 && <span className="pointer-events-none absolute -right-1 -top-1 z-30 rounded-full border border-black bg-[#f5d547] px-1.5 py-0.5 text-[8px] font-black">+{participants.length - 3}</span>}
           </span>
           <span className="mt-1 inline-flex max-w-full items-center gap-1 rounded-full bg-[#2d1f1a] px-1.5 py-0.5 text-[8px] font-bold uppercase text-white sm:text-[9px]">
             {label}
           </span>
           <span className="mt-2 flex max-w-full items-center gap-1">
             <span className="truncate text-[10px] font-bold text-[#2d1f1a] sm:text-xs">{primary.name}</span>
-            {primary.isVerified && <SmallVerifiedBadge isModerator={primary.isModerator} />}
           </span>
         </>
       ) : (
@@ -729,7 +939,72 @@ function ClassicParticipantCard({ participants, label, emptyTitle, subtitle, onO
         </>
       )}
       <span className="mt-0.5 line-clamp-2 text-[8px] leading-tight text-[#8b7355] sm:text-[9px]">{subtitle}</span>
-    </button>
+      {activeParticipant && (
+        <ProfileHoverPreview
+          walletAddress={activeParticipant.wallet}
+          fallbackAvatar={activeParticipant.avatar || FALLBACK_AVATAR}
+          fallbackName={activeParticipant.name}
+          align={align}
+        />
+      )}
+    </div>
+  );
+}
+
+function BetActivityList({ activity, onOpenProfile, creatorLabel }: {
+  activity: BetActivityView[];
+  onOpenProfile: (wallet: string | null | undefined) => void;
+  creatorLabel: "Creator" | "Challenger";
+}) {
+  return (
+    <div className="mt-4 border-t border-black/10 pt-4">
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <div>
+          <h4 className="text-[10px] font-black uppercase tracking-[0.12em] text-[#5c4a42] sm:text-xs">Bet activity</h4>
+          <p className="mt-0.5 text-[9px] font-bold text-[#9a887f]">Who backed each side and when</p>
+        </div>
+        <span className="border border-black/15 bg-[#fffaf6] px-2 py-1 text-[9px] font-black text-[#75645c]">
+          {activity.length} {activity.length === 1 ? "bet" : "bets"}
+        </span>
+      </div>
+
+      {activity.length ? (
+        <div className="max-h-56 divide-y divide-black/10 overflow-y-auto border border-black/10 bg-[#fffaf6]">
+          {activity.map((bet) => (
+            <button
+              key={bet.key}
+              type="button"
+              disabled={!bet.wallet}
+              onClick={() => onOpenProfile(bet.wallet)}
+              className="flex w-full items-center gap-2.5 px-2.5 py-2.5 text-left transition-colors hover:bg-[#fdf1e9] disabled:cursor-default sm:gap-3 sm:px-3"
+            >
+              <span className="h-8 w-8 shrink-0 overflow-hidden rounded-full border-2 border-[#d4a574] bg-[#f5d547]">
+                <Image src={bet.avatar || FALLBACK_AVATAR} alt="" width={32} height={32} className="h-full w-full object-cover" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="flex min-w-0 items-center gap-1.5">
+                  <span className="truncate text-[11px] font-black text-[#2d1f1a] sm:text-xs">{bet.name}</span>
+                  {bet.isCreator && <span className="shrink-0 bg-[#2d1f1a] px-1.5 py-0.5 text-[7px] font-black uppercase text-white">{creatorLabel}</span>}
+                </span>
+                <span className="mt-0.5 block text-[9px] font-bold text-[#8b7355]">
+                  Backed {bet.side === "TEAM_A" ? "challenger" : "opponent"}
+                </span>
+              </span>
+              <span className="shrink-0 text-right">
+                <span className="block text-[11px] font-black text-emerald-700 sm:text-xs">{formatMoney(bet.bet)}</span>
+                <span className="mt-0.5 flex items-center justify-end gap-1 text-[8px] font-bold text-[#8b7a72] sm:text-[9px]">
+                  <Clock3 className="h-2.5 w-2.5" /> {formatBetPlacedAt(bet.createdAt)}
+                </span>
+              </span>
+            </button>
+          ))}
+        </div>
+      ) : (
+        <div className="border border-dashed border-black/20 bg-[#fffaf6] px-3 py-5 text-center text-[10px] font-bold text-[#8b7a72]">
+          Bet activity will appear here when players join.
+        </div>
+      )}
+    </div>
   );
 }
 

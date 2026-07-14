@@ -7,14 +7,20 @@ import {
     ArrowLeft,
     CalendarDays,
     Check,
+    ChevronDown,
     CircleDollarSign,
     Clock3,
     Coins,
+    Crosshair,
+    Info,
     Loader2,
+    Lock,
     MessageSquareText,
     ShieldCheck,
     Swords,
     Trophy,
+    TrendingDown,
+    TrendingUp,
     Eye,
     Users,
     Wallet,
@@ -24,11 +30,24 @@ import {
 import { useUserStore } from "@/app/store/useUserStore";
 import { useBodyScrollLock } from "@/app/lib/useBodyScrollLock";
 import { useAppKit, useAppKitAccount, useAppKitProvider } from "@reown/appkit/react";
+import {
+    CandlestickSeries,
+    ColorType,
+    createChart,
+    CrosshairMode,
+    LineSeries,
+    LineStyle,
+    type IPriceLine,
+    type ISeriesApi,
+    type UTCTimestamp,
+} from "lightweight-charts";
 import { getParentCategories, getCategoriesByParent, Category } from "@/app/lib/category-service/category";
-import { createChallenge } from "@/app/lib/challenges-service/challenges";
+import { createChallenge, type Challenge } from "@/app/lib/challenges-service/challenges";
 import { Transaction } from "@solana/web3.js";
 import { getReadonlyConnection } from "@/app/lib/rektofun-program";
 import { stripUsdcQuote } from "@/app/lib/format-market-label";
+import { ChallengeCard } from "./ChallengeCard";
+import type { User } from "@/app/lib/users-service/users";
 
 interface CreateChallengeModalProps {
     isOpen: boolean;
@@ -40,17 +59,30 @@ type TxStatus = "idle" | "building" | "signing" | "confirming" | "success" | "er
 type MarketType = "crypto" | "sports";
 type ChallengeFormat = "price" | "statement";
 type ChallengeMode = "pvp" | "team";
-type ComposerPanel = "topic" | "stake" | "timing" | "players" | null;
+type ChartRange = "24H" | "7D" | "30D" | "3M";
+type ComposerPanel = "topic" | "stake" | "window" | "resolution" | "players" | null;
+type MarketCandle = {
+    time: number;
+    open: number;
+    high: number;
+    low: number;
+    close: number;
+};
 type AssetPriceState = {
     key: string;
     asset: string;
     currentPrice: number | null;
+    candles: MarketCandle[];
     status: "ready" | "failed";
 };
 
 const MAX_STATEMENT_LENGTH = 220;
 const MIN_DURATION_MINUTES = 5;
 const MAX_DURATION_MINUTES = 7 * 24 * 60;
+const DEFAULT_BET_AMOUNT = 5;
+const DEFAULT_DURATION_MINUTES = 24 * 60;
+const DEFAULT_RESOLUTION_DELAY_MS = 7 * 24 * 60 * 60 * 1000;
+const DEFAULT_CHART_RANGE: ChartRange = "3M";
 
 const formatDuration = (duration: { hours: number; minutes: number }) => {
     const totalMinutes = duration.hours * 60 + duration.minutes;
@@ -102,18 +134,21 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
     const [challengeFormat, setChallengeFormat] = useState<ChallengeFormat>("price");
     const [challengeMode, setChallengeMode] = useState<ChallengeMode>("pvp");
     const [statement, setStatement] = useState("");
-    const [betAmount, setBetAmount] = useState(1);
+    const [betAmount, setBetAmount] = useState(DEFAULT_BET_AMOUNT);
     const [predictionDirection, setPredictionDirection] = useState<"Above" | "Below">("Above");
     const [predictionPrice, setPredictionPrice] = useState("");
+    const [chartRange, setChartRange] = useState<ChartRange>(DEFAULT_CHART_RANGE);
+    const [isAdvancedPickerOpen, setIsAdvancedPickerOpen] = useState(false);
     const [assetPriceState, setAssetPriceState] = useState<AssetPriceState>({
         key: "",
         asset: "",
         currentPrice: null,
+        candles: [],
         status: "failed",
     });
-    const [selectedDate, setSelectedDate] = useState(() => new Date(Date.now() + 24 * 60 * 60 * 1000));
+    const [selectedDate, setSelectedDate] = useState(() => new Date(Date.now() + DEFAULT_RESOLUTION_DELAY_MS));
     const [composerNow] = useState(() => Date.now());
-    const [duration, setDuration] = useState({ hours: 4, minutes: 0 });
+    const [duration, setDuration] = useState(() => durationFromMinutes(DEFAULT_DURATION_MINUTES));
 
     const [activePanel, setActivePanel] = useState<ComposerPanel>(null);
     const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -148,6 +183,7 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
                 setActivePanel(null);
                 return;
             }
+            setIsAdvancedPickerOpen(false);
             onClose();
         };
 
@@ -174,7 +210,9 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
                 setSelectedChildCategory((current) =>
                     current?.parent_category?.trim().toLowerCase() === currentMarket
                         ? current
-                        : children[0] ?? null,
+                        : currentMarket === "crypto"
+                            ? children.find((category) => stripUsdcQuote(category.category).trim().toUpperCase() === "BTC") ?? children[0] ?? null
+                            : children[0] ?? null,
                 );
             } catch (error) {
                 if (cancelled) return;
@@ -228,7 +266,7 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
         .toUpperCase()
         .replace(/[^A-Z0-9]/g, "")
         .slice(0, 10);
-    const assetPriceRequestKey = `${selectedAssetSymbol}:${predictionDirection}`;
+    const assetPriceRequestKey = `${selectedAssetSymbol}:${chartRange}`;
     const isAssetPriceLoading = isPriceFeed
         && Boolean(selectedAssetSymbol)
         && assetPriceState.key !== assetPriceRequestKey;
@@ -238,17 +276,15 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
         && assetPriceState.status === "failed";
     const generatedStatement = `${stripUsdcQuote(selectedChildCategory?.category) || "Asset"} ${predictionDirection.toLowerCase()} ${formatPrice(predictionPrice)}`;
     const totalDurationMinutes = duration.hours * 60 + duration.minutes;
-    const estimatedPvpPool = betAmount * 2;
-    const estimatedPayout = estimatedPvpPool * 0.98;
 
     useEffect(() => {
         if (!isOpen || !isPriceFeed || !selectedAssetSymbol) return;
         let cancelled = false;
 
-        fetch(`/api/market-chart?asset=${encodeURIComponent(selectedAssetSymbol)}&range=24H`)
+        fetch(`/api/market-chart?asset=${encodeURIComponent(selectedAssetSymbol)}&range=${chartRange}`)
             .then(async (response) => {
                 if (!response.ok) throw new Error("Asset price unavailable");
-                return response.json() as Promise<{ candles: Array<{ close: number }> }>;
+                return response.json() as Promise<{ candles: MarketCandle[] }>;
             })
             .then((data) => {
                 const currentPrice = Number(data.candles.at(-1)?.close);
@@ -257,12 +293,17 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
                 }
                 if (cancelled) return;
 
-                const targetPrice = currentPrice * (predictionDirection === "Above" ? 1.1 : 0.9);
-                setPredictionPrice(targetPriceInputValue(targetPrice));
+                setPredictionPrice((currentTarget) => {
+                    const parsedTarget = Number(currentTarget);
+                    return Number.isFinite(parsedTarget) && parsedTarget > 0
+                        ? currentTarget
+                        : targetPriceInputValue(currentPrice * 1.1);
+                });
                 setAssetPriceState({
                     key: assetPriceRequestKey,
                     asset: selectedAssetSymbol,
                     currentPrice,
+                    candles: data.candles,
                     status: "ready",
                 });
             })
@@ -273,6 +314,7 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
                     key: assetPriceRequestKey,
                     asset: selectedAssetSymbol,
                     currentPrice: null,
+                    candles: [],
                     status: "failed",
                 });
             });
@@ -280,7 +322,7 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
         return () => {
             cancelled = true;
         };
-    }, [assetPriceRequestKey, isOpen, isPriceFeed, predictionDirection, selectedAssetSymbol]);
+    }, [assetPriceRequestKey, chartRange, isOpen, isPriceFeed, selectedAssetSymbol]);
 
     const validateForm = ({ requireProfile = true }: { requireProfile?: boolean } = {}) => {
         if (marketType === "crypto" && !selectedChildCategory) {
@@ -300,7 +342,7 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
             return "Minimum stake is 1 USDC.";
         }
         if (totalDurationMinutes < MIN_DURATION_MINUTES || totalDurationMinutes > MAX_DURATION_MINUTES) {
-            setActivePanel("timing");
+            setActivePanel("window");
             return "Join window must be between 5 minutes and 7 days.";
         }
         if (requireProfile && !user?.id) return "Finish your profile before creating a challenge.";
@@ -414,6 +456,8 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
                         market: marketType,
                         format: isPriceFeed ? "price" : "statement",
                         topic,
+                        category_image: selectedChildCategory?.image_url || "",
+                        resolves_at: new Date(resolvesAt * 1000).toISOString(),
                     },
                 },
                 creator: user!.id,
@@ -435,10 +479,12 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
             setChallengeMode("pvp");
             setStatement("");
             setPredictionPrice("");
-            setBetAmount(1);
+            setChartRange(DEFAULT_CHART_RANGE);
+            setIsAdvancedPickerOpen(false);
+            setBetAmount(DEFAULT_BET_AMOUNT);
             setSelectedChildCategory(null);
-            setDuration({ hours: 4, minutes: 0 });
-            setSelectedDate(new Date(Date.now() + 24 * 60 * 60 * 1000));
+            setDuration(durationFromMinutes(DEFAULT_DURATION_MINUTES));
+            setSelectedDate(new Date(Date.now() + DEFAULT_RESOLUTION_DELAY_MS));
             setActivePanel(null);
             setIsPreviewOpen(false);
             onCreated();
@@ -463,6 +509,7 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
                 onClick={() => {
                     if (isSubmitting) return;
                     setIsPreviewOpen(false);
+                    setIsAdvancedPickerOpen(false);
                     setActivePanel(null);
                     onClose();
                 }}
@@ -492,6 +539,7 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
                         onClick={() => {
                             if (isSubmitting) return;
                             setIsPreviewOpen(false);
+                            setIsAdvancedPickerOpen(false);
                             setActivePanel(null);
                             onClose();
                         }}
@@ -515,14 +563,28 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
                                 >
                                     <Coins className="h-3.5 w-3.5" /> Crypto
                                 </button>
-                                <button
-                                    type="button"
-                                    onClick={() => switchMarket("sports")}
-                                    className={`inline-flex h-8 items-center justify-center gap-1.5 px-3 text-xs font-black transition-colors ${marketType === "sports" ? "bg-black text-white" : "text-[#594b44] hover:bg-white/70"}`}
-                                    aria-pressed={marketType === "sports"}
+                                <span
+                                    className="group relative h-8"
+                                    tabIndex={0}
+                                    aria-label="Sports, coming soon"
                                 >
-                                    <Trophy className="h-3.5 w-3.5" /> Sports
-                                </button>
+                                    <button
+                                        type="button"
+                                        disabled
+                                        aria-describedby="sports-coming-soon"
+                                        className="inline-flex h-full w-full cursor-not-allowed items-center justify-center gap-1.5 px-3 text-xs font-black text-[#594b44] opacity-45"
+                                    >
+                                        <Lock className="h-3 w-3" aria-hidden="true" />
+                                        <Trophy className="h-3.5 w-3.5" /> Sports
+                                    </button>
+                                    <span
+                                        id="sports-coming-soon"
+                                        role="tooltip"
+                                        className="pointer-events-none absolute left-1/2 top-full z-20 mt-2 -translate-x-1/2 whitespace-nowrap border border-black bg-black px-2 py-1 text-[9px] font-black uppercase tracking-[0.08em] text-white opacity-0 shadow-[2px_2px_0_#e85a2d] transition-opacity group-hover:opacity-100 group-focus:opacity-100"
+                                    >
+                                        Coming soon
+                                    </span>
+                                </span>
                             </div>
 
                             {marketType === "crypto" && (
@@ -538,18 +600,28 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
                                     >
                                         <Activity className="h-3.5 w-3.5" /> Price
                                     </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setChallengeFormat("statement");
-                                            setFormError(null);
-                                            window.setTimeout(() => statementRef.current?.focus(), 0);
-                                        }}
-                                        className={`inline-flex h-8 items-center justify-center gap-1.5 px-2.5 text-[11px] font-black transition-colors ${challengeFormat === "statement" ? "bg-[#e85a2d] text-white" : "text-[#6d5d55] hover:bg-[#f3e1d7]"}`}
-                                        aria-pressed={challengeFormat === "statement"}
+                                    <span
+                                        className="group relative h-8"
+                                        tabIndex={0}
+                                        aria-label="Statement, coming soon"
                                     >
-                                        <MessageSquareText className="h-3.5 w-3.5" /> Statement
-                                    </button>
+                                        <button
+                                            type="button"
+                                            disabled
+                                            aria-describedby="statement-coming-soon"
+                                            className="inline-flex h-full w-full cursor-not-allowed items-center justify-center gap-1.5 px-2.5 text-[11px] font-black text-[#6d5d55] opacity-45"
+                                        >
+                                            <Lock className="h-3 w-3" aria-hidden="true" />
+                                            <MessageSquareText className="h-3.5 w-3.5" /> Statement
+                                        </button>
+                                        <span
+                                            id="statement-coming-soon"
+                                            role="tooltip"
+                                            className="pointer-events-none absolute left-1/2 top-full z-20 mt-2 -translate-x-1/2 whitespace-nowrap border border-black bg-black px-2 py-1 text-[9px] font-black uppercase tracking-[0.08em] text-white opacity-0 shadow-[2px_2px_0_#e85a2d] transition-opacity group-hover:opacity-100 group-focus:opacity-100"
+                                        >
+                                            Coming soon
+                                        </span>
+                                    </span>
                                 </div>
                             )}
 
@@ -638,11 +710,59 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
                                                 />
                                                 {isAssetPriceLoading && <Loader2 className="h-4 w-4 shrink-0 animate-spin text-[#8b7a72]" />}
                                                 {hasAssetPriceError && <span className="shrink-0 text-xs font-black text-[#e85a2d]" title="Price unavailable">!</span>}
-                                            </label>
-                                        </div>
-                                        <p className="mt-4 inline-flex items-center gap-1.5 text-xs font-bold text-[#7c6b63]">
-                                            <CalendarDays className="h-3.5 w-3.5 text-[#e85a2d]" /> by {formatDate(selectedDate)}
-                                        </p>
+                                             </label>
+                                         </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                if (!selectedAssetSymbol) {
+                                                    setActivePanel("topic");
+                                                    return;
+                                                }
+                                                setIsAdvancedPickerOpen((current) => !current);
+                                            }}
+                                            aria-expanded={isAdvancedPickerOpen}
+                                            className={`mt-3 flex w-full items-center justify-between gap-3 border px-3 py-2 text-left transition-colors ${isAdvancedPickerOpen ? "border-black bg-[#f5d547] text-black" : "border-black/15 bg-[#f8ede7] text-[#594b44] hover:border-black"}`}
+                                        >
+                                            <span className="flex min-w-0 items-center gap-2">
+                                                <Activity className="h-3.5 w-3.5 shrink-0" />
+                                                <span>
+                                                    <span className="block text-[10px] font-black uppercase tracking-[0.1em]">Advanced mode</span>
+                                                    <span className="mt-0.5 block text-[9px] font-bold opacity-65">
+                                                        {selectedAssetSymbol ? "Analyze candles and place a visual target" : "Choose an asset to open the chart"}
+                                                    </span>
+                                                </span>
+                                            </span>
+                                            <ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${isAdvancedPickerOpen ? "rotate-180" : ""}`} />
+                                        </button>
+                                        {isAdvancedPickerOpen && selectedAssetSymbol && (
+                                            <div className="mt-4">
+                                                {isAssetPriceLoading ? (
+                                                    <div className="flex h-44 items-center justify-center border-2 border-black/15 bg-[#f8ede7] text-[#8b7a72]">
+                                                        <Loader2 className="h-5 w-5 animate-spin" />
+                                                        <span className="ml-2 text-xs font-black">Loading market chart</span>
+                                                    </div>
+                                                ) : assetPriceState.status === "ready" && assetPriceState.currentPrice ? (
+                                                    <TargetPricePicker
+                                                        asset={selectedAssetSymbol}
+                                                        candles={assetPriceState.candles}
+                                                        currentPrice={assetPriceState.currentPrice}
+                                                        targetPrice={Number(predictionPrice)}
+                                                        direction={predictionDirection}
+                                                        range={chartRange}
+                                                        onRangeChange={setChartRange}
+                                                        onTargetChange={(nextTarget) => {
+                                                            setPredictionPrice(targetPriceInputValue(nextTarget));
+                                                            setPredictionDirection(nextTarget >= assetPriceState.currentPrice! ? "Above" : "Below");
+                                                            setFormError(null);
+                                                        }}
+                                                    />
+                                                ) : null}
+                                            </div>
+                                        )}
+                                         <p className="mt-4 inline-flex items-center gap-1.5 text-xs font-bold text-[#7c6b63]">
+                                             <CalendarDays className="h-3.5 w-3.5 text-[#e85a2d]" /> by {formatDate(selectedDate)}
+                                         </p>
                                     </div>
                                 ) : (
                                     <div>
@@ -669,24 +789,35 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
                                 <div className="-mr-3 mt-2 flex items-center gap-1.5 overflow-x-auto border-t border-black/10 pb-1 pr-3 pt-2.5 scrollbar-hide sm:mr-0 sm:mt-3 sm:pb-0 sm:pr-0 sm:pt-3" aria-label="Customize challenge">
                                     <ComposerButton
                                         icon={marketType === "crypto" ? Coins : Trophy}
+                                        caption="Asset"
                                         label={topicLabel}
                                         isActive={activePanel === "topic"}
                                         onClick={() => togglePanel("topic")}
                                     />
                                     <ComposerButton
                                         icon={CircleDollarSign}
+                                        caption="Stake"
                                         label={`${betAmount || 0} USDC`}
                                         isActive={activePanel === "stake"}
                                         onClick={() => togglePanel("stake")}
                                     />
                                     <ComposerButton
                                         icon={Clock3}
+                                        caption="Window"
                                         label={formatDuration(duration)}
-                                        isActive={activePanel === "timing"}
-                                        onClick={() => togglePanel("timing")}
+                                        isActive={activePanel === "window"}
+                                        onClick={() => togglePanel("window")}
+                                    />
+                                    <ComposerButton
+                                        icon={CalendarDays}
+                                        caption="Resolves by"
+                                        label={formatDate(selectedDate)}
+                                        isActive={activePanel === "resolution"}
+                                        onClick={() => togglePanel("resolution")}
                                     />
                                     <ComposerButton
                                         icon={challengeMode === "pvp" ? Swords : Users}
+                                        caption="Mode"
                                         label={challengeMode === "pvp" ? "1 vs 1" : "Teams"}
                                         isActive={activePanel === "players"}
                                         onClick={() => togglePanel("players")}
@@ -716,6 +847,7 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
                                                                 setSelectedChildCategory(category);
                                                                 if (marketType === "crypto" && category.id !== selectedChildCategory?.id) {
                                                                     setPredictionPrice("");
+                                                                    setPredictionDirection("Above");
                                                                 }
                                                                 setFormError(null);
                                                                 setActivePanel(null);
@@ -770,60 +902,65 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
                                                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-[#8b7a72]">USDC</span>
                                             </label>
                                         </div>
-                                        <p className="mt-3 text-[11px] font-bold text-[#77675f]">
+                                        {/* <p className="mt-3 text-[11px] font-bold text-[#77675f]">
                                             {challengeMode === "pvp"
                                                 ? `${estimatedPvpPool.toFixed(2)} USDC pot · ${estimatedPayout.toFixed(2)} to winner`
                                                 : `Pool starts at ${Number.isFinite(betAmount) ? betAmount : 0} USDC`}
-                                        </p>
+                                        </p> */}
                                     </div>
                                 )}
 
-                                {activePanel === "timing" && (
+                                {activePanel === "window" && (
                                     <div>
-                                        <PanelHeading>Timing</PanelHeading>
-                                        <div className="space-y-3">
-                                            <div>
-                                                <p className="mb-2 text-[9px] font-black uppercase tracking-[0.1em] text-[#8b7a72]">Join window</p>
-                                                <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
-                                                    {[
-                                                        { label: "15m", minutes: 15 },
-                                                        { label: "1h", minutes: 60 },
-                                                        { label: "4h", minutes: 240 },
-                                                        { label: "1d", minutes: 1440 },
-                                                        { label: "3d", minutes: 4320 },
-                                                        { label: "7d", minutes: 10080 },
-                                                    ].map((option) => (
-                                                        <button
-                                                            key={option.minutes}
-                                                            type="button"
-                                                            onClick={() => handleDurationChange(durationFromMinutes(option.minutes))}
-                                                            className={`h-9 min-w-0 border-2 px-2 text-xs font-black sm:min-w-12 sm:px-3 ${totalDurationMinutes === option.minutes ? "border-black bg-[#f5d547] shadow-[2px_2px_0_#111]" : "border-black/20 bg-white hover:border-black"}`}
-                                                        >
-                                                            {option.label}
-                                                        </button>
-                                                    ))}
-                            </div>
-                        </div>
-                                            <label className="block">
-                                                <span className="mb-2 block text-[9px] font-black uppercase tracking-[0.1em] text-[#8b7a72]">Resolves</span>
-                                                <span className="flex items-center gap-2 border-2 border-black/20 bg-white px-3 focus-within:border-black">
-                                                    <CalendarDays className="h-4 w-4 shrink-0 text-[#e85a2d]" />
-                                                    <input
-                                                        type="datetime-local"
-                                                        value={toDateTimeLocalValue(selectedDate)}
-                                                        min={toDateTimeLocalValue(new Date(composerNow + totalDurationMinutes * 60 * 1000))}
-                                                        onChange={(event) => handleResolutionDateChange(new Date(event.target.value))}
-                                                        className="create-challenge-date-input h-12 w-full min-w-0 flex-1 border-0 bg-transparent text-base font-black text-black outline-none sm:h-11 sm:text-xs"
-                                                    />
-                                                </span>
-                                            </label>
+                                        <PanelHeading info="The challenge expires in the selected window time, no participant can join and you will get refunded.">
+                                            Join window
+                                        </PanelHeading>
+                                        <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
+                                            {[
+                                                { label: "15m", minutes: 15 },
+                                                { label: "1h", minutes: 60 },
+                                                { label: "4h", minutes: 240 },
+                                                { label: "1d", minutes: 1440 },
+                                                { label: "3d", minutes: 4320 },
+                                                { label: "7d", minutes: 10080 },
+                                            ].map((option) => (
+                                                <button
+                                                    key={option.minutes}
+                                                    type="button"
+                                                    onClick={() => handleDurationChange(durationFromMinutes(option.minutes))}
+                                                    className={`h-9 min-w-0 border-2 px-2 text-xs font-black sm:min-w-12 sm:px-3 ${totalDurationMinutes === option.minutes ? "border-black bg-[#f5d547] shadow-[2px_2px_0_#111]" : "border-black/20 bg-white hover:border-black"}`}
+                                                >
+                                                    {option.label}
+                                                </button>
+                                            ))}
                                         </div>
+                                    </div>
+                                )}
+
+                                {activePanel === "resolution" && (
+                                    <div>
+                                        <PanelHeading info="The challenge will resolve on or before the selected time.">
+                                            Resolves by
+                                        </PanelHeading>
+                                        <label className="block">
+                                            <span className="sr-only">Resolution date and time</span>
+                                            <span className="flex items-center gap-2 border-2 border-black/20 bg-white px-3 focus-within:border-black">
+                                                <CalendarDays className="h-4 w-4 shrink-0 text-[#e85a2d]" />
+                                                <input
+                                                    type="datetime-local"
+                                                    value={toDateTimeLocalValue(selectedDate)}
+                                                    min={toDateTimeLocalValue(new Date(composerNow + totalDurationMinutes * 60 * 1000))}
+                                                    onChange={(event) => handleResolutionDateChange(new Date(event.target.value))}
+                                                    className="create-challenge-date-input h-12 w-full min-w-0 flex-1 border-0 bg-transparent text-base font-black text-black outline-none sm:h-11 sm:text-xs"
+                                                />
+                                            </span>
+                                        </label>
                                     </div>
                                 )}
 
                                 {activePanel === "players" && (
                                     <div>
-                                        <PanelHeading>Players</PanelHeading>
+                                        <PanelHeading>Select mode</PanelHeading>
                                         <div className="grid grid-cols-1 gap-2 min-[380px]:grid-cols-2">
                                             <button
                                                 type="button"
@@ -836,7 +973,7 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
                                                 <Swords className="h-5 w-5 shrink-0" />
                                                 <span>
                                                     <span className="block text-xs font-black">1 vs 1</span>
-                                                    <span className={`text-[10px] font-bold ${challengeMode === "pvp" ? "text-white/65" : "text-[#8b7a72]"}`}>One rival</span>
+                                                    <span className={`text-[10px] font-bold ${challengeMode === "pvp" ? "text-white/65" : "text-[#8b7a72]"}`}>PvP Mode</span>
                                                 </span>
                                             </button>
                                             <button
@@ -849,8 +986,8 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
                                             >
                                                 <Users className="h-5 w-5 shrink-0" />
                                                 <span>
-                                                    <span className="block text-xs font-black">Teams</span>
-                                                    <span className={`text-[10px] font-bold ${challengeMode === "team" ? "text-white/65" : "text-[#8b7a72]"}`}>Crowd vs crowd</span>
+                                                    <span className="block text-xs font-black">Team</span>
+                                                    <span className={`text-[10px] font-bold ${challengeMode === "team" ? "text-white/65" : "text-[#8b7a72]"}`}>Multiplayer Mode</span>
                                                 </span>
                                             </button>
                                         </div>
@@ -924,13 +1061,12 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
 
                         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 sm:p-5">
                             <ChallengePreview
-                                username={user?.username || "You"}
-                                isModerator={user?.user_type === "moderator"}
-                                twitterUsername={user?.twitter_username ?? null}
+                                user={user}
                                 marketType={marketType}
                                 isPriceFeed={isPriceFeed}
                                 challengeMode={challengeMode}
                                 pairTag={rawTopicLabel}
+                                categoryImage={selectedChildCategory?.image_url}
                                 title={isPriceFeed ? generatedStatement : statement.trim()}
                                 betAmount={betAmount}
                                 duration={duration}
@@ -1022,11 +1158,13 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
 
 function ComposerButton({
     icon: Icon,
+    caption,
     label,
     isActive,
     onClick,
 }: {
     icon: typeof Coins;
+    caption: string;
     label: string;
     isActive: boolean;
     onClick: () => void;
@@ -1036,13 +1174,365 @@ function ComposerButton({
             type="button"
             onClick={onClick}
             aria-pressed={isActive}
-            title={label}
-            className={`inline-flex h-8 shrink-0 items-center gap-1.5 border px-2.5 text-[10px] font-black transition-colors ${isActive ? "border-black bg-[#f5d547] text-black" : "border-black/15 bg-white text-[#6d5d55] hover:border-black hover:text-black"}`}
+            title={`${caption}: ${label}`}
+            className={`inline-flex h-11 shrink-0 items-center gap-2 border px-2.5 text-left transition-colors ${isActive ? "border-black bg-[#f5d547] text-black" : "border-black/15 bg-white text-[#6d5d55] hover:border-black hover:text-black"}`}
         >
-            <Icon className="h-3.5 w-3.5" />
-            <span className="max-w-24 truncate">{label}</span>
+            <Icon className="h-3.5 w-3.5 shrink-0" />
+            <span className="min-w-0">
+                <span className="block text-[8px] font-black uppercase leading-none tracking-[0.08em] opacity-60">
+                    {caption}
+                </span>
+                <span className="mt-1 block max-w-32 truncate text-[10px] font-black leading-none">
+                    {label}
+                </span>
+            </span>
         </button>
     );
+}
+
+function TargetPricePicker({
+    asset,
+    candles,
+    currentPrice,
+    targetPrice,
+    direction,
+    range,
+    onRangeChange,
+    onTargetChange,
+}: {
+    asset: string;
+    candles: MarketCandle[];
+    currentPrice: number;
+    targetPrice: number;
+    direction: "Above" | "Below";
+    range: ChartRange;
+    onRangeChange: (range: ChartRange) => void;
+    onTargetChange: (target: number) => void;
+}) {
+    const chartContainerRef = useRef<HTMLDivElement>(null);
+    const chartApiRef = useRef<ReturnType<typeof createChart> | null>(null);
+    const candleSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
+    const targetLineRef = useRef<IPriceLine | null>(null);
+    const onTargetChangeRef = useRef(onTargetChange);
+    const [interactionMode, setInteractionMode] = useState<"analyze" | "target">("analyze");
+    const selectedTarget = Number.isFinite(targetPrice) && targetPrice > 0 ? targetPrice : currentPrice;
+    const targetChange = currentPrice > 0 ? ((selectedTarget - currentPrice) / currentPrice) * 100 : 0;
+    const targetStateRef = useRef({ price: selectedTarget, direction });
+    const bounds = getTargetPriceBounds(candles, currentPrice);
+
+    useEffect(() => {
+        onTargetChangeRef.current = onTargetChange;
+    }, [onTargetChange]);
+
+    useEffect(() => {
+        targetStateRef.current = { price: selectedTarget, direction };
+        targetLineRef.current?.applyOptions({
+            price: selectedTarget,
+            title: `${direction.toUpperCase()} TARGET`,
+        });
+    }, [direction, selectedTarget]);
+
+    useEffect(() => {
+        const container = chartContainerRef.current;
+        const priceBounds = getTargetPriceBounds(candles, currentPrice);
+        if (!container || !priceBounds) return;
+
+        const validCandles = candles
+            .filter((candle) => [candle.time, candle.open, candle.high, candle.low, candle.close].every(Number.isFinite))
+            .map((candle) => ({
+                time: Math.floor(candle.time / 1000) as UTCTimestamp,
+                open: candle.open,
+                high: candle.high,
+                low: candle.low,
+                close: candle.close,
+            }));
+        if (validCandles.length < 2) return;
+
+        const chartApi = createChart(container, {
+            autoSize: true,
+            layout: {
+                background: { type: ColorType.Solid, color: "#163f31" },
+                textColor: "rgba(255,255,255,.58)",
+                fontFamily: "inherit",
+                attributionLogo: true,
+            },
+            grid: {
+                vertLines: { color: "rgba(255,255,255,.07)" },
+                horzLines: { color: "rgba(255,255,255,.09)" },
+            },
+            crosshair: {
+                mode: CrosshairMode.Normal,
+                vertLine: { color: "rgba(255,255,255,.35)", labelBackgroundColor: "#246044" },
+                horzLine: { color: "rgba(255,255,255,.35)", labelBackgroundColor: "#246044" },
+            },
+            rightPriceScale: {
+                borderColor: "rgba(255,255,255,.15)",
+            },
+            timeScale: {
+                borderColor: "rgba(255,255,255,.15)",
+                timeVisible: true,
+                secondsVisible: false,
+                rightOffset: 1,
+                barSpacing: 12,
+                minBarSpacing: 1,
+            },
+            handleScroll: true,
+            handleScale: true,
+            localization: {
+                priceFormatter: (price: number) => formatPrice(String(price)),
+            },
+        });
+        chartApiRef.current = chartApi;
+        const candleSeries = chartApi.addSeries(CandlestickSeries, {
+            upColor: "#34d399",
+            downColor: "#fb7185",
+            borderUpColor: "#a7f3d0",
+            borderDownColor: "#fecdd3",
+            wickUpColor: "#6ee7b7",
+            wickDownColor: "#fda4af",
+            priceLineVisible: false,
+            lastValueVisible: false,
+        });
+        candleSeries.setData(validCandles);
+
+        const rangeSeries = chartApi.addSeries(LineSeries, {
+            color: "rgba(0,0,0,0)",
+            lineVisible: false,
+            crosshairMarkerVisible: false,
+            priceLineVisible: false,
+            lastValueVisible: false,
+        });
+        rangeSeries.setData([
+            { time: validCandles[0].time, value: priceBounds.minPrice },
+            { time: validCandles.at(-1)!.time, value: priceBounds.maxPrice },
+        ]);
+
+        candleSeries.createPriceLine({
+            price: currentPrice,
+            color: "rgba(255,255,255,.48)",
+            lineWidth: 1,
+            lineStyle: LineStyle.Dashed,
+            axisLabelVisible: true,
+            title: "CURRENT",
+        });
+        const initialTarget = targetStateRef.current;
+        targetLineRef.current = candleSeries.createPriceLine({
+            price: initialTarget.price,
+            color: "#f5d547",
+            lineWidth: 2,
+            lineStyle: LineStyle.Dashed,
+            axisLabelVisible: true,
+            title: `${initialTarget.direction.toUpperCase()} TARGET`,
+        });
+        candleSeriesRef.current = candleSeries;
+        chartApi.timeScale().fitContent();
+
+        return () => {
+            chartApiRef.current = null;
+            candleSeriesRef.current = null;
+            targetLineRef.current = null;
+            chartApi.remove();
+        };
+    }, [candles, currentPrice]);
+
+    const selectTargetFromPointer = (clientY: number) => {
+        const container = chartContainerRef.current;
+        const candleSeries = candleSeriesRef.current;
+        if (!container || !candleSeries || !bounds) return;
+        const coordinate = clientY - container.getBoundingClientRect().top;
+        const price = candleSeries.coordinateToPrice(coordinate);
+        if (typeof price !== "number" || !Number.isFinite(price)) return;
+        onTargetChangeRef.current(Math.max(bounds.minPrice, Math.min(bounds.maxPrice, price)));
+    };
+
+    const handleTargetPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+        event.currentTarget.setPointerCapture(event.pointerId);
+        selectTargetFromPointer(event.clientY);
+    };
+
+    const handleTargetPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+        if (event.currentTarget.hasPointerCapture(event.pointerId)) selectTargetFromPointer(event.clientY);
+    };
+
+    const zoomChart = (factor: number) => {
+        const timeScale = chartApiRef.current?.timeScale();
+        const visibleRange = timeScale?.getVisibleLogicalRange();
+        if (!timeScale || !visibleRange) return;
+        const center = (visibleRange.from + visibleRange.to) / 2;
+        const halfRange = ((visibleRange.to - visibleRange.from) * factor) / 2;
+        timeScale.setVisibleLogicalRange({ from: center - halfRange, to: center + halfRange });
+    };
+
+    const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+        if (!bounds || !["ArrowUp", "ArrowDown"].includes(event.key)) return;
+        event.preventDefault();
+        const change = currentPrice * 0.01 * (event.key === "ArrowUp" ? 1 : -1);
+        onTargetChange(Math.max(bounds.minPrice, Math.min(bounds.maxPrice, selectedTarget + change)));
+    };
+
+    if (!bounds) return null;
+
+    return (
+        <section className="overflow-hidden border-2 border-black bg-[#163f31] text-white">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/15 px-3 py-2.5 sm:px-4">
+                <div className="flex items-center gap-2">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center border border-white/20 bg-white/10">
+                        <Crosshair className="h-4 w-4" />
+                    </span>
+                    <div>
+                        <p className="text-[9px] font-black uppercase tracking-[0.12em] text-white/55">
+                            {interactionMode === "analyze" ? "Analyze the market" : "Pick your target"}
+                        </p>
+                        <p className="text-xs font-black sm:text-sm">
+                            {interactionMode === "analyze" ? "Pan, zoom and inspect the candles" : "Click or drag to move the target"}
+                        </p>
+                    </div>
+                </div>
+                <div className="text-right">
+                    <p className="text-[9px] font-black uppercase tracking-[0.1em] text-white/50">Current {asset}</p>
+                    <p className="text-sm font-black">{formatPrice(String(currentPrice))}</p>
+                </div>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/15 bg-black/10 px-3 py-2 sm:px-4">
+                <div className="flex items-center gap-2">
+                    <span className="hidden text-[9px] font-black uppercase tracking-[0.1em] text-white/50 min-[430px]:inline">Range</span>
+                    <div className="grid grid-cols-4 border border-white/20 bg-black/15 p-0.5" aria-label="Market chart range">
+                        {(["24H", "7D", "30D", "3M"] as const).map((option) => (
+                            <button
+                                key={option}
+                                type="button"
+                                onClick={() => onRangeChange(option)}
+                                aria-pressed={range === option}
+                                className={`h-7 min-w-11 px-2 text-[9px] font-black transition-colors ${range === option ? "bg-white text-[#163f31]" : "text-white/60 hover:bg-white/10 hover:text-white"}`}
+                            >
+                                {option}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+                <div className="grid grid-cols-2 border border-white/20 bg-black/15 p-0.5" aria-label="Chart interaction mode">
+                    {(["analyze", "target"] as const).map((mode) => (
+                        <button
+                            key={mode}
+                            type="button"
+                            onClick={() => setInteractionMode(mode)}
+                            aria-pressed={interactionMode === mode}
+                            className={`inline-flex h-7 items-center justify-center gap-1 px-2 text-[9px] font-black uppercase transition-colors ${interactionMode === mode ? mode === "target" ? "bg-[#f5d547] text-black" : "bg-white text-[#163f31]" : "text-white/60 hover:bg-white/10 hover:text-white"}`}
+                        >
+                            {mode === "analyze" ? <Activity className="h-3 w-3" /> : <Crosshair className="h-3 w-3" />}
+                            {mode === "analyze" ? "Analyze" : "Set target"}
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            <div className="grid grid-cols-4 border-b border-white/15 bg-black/10 p-1.5">
+                {[-10, -5, 5, 10].map((percentage) => {
+                    const isActive = Math.abs(targetChange - percentage) < 0.15;
+                    const isUp = percentage > 0;
+                    return (
+                        <button
+                            key={percentage}
+                            type="button"
+                            onClick={() => onTargetChange(currentPrice * (1 + percentage / 100))}
+                            className={`flex h-8 items-center justify-center gap-1 text-[10px] font-black transition-colors ${isActive ? "bg-[#f5d547] text-black" : "text-white/65 hover:bg-white/10 hover:text-white"}`}
+                            aria-label={`Set target ${Math.abs(percentage)} percent ${isUp ? "above" : "below"} current price`}
+                        >
+                            {isUp ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                            {percentage > 0 ? "+" : ""}{percentage}%
+                        </button>
+                    );
+                })}
+            </div>
+
+            <div className="relative h-52 select-none sm:h-56">
+                <div ref={chartContainerRef} className="h-full w-full" />
+                {interactionMode === "analyze" && (
+                    <div className="absolute right-14 top-2 z-20 flex border border-white/20 bg-[#163f31]/90 p-0.5 shadow-sm" aria-label="Chart zoom controls">
+                        <button
+                            type="button"
+                            onClick={() => zoomChart(1.35)}
+                            className="flex h-7 w-7 cursor-pointer items-center justify-center text-sm font-black text-white/70 hover:bg-white/10 hover:text-white"
+                            aria-label="Zoom out"
+                            title="Zoom out"
+                        >
+                            −
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => zoomChart(0.72)}
+                            className="flex h-7 w-7 cursor-pointer items-center justify-center border-x border-white/15 text-sm font-black text-white/70 hover:bg-white/10 hover:text-white"
+                            aria-label="Zoom in"
+                            title="Zoom in"
+                        >
+                            +
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => chartApiRef.current?.timeScale().fitContent()}
+                            className="flex h-7 cursor-pointer items-center justify-center px-2 text-[8px] font-black uppercase text-white/70 hover:bg-white/10 hover:text-white"
+                            aria-label="Fit all candles"
+                            title="Fit all candles"
+                        >
+                            Fit
+                        </button>
+                    </div>
+                )}
+                {interactionMode === "target" && (
+                    <div
+                        role="slider"
+                        tabIndex={0}
+                        aria-label={`${asset} target price`}
+                        aria-valuemin={bounds.minPrice}
+                        aria-valuemax={bounds.maxPrice}
+                        aria-valuenow={selectedTarget}
+                        aria-valuetext={`${direction} ${formatPrice(String(selectedTarget))}`}
+                        onPointerDown={handleTargetPointerDown}
+                        onPointerMove={handleTargetPointerMove}
+                        onPointerUp={(event) => {
+                            if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+                                event.currentTarget.releasePointerCapture(event.pointerId);
+                            }
+                        }}
+                        onKeyDown={handleKeyDown}
+                        className="absolute inset-0 z-20 touch-none cursor-ns-resize outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#f5d547]"
+                    />
+                )}
+                <span
+                    className="pointer-events-none absolute left-2 top-2 z-10 max-w-[70%] border border-black bg-[#f5d547] px-2 py-1 text-[9px] font-black text-black shadow-[2px_2px_0_#111]"
+                >
+                    {direction} {formatPrice(String(selectedTarget))} · {targetChange >= 0 ? "+" : ""}{targetChange.toFixed(1)}%
+                </span>
+            </div>
+
+            <div className="flex items-center justify-between gap-3 border-t border-white/15 px-3 py-2 text-[9px] font-bold text-white/50 sm:px-4">
+                <span>
+                    <a href="https://www.tradingview.com/" target="_blank" rel="noopener noreferrer" className="pointer-events-auto text-white/65 hover:text-white">Charts by TradingView</a>
+                    {` · ${range} Binance data`}
+                </span>
+                <span>{interactionMode === "analyze" ? "Wheel/pinch to zoom" : "↑↓ keys adjust by 1%"}</span>
+            </div>
+        </section>
+    );
+}
+
+function getTargetPriceBounds(candles: MarketCandle[], currentPrice: number) {
+    const validCandles = candles.filter((candle) => Number.isFinite(candle.close) && candle.close > 0);
+    if (validCandles.length < 2 || !Number.isFinite(currentPrice) || currentPrice <= 0) return null;
+
+    const lows = validCandles.map((candle) => Number.isFinite(candle.low) && candle.low > 0 ? candle.low : candle.close);
+    const highs = validCandles.map((candle) => Number.isFinite(candle.high) && candle.high > 0 ? candle.high : candle.close);
+    const observedMin = Math.min(...lows);
+    const observedMax = Math.max(...highs);
+    const baseSpread = Math.max(observedMax - observedMin, currentPrice * 0.08);
+    let minPrice = Math.max(0, Math.min(observedMin - baseSpread * 0.15, currentPrice * 0.75));
+    let maxPrice = Math.max(observedMax + baseSpread * 0.15, currentPrice * 1.25);
+    const padding = Math.max((maxPrice - minPrice) * 0.04, currentPrice * 0.005);
+    minPrice = Math.max(0, minPrice - padding);
+    maxPrice += padding;
+
+    return { minPrice, maxPrice };
 }
 
 function VerifiedBadge({
@@ -1075,129 +1565,135 @@ function VerifiedBadge({
 }
 
 function ChallengePreview({
-    username,
-    isModerator,
-    twitterUsername,
+    user,
     marketType,
     isPriceFeed,
     challengeMode,
     pairTag,
+    categoryImage,
     title,
     betAmount,
     duration,
     resolutionDate,
 }: {
-    username: string;
-    isModerator: boolean;
-    twitterUsername: string | null;
+    user: User | null;
     marketType: MarketType;
     isPriceFeed: boolean;
     challengeMode: ChallengeMode;
     pairTag: string;
+    categoryImage?: string;
     title: string;
     betAmount: number;
     duration: { hours: number; minutes: number };
     resolutionDate: Date;
 }) {
-    const isVerified = isModerator || Boolean(twitterUsername);
-    const poolAmount = challengeMode === "pvp" ? betAmount * 2 : betAmount;
+    const now = new Date();
+    const expiryDate = new Date(now.getTime() + (duration.hours * 60 + duration.minutes) * 60 * 1000);
+    const username = user?.username || "You";
+    const profileImage = user?.profile_image || "/scribbles/btc.png";
+    const creatorId = user?.id ?? -1;
+    const pair = stripUsdcQuote(pairTag);
+    const ticker = pair.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10) || marketType.toUpperCase();
+    const safeBetAmount = Number.isFinite(betAmount) ? betAmount : 0;
+
+    const previewChallenge: Challenge = {
+        id: -1,
+        views: 0,
+        title,
+        statement: title,
+        ticker,
+        trading_pair: pair,
+        target: 0,
+        initial_bet: safeBetAmount,
+        pool_size: safeBetAmount,
+        total_pool: safeBetAmount,
+        category_image: categoryImage || null,
+        resolution_source: isPriceFeed ? "PRICE_FEED" : "COMMUNITY",
+        metadata: {
+            composer: {
+                market: marketType,
+                format: isPriceFeed ? "price" : "statement",
+                topic: pair,
+                category_image: categoryImage || "",
+                resolves_at: resolutionDate.toISOString(),
+            },
+        },
+        creator: creatorId as Challenge["creator"],
+        creator_id: creatorId,
+        creator_details: user,
+        resolution_method: isPriceFeed ? "PRICE_FEED" : "COMMUNITY",
+        participants: 1,
+        total_challengers: 1,
+        total_opponents: 0,
+        status: "OPEN",
+        mode: challengeMode === "pvp" ? "PVP" : "TEAM",
+        result: "TEAM_A",
+        direction: "UP",
+        expiry: expiryDate.toISOString(),
+        expire_time: expiryDate.toISOString(),
+        resolution_date: resolutionDate.toISOString().split("T")[0],
+        resolve_time: resolutionDate.toISOString(),
+        resolved_at: "",
+        final_price: 0,
+        category: marketType === "crypto" ? "Crypto" : "Sports",
+        created_at: now.toISOString(),
+        bet_info: {
+            highest_bet: {
+                TEAM_A: {
+                    id: creatorId,
+                    username,
+                    profile_image: profileImage,
+                    pubkey: user?.pubkey || user?.wallet_address || "",
+                    bet: safeBetAmount,
+                    twitter_username: user?.twitter_username ?? null,
+                    user_type: user?.user_type ?? "user",
+                },
+            },
+            team_count: {
+                TEAM_A: {
+                    total_bets: 1,
+                    total_amount: safeBetAmount,
+                },
+            },
+        },
+        market: {
+            name: pair,
+            icon: "",
+            image: "",
+            parent_market_id: "",
+            parent_id: "",
+        },
+    };
 
     return (
-        <div className="mx-auto w-full max-w-lg">
-            <p className="mb-2 text-center text-[10px] font-black uppercase tracking-[0.12em] text-[#8b7a72]">Card preview</p>
-            <article className="overflow-hidden border-2 border-black bg-white shadow-[4px_4px_0_#111]">
-                <div className="h-1.5 bg-emerald-500" />
-                <div className="p-4 sm:p-5">
-                    <div className="flex items-start justify-between gap-3">
-                        <div className="flex min-w-0 items-center gap-2.5">
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 border-black bg-[#f5d547] text-sm font-black text-black">
-                                {username.charAt(0).toUpperCase()}
-                            </div>
-                            <div className="min-w-0">
-                                <div className="flex min-w-0 items-center gap-1.5">
-                                    <span className="truncate text-sm font-black text-[#17120f]">{username}</span>
-                                    {isVerified && <VerifiedBadge isModerator={isModerator} twitterUsername={twitterUsername} />}
-                                </div>
-                                <p className="text-[10px] font-bold text-[#8b7a72]">challenges everyone</p>
-                            </div>
-                        </div>
-                        <span className="shrink-0 border border-emerald-300 bg-emerald-50 px-2 py-1 text-[9px] font-black uppercase tracking-[0.08em] text-emerald-800">
-                            Open
-                        </span>
-                    </div>
-
-                    <div className="mt-4">
-                        <div className="flex flex-wrap items-center gap-1.5">
-                            <span className="inline-flex items-center gap-1 border border-black/20 bg-[#f3e1d7] px-2 py-1 text-[10px] font-black text-[#594b44]">
-                                {marketType === "crypto" ? <Coins className="h-3 w-3" /> : <Trophy className="h-3 w-3" />}
-                                {pairTag}
-                            </span>
-                            <span className="border border-black/15 bg-white px-2 py-1 text-[9px] font-black uppercase tracking-[0.08em] text-[#75645c]">
-                                {isPriceFeed ? "Price" : "Statement"}
-                            </span>
-                            <span className="border border-black/15 bg-white px-2 py-1 text-[9px] font-black uppercase tracking-[0.08em] text-[#75645c]">
-                                {challengeMode === "pvp" ? "1 vs 1" : "Teams"}
-                            </span>
-                        </div>
-                        <h3 className="mt-3 break-words text-xl font-black leading-tight tracking-[-0.02em] text-[#17120f] sm:text-2xl">
-                            {title}
-                        </h3>
-                    </div>
-
-                    <div className="mt-4 grid grid-cols-[1fr_auto_1fr] items-center gap-2 border-2 border-black bg-[#f8ede7] p-3">
-                        <div className="min-w-0 text-center">
-                            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border-2 border-black bg-[#f5d547] text-sm font-black">
-                                {username.charAt(0).toUpperCase()}
-                            </div>
-                            <p className="mt-1.5 truncate text-[11px] font-black text-[#17120f]">{username}</p>
-                            <p className="text-[9px] font-bold uppercase tracking-[0.08em] text-[#75645c]">Your side</p>
-                        </div>
-                        <div className="text-center">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-black bg-black text-[11px] font-black italic text-white shadow-[2px_2px_0_#e85a2d]">
-                                VS
-                            </div>
-                            <p className="mt-2 text-[9px] font-black uppercase tracking-[0.08em] text-[#75645c]">Pool</p>
-                            <p className="text-sm font-black text-emerald-700">${Number.isFinite(poolAmount) ? poolAmount.toFixed(2) : "0.00"}</p>
-                        </div>
-                        <div className="min-w-0 text-center">
-                            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border-2 border-dashed border-black/50 bg-white text-[#8b7a72]">
-                                {challengeMode === "pvp" ? <Swords className="h-5 w-5" /> : <Users className="h-5 w-5" />}
-                            </div>
-                            <p className="mt-1.5 text-[11px] font-black text-[#594b44]">Waiting...</p>
-                            <p className="text-[9px] font-bold uppercase tracking-[0.08em] text-[#75645c]">
-                                {challengeMode === "pvp" ? "Opponent" : "Rival team"}
-                            </p>
-                        </div>
-                    </div>
-
-                    <div className="mt-3 grid grid-cols-3 divide-x divide-black/10 border-y border-black/10 py-2.5 text-center">
-                        <div className="px-1">
-                            <p className="text-[9px] font-black uppercase tracking-[0.08em] text-[#8b7a72]">Stake</p>
-                            <p className="mt-0.5 text-xs font-black text-black">{betAmount} USDC</p>
-                        </div>
-                        <div className="px-1">
-                            <p className="text-[9px] font-black uppercase tracking-[0.08em] text-[#8b7a72]">Joins close</p>
-                            <p className="mt-0.5 text-xs font-black text-black">{formatDuration(duration)}</p>
-                        </div>
-                        <div className="min-w-0 px-1">
-                            <p className="text-[9px] font-black uppercase tracking-[0.08em] text-[#8b7a72]">Resolves</p>
-                            <p className="mt-0.5 truncate text-xs font-black text-black">{formatDate(resolutionDate)}</p>
-                        </div>
-                    </div>
-
-                    <div className="mt-3 flex h-10 items-center justify-center gap-2 border-2 border-black bg-[#246044] text-xs font-black uppercase tracking-[0.06em] text-white">
-                        <Swords className="h-4 w-4" /> Join challenge
-                    </div>
-                </div>
-            </article>
+        <div className="mx-auto w-full max-w-[392px]">
+            <p className="mb-2 text-center text-[10px] font-black uppercase tracking-[0.12em] text-[#8b7a72]">Challenge preview</p>
+            <div inert className="pointer-events-none select-none" aria-label="Challenge card preview">
+                <ChallengeCard challenge={previewChallenge} showPin={false} />
+            </div>
         </div>
     );
 }
 
-function PanelHeading({ children }: { children: React.ReactNode }) {
+function PanelHeading({ children, info }: { children: React.ReactNode; info?: string }) {
     return (
-        <h3 className="mb-3 text-[10px] font-black uppercase tracking-[0.12em] text-[#75645c]">
-            {children}
+        <h3 className="mb-3 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-[#75645c]">
+            {info && (
+                <span
+                    className="group relative inline-flex shrink-0 cursor-help"
+                    tabIndex={0}
+                    aria-label={info}
+                >
+                    <Info className="h-3.5 w-3.5" aria-hidden="true" />
+                    <span
+                        role="tooltip"
+                        className="pointer-events-none absolute left-0 top-full z-30 mt-2 w-64 max-w-[calc(100vw-4rem)] border border-black bg-black px-2.5 py-2 text-[10px] font-bold normal-case leading-relaxed tracking-normal text-white opacity-0 shadow-[2px_2px_0_#e85a2d] transition-opacity group-hover:opacity-100 group-focus:opacity-100"
+                    >
+                        {info}
+                    </span>
+                </span>
+            )}
+            <span>{children}</span>
         </h3>
     );
 }

@@ -6,14 +6,20 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Search, X } from "lucide-react";
-import { getChallenges, type Challenge } from "@/app/lib/challenges-service/challenges";
-import { getUsers, type User } from "@/app/lib/users-service/users";
+import { getChallengeCategoryImage, getChallenges, type Challenge } from "@/app/lib/challenges-service/challenges";
+import { getLeaderboard, getUsers, type LeaderboardUser, type User } from "@/app/lib/users-service/users";
 import { useBodyScrollLock } from "@/app/lib/useBodyScrollLock";
 import { stripUsdcQuote } from "@/app/lib/format-market-label";
 
 type SearchTab = "all" | "challenges" | "users";
 const CHALLENGE_RESULT_LIMIT = 8;
 const USER_RESULT_LIMIT = 5;
+const USER_CANDIDATE_LIMIT = 1000;
+
+type SearchUser = User & {
+    won: number;
+    pnl: number;
+};
 
 type NavbarDesktopSearchProps = {
     searchQuery: string;
@@ -32,20 +38,75 @@ function formatPool(value: number | undefined) {
     }).format(amount);
 }
 
-function formatEndsAt(expireTime: string) {
-    const ms = new Date(expireTime).getTime() - Date.now();
-    if (Number.isNaN(ms)) return "Ends soon";
-    if (ms <= 0) return "0m";
+function parseDateValue(value: unknown) {
+    if (typeof value === "number") return Number.isFinite(value) ? value : null;
+    if (typeof value !== "string" || !value) return null;
+    const parsed = new Date(value).getTime();
+    return Number.isNaN(parsed) ? null : parsed;
+}
+
+function parseResolutionDateValue(value: unknown) {
+    if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+        return parseDateValue(`${value}T23:59:59.999Z`);
+    }
+    return parseDateValue(value);
+}
+
+function getResolveTimestamp(challenge: Challenge) {
+    return parseDateValue(challenge.metadata?.composer?.resolves_at)
+        ?? parseDateValue(challenge.resolve_time)
+        ?? parseResolutionDateValue(challenge.resolution_date);
+}
+
+function formatCountdown(timestamp: number | null) {
+    if (!timestamp) return "On result";
+    const ms = timestamp - Date.now();
+    if (ms <= 0) return "Now";
 
     const totalHours = Math.floor(ms / (1000 * 60 * 60));
     const days = Math.floor(totalHours / 24);
     const hours = totalHours % 24;
+    const minutes = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
 
     if (days > 0) return `${days}d ${hours}h`;
-    if (hours > 0) return `${hours}h`;
+    if (hours > 0) return `${hours}h ${minutes}m`;
+    return `${Math.max(1, minutes)}m`;
+}
 
-    const mins = Math.max(1, Math.floor(ms / (1000 * 60)));
-    return `${mins}m`;
+function formatResolutionMoment(timestamp: number | null) {
+    if (!timestamp) return "Resolution time unavailable";
+    return new Date(timestamp).toLocaleString("en-GB", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+    });
+}
+
+function getChallengeResultMeta(challenge: Challenge) {
+    const teamA = challenge.bet_info?.team_count?.TEAM_A;
+    const teamB = challenge.bet_info?.team_count?.TEAM_B;
+    const recordedJoined = Number(teamA?.total_bets ?? 0) + Number(teamB?.total_bets ?? 0);
+    const joined = recordedJoined || challenge.participants || challenge.total_challengers + challenge.total_opponents || 1;
+    const recordedPool = Number(teamA?.total_amount ?? 0) + Number(teamB?.total_amount ?? 0);
+    const pool = recordedPool || challenge.total_pool || challenge.pool_size || challenge.initial_bet || 0;
+    const resolvesAt = getResolveTimestamp(challenge);
+    const expiryAt = parseDateValue(challenge.expiry) ?? parseDateValue(challenge.expire_time);
+    const hasOpponent = Number(teamB?.total_bets ?? 0) > 0 || challenge.total_opponents > 0;
+    const isOpenStatus = challenge.status.toLowerCase() === "open";
+    const isOpenToJoin = isOpenStatus
+        && (!expiryAt || expiryAt > Date.now())
+        && (!resolvesAt || resolvesAt > Date.now())
+        && (challenge.mode === "TEAM" || !hasOpponent);
+    const isManualResolution = String(challenge.resolution_method || challenge.resolution_source).toUpperCase() !== "PRICE_FEED";
+    const title = stripUsdcQuote(challenge.statement) || `Bet on ${challenge.ticker}`;
+    const hasResolvedTimePassed = Boolean(resolvesAt && resolvesAt <= Date.now());
+    const resolveDate = resolvesAt
+        ? new Date(resolvesAt).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })
+        : "";
+
+    return { joined, pool, resolvesAt, isOpenToJoin, isManualResolution, title, hasResolvedTimePassed, resolveDate };
 }
 
 function getChallengeStatusMeta(status: Challenge["status"]) {
@@ -67,10 +128,13 @@ function formatMode(mode: string) {
     return mode.replace(/[_-]/g, " ").toUpperCase();
 }
 
-function formatCompactWallet(walletAddress: string | null | undefined) {
-    if (!walletAddress) return "No wallet";
-    if (walletAddress.length <= 10) return walletAddress;
-    return `${walletAddress.slice(0, 4)}...${walletAddress.slice(-4)}`;
+function formatCompactNumber(value: number) {
+    return new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(value);
+}
+
+function formatPnl(value: number) {
+    const amount = Math.abs(value).toLocaleString("en-US", { maximumFractionDigits: 2 });
+    return `${value > 0 ? "+" : value < 0 ? "-" : ""}$${amount}`;
 }
 
 function filterChallenges(challenges: Challenge[], searchTerm: string) {
@@ -101,6 +165,56 @@ function filterUsers(users: User[], searchTerm: string) {
     );
 }
 
+function leaderboardUsersAsUsers(users: LeaderboardUser[]): User[] {
+    return users.map((user) => ({
+        ...user,
+        id: Number(user.id),
+        followers: user.followers,
+        following: user.following,
+    }));
+}
+
+function buildSearchUsers(users: User[], leaderboardUsers: LeaderboardUser[], searchTerm = ""): SearchUser[] {
+    const metricsByWallet = new Map<string, LeaderboardUser>();
+    const metricsById = new Map<string, LeaderboardUser>();
+
+    leaderboardUsers.forEach((user) => {
+        const wallet = (user.wallet_address || user.pubkey || "").toLowerCase();
+        if (wallet) metricsByWallet.set(wallet, user);
+        metricsById.set(String(user.id), user);
+    });
+
+    return filterUsers(users, searchTerm)
+        .map((user) => {
+            const wallet = (user.wallet_address || user.pubkey || "").toLowerCase();
+            const metrics = metricsByWallet.get(wallet) ?? metricsById.get(String(user.id));
+            return {
+                ...user,
+                followers: user.followers?.length ? user.followers : metrics?.followers ?? [],
+                won: metrics?.won ?? 0,
+                pnl: metrics?.pnl ?? 0,
+            };
+        })
+        .sort((a, b) =>
+            (b.followers?.length ?? 0) - (a.followers?.length ?? 0)
+            || b.won - a.won
+            || b.pnl - a.pnl
+        )
+        .slice(0, USER_RESULT_LIMIT);
+}
+
+function UserVerifiedBadge({ isModerator, username }: { isModerator: boolean; username: string }) {
+    const label = isModerator ? `${username} is a verified KOL` : `${username} is verified on X`;
+    return (
+        <span className="absolute -bottom-1 -right-1 z-10 flex h-5 w-5 items-center justify-center drop-shadow-sm" title={label} aria-label={label}>
+            <svg className="h-full w-full" viewBox="0 0 32 32" aria-hidden="true">
+                <path fill={isModerator ? "#F5B800" : "#378FDB"} stroke="white" strokeWidth="1.5" strokeLinejoin="round" d="M16 1.5l2.8 2.2 3.5-1 1.6 3.2 3.6.5.1 3.7 3 2-1.4 3.4 1.4 3.4-3 2-.1 3.7-3.6.5-1.6 3.2-3.5-1L16 30.5l-2.8-2.2-3.5 1-1.6-3.2-3.6-.5-.1-3.7-3-2 1.4-3.4-1.4-3.4 3-2 .1-3.7 3.6-.5 1.6-3.2 3.5 1L16 1.5Z" />
+                <path d="m9.4 16.2 4.2 4.2 9-9" fill="none" stroke="white" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+        </span>
+    );
+}
+
 export function NavbarDesktopSearch({
     searchQuery,
     onSearchQueryChange,
@@ -116,7 +230,7 @@ export function NavbarDesktopSearch({
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [challengeResults, setChallengeResults] = useState<Challenge[]>([]);
-    const [userResults, setUserResults] = useState<User[]>([]);
+    const [userResults, setUserResults] = useState<SearchUser[]>([]);
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const requestIdRef = useRef(0);
     const hasInitializedOpenStateRef = useRef(false);
@@ -131,17 +245,19 @@ export function NavbarDesktopSearch({
         setError(null);
 
         try {
-            const [challengesRes, usersRes] = await Promise.all([
+            const [challengesRes, usersRes, leaderboardRes] = await Promise.all([
                 getChallenges({ limit: CHALLENGE_RESULT_LIMIT }).catch(() => null),
-                getUsers({ limit: USER_RESULT_LIMIT }).catch(() => null),
+                getUsers({ limit: USER_CANDIDATE_LIMIT }).catch(() => null),
+                getLeaderboard(USER_CANDIDATE_LIMIT, 0, undefined, "all", "rank", "asc").catch(() => null),
             ]);
 
             if (requestIdRef.current !== reqId) return;
 
             setChallengeResults((challengesRes?.challenges ?? []).slice(0, CHALLENGE_RESULT_LIMIT));
-            setUserResults((usersRes?.users ?? []).slice(0, USER_RESULT_LIMIT));
+            const baseUsers = usersRes?.users ?? leaderboardUsersAsUsers(leaderboardRes?.users ?? []);
+            setUserResults(buildSearchUsers(baseUsers, leaderboardRes?.users ?? []));
 
-            if (!challengesRes && !usersRes) {
+            if (!challengesRes && !usersRes && !leaderboardRes) {
                 setError("Could not load search results.");
             }
         } catch {
@@ -180,17 +296,19 @@ export function NavbarDesktopSearch({
         setError(null);
 
         try {
-            const [challengesRes, usersRes] = await Promise.all([
+            const [challengesRes, usersRes, leaderboardRes] = await Promise.all([
                 getChallenges({ limit: CHALLENGE_RESULT_LIMIT }).catch(() => null),
-                getUsers({ limit: USER_RESULT_LIMIT }).catch(() => null),
+                getUsers({ limit: USER_CANDIDATE_LIMIT }).catch(() => null),
+                getLeaderboard(USER_CANDIDATE_LIMIT, 0, nextQuery, "all", "rank", "asc").catch(() => null),
             ]);
 
             if (requestIdRef.current !== reqId) return;
 
             setChallengeResults(filterChallenges(challengesRes?.challenges ?? [], nextQuery).slice(0, CHALLENGE_RESULT_LIMIT));
-            setUserResults(filterUsers(usersRes?.users ?? [], nextQuery).slice(0, USER_RESULT_LIMIT));
+            const baseUsers = usersRes?.users ?? leaderboardUsersAsUsers(leaderboardRes?.users ?? []);
+            setUserResults(buildSearchUsers(baseUsers, leaderboardRes?.users ?? [], nextQuery));
 
-            if (!challengesRes && !usersRes) {
+            if (!challengesRes && !usersRes && !leaderboardRes) {
                 setError("Could not fetch search results. Please try again.");
             }
         } catch {
@@ -345,11 +463,13 @@ export function NavbarDesktopSearch({
                                                         <div className="h-3 w-1/2 rounded bg-[#f1ece6]" />
                                                     </div>
                                                 </div>
-                                                <div className="mt-3 grid grid-cols-3 gap-2">
+                                                <div className="mt-3 grid grid-cols-4 gap-2">
+                                                    <div className="h-8 rounded bg-[#f1ece6]" />
                                                     <div className="h-8 rounded bg-[#f1ece6]" />
                                                     <div className="h-8 rounded bg-[#f1ece6]" />
                                                     <div className="h-8 rounded bg-[#f1ece6]" />
                                                 </div>
+                                                <div className="mt-3 h-7 rounded bg-[#f1ece6]" />
                                             </div>
                                         ))}
                                     </div>
@@ -359,7 +479,7 @@ export function NavbarDesktopSearch({
                             {showUsers && (
                                 <section className="px-4 md:px-6 py-4 border-b border-[#f0dfd2] animate-pulse">
                                     <div className="mb-4 h-7 w-20 rounded bg-[#efe4db]" />
-                                    <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-5">
+                                    <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
                                         {cardSkeletons.map((_, index) => (
                                             <div key={`user-skeleton-${index}`} className="rounded-lg border border-[#eadfd6] bg-white p-3">
                                                 <div className="flex items-center gap-3">
@@ -368,6 +488,11 @@ export function NavbarDesktopSearch({
                                                         <div className="h-3.5 w-4/5 rounded bg-[#f1ece6]" />
                                                         <div className="h-3 w-3/5 rounded bg-[#f1ece6]" />
                                                     </div>
+                                                </div>
+                                                <div className="mt-3 grid grid-cols-3 gap-2 border-t border-[#f0dfd2] pt-3">
+                                                    <div className="h-8 rounded bg-[#f1ece6]" />
+                                                    <div className="h-8 rounded bg-[#f1ece6]" />
+                                                    <div className="h-8 rounded bg-[#f1ece6]" />
                                                 </div>
                                             </div>
                                         ))}
@@ -417,7 +542,11 @@ export function NavbarDesktopSearch({
                             <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2">
                                 {challengeResults.map((challenge) => {
                                     const statusMeta = getChallengeStatusMeta(challenge.status);
-                                    const participantCount = challenge.participants ?? 0;
+                                    const meta = getChallengeResultMeta(challenge);
+                                    const resolveState = meta.hasResolvedTimePassed
+                                        ? challenge.status === "RESOLVED" ? "Resolved" : "Resolving"
+                                        : formatCountdown(meta.resolvesAt);
+                                    const resolutionMoment = meta.resolvesAt ? formatResolutionMoment(meta.resolvesAt) : "On result";
                                     return (
                                         <button
                                             key={challenge.id}
@@ -430,9 +559,14 @@ export function NavbarDesktopSearch({
                                         >
                                             <div className="flex items-start gap-3">
                                                 <div className="relative flex h-12 w-12 flex-shrink-0 items-center justify-center overflow-hidden rounded-md border border-[#eadfd6] bg-[#f3f4f6]">
-                                                    <span className="text-xs font-black text-[#8a7468]">
-                                                        {challenge.ticker.slice(0, 4).toUpperCase()}
-                                                    </span>
+                                                    <Image
+                                                        src={getChallengeCategoryImage(challenge)}
+                                                        alt={challenge.ticker || "Challenge category"}
+                                                        fill
+                                                        sizes="48px"
+                                                        unoptimized
+                                                        className="object-contain p-1.5"
+                                                    />
                                                 </div>
                                                 <div className="min-w-0 flex-1">
                                                     <div className="flex items-center gap-2">
@@ -443,37 +577,42 @@ export function NavbarDesktopSearch({
                                                             {stripUsdcQuote(challenge.trading_pair || challenge.ticker) || "General"}
                                                         </span>
                                                     </div>
-                                                    <p className="mt-1 line-clamp-2 text-sm font-black leading-snug text-[#111827] group-hover:text-[#e85a2d]">
-                                                        {stripUsdcQuote(challenge.statement)}
-                                                    </p>
+                                                    <div className="mt-1 text-sm font-black leading-snug text-[#111827] group-hover:text-[#e85a2d] sm:text-[15px]">
+                                                        {meta.isManualResolution || meta.hasResolvedTimePassed ? (
+                                                            <p className="line-clamp-2">{meta.title}{!meta.isManualResolution && meta.hasResolvedTimePassed && meta.resolveDate ? ` by ${meta.resolveDate}` : ""}</p>
+                                                        ) : (
+                                                            <>
+                                                                <p className="truncate">{meta.title} In</p>
+                                                                <p>Next <span className="ml-1 text-sm font-bold text-emerald-800">{formatCountdown(meta.resolvesAt)}</span></p>
+                                                            </>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </div>
-                                            <div className="mt-3 grid grid-cols-3 gap-2 border-t border-[#f0dfd2] pt-3">
-                                                <div>
-                                                    <p className="text-[10px] font-black uppercase tracking-[0.08em] text-[#8a7468]">Pool</p>
-                                                    <p className="truncate text-sm font-black text-[#111827]">
-                                                        {formatPool((challenge.pool_size ?? 0) > 0 ? challenge.pool_size : challenge.initial_bet)}
-                                                    </p>
+                                            <div className="mt-3 grid grid-cols-2 divide-x divide-y divide-[#f0dfd2] border-t border-[#f0dfd2] pt-3 min-[430px]:grid-cols-4 min-[430px]:divide-y-0">
+                                                <div className="min-w-0 px-2 first:pl-0">
+                                                    <p className="text-[9px] font-black uppercase tracking-[0.08em] text-[#8a7468]">Total pool</p>
+                                                    <p className="truncate text-sm font-black text-[#111827]">{formatPool(meta.pool)}</p>
                                                 </div>
-                                                <div>
-                                                    <p className="text-[10px] font-black uppercase tracking-[0.08em] text-[#8a7468]">Ends</p>
-                                                    <p className="truncate text-sm font-black text-[#166534]">
-                                                        {formatEndsAt(challenge.resolution_date || challenge.expiry)}
-                                                    </p>
+                                                <div className="min-w-0 px-2">
+                                                    <p className="text-[9px] font-black uppercase tracking-[0.08em] text-[#8a7468]">Joined</p>
+                                                    <p className="truncate text-sm font-black text-[#111827]">{meta.joined} {meta.joined === 1 ? "player" : "players"}</p>
                                                 </div>
-                                                <div>
-                                                    <p className="text-[10px] font-black uppercase tracking-[0.08em] text-[#8a7468]">Players</p>
-                                                    <p className="truncate text-sm font-black text-[#111827]">
-                                                        {participantCount}
-                                                    </p>
+                                                <div className="min-w-0 px-2 pt-2 min-[430px]:pt-0">
+                                                    <p className="text-[9px] font-black uppercase tracking-[0.08em] text-[#8a7468]">Mode</p>
+                                                    <p className="truncate text-sm font-black text-[#111827]">{formatMode(challenge.mode)}</p>
+                                                </div>
+                                                <div className="min-w-0 px-2 pt-2 min-[430px]:pr-0 min-[430px]:pt-0">
+                                                    <p className="text-[9px] font-black uppercase tracking-[0.08em] text-[#8a7468]">Resolves</p>
+                                                    <p className="truncate text-sm font-black text-[#166534]" title={resolutionMoment}>{resolveState}</p>
                                                 </div>
                                             </div>
-                                            <div className="mt-2 flex items-center justify-between gap-2">
-                                                <span className="truncate text-xs font-semibold text-[#64748b]">
-                                                    by {challenge.creator_details?.username || "Unknown"}
+                                            <div className="mt-3 flex items-center justify-between gap-2 border-t border-[#f0dfd2] pt-2.5">
+                                                <span className="truncate text-[10px] font-semibold text-[#7c6a60]" title={resolutionMoment}>
+                                                    Resolves {resolutionMoment}
                                                 </span>
-                                                <span className="shrink-0 rounded-md bg-[#f5d547] px-2 py-1 text-[10px] font-black uppercase text-black">
-                                                    {formatMode(challenge.mode)}
+                                                <span className={`shrink-0 border px-2 py-1 text-[9px] font-black uppercase tracking-[0.06em] ${meta.isOpenToJoin ? "border-emerald-300 bg-emerald-50 text-emerald-700" : "border-black/15 bg-[#f3ece7] text-[#75645c]"}`}>
+                                                    {meta.isOpenToJoin ? "Open to join" : "Joining closed"}
                                                 </span>
                                             </div>
                                         </button>
@@ -486,47 +625,54 @@ export function NavbarDesktopSearch({
                     {!isLoading && showUsers && userResults.length > 0 && (
                         <section className="px-4 md:px-6 py-4 border-b border-[#f0dfd2]">
                             <div className="mb-4 flex items-center justify-between">
-                                <h3 className="text-lg md:text-xl font-semibold text-[#1e293b]">Users</h3>
+                                <div>
+                                    <h3 className="text-lg font-black text-[#1e293b] md:text-xl">Users</h3>
+                                    <p className="text-xs font-semibold text-[#7c6a60]">Most followed users first</p>
+                                </div>
                                 <Link href="/leaderboard" onClick={closeModal} className="text-[#f97316] text-xs md:text-sm font-bold">View all →</Link>
                             </div>
-                            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-5">
+                            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
                                 {userResults.map((user, index) => {
                                     const username = user.username || "Unnamed";
+                                    const isVerified = Boolean(user.twitter_username || user.user_type === "moderator");
+                                    const followerCount = user.followers?.length ?? 0;
+                                    const wallet = user.wallet_address || user.pubkey;
                                     return (
                                         <Link
                                             key={user.id}
-                                            href={user.pubkey ? `/profile/${user.pubkey}` : "/"}
+                                            href={wallet ? `/profile/${wallet}` : "/"}
                                             onClick={closeModal}
-                                            className="group rounded-lg border-2 border-[#eadfd6] bg-white p-3 shadow-[2px_2px_0_rgba(17,17,17,0.08)] transition hover:-translate-y-0.5 hover:border-black hover:bg-[#fffaf6] hover:shadow-[3px_3px_0_#111] focus:outline-none focus:shadow-[0_0_0_4px_rgba(232,90,45,0.18)]"
+                                            className="group relative rounded-lg border-2 border-[#eadfd6] bg-white p-3 shadow-[2px_2px_0_rgba(17,17,17,0.08)] transition hover:-translate-y-0.5 hover:border-black hover:bg-[#fffaf6] hover:shadow-[3px_3px_0_#111] focus:outline-none focus:shadow-[0_0_0_4px_rgba(232,90,45,0.18)]"
                                         >
+                                            <span className="absolute right-2.5 top-2.5 border border-black/15 bg-[#fff8f4] px-1.5 py-0.5 text-[9px] font-black text-[#7c6a60]">#{index + 1}</span>
                                             <div className="flex items-center gap-3">
-                                                <div className="relative h-11 w-11 shrink-0">
+                                                <div className="relative h-12 w-12 shrink-0">
                                                     <Image
-                                                        src={user.profile_image || "https://earningrecords.com/assets/rektofun/profiles/1.svg"}
+                                                        src={user.profile_image || user.twitter_profile_image || "https://earningrecords.com/assets/rektofun/profiles/1.svg"}
                                                         alt={username}
                                                         fill
-                                                        sizes="44px"
+                                                        sizes="48px"
                                                         className="rounded-full border-2 border-black bg-[#fff4ed] object-cover"
                                                     />
-                                                    <span className="absolute -bottom-1 -right-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full border border-black bg-[#f5d547] px-1 text-[10px] font-black text-black">
-                                                        {index + 1}
-                                                    </span>
+                                                    {isVerified && <UserVerifiedBadge isModerator={user.user_type === "moderator"} username={username} />}
                                                 </div>
-                                                <div className="min-w-0 flex-1">
+                                                <div className="min-w-0 flex-1 pr-7">
                                                     <p className="truncate text-sm font-black text-[#0f172a] group-hover:text-[#e85a2d]">{username}</p>
-                                                    <p className="truncate text-xs font-semibold text-[#64748b]">{formatCompactWallet(user.pubkey)}</p>
+                                                    <p className="mt-0.5 line-clamp-2 text-xs font-semibold leading-4 text-[#64748b]">{user.description || user.bio || "No bio yet"}</p>
                                                 </div>
                                             </div>
-                                            <div className="mt-3 grid grid-cols-2 gap-2 border-t border-[#f0dfd2] pt-2">
-                                                <div>
-                                                    <p className="text-[10px] font-black uppercase tracking-[0.08em] text-[#8a7468]">User ID</p>
-                                                    <p className="truncate text-xs font-black text-[#111827]">#{user.id}</p>
+                                            <div className="mt-3 grid grid-cols-3 divide-x divide-[#f0dfd2] border-t border-[#f0dfd2] pt-3 text-center">
+                                                <div className="min-w-0 px-1">
+                                                    <p className="truncate text-sm font-black text-[#111827]">{formatCompactNumber(followerCount)}</p>
+                                                    <p className="mt-0.5 text-[9px] font-black uppercase tracking-[0.07em] text-[#8a7468]">Followers</p>
                                                 </div>
-                                                <div>
-                                                    <p className="text-[10px] font-black uppercase tracking-[0.08em] text-[#8a7468]">Joined</p>
-                                                    <p className="truncate text-xs font-black text-[#111827]">
-                                                        {new Date(user.created_at).toLocaleDateString()}
-                                                    </p>
+                                                <div className="min-w-0 px-1">
+                                                    <p className="truncate text-sm font-black text-emerald-700">{formatCompactNumber(user.won)}</p>
+                                                    <p className="mt-0.5 text-[9px] font-black uppercase tracking-[0.07em] text-[#8a7468]">Wins</p>
+                                                </div>
+                                                <div className="min-w-0 px-1">
+                                                    <p className={`truncate text-sm font-black ${user.pnl > 0 ? "text-emerald-700" : user.pnl < 0 ? "text-red-600" : "text-[#111827]"}`} title={formatPnl(user.pnl)}>{formatPnl(user.pnl)}</p>
+                                                    <p className="mt-0.5 text-[9px] font-black uppercase tracking-[0.07em] text-[#8a7468]">P&amp;L</p>
                                                 </div>
                                             </div>
                                         </Link>
