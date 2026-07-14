@@ -48,6 +48,7 @@ import { getReadonlyConnection } from "@/app/lib/rektofun-program";
 import { stripUsdcQuote } from "@/app/lib/format-market-label";
 import { ChallengeCard } from "./ChallengeCard";
 import type { User } from "@/app/lib/users-service/users";
+import { announceChallengeCreated } from "@/app/lib/realtime-events";
 
 interface CreateChallengeModalProps {
     isOpen: boolean;
@@ -77,10 +78,10 @@ type AssetPriceState = {
 };
 
 const MAX_STATEMENT_LENGTH = 220;
-const MIN_DURATION_MINUTES = 5;
-const MAX_DURATION_MINUTES = 7 * 24 * 60;
+const MIN_DURATION_MINUTES = 15;
+const MAX_RESOLUTION_DELAY_MINUTES = 14 * 24 * 60;
 const DEFAULT_BET_AMOUNT = 5;
-const DEFAULT_DURATION_MINUTES = 24 * 60;
+const DEFAULT_DURATION_MINUTES = 15;
 const DEFAULT_RESOLUTION_DELAY_MS = 7 * 24 * 60 * 60 * 1000;
 const DEFAULT_CHART_RANGE: ChartRange = "3M";
 
@@ -112,6 +113,15 @@ const durationFromMinutes = (totalMinutes: number) => ({
     hours: Math.floor(totalMinutes / 60),
     minutes: totalMinutes % 60,
 });
+
+const getDefaultResolutionDate = (now: number) => {
+    const date = new Date(now + DEFAULT_RESOLUTION_DELAY_MS);
+    date.setHours(5, 30, 0, 0);
+    return date;
+};
+
+const getTimeUntilResolutionMinutes = (resolutionDate: Date, now: number) =>
+    Math.max(0, Math.floor((resolutionDate.getTime() - now) / (60 * 1000)));
 
 const formatPrice = (value: string) => {
     const parsed = Number(value);
@@ -146,8 +156,8 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
         candles: [],
         status: "failed",
     });
-    const [selectedDate, setSelectedDate] = useState(() => new Date(Date.now() + DEFAULT_RESOLUTION_DELAY_MS));
     const [composerNow] = useState(() => Date.now());
+    const [selectedDate, setSelectedDate] = useState(() => getDefaultResolutionDate(composerNow));
     const [duration, setDuration] = useState(() => durationFromMinutes(DEFAULT_DURATION_MINUTES));
 
     const [activePanel, setActivePanel] = useState<ComposerPanel>(null);
@@ -248,15 +258,11 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
 
     const handleDurationChange = (nextDuration: { hours: number; minutes: number }) => {
         setDuration(nextDuration);
-        const expiryTime = composerNow + (nextDuration.hours * 60 + nextDuration.minutes) * 60 * 1000;
-        if (selectedDate.getTime() < expiryTime) {
-            setSelectedDate(new Date(expiryTime + 30 * 60 * 1000));
-        }
     };
 
     const handleResolutionDateChange = (nextDate: Date) => {
-        const expiryTime = composerNow + (duration.hours * 60 + duration.minutes) * 60 * 1000;
-        setSelectedDate(nextDate.getTime() < expiryTime ? new Date(expiryTime) : nextDate);
+        if (!Number.isFinite(nextDate.getTime())) return;
+        setSelectedDate(nextDate);
     };
 
     const isPriceFeed = marketType === "crypto" && challengeFormat === "price";
@@ -276,6 +282,9 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
         && assetPriceState.status === "failed";
     const generatedStatement = `${stripUsdcQuote(selectedChildCategory?.category) || "Asset"} ${predictionDirection.toLowerCase()} ${formatPrice(predictionPrice)}`;
     const totalDurationMinutes = duration.hours * 60 + duration.minutes;
+    const timeUntilResolutionMinutes = getTimeUntilResolutionMinutes(selectedDate, composerNow);
+    const minResolutionDate = new Date(composerNow + MIN_DURATION_MINUTES * 60 * 1000);
+    const maxResolutionDate = new Date(composerNow + MAX_RESOLUTION_DELAY_MINUTES * 60 * 1000);
 
     useEffect(() => {
         if (!isOpen || !isPriceFeed || !selectedAssetSymbol) return;
@@ -341,9 +350,13 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
             setActivePanel("stake");
             return "Minimum stake is 1 USDC.";
         }
-        if (totalDurationMinutes < MIN_DURATION_MINUTES || totalDurationMinutes > MAX_DURATION_MINUTES) {
+        if (selectedDate.getTime() < minResolutionDate.getTime() || selectedDate.getTime() > maxResolutionDate.getTime()) {
+            setActivePanel("resolution");
+            return "Resolution must be between 15 minutes and 14 days from now.";
+        }
+        if (totalDurationMinutes < MIN_DURATION_MINUTES || totalDurationMinutes > timeUntilResolutionMinutes) {
             setActivePanel("window");
-            return "Join window must be between 5 minutes and 7 days.";
+            return "Join window must be at least 15 minutes and cannot extend beyond the resolution time.";
         }
         if (requireProfile && !user?.id) return "Finish your profile before creating a challenge.";
         return null;
@@ -389,6 +402,8 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
         setFormError(null);
 
         try {
+            // Transaction timestamps must be calculated at submission time, not at render time.
+            // eslint-disable-next-line react-hooks/purity
             const nowSec = Math.floor(Date.now() / 1000);
             const expiresAt = nowSec + duration.hours * 3600 + duration.minutes * 60;
             const resolvesAt = Math.max(Math.floor(selectedDate.getTime() / 1000), expiresAt);
@@ -483,10 +498,12 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
             setIsAdvancedPickerOpen(false);
             setBetAmount(DEFAULT_BET_AMOUNT);
             setSelectedChildCategory(null);
+            const nextResolutionDate = getDefaultResolutionDate(composerNow);
+            setSelectedDate(nextResolutionDate);
             setDuration(durationFromMinutes(DEFAULT_DURATION_MINUTES));
-            setSelectedDate(new Date(Date.now() + DEFAULT_RESOLUTION_DELAY_MS));
             setActivePanel(null);
             setIsPreviewOpen(false);
+            announceChallengeCreated();
             onCreated();
         } catch (error) {
             console.error("Error creating challenge:", error);
@@ -948,8 +965,11 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
                                                 <CalendarDays className="h-4 w-4 shrink-0 text-[#e85a2d]" />
                                                 <input
                                                     type="datetime-local"
+                                                    required
+                                                    step={60}
                                                     value={toDateTimeLocalValue(selectedDate)}
-                                                    min={toDateTimeLocalValue(new Date(composerNow + totalDurationMinutes * 60 * 1000))}
+                                                    min={toDateTimeLocalValue(minResolutionDate)}
+                                                    max={toDateTimeLocalValue(maxResolutionDate)}
                                                     onChange={(event) => handleResolutionDateChange(new Date(event.target.value))}
                                                     className="create-challenge-date-input h-12 w-full min-w-0 flex-1 border-0 bg-transparent text-base font-black text-black outline-none sm:h-11 sm:text-xs"
                                                 />
@@ -1671,6 +1691,10 @@ function ChallengePreview({
             <div inert className="pointer-events-none select-none" aria-label="Challenge card preview">
                 <ChallengeCard challenge={previewChallenge} showPin={false} />
             </div>
+            <div className="mt-3 border-2 border-black bg-[#f5d547] px-3 py-2.5 text-[10px] font-bold leading-relaxed text-[#17120f] shadow-[2px_2px_0_#111]">
+                <span className="font-black uppercase">Important:</span>{" "}
+                You can cancel the challenge and receive a refund only before the join window closes. Once someone accepts the challenge, it can no longer be cancelled.
+            </div>
         </div>
     );
 }
@@ -1678,9 +1702,10 @@ function ChallengePreview({
 function PanelHeading({ children, info }: { children: React.ReactNode; info?: string }) {
     return (
         <h3 className="mb-3 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-[#75645c]">
+            <span>{children}</span>
             {info && (
                 <span
-                    className="group relative inline-flex shrink-0 cursor-help"
+                    className="group relative inline-flex shrink-0 cursor-help animate-pulse"
                     tabIndex={0}
                     aria-label={info}
                 >
@@ -1693,7 +1718,6 @@ function PanelHeading({ children, info }: { children: React.ReactNode; info?: st
                     </span>
                 </span>
             )}
-            <span>{children}</span>
         </h3>
     );
 }
