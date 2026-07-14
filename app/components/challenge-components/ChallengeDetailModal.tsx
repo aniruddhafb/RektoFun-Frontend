@@ -7,6 +7,7 @@ import {
   Activity,
   ArrowRight,
   CalendarDays,
+  ChevronDown,
   Clock3,
   Crosshair,
   Loader2,
@@ -496,7 +497,8 @@ export default function ChallengeDetailModal({ challenge, creator, isOpen, onClo
 
           <div className="mt-3 sm:mt-4">
             {isCrypto ? (
-              <CryptoMarketPanel
+              <LazyCryptoMarketPanel
+                key={challenge.id}
                 asset={challenge.ticker}
                 target={isManualResolution ? undefined : targetPrice}
                 direction={isDirectionalBelow ? "below" : "above"}
@@ -627,6 +629,43 @@ function SummaryStat({ icon: Icon, label, value, accent = false }: {
   );
 }
 
+function LazyCryptoMarketPanel({ asset, target, direction }: {
+  asset: string;
+  target?: number;
+  direction: "above" | "below";
+}) {
+  const [isExpanded, setIsExpanded] = React.useState(false);
+
+  return (
+    <section className="border-2 border-black bg-white shadow-[3px_3px_0_#111]">
+      <button
+        type="button"
+        onClick={() => setIsExpanded((expanded) => !expanded)}
+        aria-expanded={isExpanded}
+        aria-controls="challenge-market-analysis"
+        className="flex w-full cursor-pointer items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-[#f5d547]/25 sm:px-5 sm:py-4"
+      >
+        <span className="flex min-w-0 items-center gap-3">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center border-2 border-black bg-[#163f31] text-white">
+            <Activity className="h-4 w-4" />
+          </span>
+          <span className="min-w-0">
+            <span className="block text-[10px] font-black uppercase tracking-[0.12em] text-[#8b7a72]">Analyze market</span>
+            <span className="block truncate text-sm font-black text-[#17120f]">View the {asset} price chart</span>
+          </span>
+        </span>
+        <ChevronDown className={`h-5 w-5 shrink-0 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`} />
+      </button>
+
+      {isExpanded && (
+        <div id="challenge-market-analysis" className="border-t-2 border-black">
+          <CryptoMarketPanel asset={asset} target={target} direction={direction} />
+        </div>
+      )}
+    </section>
+  );
+}
+
 function CryptoMarketPanel({ asset, target, direction }: {
   asset: string;
   target?: number;
@@ -669,7 +708,7 @@ function CryptoMarketPanel({ asset, target, direction }: {
   const isPositive = priceChange >= 0;
 
   return (
-    <section className="overflow-hidden border-2 border-black bg-[#163f31] text-white shadow-[3px_3px_0_#111]">
+    <section className="overflow-hidden bg-[#163f31] text-white">
       <div className="flex flex-wrap items-start justify-between gap-3 border-b border-white/15 px-4 py-3 sm:px-5">
         <div>
           <div className="flex items-center gap-2">

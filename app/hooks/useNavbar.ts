@@ -9,6 +9,7 @@ import { getDiceBearAvatarUrl } from '@/app/lib/profile-avatar';
 import { User } from '@/app/lib/users-service/users';
 import { fetchRektoBalance, fetchUsdcBalance as fetchUsdcTokenBalance } from '@/app/lib/token-balances';
 import { clearPendingReferralCode, getPendingReferralCode } from '@/app/lib/referral-attribution';
+import { CHALLENGE_CREATED_EVENT } from '@/app/lib/realtime-events';
 
 export function useNavbar() {
   // AppKit hooks
@@ -99,6 +100,17 @@ export function useNavbar() {
 
   useEffect(() => {
     fetchUsdcBalance();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [address, isConnected]);
+
+  useEffect(() => {
+    const refreshBalances = () => {
+      void fetchUsdcBalance();
+    };
+
+    window.addEventListener(CHALLENGE_CREATED_EVENT, refreshBalances);
+    return () => window.removeEventListener(CHALLENGE_CREATED_EVENT, refreshBalances);
+    // The event handler should always use the wallet values from this render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [address, isConnected]);
 
