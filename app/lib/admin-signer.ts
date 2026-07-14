@@ -17,6 +17,12 @@
  */
 
 import { Keypair, PublicKey, Transaction } from "@solana/web3.js";
+import {
+  TOKEN_PROGRAM_ID,
+  createAssociatedTokenAccountInstruction,
+  createTransferInstruction,
+  getAssociatedTokenAddress,
+} from "@solana/spl-token";
 import bs58 from "bs58";
 import {
   buildCreateChallengeTx,
@@ -45,6 +51,63 @@ function getAdminKeypair(): Keypair {
 
 export function getAdminPublicKey(): PublicKey {
   return getAdminKeypair().publicKey;
+}
+
+/**
+ * Build a gas-sponsored SPL token transfer. The admin pays the transaction
+ * fee (and recipient ATA rent when needed), while the token owner must still
+ * add their wallet signature before the transaction can be broadcast.
+ */
+export async function buildAdminSignedTokenTransferTx(args: {
+  sender: PublicKey;
+  recipient: PublicKey;
+  mint: PublicKey;
+  amount: bigint;
+}) {
+  if (args.amount <= BigInt(0)) throw new Error("Transfer amount must be positive.");
+
+  const adminKeypair = getAdminKeypair();
+  const connection = getReadonlyConnection();
+  const senderTokenAccount = await getAssociatedTokenAddress(args.mint, args.sender, false);
+  const recipientTokenAccount = await getAssociatedTokenAddress(args.mint, args.recipient, false);
+
+  const senderAccount = await connection.getAccountInfo(senderTokenAccount);
+  if (!senderAccount) throw new Error("The sender token account does not exist.");
+
+  const tx = new Transaction();
+  const recipientAccount = await connection.getAccountInfo(recipientTokenAccount);
+  if (!recipientAccount) {
+    tx.add(
+      createAssociatedTokenAccountInstruction(
+        adminKeypair.publicKey,
+        recipientTokenAccount,
+        args.recipient,
+        args.mint,
+      ),
+    );
+  }
+
+  tx.add(
+    createTransferInstruction(
+      senderTokenAccount,
+      recipientTokenAccount,
+      args.sender,
+      args.amount,
+      [],
+      TOKEN_PROGRAM_ID,
+    ),
+  );
+
+  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
+  tx.feePayer = adminKeypair.publicKey;
+  tx.recentBlockhash = blockhash;
+  tx.partialSign(adminKeypair);
+
+  return {
+    serializedTx: tx.serialize({ requireAllSignatures: false }).toString("base64"),
+    blockhash,
+    lastValidBlockHeight,
+  };
 }
 
 /**
@@ -88,7 +151,10 @@ export async function buildAdminSignedCreateChallengeTx(
   const [counterPDA] = deriveCreatorCounter(userPubkey);
   let nextChallengeId = 0;
   try {
-    const counter = await (program.account as any).creatorCounter.fetch(counterPDA);
+    const counterAccount = program.account as unknown as {
+      creatorCounter: { fetch: (address: PublicKey) => Promise<{ count: unknown }> };
+    };
+    const counter = await counterAccount.creatorCounter.fetch(counterPDA);
     nextChallengeId = Number(counter.count);
   } catch {
     // Counter doesn't exist yet — this will be the user's first challenge.

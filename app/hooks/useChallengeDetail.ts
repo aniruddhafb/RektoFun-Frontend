@@ -120,7 +120,7 @@ export function useChallengeDetail(
   const opponentAvatar = teamBHighestBet?.profile_image || assetLogo;
   const opponentWalletAddress = teamBHighestBet?.pubkey || "";
   const hasOpponents = Boolean(teamBHighestBet) || Number(challenge?.participants ?? 0) > 1;
-  const isTeam= challenge?.mode === "TEAM";
+  const isTeam = challenge?.mode === "TEAM";
   const betAmount = challenge?.initial_bet ?? 0;
   const composerResolvesAt = challenge?.metadata?.composer?.resolves_at;
   const createdTimestamp = parseTimestamp(challenge?.created_at);
@@ -198,11 +198,12 @@ export function useChallengeDetail(
   const isManualResolution = resolutionMethod !== "PRICE_FEED";
   const isResolutionPending = challenge?.status === "PENDING_RESOLUTION";
   const isResolutionResolved = challenge?.status === "RESOLVED";
+  const isCancelled = challenge?.status === "CANCELLED";
   const isAccepted = isResolutionPending || isResolutionResolved || hasOpponents;
 
   const hasResolveTimePassed = Boolean(resolveTimestamp && resolveTimestamp <= currentTime);
   const showResolvesBox = !isExpireTimeAchieved || hasOpponents;
-  const hideExpiresBox = !isTeam&& hasOpponents;
+  const hideExpiresBox = !isTeam && hasOpponents;
   const timelineColumns = (!hideExpiresBox ? 1 : 0) + 2 + (showResolvesBox ? 1 : 0);
 
   // Countdown texts
@@ -211,17 +212,17 @@ export function useChallengeDetail(
   const createdTimeText = formatCreatedTimeAgo(createdTimestamp, currentTime);
   const resolveDateByText = resolveTimestamp
     ? new Date(resolveTimestamp).toLocaleDateString("en-GB", {
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-      })
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    })
     : "";
   const resolveDayDateText = resolveTimestamp
     ? new Date(resolveTimestamp).toLocaleDateString("en-GB", {
-        weekday: "long",
-        day: "numeric",
-        month: "long",
-      })
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+    })
     : "Unknown date";
 
   const resolvesInText = hasResolveTimePassed
@@ -233,23 +234,27 @@ export function useChallengeDetail(
   const expiresInTextForBox = isExpireTimeAchieved && !hasOpponents ? "Expired" : expiresInText;
 
   // Status label
-  const statusLabel = isResolutionResolved
-    ? "Resolved"
-    : isResolutionPending || hasResolveTimePassed
-      ? "Resolving"
-      : isAccepted
-        ? "Live"
-        : isExpireTimeAchieved
-          ? "Expired"
-          : "Open";
+  const statusLabel = isCancelled
+    ? "Cancelled"
+    : isResolutionResolved
+      ? "Resolved"
+      : isResolutionPending || hasResolveTimePassed
+        ? "Resolving"
+        : isAccepted
+          ? "Live"
+          : isExpireTimeAchieved
+            ? "Expired"
+            : "Open";
 
-  const statusClassName = isResolutionResolved
-    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-    : isResolutionPending || hasResolveTimePassed
-      ? "border-amber-200 bg-amber-50 text-amber-700"
-      : isExpireTimeAchieved && !isAccepted
-        ? "border-red-200 bg-red-50 text-red-700"
-        : "border-[#b9dec9] bg-[#f1fbf5] text-[#246044]";
+  const statusClassName = isCancelled
+    ? "border-gray-300 bg-gray-100 text-gray-700"
+    : isResolutionResolved
+      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+      : isResolutionPending || hasResolveTimePassed
+        ? "border-amber-200 bg-amber-50 text-amber-700"
+        : isExpireTimeAchieved && !isAccepted
+          ? "border-red-200 bg-red-50 text-red-700"
+          : "border-[#b9dec9] bg-[#f1fbf5] text-[#246044]";
 
   // Description
   const challengeTicker = challenge?.ticker?.trim().toLowerCase() || "this asset";
@@ -288,7 +293,11 @@ export function useChallengeDetail(
     let ctaDisabled = false;
     let ctaClassName = "";
 
-    if (!isTeam) {
+    if (isCancelled) {
+      ctaLabel = "CANCELLED";
+      ctaDisabled = true;
+      ctaClassName = completedCtaClassName;
+    } else if (!isTeam) {
       if (isResolveTimeAchieved && isResolutionResolved) {
         ctaLabel = "COMPLETED ✅";
         ctaDisabled = true;
@@ -486,7 +495,7 @@ export function useChallengeDetail(
     statusLabel,
     statusClassName,
     canToggleDescription: isDescriptionTruncatable,
-    modeLabel: isTeam? "Multi Mode" : "PvP Mode",
+    modeLabel: isTeam ? "Multi Mode" : "PvP Mode",
     totalPoolLabel: `$${Number(betAmount || 0).toLocaleString()}`,
     primaryTitle: displayedTitle + (!isManualResolution && isResolveTimeAchieved && resolveDateByText ? ` by ${resolveDateByText}` : ""),
     resolutionLabel: isManualResolution ? "Community resolution" : "Price feed resolution",

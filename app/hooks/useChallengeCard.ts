@@ -16,9 +16,10 @@ import {
   USDC_MULTIPLIER,
   getReadonlyConnection,
 } from "@/app/lib/rektofun-program";
-import { fetchUsdcBalance as fetchUsdcTokenBalance } from "@/app/lib/token-balances";
+import { useTokenBalanceStore } from "@/app/store/useTokenBalanceStore";
 import { stripUsdcQuote } from "@/app/lib/format-market-label";
 import { getUserByWallet } from "@/app/lib/users-service/users";
+import { announceChallengeUpdated } from "@/app/lib/realtime-events";
 
 interface ExactCountdownDetails {
   exactCountdown: string;
@@ -268,30 +269,16 @@ export function useChallengeCard(challenge: Challenge) {
   const [joinSide, setJoinSide] = React.useState<"TEAM_A" | "TEAM_B">("TEAM_B");
   const [currentTime, setCurrentTime] = React.useState(() => Date.now());
   const [escrowAddress, setEscrowAddress] = React.useState<string | undefined>(undefined);
-  const [usdcBalance, setUsdcBalance] = React.useState<number | null>(null);
+  const balanceWalletAddress = useTokenBalanceStore((state) => state.walletAddress);
+  const storedUsdcBalance = useTokenBalanceStore((state) => state.usdcBalance);
+  const loadBalances = useTokenBalanceStore((state) => state.loadBalances);
+  const usdcBalance = balanceWalletAddress === address ? storedUsdcBalance : null;
   const [challengeAction, setChallengeAction] = React.useState<ChallengeAction>(null);
   const [actionError, setActionError] = React.useState("");
+  const [locallyCancelled, setLocallyCancelled] = React.useState(false);
+  const [claimedWinnings, setClaimedWinnings] = React.useState<number | null>(null);
 
   const connection = getReadonlyConnection();
-
-  // Fetch USDC balance
-  React.useEffect(() => {
-    const fetchBalance = async () => {
-      if (!address || !isConnected) {
-        setUsdcBalance(null);
-        return;
-      }
-
-      try {
-        const balance = await fetchUsdcTokenBalance(address);
-        setUsdcBalance(balance);
-      } catch {
-        setUsdcBalance(0);
-      }
-    };
-
-    fetchBalance();
-  }, [address, isConnected, connection]);
 
   // Update current time every second so the exact countdown (with seconds) stays live
   React.useEffect(() => {
@@ -460,9 +447,11 @@ export function useChallengeCard(challenge: Challenge) {
         side: joinSide,
         creator: user.id,
       });
+      await loadBalances(address, true);
       void joinedChallengeRequests.get(user.id)?.then((ids) => ids.add(challenge.id));
 
       setIsBetFormOpen(false);
+      announceChallengeUpdated({ challengeId: challenge.id, action: "joined" });
     } catch (error) {
       console.error("Failed to accept challenge:", error);
       setBetError(GENERIC_ACCEPT_ERROR);
@@ -571,10 +560,10 @@ export function useChallengeCard(challenge: Challenge) {
   const challengeEndTimeText = formatUtcDateTime(resolveTimestamp);
   const resolveDateByText = resolveTimestamp
     ? new Date(resolveTimestamp).toLocaleDateString("en-GB", {
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-      })
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    })
     : "";
   const endsByCountdown = formatEndsByCountdown(resolveTimestamp, currentTime);
   const exactCountdownDetails = formatExactCountdownDetails(resolveTimestamp, currentTime);
@@ -701,6 +690,28 @@ export function useChallengeCard(challenge: Challenge) {
         signAllTransactions: (txs: Transaction[]) => signer.signAllTransactions(txs),
       };
       const program = getRektoProgram(walletAdapter);
+      let winningsAmount: number | null = null;
+      if (availableChallengeAction === "winnings") {
+        const chainChallenge = await fetchChallenge(program, challengePDA);
+        if (!chainChallenge || chainChallenge.winningSideTotalAmount <= BigInt(0)) {
+          throw new Error("Unable to calculate winnings.");
+        }
+        let participantStake = BigInt(0);
+        if (chainChallenge.winningSide === "CreatorTeam") {
+          if (chainChallenge.creator.equals(participant)) {
+            participantStake = chainChallenge.betAmount;
+          } else {
+            const index = chainChallenge.creatorTeam.findIndex((wallet) => wallet.equals(participant));
+            if (index >= 0) participantStake = chainChallenge.creatorTeamAmounts[index] ?? BigInt(0);
+          }
+        } else if (chainChallenge.winningSide === "OpponentTeam") {
+          const index = chainChallenge.opponentTeam.findIndex((wallet) => wallet.equals(participant));
+          if (index >= 0) participantStake = chainChallenge.opponentTeamAmounts[index] ?? BigInt(0);
+        }
+        const payoutMicroUsdc = participantStake * chainChallenge.settledNetPot
+          / chainChallenge.winningSideTotalAmount;
+        winningsAmount = Number(payoutMicroUsdc) / USDC_MULTIPLIER;
+      }
       const tx = availableChallengeAction === "cancel"
         ? await buildCancelChallengeTx(program, participant, challengePDA)
         : availableChallengeAction === "refund"
@@ -717,8 +728,20 @@ export function useChallengeCard(challenge: Challenge) {
         } catch (syncError) {
           console.error("Challenge cancelled on-chain but backend status sync failed:", syncError);
         }
+        setLocallyCancelled(true);
       }
       setChallengeAction(null);
+      if (availableChallengeAction === "winnings" && winningsAmount !== null) {
+        setClaimedWinnings(winningsAmount);
+      }
+      announceChallengeUpdated({
+        challengeId: challenge.id,
+        action: availableChallengeAction === "cancel"
+          ? "cancelled"
+          : availableChallengeAction === "refund"
+            ? "refunded"
+            : "redeemed",
+      });
       router.refresh();
     } catch (error) {
       console.error("Challenge action failed:", error);
@@ -755,6 +778,10 @@ export function useChallengeCard(challenge: Challenge) {
         : availableChallengeAction === "refund" ? "Claim refund" : "Claim winnings";
       ctaDisabled = isLoading;
       ctaClassName = activeCtaClassName;
+    } else if (locallyCancelled || challenge.status === "CANCELLED") {
+      ctaLabel = "Cancelled";
+      ctaDisabled = true;
+      ctaClassName = completedCtaClassName;
     } else if (isPvpMode) {
       if (isResolveTimeAchieved && hasOpponents && isResolutionResolved) {
         ctaLabel = "Completed";
@@ -907,6 +934,8 @@ export function useChallengeCard(challenge: Challenge) {
     ctaState,
     challengeAction: availableChallengeAction,
     actionError,
+    claimedWinnings,
+    closeWinningsShare: () => setClaimedWinnings(null),
     isBattleOnState,
     isResolvingState,
     isCompletedState,

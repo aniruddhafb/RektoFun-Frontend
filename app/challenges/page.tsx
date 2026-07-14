@@ -12,6 +12,7 @@ import { CreateChallengeModal } from "../components/challenge-components/CreateC
 import { Challenge, getChallengeById } from "../lib/challenges-service/challenges";
 import ChallengeDetailModal from "../components/challenge-components/ChallengeDetailModal";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { CHALLENGE_UPDATED_EVENT, type ChallengeUpdatedDetail } from "../lib/realtime-events";
 
 const BOOKMARKS_STORAGE_KEY = "rektofun:challenge-bookmarks";
 
@@ -113,6 +114,20 @@ function ChallengesPageContent() {
     setShowCreateSuccessToast(true);
   };
 
+
+  useEffect(() => {
+    const refreshSelectedChallenge = (event: Event) => {
+      const { challengeId } = (event as CustomEvent<ChallengeUpdatedDetail>).detail;
+      if (selectedChallenge?.id !== challengeId) return;
+
+      getChallengeById(challengeId)
+        .then(setSelectedChallenge)
+        .catch((error) => console.error("Failed to refresh open challenge:", error));
+    };
+
+    window.addEventListener(CHALLENGE_UPDATED_EVENT, refreshSelectedChallenge);
+    return () => window.removeEventListener(CHALLENGE_UPDATED_EVENT, refreshSelectedChallenge);
+  }, [selectedChallenge?.id]);
 
   useEffect(() => {
     if (!showCreateSuccessToast) return;

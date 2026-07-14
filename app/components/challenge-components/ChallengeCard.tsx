@@ -7,6 +7,7 @@ import { useChallengeCard } from "@/app/hooks/useChallengeCard";
 import { Challenge } from "@/app/lib/challenges-service/challenges";
 import { ShareChallengeModal } from "./ShareChallengeModal";
 import { ProfileHoverPreview } from "./ProfileHoverPreview";
+import { WinningsShareModal } from "./WinningsShareModal";
 
 interface ChallengeCardProps {
     challenge: Challenge;
@@ -80,6 +81,8 @@ export function ChallengeCard({
         challengeAction,
         actionError,
         handleChallengeAction,
+        claimedWinnings,
+        closeWinningsShare,
         isBattleOnState,
         isResolvingState,
         isCompletedState,
@@ -148,7 +151,7 @@ export function ChallengeCard({
     return (
         <>
             <div onClick={handleClick}
-                className="challenge-card-shell group/card relative block cursor-pointer overflow-visible rounded-xl border border-gray-200 bg-[#fffaf6] p-3 transition-all duration-300 hover:z-40 hover:-translate-y-0.5 hover:border-gray-300 hover:shadow-md focus-within:z-40 sm:p-4"
+                className="challenge-card-shell group/card relative block cursor-pointer overflow-visible rounded-xl border border-gray-200 bg-[#fffaf6] p-3 transition-all duration-300 hover:z-30 hover:-translate-y-0.5 hover:border-gray-300 hover:shadow-md focus-within:z-30 sm:p-4"
             >
                 {/* Header */}
                 <div className="mb-3 flex items-start justify-between gap-2">
@@ -676,6 +679,12 @@ export function ChallengeCard({
                 onJoinSideChange={(side) => setJoinSide(side)}
             />
             <ShareChallengeModal challenge={challenge} isOpen={isShareModalOpen} onClose={() => setIsShareModalOpen(false)} />
+            <WinningsShareModal
+                challenge={challenge}
+                amount={claimedWinnings ?? 0}
+                isOpen={claimedWinnings !== null}
+                onClose={closeWinningsShare}
+            />
         </>
     );
 }

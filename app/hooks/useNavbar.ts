@@ -7,7 +7,7 @@ import { useUserStore } from '@/app/store/useUserStore';
 import { createUser, getUserByPubkey } from '@/app/lib/users-service/users';
 import { getDiceBearAvatarUrl } from '@/app/lib/profile-avatar';
 import { User } from '@/app/lib/users-service/users';
-import { fetchRektoBalance, fetchUsdcBalance as fetchUsdcTokenBalance } from '@/app/lib/token-balances';
+import { useTokenBalanceStore } from '@/app/store/useTokenBalanceStore';
 import { clearPendingReferralCode, getPendingReferralCode } from '@/app/lib/referral-attribution';
 import { CHALLENGE_CREATED_EVENT } from '@/app/lib/realtime-events';
 
@@ -37,8 +37,13 @@ export function useNavbar() {
   const [userProfileData, setUserProfileData] = useState<{ username: string; profileImage: string } | null>(null);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [initializedAddress, setInitializedAddress] = useState<string | null>(null);
-  const [usdcBalance, setUsdcBalance] = useState<number | null>(null);
-  const [rektoBalance, setRektoBalance] = useState<number | null>(null);
+  const balanceWalletAddress = useTokenBalanceStore((state) => state.walletAddress);
+  const storedUsdcBalance = useTokenBalanceStore((state) => state.usdcBalance);
+  const storedRektoBalance = useTokenBalanceStore((state) => state.rektoBalance);
+  const loadBalances = useTokenBalanceStore((state) => state.loadBalances);
+  const clearBalances = useTokenBalanceStore((state) => state.clearBalances);
+  const usdcBalance = balanceWalletAddress === address ? storedUsdcBalance : null;
+  const rektoBalance = balanceWalletAddress === address ? storedRektoBalance : null;
 
   const createRandomUsername = (walletAddress: string) => {
     const adjectives = ['Lucky', 'Brave', 'Swift', 'Cosmic', 'Rekto', 'Mighty', 'Sunny', 'Wild'];
@@ -79,23 +84,12 @@ export function useNavbar() {
 
 
   // Fetch tracked asset balances
-  const fetchUsdcBalance = async () => {
+  const fetchUsdcBalance = async (force = false) => {
     if (!address || !isConnected) {
-      setUsdcBalance(null);
-      setRektoBalance(null);
+      clearBalances();
       return;
     }
-
-    try {
-      const [usdc, rekto] = await Promise.all([
-        fetchUsdcTokenBalance(address).catch(() => 0),
-        fetchRektoBalance(address).catch(() => 0),
-      ]);
-      setUsdcBalance(usdc);
-      setRektoBalance(rekto);
-    } catch {
-      setUsdcBalance(0);
-    }
+    await loadBalances(address, force);
   };
 
   useEffect(() => {
@@ -105,7 +99,7 @@ export function useNavbar() {
 
   useEffect(() => {
     const refreshBalances = () => {
-      void fetchUsdcBalance();
+      void fetchUsdcBalance(true);
     };
 
     window.addEventListener(CHALLENGE_CREATED_EVENT, refreshBalances);
@@ -113,6 +107,12 @@ export function useNavbar() {
     // The event handler should always use the wallet values from this render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [address, isConnected]);
+
+  useEffect(() => {
+    if (isDepositModalOpen) void fetchUsdcBalance(true);
+    // Opening the modal is an explicit balance refresh trigger.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDepositModalOpen]);
 
   // Sync store user when it changes
   useEffect(() => {
