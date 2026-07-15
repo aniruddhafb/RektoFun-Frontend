@@ -101,7 +101,8 @@ const FALLBACK_AVATAR = "/scribbles/btc.png";
 function cleanCtaLabel(label: string) {
   const normalized = label.toLowerCase();
   if (normalized.includes("join")) return "Join challenge";
-  if (normalized.includes("ongoing") || normalized.includes("battle")) return "Battle live";
+  if (normalized.includes("battle ongoing")) return "Battle ongoing";
+  if (normalized.includes("ongoing") || normalized.includes("battle") || normalized === "live") return "Live";
   if (normalized.includes("resolving")) return "Resolving";
   if (normalized.includes("complete")) return "Completed";
   if (normalized.includes("expired")) return "Expired";
@@ -277,10 +278,16 @@ export default function ChallengeDetailModal({ challenge, creator, isOpen, onClo
     targetPrice,
     isDirectionalBelow,
     isManualResolution,
+    hasOpponents,
     isExpireTimeAchieved,
     isResolveTimeAchieved,
-    isResolutionPending,
     isResolutionResolved,
+    lifecycle,
+    showResolvesBox,
+    hideExpiresBox,
+    timelineColumns,
+    hasWon,
+    hasLost,
     endsInText,
     resolvesInText,
     expiresInTextForBox,
@@ -444,6 +451,18 @@ export default function ChallengeDetailModal({ challenge, creator, isOpen, onClo
   const teamB = participants.filter((participant) => participant.side === "TEAM_B");
   const teamAStake = teamA.reduce((sum, participant) => sum + participant.bet, 0);
   const teamBStake = teamB.reduce((sum, participant) => sum + participant.bet, 0);
+  const winningSide: ParticipantView["side"] | null = teamB.length === 0
+    ? null
+    : isResolutionResolved
+      ? challenge.result === "TEAM_A" || challenge.result === "TEAM_B" ? challenge.result : null
+      : isManualResolution
+        ? null
+        : hasWon
+          ? "TEAM_A"
+          : hasLost
+            ? "TEAM_B"
+            : null;
+  const winningLabel = isResolutionResolved ? "Winner" : "Leading";
   const recordedPool = teamAStake + teamBStake;
   const totalPool = recordedPool || challenge.total_pool || challenge.pool_size || challenge.initial_bet || 0;
   const escrowAddress = typeof challenge.metadata?.onchain?.challenge_pda === "string"
@@ -453,6 +472,11 @@ export default function ChallengeDetailModal({ challenge, creator, isOpen, onClo
   const escrowHref = escrowAddress
     ? `https://solscan.io/account/${encodeURIComponent(escrowAddress)}${getSolscanClusterQuery()}`
     : "";
+  const joinsCloseText = !isTeam && hasOpponents
+    ? "Opponent matched"
+    : isTeam && isExpireTimeAchieved
+      ? "Window expired"
+      : expiresInTextForBox;
   const participantLoading = participantState.key !== String(challenge.id) && !participantState.failed;
   const composerMarket = challenge.metadata?.composer?.market;
   const isSports = challenge.category?.toLowerCase() === "sports" || composerMarket === "sports" || challenge.ticker === "SPORTS";
@@ -519,15 +543,15 @@ export default function ChallengeDetailModal({ challenge, creator, isOpen, onClo
               </div>
             </div>
 
-            <div className="mt-4 grid grid-cols-2 gap-2 border-t border-black/10 pt-4 sm:grid-cols-4">
+            <div className={`mt-4 grid grid-cols-2 gap-2 border-t border-black/10 pt-4 ${timelineColumns === 3 ? "sm:grid-cols-3" : "sm:grid-cols-4"}`}>
               <SummaryStat icon={Trophy} label="Pool" value={formatMoney(totalPool)} />
               {isCrypto && !isManualResolution ? (
                 <SummaryStat icon={Target} label="Target" value={formatPrice(targetPrice)} accent />
               ) : (
                 <SummaryStat icon={ShieldCheck} label="Resolution" value={isSports ? "Community" : resolutionLabel.replace(" resolution", "")} />
               )}
-              <SummaryStat icon={Clock3} label="Joins close" value={expiresInTextForBox} />
-              <SummaryStat icon={CalendarDays} label="Resolves" value={resolvesInText || "On result"} />
+              {!hideExpiresBox && <SummaryStat icon={Clock3} label="Joins close" value={joinsCloseText} />}
+              {showResolvesBox && <SummaryStat icon={CalendarDays} label="Resolves" value={resolvesInText || "On result"} />}
             </div>
 
           </section>
@@ -545,7 +569,7 @@ export default function ChallengeDetailModal({ challenge, creator, isOpen, onClo
                 statusLabel={statusLabel}
                 resolvesIn={resolvesInText || "After the event"}
                 isResolved={isResolutionResolved}
-                isResolving={isResolutionPending}
+                isResolving={lifecycle === "RESOLVING"}
               />
             )}
           </div>
@@ -583,11 +607,13 @@ export default function ChallengeDetailModal({ challenge, creator, isOpen, onClo
                       subtitle={`${teamA.length} ${teamA.length === 1 ? "bet" : "bets"}`}
                       onOpenProfile={openProfile}
                       align="left"
+                      isWinning={winningSide === "TEAM_A"}
+                      winningLabel={winningLabel}
                     />
                   </div>
 
                   <div className="flex w-16 shrink-0 items-center justify-center pb-10 sm:w-20 sm:pb-11">
-                    {teamB.length ? (
+                    {lifecycle === "LIVE" && hasOpponents ? (
                       <video
                         src="/animations/Sword%20Battle.webm"
                         autoPlay
@@ -614,6 +640,8 @@ export default function ChallengeDetailModal({ challenge, creator, isOpen, onClo
                       onOpenProfile={openProfile}
                       dashed={!teamB.length}
                       align="right"
+                      isWinning={winningSide === "TEAM_B"}
+                      winningLabel={winningLabel}
                     />
                   </div>
                 </div>
@@ -980,7 +1008,7 @@ function SportsOutcomePanel({ statusLabel, resolvesIn, isResolved, isResolving }
   );
 }
 
-function ClassicParticipantCard({ participants, label, emptyTitle, subtitle, onOpenProfile, align, dashed = false }: {
+function ClassicParticipantCard({ participants, label, emptyTitle, subtitle, onOpenProfile, align, dashed = false, isWinning = false, winningLabel = "Leading" }: {
   participants: ParticipantView[];
   label: string;
   emptyTitle: string;
@@ -988,6 +1016,8 @@ function ClassicParticipantCard({ participants, label, emptyTitle, subtitle, onO
   onOpenProfile: (wallet: string | null | undefined) => void;
   align: "left" | "right";
   dashed?: boolean;
+  isWinning?: boolean;
+  winningLabel?: "Leading" | "Winner";
 }) {
   const primary = participants[0];
   const visibleParticipants = participants.slice(0, 3);
@@ -1000,8 +1030,16 @@ function ClassicParticipantCard({ participants, label, emptyTitle, subtitle, onO
       onBlurCapture={(event) => {
         if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setActiveParticipantKey(null);
       }}
-      className={`relative flex h-[132px] w-[98px] max-w-full shrink-0 flex-col items-center justify-center rounded-xl p-2 text-center transition-transform hover:-translate-y-0.5 sm:h-[140px] sm:w-[120px] sm:p-3 ${activeParticipant ? "z-[70]" : ""} ${dashed ? "border-2 border-dashed border-[#ead2c4] bg-[#fffaf6]" : "border-2 border-[#d4a574]/35 bg-white shadow-[0_5px_16px_rgba(77,48,32,.05)]"}`}
+      className={`relative flex h-[132px] w-[98px] max-w-full shrink-0 flex-col items-center justify-center rounded-xl p-2 text-center transition-transform hover:-translate-y-0.5 sm:h-[140px] sm:w-[120px] sm:p-3 ${activeParticipant ? "z-[70]" : ""} ${isWinning ? `border-2 border-emerald-600 bg-emerald-50 ${winningLabel === "Winner" ? "shadow-[0_0_0_3px_rgba(16,185,129,.14),0_8px_22px_rgba(16,185,129,.24)]" : "shadow-none"}` : dashed ? "border-2 border-dashed border-[#ead2c4] bg-[#fffaf6]" : "border-2 border-[#d4a574]/35 bg-white shadow-[0_5px_16px_rgba(77,48,32,.05)]"}`}
     >
+      {isWinning && (
+        <>
+          <span className="pointer-events-none absolute inset-0 rounded-xl border-2 border-emerald-400/70 motion-safe:animate-pulse" aria-hidden="true" />
+          <span className={`absolute -top-3 left-1/2 z-30 inline-flex -translate-x-1/2 items-center gap-1 whitespace-nowrap rounded-full border-2 border-black bg-[#f5d547] px-2 py-0.5 text-[8px] font-black uppercase tracking-[0.08em] text-black ${winningLabel === "Winner" ? "shadow-[2px_2px_0_#111]" : "shadow-none"}`}>
+            <Trophy className="h-3 w-3 motion-safe:animate-bounce" aria-hidden="true" /> {winningLabel}
+          </span>
+        </>
+      )}
       {primary ? (
         <>
           <span className="relative flex h-12 w-full items-center justify-center sm:h-14">

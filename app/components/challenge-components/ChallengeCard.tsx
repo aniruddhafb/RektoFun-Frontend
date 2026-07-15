@@ -168,8 +168,6 @@ export function ChallengeCard({
         isExpiresInState,
         expiryStatusText,
         expiryTooltipText,
-        hasWon,
-        hasLost,
         usdcBalance,
         modalMinAcceptBet,
         requiresCreatorStakeMatch,
@@ -422,18 +420,7 @@ export function ChallengeCard({
                             }}
                             className={`relative group flex flex-col items-center ${activeProfilePreview === "creator" ? "z-30" : ""}`}
                         >
-                            <div className={`challenge-card-profile-tile relative flex h-[132px] w-[98px] max-w-full flex-col items-center justify-center p-2 transition-all duration-300 sm:h-[140px] sm:w-[120px] sm:p-3 ${isPvpMode ? "rounded-none" : "rounded-xl"} ${hasWon
-                                ? "bg-gradient-to-br from-amber-100 to-yellow-50 border-2 border-amber-400"
-                                : hasLost
-                                    ? "bg-gradient-to-br from-red-100 to-rose-50 border-2 border-red-300"
-                                    : "bg-white/80 border-2 border-[#d4a574]/30"
-                                }`}>
-                                {/* Winner Crown */}
-                                {hasWon && (
-                                    <div className="text-2xl">
-                                        👑
-                                    </div>
-                                )}
+                            <div className={`challenge-card-profile-tile relative flex h-[132px] w-[98px] max-w-full flex-col items-center justify-center border-2 border-[#d4a574]/30 bg-white/80 p-2 transition-all duration-300 sm:h-[140px] sm:w-[120px] sm:p-3 ${isPvpMode ? "rounded-none" : "rounded-xl"}`}>
 
                                 {/* Avatar */}
                                 {isTeam ? (
@@ -443,7 +430,7 @@ export function ChallengeCard({
                                         onOpenProfile={openProfile}
                                     />
                                 ) : <div className="relative">
-                                    <div className={`h-11 w-11 overflow-hidden rounded-full border-2 sm:h-14 sm:w-14 ${hasWon ? "border-amber-400" : "border-[#d4a574]"}`}>
+                                    <div className="h-11 w-11 overflow-hidden rounded-full border-2 border-[#d4a574] sm:h-14 sm:w-14">
                                         <Image
                                             src={creatorProfileImage}
                                             alt={creatorDisplayName}
@@ -470,11 +457,7 @@ export function ChallengeCard({
                                                 ? `${teamATotalBets} ${teamATotalBets === 1 ? "bet" : "bets"}`
                                                 : `Has bet $${teamATotalAmount}`}
                                         </p>
-                                    ) : (
-                                        <p className="mt-0.5 break-all text-[10px] text-[#8b7355]">
-                                            {hasWon ? "Won!" : hasLost ? "Lost" : ""}
-                                        </p>
-                                    )}
+                                    ) : null}
                                 </div>
                             </div>
 
@@ -547,18 +530,7 @@ export function ChallengeCard({
                                 }}
                                 className={`relative group flex flex-col items-center ${activeProfilePreview === "opponent" ? "z-30" : ""}`}
                             >
-                                <div className={`challenge-card-profile-tile relative flex h-[132px] w-[98px] max-w-full flex-col items-center justify-center p-2 transition-all duration-300 sm:h-[140px] sm:w-[120px] sm:p-3 ${isPvpMode ? "rounded-none" : "rounded-xl"} ${hasLost
-                                    ? "bg-gradient-to-br from-amber-100 to-yellow-50 border-2 border-amber-400"
-                                    : hasWon
-                                        ? "bg-gradient-to-br from-red-100 to-rose-50 border-2 border-red-300"
-                                        : "bg-white/80 border-2 border-[#d4a574]/30"
-                                    }`}>
-                                    {/* Winner Crown */}
-                                    {hasLost && (
-                                        <div className="text-2xl">
-                                            👑
-                                        </div>
-                                    )}
+                                <div className={`challenge-card-profile-tile relative flex h-[132px] w-[98px] max-w-full flex-col items-center justify-center border-2 border-[#d4a574]/30 bg-white/80 p-2 transition-all duration-300 sm:h-[140px] sm:w-[120px] sm:p-3 ${isPvpMode ? "rounded-none" : "rounded-xl"}`}>
 
                                     {/* Avatar */}
                                     {isTeam ? (
@@ -568,7 +540,7 @@ export function ChallengeCard({
                                             onOpenProfile={openProfile}
                                         />
                                     ) : <div className="relative">
-                                        <div className={`h-11 w-11 overflow-hidden rounded-full border-2 sm:h-14 sm:w-14 ${hasLost ? "border-amber-400" : "border-[#d4a574]"}`}>
+                                        <div className="h-11 w-11 overflow-hidden rounded-full border-2 border-[#d4a574] sm:h-14 sm:w-14">
                                             <Image
                                                 src={opponentProfileImage}
                                                 alt={opponentDisplayName}
@@ -595,11 +567,7 @@ export function ChallengeCard({
                                                     ? `${teamBTotalBets} ${teamBTotalBets === 1 ? "bet" : "bets"}`
                                                     : `Has bet $${teamBTotalAmount}`}
                                             </p>
-                                        ) : (
-                                            <p className="mt-0.5 break-all text-[10px] text-[#8b7355]">
-                                                {hasLost ? "Won!" : hasWon ? "Lost" : ""}
-                                            </p>
-                                        )}
+                                        ) : null}
                                     </div>
                                 </div>
                                 {activeProfilePreview === "opponent" && (

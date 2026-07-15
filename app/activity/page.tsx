@@ -19,12 +19,13 @@ import {
 import { ChallengeActivity, getActivityLabel, getActivityVerb, getChallengeActivityPage } from "@/app/lib/activity-service/activity";
 import { useBodyScrollLock } from "@/app/lib/useBodyScrollLock";
 import { stripUsdcQuote } from "@/app/lib/format-market-label";
+import { getChallengeLifecycle, type ChallengeLifecycle } from "@/app/lib/challenge-lifecycle";
 
-type ActivityType = "All Activity" | "Sports" | "Crypto" | "PVP Mode" | "Multi Mode";
-type ActivityStatus = "All Status" | "Expired" | "Ongoing" | "Resolved" | "Resolving" | "Completed";
+type ActivityType = "All Activity" | "Sports" | "Crypto" | "PVP Mode" | "Team Mode";
+type ActivityStatus = "All Status" | "Open" | "Live" | "Resolving" | "Resolved" | "Expired" | "Cancelled";
 
-const activityTypeOptions: ActivityType[] = ["All Activity", "Sports", "Crypto", "PVP Mode", "Multi Mode"];
-const activityStatusOptions: ActivityStatus[] = ["All Status", "Expired", "Ongoing", "Resolved", "Resolving", "Completed"];
+const activityTypeOptions: ActivityType[] = ["All Activity", "Sports", "Crypto", "PVP Mode", "Team Mode"];
+const activityStatusOptions: ActivityStatus[] = ["All Status", "Open", "Live", "Resolving", "Resolved", "Expired", "Cancelled"];
 const SKELETON_CARDS_COUNT = 4;
 
 function getChallengeEndTime(challenge: Challenge): string {
@@ -69,8 +70,24 @@ function getShortWallet(address: string): string {
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
 }
 
-function getStatusKey(challenge: Challenge): string {
-    return (challenge.status || "").toLowerCase();
+function getActivityLifecycle(challenge: Challenge, currentTimeMs: number): ChallengeLifecycle {
+    const composerResolvesAt = challenge.metadata?.composer?.resolves_at;
+    const resolveValue = typeof composerResolvesAt === "string"
+        ? composerResolvesAt
+        : challenge.resolve_time || challenge.resolution_date;
+    const expiryValue = challenge.expire_time || challenge.expiry;
+    const resolveMs = resolveValue ? new Date(resolveValue).getTime() : Number.NaN;
+    const expiryMs = expiryValue ? new Date(expiryValue).getTime() : Number.NaN;
+    const hasOpponents = Boolean(challenge.bet_info?.highest_bet?.TEAM_B)
+        || Number(challenge.participants || 0) > 1;
+
+    return getChallengeLifecycle({
+        status: challenge.status,
+        hasOpponents,
+        resolveTimestamp: Number.isFinite(resolveMs) ? resolveMs : null,
+        expiryTimestamp: Number.isFinite(expiryMs) ? expiryMs : null,
+        now: currentTimeMs,
+    });
 }
 
 function getModeLabel(mode?: string): string {
@@ -81,32 +98,28 @@ function getModeLabel(mode?: string): string {
 }
 
 function getResolutionStatus(challenge: Challenge, currentTimeMs: number): string {
-    const challengeStatus = getStatusKey(challenge);
     const resolutionStatus = challenge.resolution_status?.trim().toLowerCase();
-    const resolveMs = new Date(challenge.resolve_time).getTime();
+    const lifecycle = getActivityLifecycle(challenge, currentTimeMs);
 
-    if (challengeStatus === "resolved" || Boolean(challenge.resolved_at)) return "Resolved";
-    if (challengeStatus === "cancelled") return "Cancelled";
+    if (lifecycle === "RESOLVED") return "Resolved";
+    if (lifecycle === "CANCELLED") return "Cancelled";
     if (resolutionStatus && !["none", "null", "pending"].includes(resolutionStatus)) {
         return resolutionStatus
             .split("_")
             .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
             .join(" ");
     }
-    if (
-        challengeStatus === "locked" ||
-        challengeStatus === "pending_resolution" ||
-        (Number.isFinite(resolveMs) && resolveMs <= currentTimeMs)
-    ) {
-        return "Resolving";
-    }
-    return "Pending";
+    if (lifecycle === "RESOLVING") return "Resolving";
+    if (lifecycle === "LIVE") return "Live";
+    if (lifecycle === "EXPIRED") return "Expired";
+    return "Open";
 }
 
 function getResolutionStatusClass(status: string): string {
     if (status === "Resolved") return "border-emerald-200 bg-emerald-50 text-emerald-700";
-    if (status === "Cancelled" || status === "Failed") return "border-red-200 bg-red-50 text-red-700";
+    if (status === "Cancelled" || status === "Expired" || status === "Failed") return "border-red-200 bg-red-50 text-red-700";
     if (status === "Resolving") return "border-amber-200 bg-amber-50 text-amber-700";
+    if (status === "Live") return "border-emerald-200 bg-emerald-50 text-emerald-700";
     return "border-sky-200 bg-sky-50 text-sky-700";
 }
 
@@ -320,11 +333,8 @@ export default function ActivityPage() {
             const marketName = challenge.market?.name?.toLowerCase() ?? "";
             const parentId = challenge.market?.parent_id?.toLowerCase() ?? "";
             const resolutionSource = challenge.resolution_source?.toLowerCase() ?? "";
-            const resolutionStatus = challenge.resolution_status?.toLowerCase() ?? "";
             const normalizedSearch = searchQuery.trim().toLowerCase();
-            const expireMs = new Date(challenge.expire_time).getTime();
-            const resolveMs = new Date(challenge.resolve_time).getTime();
-            const status = getStatusKey(challenge);
+            const lifecycle = getActivityLifecycle(challenge, currentTimeMs);
             const creator = getActivityCreator(challenge);
 
             const matchesType =
@@ -336,19 +346,11 @@ export default function ActivityPage() {
                     !parentId.includes("sport") &&
                     resolutionSource !== "manual") ||
                 (activeFilter === "PVP Mode" && mode.includes("pvp")) ||
-                (activeFilter === "Multi Mode" && (mode.includes("multi") || mode.includes("team")));
+                (activeFilter === "Team Mode" && (mode.includes("multi") || mode.includes("team")));
 
             const matchesStatus =
                 activeStatus === "All Status" ||
-                (activeStatus === "Expired" && Number.isFinite(expireMs) && expireMs <= currentTimeMs && status !== "resolved") ||
-                (activeStatus === "Ongoing" && status === "open" && (!Number.isFinite(expireMs) || expireMs > currentTimeMs)) ||
-                (activeStatus === "Resolved" && status === "resolved") ||
-                (activeStatus === "Resolving" &&
-                    (status === "locked" ||
-                        status === "pending_resolution" ||
-                        resolutionStatus.includes("resolving") ||
-                        (Number.isFinite(resolveMs) && resolveMs <= currentTimeMs && status !== "resolved"))) ||
-                (activeStatus === "Completed" && (status === "resolved" || Boolean(challenge.resolved_at)));
+                activeStatus.toUpperCase() === lifecycle;
 
             const matchesSearch =
                 normalizedSearch.length === 0 ||

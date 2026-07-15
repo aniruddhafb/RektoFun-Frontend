@@ -486,6 +486,12 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
                     resolvesAt,
                     challengeType: challengeMode,
                     maxTeamSize: 0,
+                    statement: challengeStatement,
+                    ticker,
+                    tradingPair: topic,
+                    target: targetPrice,
+                    resolutionMethod: isPriceFeed ? "PRICE_FEED" : "COMMUNITY",
+                    resolutionDate: new Date(resolvesAt * 1000).toISOString().split("T")[0],
                 }),
             });
 

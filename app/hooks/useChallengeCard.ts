@@ -1,6 +1,6 @@
 import React from "react";
 import { useRouter } from "next/navigation";
-import { useAppKitAccount, useAppKitProvider } from "@reown/appkit/react";
+import { useAppKit, useAppKitAccount, useAppKitProvider } from "@reown/appkit/react";
 import { PublicKey, Transaction } from "@solana/web3.js";
 import { Challenge, getChallengeById, getChallengeCategoryImage, updateChallengeStatus } from "@/app/lib/challenges-service/challenges";
 import { createPosition, getPositions } from "@/app/lib/positions-service/positions";
@@ -16,6 +16,7 @@ import { useTokenBalanceStore } from "@/app/store/useTokenBalanceStore";
 import { stripUsdcQuote } from "@/app/lib/format-market-label";
 import { getUserByWallet } from "@/app/lib/users-service/users";
 import { announceChallengeUpdated } from "@/app/lib/realtime-events";
+import { getChallengeLifecycle } from "@/app/lib/challenge-lifecycle";
 
 interface ExactCountdownDetails {
   exactCountdown: string;
@@ -256,6 +257,7 @@ export function useChallengeCard(challenge: Challenge) {
   const router = useRouter();
   const { user } = useUserStore();
   const { address, isConnected } = useAppKitAccount();
+  const { open } = useAppKit();
   const { walletProvider } = useAppKitProvider("solana");
 
   const [isLoading, setIsLoading] = React.useState(false);
@@ -389,6 +391,10 @@ export function useChallengeCard(challenge: Challenge) {
   const openBetForm = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (hasJoinedChallenge || isJoinedStatusLoading) return;
+    if (!isConnected || !address) {
+      open();
+      return;
+    }
     setBetInput(String(challenge.initial_bet ?? ""));
     setBetError("");
     setJoinSide("TEAM_B");
@@ -604,9 +610,6 @@ export function useChallengeCard(challenge: Challenge) {
     teamBHighestBet?.user_type,
   );
 
-  const hasWon = false;
-  const hasLost = false;
-
   const totalPooledAmount = teamATotalAmount + teamBTotalAmount;
   const resolvedPoolAmount = totalPooledAmount > 0
     ? totalPooledAmount
@@ -645,10 +648,20 @@ export function useChallengeCard(challenge: Challenge) {
   const isManualResolution = challenge.resolution_method !== "PRICE_FEED";
   const totalOpponents = Math.max((challenge.participants ?? 0) - 1, 0);
   const hasOpponents = hasOpponentInfo || totalOpponents > 0;
+  // These names describe the creator side's outcome and are also used to
+  // decorate the two participant tiles. Only show a winner once the backend
+  // has confirmed the result and both sides exist.
+  const hasWon = hasOpponents && challenge.status === "RESOLVED" && challenge.result === "TEAM_A";
+  const hasLost = hasOpponents && challenge.status === "RESOLVED" && challenge.result === "TEAM_B";
   const isExpireTimeAchieved = Boolean(expiryTimestamp && expiryTimestamp <= currentTime);
   const isResolveTimeAchieved = Boolean(resolveTimestamp && resolveTimestamp <= currentTime);
-  const isResolutionPending = challenge.status === "PENDING_RESOLUTION";
-  const isResolutionResolved = challenge.status === "RESOLVED";
+  const lifecycle = getChallengeLifecycle({
+    status: locallyCancelled ? "CANCELLED" : challenge.status,
+    hasOpponents,
+    expiryTimestamp,
+    resolveTimestamp,
+    now: currentTime,
+  });
 
   React.useEffect(() => {
     if (!address || !walletProvider || !isConnected) {
@@ -845,6 +858,8 @@ export function useChallengeCard(challenge: Challenge) {
   const resolvingCtaClassName =
     `${ctaBaseClassName} bg-amber-100 text-amber-700 hover:shadow-[2px_2px_0_#111] cursor-not-allowed`;
   const completedCtaClassName =
+    `${ctaBaseClassName} bg-[#008080] opacity-80 text-white hover:shadow-[2px_2px_0_#111] cursor-not-allowed`;
+  const cancelledCtaClassName =
     `${ctaBaseClassName} bg-gray-200 text-gray-700 hover:shadow-[2px_2px_0_#111] cursor-not-allowed`;
 
   const getCtaButtonState = (): CTAButtonState => {
@@ -860,61 +875,43 @@ export function useChallengeCard(challenge: Challenge) {
       ctaClassName = availableChallengeAction === "cancel" && !isExpireTimeAchieved
         ? destructiveCtaClassName
         : activeCtaClassName;
-    } else if (locallyCancelled || challenge.status === "CANCELLED") {
+    } else if (lifecycle === "CANCELLED") {
       ctaLabel = "Cancelled";
       ctaDisabled = true;
+      ctaClassName = cancelledCtaClassName;
+    } else if (lifecycle === "RESOLVED") {
+      ctaLabel = "Completed";
+      ctaDisabled = true;
       ctaClassName = completedCtaClassName;
+    } else if (lifecycle === "RESOLVING") {
+      ctaLabel = "Resolving";
+      ctaDisabled = true;
+      ctaClassName = resolvingCtaClassName;
     } else if (hasJoinedChallenge) {
       ctaLabel = "Already joined";
       ctaDisabled = true;
       ctaClassName = ongoingCtaClassName;
-    } else if (isPvpMode) {
-      if (isResolveTimeAchieved && hasOpponents && isResolutionResolved) {
-        ctaLabel = "Completed";
-        ctaDisabled = true;
-        ctaClassName = completedCtaClassName;
-      } else if (isResolveTimeAchieved && hasOpponents && isResolutionPending) {
-        ctaLabel = "Resolving";
-        ctaDisabled = true;
-        ctaClassName = resolvingCtaClassName;
-      } else if (!isResolveTimeAchieved && hasOpponents) {
-        ctaLabel = "Battle live";
-        ctaDisabled = true;
-        ctaClassName = ongoingCtaClassName;
-      } else if (isExpireTimeAchieved && !hasOpponents) {
-        ctaLabel = "Expired";
-        ctaDisabled = true;
-        ctaClassName = expiredCtaClassName;
-      } else {
-        ctaLabel = "Join challenge";
-        ctaDisabled = isLoading || isCreator || isJoinedStatusLoading;
-        ctaClassName = activePvpCtaClassName;
-      }
-    } else if (isTeam) {
-      if (isResolveTimeAchieved && hasOpponents && isResolutionResolved) {
-        ctaLabel = "Completed";
-        ctaDisabled = true;
-        ctaClassName = completedCtaClassName;
-      } else if (isResolveTimeAchieved && hasOpponents && isResolutionPending) {
-        ctaLabel = "Resolving";
-        ctaDisabled = true;
-        ctaClassName = resolvingCtaClassName;
-      } else if (isExpireTimeAchieved && !hasOpponents) {
-        ctaLabel = "Expired";
-        ctaDisabled = true;
-        ctaClassName = expiredCtaClassName;
-      } else if (!isExpireTimeAchieved) {
+    } else if (lifecycle === "LIVE") {
+      if (isTeam && !isExpireTimeAchieved) {
         ctaLabel = "Join challenge";
         ctaDisabled = isLoading || isCreator || isJoinedStatusLoading;
         ctaClassName = activeCtaClassName;
       } else {
-        ctaLabel = "Battle live";
+        ctaLabel = isTeam ? "Battle ongoing" : "Live";
         ctaDisabled = true;
         ctaClassName = ongoingCtaClassName;
       }
+    } else if (lifecycle === "EXPIRED") {
+      ctaLabel = "Expired";
+      ctaDisabled = true;
+      ctaClassName = expiredCtaClassName;
+    } else {
+      ctaLabel = "Join challenge";
+      ctaDisabled = isLoading || isCreator || isJoinedStatusLoading;
+      ctaClassName = isPvpMode ? activePvpCtaClassName : activeCtaClassName;
     }
 
-    const isOngoing = ctaLabel === "Battle live";
+    const isOngoing = lifecycle === "LIVE" && hasOpponents;
     const showCreatorHint = isCreator && ctaLabel === "Join challenge";
 
     return {
@@ -927,11 +924,11 @@ export function useChallengeCard(challenge: Challenge) {
   };
 
   const ctaState = getCtaButtonState();
-  const isCancelledState = ctaState.label === "Cancelled";
-  const isBattleOnState = !isResolveTimeAchieved && hasOpponents;
-  const isResolvingState = isResolveTimeAchieved && hasOpponents && isResolutionPending;
-  const isCompletedState = isResolveTimeAchieved && hasOpponents && isResolutionResolved;
-  const isExpiresInState = !isCancelledState && !isExpireTimeAchieved && !hasOpponents;
+  const isCancelledState = lifecycle === "CANCELLED";
+  const isBattleOnState = lifecycle === "LIVE";
+  const isResolvingState = lifecycle === "RESOLVING";
+  const isCompletedState = lifecycle === "RESOLVED";
+  const isExpiresInState = lifecycle === "OPEN";
 
   const expiryStatusText = isCancelledState
     ? "Challenge cancelled"

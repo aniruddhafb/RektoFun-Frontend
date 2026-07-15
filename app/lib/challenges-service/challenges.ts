@@ -24,6 +24,13 @@ export interface CreateChallengeParams {
   category?: string;
 }
 
+export interface ChallengeAvailability {
+  allowed: boolean;
+  reason?: string | null;
+  available_at?: string | null;
+  conflicting_challenge_ids: number[];
+}
+
 export interface HighestBetEntry {
   id: number;
   username: string;
@@ -126,6 +133,10 @@ export interface GetChallengesParams {
   search?: string;
   sort?: string;
   resolution_source?: string;
+  open_first?: boolean;
+  status?: string;
+  expiring_soon?: boolean;
+  joinable?: boolean;
 }
 
 export interface GetChallengesOptions {
@@ -148,9 +159,26 @@ export async function createChallenge(params: CreateChallengeParams): Promise<Ch
   console.log("response", response);
 
   if (!response.ok) {
-    throw new Error(`Failed to create challenge: ${response.statusText}`);
+    const data = await response.json().catch(() => null);
+    const detail = data?.detail;
+    throw new Error(
+      (typeof detail === "object" ? detail?.reason : detail)
+      || `Failed to create challenge: ${response.statusText}`
+    );
   }
 
+  return response.json();
+}
+
+export async function checkChallengeAvailability(
+  params: CreateChallengeParams
+): Promise<ChallengeAvailability> {
+  const response = await fetch(`${API_BASE_URL}/challenges/availability`, {
+    method: "POST",
+    headers: { accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify(params),
+  });
+  if (!response.ok) throw new Error("Could not check whether this challenge is available.");
   return response.json();
 }
 
@@ -179,6 +207,22 @@ export async function getChallenges(
 
   if (params?.resolution_source) {
     queryParams.append('resolution_source', params.resolution_source);
+  }
+
+  if (params?.open_first !== undefined) {
+    queryParams.append('open_first', params.open_first.toString());
+  }
+
+  if (params?.status) {
+    queryParams.append('status', params.status);
+  }
+
+  if (params?.expiring_soon !== undefined) {
+    queryParams.append('expiring_soon', params.expiring_soon.toString());
+  }
+
+  if (params?.joinable !== undefined) {
+    queryParams.append('joinable', params.joinable.toString());
   }
   
   const queryString = queryParams.toString();
