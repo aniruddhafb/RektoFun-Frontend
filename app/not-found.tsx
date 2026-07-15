@@ -112,7 +112,7 @@ export default function NotFound() {
                         href="/"
                         className="px-8 py-4 bg-black text-white text-base font-semibold rounded-lg hover:bg-gray-800 transition-all shadow-lg hover:scale-105 hover:shadow-glow"
                     >
-                        Go Home ➝
+                        Go Home➝
                     </Link>
                     <Link
                         href="/challenges"
