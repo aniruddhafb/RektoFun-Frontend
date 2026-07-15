@@ -267,7 +267,6 @@ function ChallengesPageContent() {
         onRefreshComplete={handleRefreshComplete}
         activeFilter={activeFilter}
         searchQuery={searchQuery}
-        resolutionSource="PRICE_FEED"
       />
 
       <RektLoadingOverlay isLoading={isRekting} />

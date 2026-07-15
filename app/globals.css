@@ -934,3 +934,69 @@ input, textarea, [contenteditable="true"] {
 .scrollbar-thin::-webkit-scrollbar-thumb:hover {
   background-color: #e5c7b8;
 }
+
+/*
+ * Keep small screens crisp. The desktop arcade treatment uses fixed texture
+ * layers, blurred colour fields, and pixel rendering; together they make
+ * page backgrounds and type look hazy on high-density mobile displays.
+ */
+@media (max-width: 767px) {
+  .pixel-shell::before,
+  .pixel-shell::after,
+  .rekto-page::before,
+  .rekto-page::after {
+    content: none;
+    display: none;
+  }
+
+  .pixel-shell,
+  .pixel-shell * {
+    text-rendering: auto;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  .pixel-shell :is(h1, h2, h3, h4, h5, h6, p, span, label, a, li, strong, small) {
+    text-shadow: none;
+  }
+
+  .pixel-shell img,
+  .pixel-shell canvas,
+  .pixel-shell button,
+  .pixel-shell [role="button"],
+  .pixel-shell select {
+    image-rendering: auto;
+  }
+
+  .pixel-shell [class*="backdrop-blur"] {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+
+  .scribble-stars,
+  .scribble-btc,
+  .scribble-dollars,
+  .scribble-sol,
+  .scribble-coins,
+  .scribble-bags,
+  .scribble-doge,
+  .scribble-pepe,
+  .scribble-pengu,
+  .scribble-shiba,
+  .scribble-trump,
+  .scribble-usa,
+  .scribble-phantom,
+  .animate-airdrop,
+  .animate-pop-in,
+  .animate-spin-slow,
+  .animate-float-gentle,
+  .animate-float-wavy,
+  .animate-float-updown,
+  .animate-float-diagonal,
+  .animate-bounce-glow,
+  .bubble-pop,
+  .welcome-copy,
+  .rekto-modal-panel {
+    animation: none !important;
+  }
+}

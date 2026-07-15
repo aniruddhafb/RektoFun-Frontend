@@ -25,7 +25,7 @@ export function NavbarMobileBottomNav({
 
     return (
         <div
-            className="fixed bottom-0 left-0 right-0 z-50 border-t border-black/15 bg-[#fffaf6]/95 backdrop-blur-xl md:hidden"
+            className="fixed bottom-0 left-0 right-0 z-50 border-t border-black/15 bg-[#f3e1d7] md:hidden"
             style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
         >
             <nav aria-label="Mobile navigation" className="mx-auto flex h-[4.25rem] max-w-lg items-end justify-around px-1">
@@ -33,7 +33,7 @@ export function NavbarMobileBottomNav({
                     href="/challenges"
                     className={`${itemBase} ${isActive("/challenges") ? "text-[#e85a2d]" : "text-[#74645c]"}`}
                 >
-                    <Compass className="h-[21px] w-[21px] shrink-0" strokeWidth={isActive("/challenges") ? 2.5 : 2} />
+                    <Compass className="h-6 w-6 shrink-0" strokeWidth={isActive("/challenges") ? 2.5 : 2} />
                     <span className={labelBase}>Challenges</span>
                 </Link>
 
@@ -50,7 +50,7 @@ export function NavbarMobileBottomNav({
                     aria-label="Search"
                     className={`${itemBase} cursor-pointer !border-0 !bg-transparent !shadow-none ${isSearchOpen ? "text-[#e85a2d]" : "text-[#74645c]"}`}
                 >
-                    <Search className="h-[21px] w-[21px] shrink-0" strokeWidth={isSearchOpen ? 2.5 : 2} />
+                    <Search className="h-6 w-6 shrink-0" strokeWidth={isSearchOpen ? 2.5 : 2} />
                     <span className={labelBase}>Search</span>
                 </div>
 
@@ -70,7 +70,7 @@ export function NavbarMobileBottomNav({
                     href="/leaderboard"
                     className={`${itemBase} ${isActive("/leaderboard") ? "text-[#e85a2d]" : "text-[#74645c]"}`}
                 >
-                    <Trophy className="h-[21px] w-[21px] shrink-0" strokeWidth={isActive("/leaderboard") ? 2.5 : 2} />
+                    <Trophy className="h-6 w-6 shrink-0" strokeWidth={isActive("/leaderboard") ? 2.5 : 2} />
                     <span className={labelBase}>
                         Leaderboard
                     </span>
@@ -80,7 +80,7 @@ export function NavbarMobileBottomNav({
                     href={profileHref}
                     className={`${itemBase} ${isActive("/profile") ? "text-[#e85a2d]" : "text-[#74645c]"}`}
                 >
-                    <UserRound className="h-[21px] w-[21px] shrink-0" strokeWidth={isActive("/profile") ? 2.5 : 2} />
+                    <UserRound className="h-6 w-6 shrink-0" strokeWidth={isActive("/profile") ? 2.5 : 2} />
                     <span className={labelBase}>Profile</span>
                 </Link>
             </nav>

@@ -12,6 +12,7 @@ import { ReferralModal } from "@/app/components/ReferralModal";
 import { CreateProfileModal } from "@/app/components/navbar-components/CreateProfileModal";
 import { SettingsModal } from "@/app/components/SettingsModal";
 import { NavbarBrand, NavbarDesktopSearch, NavbarMobileBottomNav } from "@/app/components/navbar-components";
+import { isAdminWallet } from "@/app/lib/admin";
 export default function Navbar() {
     const pathname = usePathname();
     const isHomePage = pathname === "/";
@@ -45,6 +46,7 @@ export default function Navbar() {
 
         // Connection state
         isConnected,
+        address,
 
         // Handlers
         handleConnect,
@@ -95,6 +97,7 @@ export default function Navbar() {
                             displayProfileImage={userProfileData?.profileImage || null}
                             isXVerified={Boolean(currentUser?.twitter_username)}
                             isModerator={currentUser?.user_type === "moderator"}
+                            isAdmin={isAdminWallet(address)}
                             usdcBalance={usdcBalance}
                             isDropdownOpen={isDropdownOpen}
                             onAuth={handleConnect}
