@@ -65,7 +65,7 @@ pub struct CreateChallenge<'info> {
         ],
         bump,
     )]
-    pub challenge: Account<'info, ChallengeAccount>,
+    pub challenge: Box<Account<'info, ChallengeAccount>>,
 
     /// USDC vault token account — an ATA owned by the challenge PDA.
     /// Holds all bets (creator's + all participants').
@@ -165,6 +165,7 @@ pub(crate) fn handler(ctx: Context<CreateChallenge>, params: CreateChallengePara
     challenge.winning_side = WinningSide::None;
     challenge.winning_side_total_amount = 0;
     challenge.settled_net_pot = 0;
+    challenge.winners_remaining = 0;
 
     // PVP-specific defaults
     challenge.challenger = Pubkey::default();

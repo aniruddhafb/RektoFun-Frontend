@@ -44,7 +44,7 @@ pub struct ClaimRefund<'info> {
         constraint = challenge.status == ChallengeStatus::Cancelled @ RektoError::NotCancelled,
         constraint = challenge.creator == creator.key() @ RektoError::UnauthorizedSettle,
     )]
-    pub challenge: Account<'info, ChallengeAccount>,
+    pub challenge: Box<Account<'info, ChallengeAccount>>,
 
     /// USDC vault — owned by the challenge PDA
     #[account(

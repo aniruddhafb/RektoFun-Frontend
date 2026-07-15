@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token_interface::{self, Mint, TokenAccount, TokenInterface, TransferChecked};
+use anchor_spl::token_interface::{self, CloseAccount, Mint, TokenAccount, TokenInterface, TransferChecked};
 
 use crate::{
     constants::*,
@@ -40,7 +40,7 @@ pub struct SettleChallenge<'info> {
         ],
         bump = challenge.bump,
     )]
-    pub challenge: Account<'info, ChallengeAccount>,
+    pub challenge: Box<Account<'info, ChallengeAccount>>,
 
     /// USDC vault token account — owned by the challenge PDA
     #[account(
@@ -51,7 +51,7 @@ pub struct SettleChallenge<'info> {
         token::authority = challenge,
         token::token_program = token_program,
     )]
-    pub vault: InterfaceAccount<'info, TokenAccount>,
+    pub vault: Box<InterfaceAccount<'info, TokenAccount>>,
 
     /// PVP only: winner's USDC token account — must actually belong to whichever
     /// side `creator_wins` declares as the winner (creator or challenger).
@@ -64,7 +64,7 @@ pub struct SettleChallenge<'info> {
             || winner_usdc_account.owner == if creator_wins { creator.key() } else { challenger.key() }
             @ RektoError::UnauthorizedSettle,
     )]
-    pub winner_usdc_account: InterfaceAccount<'info, TokenAccount>,
+    pub winner_usdc_account: Box<InterfaceAccount<'info, TokenAccount>>,
 
     /// Platform treasury USDC token account (receives the fee for both PVP and TEAM)
     #[account(
@@ -72,7 +72,7 @@ pub struct SettleChallenge<'info> {
         token::mint = usdc_mint,
         token::token_program = token_program,
     )]
-    pub treasury_usdc_account: InterfaceAccount<'info, TokenAccount>,
+    pub treasury_usdc_account: Box<InterfaceAccount<'info, TokenAccount>>,
 
     /// Creator-revenue USDC token account — receives creator_fee_bps of the pot
     /// for BOTH PVP and TEAM, regardless of who wins. Required in both cases
@@ -84,7 +84,7 @@ pub struct SettleChallenge<'info> {
         token::token_program = token_program,
         constraint = creator_usdc_account.owner == challenge.creator @ RektoError::UnauthorizedSettle,
     )]
-    pub creator_usdc_account: InterfaceAccount<'info, TokenAccount>,
+    pub creator_usdc_account: Box<InterfaceAccount<'info, TokenAccount>>,
 
     /// USDC mint — validated by token account constraints above
     pub usdc_mint: InterfaceAccount<'info, Mint>,
@@ -216,6 +216,23 @@ pub(crate) fn handler(ctx: Context<SettleChallenge>, creator_wins: bool) -> Resu
                 fee,
                 creator_fee,
             );
+
+            // Vault is fully drained by the three transfers above (winner_payout + fee +
+            // creator_fee == total_pot exactly); reclaim its rent to the admin wallet
+            // that originally paid it at creation.
+            token_interface::close_account(CpiContext::new_with_signer(
+                ctx.accounts.token_program.key(),
+                CloseAccount {
+                    account: ctx.accounts.vault.to_account_info(),
+                    destination: ctx.accounts.admin.to_account_info(),
+                    authority: ctx.accounts.challenge.to_account_info(),
+                },
+                signer_seeds,
+            ))?;
+
+            // PVP has no further claims after settlement (payout is atomic above) —
+            // reclaim the challenge PDA's rent too.
+            ctx.accounts.challenge.close(ctx.accounts.admin.to_account_info())?;
         }
 
         // ── TEAM ─────────────────────────────────────────────────────────────
@@ -318,6 +335,14 @@ pub(crate) fn handler(ctx: Context<SettleChallenge>, creator_wins: bool) -> Resu
                 opponent_team_sum
             };
 
+            // Number of winning-side participants who still need to claim; the vault
+            // and challenge PDA are closed to admin once this hits zero.
+            let winners_remaining: u16 = if creator_wins {
+                1u16 + challenge.creator_team.len() as u16
+            } else {
+                challenge.opponent_team.len() as u16
+            };
+
             // Record the winning side — individual winners claim via claim_winnings
             let challenge = &mut ctx.accounts.challenge;
             challenge.status = ChallengeStatus::Settled;
@@ -328,6 +353,7 @@ pub(crate) fn handler(ctx: Context<SettleChallenge>, creator_wins: bool) -> Resu
             };
             challenge.winning_side_total_amount = winning_side_total_amount;
             challenge.settled_net_pot = net_pot;
+            challenge.winners_remaining = winners_remaining;
 
             msg!(
                 "TEAM Challenge #{} settled — {} team wins — net pot {} USDC micro-units split proportionally across {} USDC micro-units of winning stake (platform fee: {}, creator fee: {})",
