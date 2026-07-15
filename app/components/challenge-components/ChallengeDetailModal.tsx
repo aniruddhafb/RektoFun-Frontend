@@ -1030,12 +1030,12 @@ function ClassicParticipantCard({ participants, label, emptyTitle, subtitle, onO
       onBlurCapture={(event) => {
         if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setActiveParticipantKey(null);
       }}
-      className={`relative flex h-[132px] w-[98px] max-w-full shrink-0 flex-col items-center justify-center rounded-xl p-2 text-center transition-transform hover:-translate-y-0.5 sm:h-[140px] sm:w-[120px] sm:p-3 ${activeParticipant ? "z-[70]" : ""} ${isWinning ? `border-2 border-emerald-600 bg-emerald-50 ${winningLabel === "Winner" ? "shadow-[0_0_0_3px_rgba(16,185,129,.14),0_8px_22px_rgba(16,185,129,.24)]" : "shadow-none"}` : dashed ? "border-2 border-dashed border-[#ead2c4] bg-[#fffaf6]" : "border-2 border-[#d4a574]/35 bg-white shadow-[0_5px_16px_rgba(77,48,32,.05)]"}`}
+      className={`relative flex h-[132px] w-[98px] max-w-full shrink-0 flex-col items-center justify-center p-2 text-center transition-transform hover:-translate-y-0.5 sm:h-[140px] sm:w-[120px] sm:p-3 ${activeParticipant ? "z-[70]" : ""} ${isWinning ? `border-2 border-emerald-600 bg-emerald-50 ${winningLabel === "Winner" ? "shadow-[0_0_0_3px_rgba(16,185,129,.14),0_8px_22px_rgba(16,185,129,.24)]" : "shadow-none"}` : dashed ? "border-2 border-dashed border-[#ead2c4] bg-[#fffaf6]" : "border-2 border-[#d4a574]/35 bg-white shadow-[0_5px_16px_rgba(77,48,32,.05)]"}`}
     >
       {isWinning && (
         <>
-          <span className="pointer-events-none absolute inset-0 rounded-xl border-2 border-emerald-400/70 motion-safe:animate-pulse" aria-hidden="true" />
-          <span className={`absolute -top-3 left-1/2 z-30 inline-flex -translate-x-1/2 items-center gap-1 whitespace-nowrap rounded-full border-2 border-black bg-[#f5d547] px-2 py-0.5 text-[8px] font-black uppercase tracking-[0.08em] text-black ${winningLabel === "Winner" ? "shadow-[2px_2px_0_#111]" : "shadow-none"}`}>
+          <span className="pointer-events-none absolute inset-0 border-2 border-emerald-400/70 motion-safe:animate-pulse" aria-hidden="true" />
+          <span className="absolute -top-3 left-1/2 z-30 inline-flex -translate-x-1/2 items-center gap-1 whitespace-nowrap rounded-full border-2 border-black bg-[#f5d547] px-2 py-0.5 text-[8px] font-black uppercase tracking-[0.08em] text-black shadow-none">
             <Trophy className="h-3 w-3 motion-safe:animate-bounce" aria-hidden="true" /> {winningLabel}
           </span>
         </>

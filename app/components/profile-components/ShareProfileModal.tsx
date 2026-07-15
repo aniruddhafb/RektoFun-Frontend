@@ -34,6 +34,7 @@ function loadImage(src: string) {
 
     const promise = new Promise<HTMLImageElement>((resolve) => {
     const image = new window.Image();
+    const timeout = window.setTimeout(() => resolve(image), 3000);
     let imageSource = src;
     try {
         const url = new URL(src);
@@ -48,8 +49,8 @@ function loadImage(src: string) {
         // Local asset paths are already safe to load directly.
     }
     image.src = /^https:\/\//i.test(imageSource) ? `/api/image-proxy?url=${encodeURIComponent(imageSource)}` : imageSource;
-        image.onload = () => resolve(image);
-        image.onerror = () => resolve(image);
+        image.onload = () => { window.clearTimeout(timeout); resolve(image); };
+        image.onerror = () => { window.clearTimeout(timeout); resolve(image); };
     });
     imageCache.set(src, promise);
     return promise;
@@ -132,7 +133,7 @@ export function ShareProfileModal({ isOpen, onClose, username, avatar, verified,
         <button type="button" className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} aria-label="Close share card" />
         <div className="relative z-10 max-h-[94vh] w-full max-w-xl overflow-y-auto border-2 border-black bg-[#fff8f4] p-4 sm:p-5">
             <div className="mb-4 flex items-center justify-between"><h2 id="share-profile-title" className="text-xl font-black text-gray-950">Share profile</h2><button type="button" onClick={onClose} className="flex h-9 w-9 cursor-pointer items-center justify-center border-2 border-black bg-white hover:bg-[#f5d547]" aria-label="Close"><X className="h-4 w-4" strokeWidth={3} /></button></div>
-            <canvas ref={canvasRef} className="hidden" /><div className="overflow-hidden border-2 border-black bg-[#f1d5c5]">{preview && <Image src={preview} alt={`Generated share card for ${username}`} width={1200} height={1200} unoptimized className="aspect-square w-full" />}</div>
+            <canvas ref={canvasRef} className="hidden" /><div className="relative aspect-square overflow-hidden border-2 border-black bg-[#f1d5c5]">{!preview && <div className="absolute inset-0 grid place-items-center"><span className="animate-pulse text-xs font-black uppercase tracking-[.16em] text-[#6f574b]">Generating card…</span></div>}{preview && <Image src={preview} alt={`Generated share card for ${username}`} width={1200} height={1200} unoptimized className="aspect-square w-full" />}</div>
             <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
                 <button type="button" onClick={copyLink} className="flex cursor-pointer items-center justify-center gap-2 border-2 border-black bg-white px-3 py-3 text-sm font-black hover:bg-[#fdf1e9]">{feedback === "link" ? <Check className="h-4 w-4" /> : <Link2 className="h-4 w-4" />}{feedback === "link" ? "Copied" : "Copy link"}</button>
                 <button type="button" onClick={copyImage} className="flex cursor-pointer items-center justify-center gap-2 border-2 border-black bg-white px-3 py-3 text-sm font-black hover:bg-[#fdf1e9]">{feedback === "image" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}{feedback === "image" ? "Copied" : "Copy image"}</button>

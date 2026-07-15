@@ -74,7 +74,13 @@ export function NotificationBell() {
   const openNotification = (notification: AppNotification) => {
     setIsOpen(false);
     markOneRead(notification);
-    router.push(`/challenges?challengeId=${encodeURIComponent(notification.challenge_id)}`);
+    if ((notification.event_type === "user_followed" || notification.event_type === "user_followed_back") && notification.actor_wallet_address) {
+      router.push(`/profile/${encodeURIComponent(notification.actor_wallet_address)}`);
+      return;
+    }
+    if (notification.challenge_id !== null) {
+      router.push(`/challenges?challengeId=${encodeURIComponent(notification.challenge_id)}`);
+    }
   };
 
   const openActorProfile = (event: React.MouseEvent, notification: AppNotification) => {
@@ -109,9 +115,9 @@ export function NotificationBell() {
                 {!notification.is_read && <span className="absolute bottom-4 left-0 top-4 w-1 rounded-r-full bg-[#e85a2d]" />}
                 <button type="button" onClick={(event) => openActorProfile(event, notification)} disabled={!notification.actor_wallet_address} className="relative h-12 w-12 shrink-0 cursor-pointer rounded-full outline-none ring-[#e85a2d] transition hover:scale-105 focus-visible:ring-2 disabled:cursor-default" aria-label={`Open ${notification.actor_username || "user"}'s profile`}>
                   <Image src={notification.actor_profile_image || "/scribbles/pepe.png"} alt="" width={48} height={48} className="h-12 w-12 rounded-full border-2 border-black/80 bg-white object-cover" />
-                  <span className="absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full border-2 border-white bg-[#f5d547] text-[10px]">{notification.event_type === "challenge_created" ? "+" : "↗"}</span>
+                  <span className="absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full border-2 border-white bg-[#f5d547] text-[10px]">{notification.event_type === "challenge_created" ? "+" : notification.event_type === "user_followed" || notification.event_type === "user_followed_back" ? "♥" : "↗"}</span>
                 </button>
-                <div className="min-w-0 flex-1"><div className="flex items-start justify-between gap-3"><p className="text-sm font-extrabold leading-5 text-gray-950">{notification.message}</p><time className="shrink-0 pt-0.5 text-[11px] font-bold text-gray-400">{new Date(notification.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</time></div><p className="mt-1 text-xs font-semibold leading-5 text-gray-500">{notification.event_type === "challenge_created" ? "A new challenge is ready to join." : "View the challenge they joined."}</p><span className="mt-2 inline-flex text-[11px] font-black text-[#c74620] opacity-0 transition-opacity group-hover:opacity-100">View challenge →</span></div>
+                <div className="min-w-0 flex-1"><div className="flex items-start justify-between gap-3"><p className="text-sm font-extrabold leading-5 text-gray-950">{notification.message}</p><time className="shrink-0 pt-0.5 text-[11px] font-bold text-gray-400">{new Date(notification.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</time></div><p className="mt-1 text-xs font-semibold leading-5 text-gray-500">{notification.event_type === "challenge_created" ? "A new challenge is ready to join." : notification.event_type === "user_followed" || notification.event_type === "user_followed_back" ? "Tap to view their profile." : "View the challenge they joined."}</p><span className="mt-2 inline-flex text-[11px] font-black text-[#c74620] opacity-0 transition-opacity group-hover:opacity-100">{notification.event_type === "user_followed" || notification.event_type === "user_followed_back" ? "View profile →" : "View challenge →"}</span></div>
                 {!notification.is_read && <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-[#e85a2d]" />}
               </div>
             ))}

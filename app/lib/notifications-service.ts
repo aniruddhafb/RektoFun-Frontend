@@ -3,8 +3,8 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_BE_API_URL || "http://localhost:800
 export type AppNotification = {
   id: number;
   actor_id: number;
-  challenge_id: number;
-  event_type: "challenge_created" | "challenge_joined";
+  challenge_id: number | null;
+  event_type: "challenge_created" | "challenge_joined" | "user_followed" | "user_followed_back";
   message: string;
   is_read: boolean;
   created_at: string;
