@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ReactNode, useRef, useState } from "react";
-import { Music, Pause } from "lucide-react";
+import { LayoutDashboard, Music, Pause } from "lucide-react";
 import favicon from "../../../public/logos/1.png";
 import Image from "next/image";
 
@@ -12,6 +12,7 @@ type NavbarProfileDropdownProps = {
     displayProfileImage: string | null;
     isXVerified: boolean;
     isModerator: boolean;
+    isAdmin: boolean;
     usdcBalance: number | null;
     isOpen: boolean;
     onClose: () => void;
@@ -78,6 +79,7 @@ export function NavbarProfileDropdown({
     displayProfileImage,
     isXVerified,
     isModerator,
+    isAdmin,
     usdcBalance,
     isOpen,
     onClose,
@@ -350,6 +352,12 @@ export function NavbarProfileDropdown({
                             >
                                 {isMusicPlaying ? "Pause music" : "Play music"}
                             </MenuAction>
+
+                            {isAdmin && (
+                                <MenuAction href="/admin" onClick={onClose} icon={<LayoutDashboard className="h-5 w-5 text-gray-500" />}>
+                                    Admin panel
+                                </MenuAction>
+                            )}
 
                             <div className="my-2 border-t-2 border-black" />
 
