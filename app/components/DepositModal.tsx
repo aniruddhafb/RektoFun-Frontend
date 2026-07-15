@@ -6,20 +6,17 @@ import { solana, solanaDevnet } from "@reown/appkit/networks";
 import QRCode from "qrcode";
 import { Connection, PublicKey, Transaction } from "@solana/web3.js";
 import {
-  TOKEN_PROGRAM_ID,
-  createAssociatedTokenAccountInstruction,
-  createTransferInstruction,
   getMint,
-  getAssociatedTokenAddress,
 } from "@solana/spl-token";
 import { ArrowDownToLine, ArrowUpFromLine, ArrowUpRight, Check, ChevronDown, Copy, X } from "lucide-react";
 import { SOLANA_CLUSTER, getSolanaRpcEndpoint, getSolscanClusterQuery, getTokenMintAddress } from "@/app/lib/solana-config";
 import { useBodyScrollLock } from "@/app/lib/useBodyScrollLock";
+import { useTokenBalanceStore } from "@/app/store/useTokenBalanceStore";
 
 type FundsMode = "deposit" | "withdraw";
 type Asset = "usdc" | "rekto";
 type SolanaWalletProvider = {
-  signAndSendTransaction: (transaction: Transaction) => Promise<string>;
+  signTransaction: (transaction: Transaction) => Promise<Transaction>;
 };
 
 const ASSET_CONFIG = {
@@ -54,6 +51,7 @@ export function DepositModal({ isOpen, onClose, initialMode = "deposit", usdcBal
   const { address, isConnected } = useAppKitAccount();
   const { walletProvider } = useAppKitProvider<SolanaWalletProvider>("solana");
   const { switchNetwork } = useAppKitNetwork();
+  const loadBalances = useTokenBalanceStore((state) => state.loadBalances);
 
   const [mode, setMode] = useState<FundsMode>(initialMode);
   const [copied, setCopied] = useState(false);
@@ -189,47 +187,42 @@ export function DepositModal({ isOpen, onClose, initialMode = "deposit", usdcBal
         return;
       }
 
-      const senderPubkey = new PublicKey(address);
-      const senderTokenAccount = await getAssociatedTokenAddress(config.mint, senderPubkey, false);
-      const recipientTokenAccount = await getAssociatedTokenAddress(config.mint, recipientPubkey, false);
-
-      const tx = new Transaction();
-      const recipientAtaInfo = await connection.getAccountInfo(recipientTokenAccount);
-
-      if (!recipientAtaInfo) {
-        tx.add(
-          createAssociatedTokenAccountInstruction(
-            senderPubkey,
-            recipientTokenAccount,
-            recipientPubkey,
-            config.mint
-          )
-        );
+      const response = await fetch("/api/tokens/withdraw", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sender: address,
+          recipient: recipientPubkey.toBase58(),
+          asset,
+          amount: tokenAmount.toString(),
+        }),
+      });
+      const data = (await response.json()) as {
+        serializedTx?: string;
+        blockhash?: string;
+        lastValidBlockHeight?: number;
+        error?: string;
+      };
+      if (!response.ok || !data.serializedTx || !data.blockhash || !data.lastValidBlockHeight) {
+        throw new Error(data.error || "Failed to prepare withdrawal.");
       }
 
-      tx.add(
-        createTransferInstruction(
-          senderTokenAccount,
-          recipientTokenAccount,
-          senderPubkey,
-          tokenAmount,
-          [],
-          TOKEN_PROGRAM_ID
-        )
-      );
+      const tx = Transaction.from(Buffer.from(data.serializedTx, "base64"));
+      const signedTx = await walletProvider.signTransaction(tx);
+      const signature = await connection.sendRawTransaction(signedTx.serialize(), {
+        skipPreflight: false,
+        preflightCommitment: "confirmed",
+      });
+      await connection.confirmTransaction({
+        signature,
+        blockhash: data.blockhash,
+        lastValidBlockHeight: data.lastValidBlockHeight,
+      }, "confirmed");
 
-      tx.feePayer = senderPubkey;
-      tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
-
-      const signedTx = await walletProvider.signAndSendTransaction(tx);
-      setTxSignature(signedTx);
+      setTxSignature(signature);
       setAmountInput("");
       setRecipientAddress("");
-
-      // Refresh balance after 2 seconds
-      setTimeout(() => {
-        window.location.reload();
-      }, 2000);
+      await loadBalances(address, true);
     } catch (err: unknown) {
       console.error("[DepositModal] Withdraw failed:", err);
       setError(err instanceof Error ? err.message : "Withdraw failed. Please try again.");

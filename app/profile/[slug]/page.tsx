@@ -16,9 +16,15 @@ import { followUser, getLeaderboard, getUserByWallet, LeaderboardUser, unfollowU
 import { useUserStore } from "@/app/store/useUserStore";
 import {
     Challenge,
+    getChallengeById,
     getChallenges,
 } from "@/app/lib/challenges-service/challenges";
 import { fetchRektoBalance, fetchUsdcBalance } from "@/app/lib/token-balances";
+import {
+    CHALLENGE_CREATED_EVENT,
+    CHALLENGE_UPDATED_EVENT,
+    type ChallengeUpdatedDetail,
+} from "@/app/lib/realtime-events";
 
 type TabType = "challenges" | "activity";
 
@@ -128,6 +134,25 @@ export default function ProfilePage() {
 
         fetchUserChallenges();
     }, [user?.id, challengeRefreshKey]);
+
+    useEffect(() => {
+        const refreshChallenges = () => setChallengeRefreshKey((key) => key + 1);
+        const refreshUpdatedChallenge = (event: Event) => {
+            refreshChallenges();
+            const { challengeId } = (event as CustomEvent<ChallengeUpdatedDetail>).detail;
+            if (selectedChallenge?.id !== challengeId) return;
+            getChallengeById(challengeId)
+                .then(setSelectedChallenge)
+                .catch((refreshError) => console.error("Failed to refresh open challenge:", refreshError));
+        };
+
+        window.addEventListener(CHALLENGE_CREATED_EVENT, refreshChallenges);
+        window.addEventListener(CHALLENGE_UPDATED_EVENT, refreshUpdatedChallenge);
+        return () => {
+            window.removeEventListener(CHALLENGE_CREATED_EVENT, refreshChallenges);
+            window.removeEventListener(CHALLENGE_UPDATED_EVENT, refreshUpdatedChallenge);
+        };
+    }, [selectedChallenge?.id]);
 
     useEffect(() => {
         let cancelled = false;

@@ -6,7 +6,7 @@ import { ChallengeCard } from "./ChallengeCard";
 import { getChallenges, Challenge } from "../../lib/challenges-service/challenges";
 import { getPositions } from "../../lib/positions-service/positions";
 import { useUserStore } from "@/app/store/useUserStore";
-import { CHALLENGE_CREATED_EVENT } from "@/app/lib/realtime-events";
+import { CHALLENGE_CREATED_EVENT, CHALLENGE_UPDATED_EVENT } from "@/app/lib/realtime-events";
 
 interface ChallengeGridProps {
     onRekt: (challenge: Challenge) => void;
@@ -167,7 +167,11 @@ export function ChallengeGrid({
     useEffect(() => {
         const refreshChallenges = () => setRetryNonce((nonce) => nonce + 1);
         window.addEventListener(CHALLENGE_CREATED_EVENT, refreshChallenges);
-        return () => window.removeEventListener(CHALLENGE_CREATED_EVENT, refreshChallenges);
+        window.addEventListener(CHALLENGE_UPDATED_EVENT, refreshChallenges);
+        return () => {
+            window.removeEventListener(CHALLENGE_CREATED_EVENT, refreshChallenges);
+            window.removeEventListener(CHALLENGE_UPDATED_EVENT, refreshChallenges);
+        };
     }, []);
 
     useEffect(() => {

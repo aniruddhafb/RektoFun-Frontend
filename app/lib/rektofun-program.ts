@@ -126,8 +126,12 @@ export interface OnChainChallenge {
   status: "Open" | "Active" | "Settled" | "Cancelled";
   challengeType: "Pvp" | "Team";
   creatorTeam: PublicKey[];
+  creatorTeamAmounts: bigint[];
   opponentTeam: PublicKey[];
+  opponentTeamAmounts: bigint[];
   winningSide: "None" | "CreatorTeam" | "OpponentTeam";
+  winningSideTotalAmount: bigint;
+  settledNetPot: bigint;
   vaultBump: number;
   bump: number;
 }
@@ -443,8 +447,12 @@ export async function fetchAllChallenges(
         status: enumVariant(d.status) as OnChainChallenge["status"],
         challengeType: enumVariant(d.challengeType) as OnChainChallenge["challengeType"],
         creatorTeam: d.creatorTeam as PublicKey[],
+        creatorTeamAmounts: d.creatorTeamAmounts.map((amount: BN) => BigInt(amount.toString())),
         opponentTeam: d.opponentTeam as PublicKey[],
+        opponentTeamAmounts: d.opponentTeamAmounts.map((amount: BN) => BigInt(amount.toString())),
         winningSide: enumVariant(d.winningSide) as OnChainChallenge["winningSide"],
+        winningSideTotalAmount: BigInt(d.winningSideTotalAmount.toString()),
+        settledNetPot: BigInt(d.settledNetPot.toString()),
         vaultBump: d.vaultBump,
         bump: d.bump,
       } as OnChainChallenge;
@@ -480,8 +488,12 @@ export async function fetchChallenge(
       status: enumVariant(d.status) as OnChainChallenge["status"],
       challengeType: enumVariant(d.challengeType) as OnChainChallenge["challengeType"],
       creatorTeam: d.creatorTeam as PublicKey[],
+      creatorTeamAmounts: d.creatorTeamAmounts.map((amount: BN) => BigInt(amount.toString())),
       opponentTeam: d.opponentTeam as PublicKey[],
+      opponentTeamAmounts: d.opponentTeamAmounts.map((amount: BN) => BigInt(amount.toString())),
       winningSide: enumVariant(d.winningSide) as OnChainChallenge["winningSide"],
+      winningSideTotalAmount: BigInt(d.winningSideTotalAmount.toString()),
+      settledNetPot: BigInt(d.settledNetPot.toString()),
       vaultBump: d.vaultBump,
       bump: d.bump,
     };

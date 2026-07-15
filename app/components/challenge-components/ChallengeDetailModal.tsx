@@ -37,6 +37,7 @@ import { useChallengeCard } from "@/app/hooks/useChallengeCard";
 import { AcceptChallengeModal } from "./AcceptChallengeModal";
 import { ProfileHoverPreview } from "./ProfileHoverPreview";
 import { ShareChallengeModal } from "./ShareChallengeModal";
+import { WinningsShareModal } from "./WinningsShareModal";
 
 interface ChallengeDetailModalProps {
   challenge: Challenge | null;
@@ -154,6 +155,8 @@ function ChallengeAcceptAction({ challenge, ctaState, canOpen, onOpenChange }: C
     actionError,
     handleChallengeAction,
     ctaState: actionCtaState,
+    claimedWinnings,
+    closeWinningsShare,
   } = useChallengeCard(challenge);
 
   React.useEffect(() => {
@@ -215,6 +218,12 @@ function ChallengeAcceptAction({ challenge, ctaState, canOpen, onOpenChange }: C
           if (betError) setBetError("");
         }}
         onJoinSideChange={setJoinSide}
+      />
+      <WinningsShareModal
+        challenge={challenge}
+        amount={claimedWinnings ?? 0}
+        isOpen={claimedWinnings !== null}
+        onClose={closeWinningsShare}
       />
     </>
   );
