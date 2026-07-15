@@ -66,7 +66,7 @@ export function ChallengeFiltersSection({
                 <button
                     type="button"
                     onClick={() => setIsMobileFiltersOpen(true)}
-                    className="flex w-full cursor-pointer items-center justify-between rounded-2xl border border-black/15 bg-white/75 px-4 py-3 text-sm font-medium text-gray-800 !shadow-none transition hover:border-black/25 hover:bg-white hover:!shadow-none active:!shadow-none sm:hidden"
+                    className="flex w-full cursor-pointer items-center justify-between border-2 border-black bg-[#fffaf6] px-4 py-3 text-sm font-black text-[#211530] shadow-[3px_3px_0_#211530] transition active:translate-y-0.5 active:shadow-none sm:hidden"
                 >
                     <span>Filters</span>
                     <span className="max-w-[65%] truncate text-right text-xs text-gray-500">
@@ -125,11 +125,11 @@ export function ChallengeFiltersSection({
                         className="absolute inset-0 bg-black/40"
                     />
 
-                    <div className="absolute inset-x-0 bottom-0 max-h-[82vh] overflow-y-auto rounded-t-3xl border border-b-0 border-black/[0.06] bg-white p-4 pb-6">
-                        <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-gray-300" />
+                    <div className="absolute inset-x-0 bottom-0 max-h-[88dvh] overflow-y-auto border-2 border-b-0 border-black bg-[#f3e1d7] p-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+                        <div className="mx-auto mb-4 h-1.5 w-12 bg-[#211530]" />
 
                         <div className="flex items-center justify-between">
-                            <h3 className="text-base font-semibold text-gray-900">Challenge Filters</h3>
+                            <h3 className="text-lg font-black text-[#211530]">Challenge filters</h3>
                             <button
                                 type="button"
                                 onClick={() => setIsMobileFiltersOpen(false)}
@@ -163,9 +163,9 @@ export function ChallengeFiltersSection({
                                             setActiveFilter(option.label);
                                             setIsMobileFiltersOpen(false);
                                         }}
-                                        className={`flex w-full items-center gap-2 rounded-xl border px-3 py-3 text-left text-sm transition ${activeFilter === option.label
-                                            ? "border-gray-950 bg-gray-950 font-semibold text-white"
-                                            : "border-black/[0.07] text-gray-700 hover:bg-gray-50"
+                                    className={`flex w-full items-center gap-2 border-2 border-black px-3 py-3 text-left text-sm font-black transition ${activeFilter === option.label
+                                            ? "bg-[#211530] text-white shadow-[3px_3px_0_#e85a2d]"
+                                            : "bg-[#fffaf6] text-[#493b35]"
                                             }`}
                                     >
                                         {option.icon}

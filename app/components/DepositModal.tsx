@@ -237,14 +237,14 @@ export function DepositModal({ isOpen, onClose, initialMode = "deposit", usdcBal
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center px-4">
+    <div className="fixed inset-0 z-[300] flex items-start justify-center sm:items-center sm:px-4 sm:py-4">
       <div
         className="absolute inset-0 bg-black/45 backdrop-blur-sm"
         onClick={handleClose}
       />
-      <div className="relative z-10 max-h-[calc(100vh-2rem)] w-full max-w-md overflow-y-auto rounded-lg border border-[#1f2937] bg-[#fff8f4]">
+      <section role="dialog" aria-modal="true" aria-labelledby="funds-modal-title" className="relative z-10 mx-2 mt-16 flex h-[calc(100dvh-9rem)] w-full max-w-md flex-col overflow-hidden border-2 border-black bg-[#fff8f4] sm:mx-0 sm:mt-0 sm:h-auto sm:max-h-[calc(100dvh-2rem)] sm:rounded-lg">
         {/* Header */}
-        <div className="border-b border-[#ead7cc] bg-white/55 px-5 py-4">
+        <div className="shrink-0 border-b-2 border-black bg-white/70 px-4 py-3 sm:px-5 sm:py-4">
           <div className="flex items-center justify-between gap-4">
             <div className="flex min-w-0 items-center gap-3">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-[#f0cdbc] bg-[#ffe8db] text-[#e85a2d]">
@@ -255,7 +255,7 @@ export function DepositModal({ isOpen, onClose, initialMode = "deposit", usdcBal
                 )}
               </div>
               <div className="min-w-0">
-                <h2 className="truncate text-lg font-black text-gray-950">
+                <h2 id="funds-modal-title" className="truncate text-lg font-black text-gray-950">
                   {mode === "deposit" ? "Deposit Funds" : "Withdraw Funds"}
                 </h2>
                 <p className="text-xs font-semibold text-[#7c6a60]">Solana · {assetLabel}</p>
@@ -273,7 +273,7 @@ export function DepositModal({ isOpen, onClose, initialMode = "deposit", usdcBal
         </div>
 
         {/* Content */}
-        <div className="p-5">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 pb-[max(1rem,env(safe-area-inset-bottom))] sm:p-5">
           {!isConnected && (
             <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-4">
               <p className="text-sm font-bold text-red-700">Connect your wallet to continue.</p>
@@ -324,7 +324,7 @@ export function DepositModal({ isOpen, onClose, initialMode = "deposit", usdcBal
           </div>
 
           {/* Network and asset selectors */}
-          <div className="mb-4 grid grid-cols-2 gap-3">
+          <div className="mb-4 grid grid-cols-1 gap-3 min-[360px]:grid-cols-2">
             <label className="block text-xs font-black uppercase tracking-[0.08em] text-[#7c6a60]">
               Network
               <div className="relative mt-2">
@@ -361,10 +361,10 @@ export function DepositModal({ isOpen, onClose, initialMode = "deposit", usdcBal
                       <img
                         src={qrCodeUrl}
                         alt="QR code for your Solana deposit address"
-                        className="h-56 w-56"
+                        className="h-[min(14rem,58vw)] w-[min(14rem,58vw)]"
                       />
                     ) : (
-                      <div className="flex h-56 w-56 items-center justify-center text-sm font-bold text-gray-500">
+                      <div className="flex h-[min(14rem,58vw)] w-[min(14rem,58vw)] items-center justify-center text-sm font-bold text-gray-500">
                         Generating QR code…
                       </div>
                     )}
@@ -502,7 +502,7 @@ export function DepositModal({ isOpen, onClose, initialMode = "deposit", usdcBal
             </>
           )}
         </div>
-      </div>
+      </section>
     </div>
   );
 }

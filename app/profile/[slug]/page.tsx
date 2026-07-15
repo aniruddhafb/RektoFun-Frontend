@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useLayoutEffect, useCallback, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { useAppKitAccount } from "@reown/appkit/react";
 import ChallengeDetailModal from "@/app/components/challenge-components/ChallengeDetailModal";
@@ -67,6 +67,13 @@ export default function ProfilePage() {
     const isFollowing = !!(currentUser?.id && user?.followers?.includes(currentUser.id));
     const profileWalletAddress = user?.wallet_address || walletFromSlug;
     const profileUserId = user?.id;
+
+    useLayoutEffect(() => {
+        if (!window.matchMedia("(max-width: 767px)").matches) return;
+        window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+        const frame = window.requestAnimationFrame(() => window.scrollTo({ top: 0, left: 0, behavior: "auto" }));
+        return () => window.cancelAnimationFrame(frame);
+    }, [loading, walletFromSlug]);
 
     // Fetch user data by wallet address
     useEffect(() => {

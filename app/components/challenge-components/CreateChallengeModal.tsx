@@ -449,7 +449,8 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
         }
 
         if (!address || !isConnected) {
-            open();
+            onClose();
+            window.setTimeout(() => void open({ view: "Connect" }), 50);
             return;
         }
         if (!walletProvider) {
@@ -587,7 +588,7 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
     const statusLabel = getStatusLabel();
 
     return createPortal(
-        <div className="create-challenge-overlay fixed inset-0 z-[250] flex items-center justify-center p-3 min-[380px]:p-4 sm:p-5">
+        <div className="create-challenge-overlay fixed inset-0 z-[250] flex items-end justify-center p-0 sm:items-center sm:p-5">
             <button
                 type="button"
                 className="absolute inset-0 h-full w-full cursor-default bg-black/45 backdrop-blur-[2px]"
@@ -605,7 +606,7 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="create-challenge-title"
-                className="create-challenge-modal relative flex h-auto max-h-[calc(100dvh-1.5rem)] w-full max-w-2xl flex-col overflow-hidden border-2 border-black bg-[#fffaf6] min-[380px]:max-h-[calc(100dvh-2rem)] sm:max-h-[92vh]"
+                className="create-challenge-modal relative flex h-[100dvh] max-h-[100dvh] w-full max-w-2xl flex-col overflow-hidden border-2 border-black bg-[#fffaf6] sm:h-auto sm:max-h-[92vh]"
             >
                 <header className="flex shrink-0 items-center justify-between border-b-2 border-black px-3 py-2.5 sm:px-5 sm:py-3.5">
                     <div className="flex items-center gap-2.5">

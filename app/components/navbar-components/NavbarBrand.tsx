@@ -26,7 +26,7 @@ export function NavbarBrand() {
                     alt="REKTO"
                     width={220}
                     height={60}
-                    className="h-5 w-auto min-[380px]:h-6 sm:h-8"
+                    className="h-7 w-auto min-[380px]:h-8 sm:h-8"
                     priority
                 />
             </Link>

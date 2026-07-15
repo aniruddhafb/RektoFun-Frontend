@@ -21,6 +21,16 @@ body {
   overflow-x: hidden;
 }
 
+body, body * {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+input, textarea, [contenteditable="true"] {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
 /* Global pixel-art treatment (subtle and non-destructive to layout) */
 .pixel-shell {
   position: relative;
