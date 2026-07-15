@@ -1,5 +1,6 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { useNavbar } from "@/app/hooks/useNavbar";
 import {
     NavbarAuthSection,
@@ -12,6 +13,8 @@ import { CreateProfileModal } from "@/app/components/navbar-components/CreatePro
 import { SettingsModal } from "@/app/components/SettingsModal";
 import { NavbarBrand, NavbarDesktopSearch, NavbarMobileBottomNav } from "@/app/components/navbar-components";
 export default function Navbar() {
+    const pathname = usePathname();
+    const isHomePage = pathname === "/";
     const {
         // UI state
         searchQuery,
@@ -51,6 +54,7 @@ export default function Navbar() {
         isActive,
         applyUserToState,
     } = useNavbar();
+    const showAppNavigation = !isHomePage || isConnected;
 
     return (
         <>
@@ -71,7 +75,7 @@ export default function Navbar() {
 
             {/* Main Navbar */}
             <nav className="fixed left-0 right-0 z-[40] bg-[#f3e1d7]/95 shadow-[0_2px_0_#111] backdrop-blur-md">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div className="max-w-7xl mx-auto px-2 min-[380px]:px-3 sm:px-6 lg:px-8">
                     <div className="flex items-center justify-between h-20">
                         <NavbarBrand />
 
@@ -84,6 +88,7 @@ export default function Navbar() {
                         />
 
                         <NavbarAuthSection
+                            isHomePage={isHomePage}
                             authenticated={isConnected}
                             displayAddress={displayAddress || ""}
                             displayUsername={displayUsername}
@@ -115,13 +120,15 @@ export default function Navbar() {
                     </div>
                 </div>
 
-                <NavbarNavLinks
-                    isActive={isActive}
-                    onOpenReferral={() => setIsReferralModalOpen(true)}
-                />
+                {showAppNavigation && (
+                    <NavbarNavLinks
+                        isActive={isActive}
+                        onOpenReferral={() => setIsReferralModalOpen(true)}
+                    />
+                )}
             </nav>
 
-            <div className="h-[88px] md:h-[128px]" />
+            <div className={showAppNavigation ? "h-[88px] md:h-[128px]" : "h-20"} />
 
             {isDropdownOpen && (
                 <div className="fixed inset-0 z-[35]" onClick={() => setIsDropdownOpen(false)} />
@@ -155,13 +162,15 @@ export default function Navbar() {
                 onClose={() => setIsSettingsModalOpen(false)}
             />
 
-            <NavbarMobileBottomNav
-                isActive={isActive}
-                profileHref={profileHref}
-                onSearchClick={() => setIsSearchModalOpen(true)}
-                onCreateClick={handleMobileCreateClick}
-                isSearchOpen={isSearchModalOpen}
-            />
+            {showAppNavigation && (
+                <NavbarMobileBottomNav
+                    isActive={isActive}
+                    profileHref={profileHref}
+                    onSearchClick={() => setIsSearchModalOpen(true)}
+                    onCreateClick={handleMobileCreateClick}
+                    isSearchOpen={isSearchModalOpen}
+                />
+            )}
         </>
     );
 }

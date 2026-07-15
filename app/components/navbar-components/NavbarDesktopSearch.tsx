@@ -690,7 +690,7 @@ export function NavbarDesktopSearch({
 
     return (
         <>
-            <div className="hidden md:flex items-center gap-6 flex-1 justify-center max-w-2xl mx-8">
+            <div className="hidden lg:flex items-center gap-4 xl:gap-6 flex-1 justify-center max-w-2xl mx-4 xl:mx-8">
                 <div className="relative flex-1 max-w-md">
                     <button
                         type="button"

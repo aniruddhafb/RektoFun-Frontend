@@ -19,9 +19,9 @@ export function NavbarMobileBottomNav({
     isSearchOpen,
 }: NavbarMobileBottomNavProps) {
     const itemBase =
-        "relative flex flex-col items-center justify-center gap-0.5 min-w-0 flex-1 py-1.5 transition-colors hover:text-black";
+        "relative flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 overflow-hidden px-0.5 py-1.5 transition-colors hover:text-black";
 
-    const labelBase = "text-[10px] font-black truncate";
+    const labelBase = "max-w-full truncate text-[9px] font-black min-[380px]:text-[10px]";
 
     return (
         <div
