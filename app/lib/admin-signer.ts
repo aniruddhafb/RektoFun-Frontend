@@ -26,12 +26,70 @@ import {
 import bs58 from "bs58";
 import {
   buildCreateChallengeTx,
+  buildAcceptChallengeTx,
+  buildCancelChallengeTx,
+  buildClaimRefundTx,
+  buildClaimWinningsTx,
   CreateChallengeArgs,
   deriveChallengePDA,
   deriveCreatorCounter,
   getReadonlyConnection,
   getRektoProgram,
 } from "./rektofun-program";
+
+export type SponsoredChallengeAction = "accept" | "cancel" | "refund" | "winnings";
+
+export async function buildAdminSignedChallengeActionTx(args: {
+  action: SponsoredChallengeAction;
+  participant: PublicKey;
+  creator: PublicKey;
+  challengePDA: PublicKey;
+  joinCreatorSide?: boolean;
+  amountMicroUsdc?: bigint;
+}) {
+  const adminKeypair = getAdminKeypair();
+  const adminPubkey = adminKeypair.publicKey;
+  const connection = getReadonlyConnection();
+  const adminWalletAdapter = {
+    publicKey: adminPubkey,
+    signTransaction: async (tx: Transaction) => {
+      tx.partialSign(adminKeypair);
+      return tx;
+    },
+    signAllTransactions: async (txs: Transaction[]) => {
+      txs.forEach((tx) => tx.partialSign(adminKeypair));
+      return txs;
+    },
+  };
+  const program = getRektoProgram(adminWalletAdapter);
+
+  const tx = args.action === "accept"
+    ? await buildAcceptChallengeTx(
+      program,
+      args.participant,
+      args.challengePDA,
+      args.creator,
+      Boolean(args.joinCreatorSide),
+      args.amountMicroUsdc ?? BigInt(0),
+      adminPubkey,
+    )
+    : args.action === "cancel"
+      ? await buildCancelChallengeTx(program, args.participant, args.challengePDA)
+      : args.action === "refund"
+        ? await buildClaimRefundTx(program, args.participant, args.creator, args.challengePDA, adminPubkey)
+        : await buildClaimWinningsTx(program, args.participant, args.creator, args.challengePDA, adminPubkey);
+
+  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
+  tx.feePayer = adminPubkey;
+  tx.recentBlockhash = blockhash;
+  tx.partialSign(adminKeypair);
+
+  return {
+    serializedTx: tx.serialize({ requireAllSignatures: false }).toString("base64"),
+    blockhash,
+    lastValidBlockHeight,
+  };
+}
 
 let cachedKeypair: Keypair | null = null;
 

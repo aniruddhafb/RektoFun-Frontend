@@ -158,26 +158,6 @@ export async function getChallenges(
   _options?: GetChallengesOptions
 ): Promise<GetChallengesResponse> {
   void _options;
-  if (params?.created_by !== undefined) {
-    const response = await fetch(`${API_BASE_URL}/challenges/by-creator/${params.created_by}`, {
-      method: 'GET',
-      headers: {
-        'accept': 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch challenges by creator: ${response.statusText}`);
-    }
-
-    const challenges = await response.json();
-    return {
-      challenges,
-      total: challenges.length,
-      count: challenges.length,
-    };
-  }
-
   const queryParams = new URLSearchParams();
   
   if (params?.limit !== undefined) {
@@ -186,6 +166,10 @@ export async function getChallenges(
   
   if (params?.offset !== undefined) {
     queryParams.append('offset', params.offset.toString());
+  }
+
+  if (params?.created_by !== undefined) {
+    queryParams.append('created_by', params.created_by.toString());
   }
 
   if (params?.search) {

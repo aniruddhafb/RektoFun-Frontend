@@ -15,8 +15,8 @@ import {
 import ChallengeDetailModal from "@/app/components/challenge-components/ChallengeDetailModal";
 import {
     Challenge,
-    getChallenges,
 } from "@/app/lib/challenges-service/challenges";
+import { ChallengeActivity, getActivityLabel, getActivityVerb, getChallengeActivities } from "@/app/lib/activity-service/activity";
 import { useBodyScrollLock } from "@/app/lib/useBodyScrollLock";
 import { stripUsdcQuote } from "@/app/lib/format-market-label";
 
@@ -25,7 +25,6 @@ type ActivityStatus = "All Status" | "Expired" | "Ongoing" | "Resolved" | "Resol
 
 const activityTypeOptions: ActivityType[] = ["All Activity", "Sports", "Crypto", "PVP Mode", "Multi Mode"];
 const activityStatusOptions: ActivityStatus[] = ["All Status", "Expired", "Ongoing", "Resolved", "Resolving", "Completed"];
-const PAGE_SIZE = 5;
 const SKELETON_CARDS_COUNT = 4;
 
 function getChallengeEndTime(challenge: Challenge): string {
@@ -162,7 +161,7 @@ export default function ActivityPage() {
     const [activeFilter, setActiveFilter] = useState<ActivityType>("All Activity");
     const [activeStatus, setActiveStatus] = useState<ActivityStatus>("All Status");
     const [searchQuery, setSearchQuery] = useState("");
-    const [activities, setActivities] = useState<Challenge[]>([]);
+    const [activities, setActivities] = useState<ChallengeActivity[]>([]);
     const [pageIndex, setPageIndex] = useState(1);
     const [reloadKey, setReloadKey] = useState(0);
     const [isInitialLoading, setIsInitialLoading] = useState(true);
@@ -206,6 +205,23 @@ export default function ActivityPage() {
     useEffect(() => {
         const interval = window.setInterval(() => setCurrentTimeMs(Date.now()), 60000);
         return () => window.clearInterval(interval);
+    }, []);
+
+    useEffect(() => {
+        let active = true;
+        const refreshActivity = async () => {
+            try {
+                const events = await getChallengeActivities();
+                if (active) setActivities(events);
+            } catch {
+                // Preserve the last successful feed if a background refresh fails.
+            }
+        };
+        const interval = window.setInterval(refreshActivity, 15_000);
+        return () => {
+            active = false;
+            window.clearInterval(interval);
+        };
     }, []);
 
     useEffect(() => {
@@ -255,9 +271,6 @@ export default function ActivityPage() {
     useEffect(() => {
         let isMounted = true;
         const requestId = ++requestIdRef.current;
-        const offset = (pageIndex - 1) * PAGE_SIZE;
-        const normalizedSearch = searchQuery.trim();
-
         const loadActivities = async () => {
             try {
                 if (pageIndex === 1) {
@@ -269,21 +282,13 @@ export default function ActivityPage() {
                     setIsLoadingMore(true);
                 }
 
-                const response = await getChallenges(
-                    {
-                        limit: PAGE_SIZE,
-                        offset,
-                        search: normalizedSearch.length > 0 ? normalizedSearch : undefined,
-                        sort: "latest",
-                    },
-                    { bypassCache: true },
-                );
+                const response = await getChallengeActivities();
 
                 if (!isMounted || requestId !== requestIdRef.current) return;
 
-                const sorted = [...response.challenges].sort(
-                    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-                );
+                const offset = pageIndex === 1 ? 0 : 6 + (pageIndex - 2) * 9;
+                const pageSize = pageIndex === 1 ? 6 : 9;
+                const sorted = response.slice(offset, offset + pageSize);
 
                 setActivities((current) => {
                     if (pageIndex === 1) return sorted;
@@ -291,7 +296,7 @@ export default function ActivityPage() {
                     const seen = new Set(current.map((item) => item.id));
                     return [...current, ...sorted.filter((item) => !seen.has(item.id))];
                 });
-                setHasMore(sorted.length === PAGE_SIZE && offset + sorted.length < (response.count ?? offset + sorted.length));
+                setHasMore(offset + sorted.length < response.length);
             } catch (fetchError) {
                 if (!isMounted || requestId !== requestIdRef.current) return;
                 setError(fetchError instanceof Error ? fetchError.message : "Failed to load activity.");
@@ -334,16 +339,17 @@ export default function ActivityPage() {
 
     const filteredActivities = useMemo(() => {
         return activities.filter((activity) => {
-            const mode = activity.mode?.toLowerCase() ?? "";
-            const marketName = activity.market?.name?.toLowerCase() ?? "";
-            const parentId = activity.market?.parent_id?.toLowerCase() ?? "";
-            const resolutionSource = activity.resolution_source?.toLowerCase() ?? "";
-            const resolutionStatus = activity.resolution_status?.toLowerCase() ?? "";
+            const challenge = activity.challenge;
+            const mode = challenge.mode?.toLowerCase() ?? "";
+            const marketName = challenge.market?.name?.toLowerCase() ?? "";
+            const parentId = challenge.market?.parent_id?.toLowerCase() ?? "";
+            const resolutionSource = challenge.resolution_source?.toLowerCase() ?? "";
+            const resolutionStatus = challenge.resolution_status?.toLowerCase() ?? "";
             const normalizedSearch = searchQuery.trim().toLowerCase();
-            const expireMs = new Date(activity.expire_time).getTime();
-            const resolveMs = new Date(activity.resolve_time).getTime();
-            const status = getStatusKey(activity);
-            const creator = getActivityCreator(activity);
+            const expireMs = new Date(challenge.expire_time).getTime();
+            const resolveMs = new Date(challenge.resolve_time).getTime();
+            const status = getStatusKey(challenge);
+            const creator = getActivityCreator(challenge);
 
             const matchesType =
                 activeFilter === "All Activity" ||
@@ -366,11 +372,13 @@ export default function ActivityPage() {
                         status === "pending_resolution" ||
                         resolutionStatus.includes("resolving") ||
                         (Number.isFinite(resolveMs) && resolveMs <= currentTimeMs && status !== "resolved"))) ||
-                (activeStatus === "Completed" && (status === "resolved" || Boolean(activity.resolved_at)));
+                (activeStatus === "Completed" && (status === "resolved" || Boolean(challenge.resolved_at)));
 
             const matchesSearch =
                 normalizedSearch.length === 0 ||
-                activity.title?.toLowerCase().includes(normalizedSearch) ||
+                challenge.title?.toLowerCase().includes(normalizedSearch) ||
+                getActivityVerb(activity.type).includes(normalizedSearch) ||
+                activity.actor?.username?.toLowerCase().includes(normalizedSearch) ||
                 creator.username.toLowerCase().includes(normalizedSearch) ||
                 creator.wallet.toLowerCase().includes(normalizedSearch) ||
                 marketName.includes(normalizedSearch);
@@ -599,34 +607,38 @@ export default function ActivityPage() {
 
                     {!isInitialLoading &&
                         filteredActivities.map((item) => {
-                            const creator = getActivityCreator(item);
-                            const marketIcon = item.market?.icon || "/scribbles/btc.png";
-                            const totalPool = item.total_pool || item.pool_size || item.initial_bet || 0;
-                            const participantCount = item.total_challengers || item.participants || 0;
-                            const resolutionStatus = getResolutionStatus(item, currentTimeMs);
-                            const modeLabel = getModeLabel(item.mode);
-                            const endTime = getChallengeEndTime(item);
-                            const activityHeadline = getActivityHeadline(item, endTime);
+                            const challenge = item.challenge;
+                            const creator = getActivityCreator(challenge);
+                            const actorName = item.actor?.username || creator.username;
+                            const actorAvatar = item.actor?.profile_image || creator.avatar;
+                            const actorSlug = item.actor?.wallet_address || item.actor?.pubkey || creator.profileSlug;
+                            const marketIcon = challenge.market?.icon || "/scribbles/btc.png";
+                            const totalPool = challenge.total_pool || challenge.pool_size || challenge.initial_bet || 0;
+                            const participantCount = challenge.total_challengers || challenge.participants || 0;
+                            const resolutionStatus = getResolutionStatus(challenge, currentTimeMs);
+                            const modeLabel = getModeLabel(challenge.mode);
+                            const endTime = getChallengeEndTime(challenge);
+                            const activityHeadline = getActivityHeadline(challenge, endTime);
 
                             return (
                                 <article
                                     key={item.id}
                                     role="button"
                                     tabIndex={0}
-                                    onClick={() => handleActivityClick(item)}
+                                    onClick={() => handleActivityClick(challenge)}
                                     onKeyDown={(event) => {
                                         if (event.key === "Enter" || event.key === " ") {
                                             event.preventDefault();
-                                            handleActivityClick(item);
+                                            handleActivityClick(challenge);
                                         }
                                     }}
-                                    className="group cursor-pointer rounded-xl border border-[#e6d8ce] bg-white px-3 py-3 transition-colors hover:border-[#c9a58b] hover:bg-[#fffcfa] sm:px-4"
+                                    className="group cursor-pointer overflow-hidden rounded-2xl border border-[#e7d8ce] bg-white p-3 shadow-[0_2px_10px_rgba(70,45,30,0.04)] transition-all hover:-translate-y-0.5 hover:border-[#c9a58b] hover:shadow-[0_8px_24px_rgba(70,45,30,0.09)] sm:p-4"
                                 >
                                     <div className="flex items-center gap-3">
-                                        <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-[#e5d6cb] bg-[#f7eee8] sm:h-14 sm:w-14">
+                                        <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-[#e5d6cb] bg-[#f7eee8] shadow-sm sm:h-14 sm:w-14">
                                             <Image
                                                 src={marketIcon}
-                                                alt={item.ticker || "Asset"}
+                                                alt={challenge.ticker || "Asset"}
                                                 width={56}
                                                 height={56}
                                                 className="h-full w-full object-cover"
@@ -634,24 +646,30 @@ export default function ActivityPage() {
                                         </div>
 
                                         <div className="min-w-0 flex-1">
-                                            <h2 className="line-clamp-2 text-sm font-black leading-snug text-[#17110e] sm:text-base">
+                                            <div className="mb-1 flex items-center gap-2">
+                                                <span className={`rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.08em] ${item.type === "joined" ? "bg-emerald-50 text-emerald-700" : item.type === "cancelled" ? "bg-rose-50 text-rose-700" : item.type === "expired" ? "bg-gray-100 text-gray-600" : "bg-sky-50 text-sky-700"}`}>
+                                                    {getActivityLabel(item.type)}
+                                                </span>
+                                                <span className="text-[10px] font-semibold text-[#9a8274]">{formatTimeAgo(item.occurredAt)}</span>
+                                            </div>
+                                            <h2 className="truncate text-sm font-black leading-snug text-[#17110e] sm:text-base" title={activityHeadline}>
                                                 {activityHeadline}
                                             </h2>
 
                                             <div className="mt-1.5 flex min-w-0 items-center gap-1.5 text-xs text-[#8b7467]">
-                                                <Image src={creator.avatar} alt="" width={20} height={20} className="h-5 w-5 shrink-0 rounded-full object-cover" />
+                                                <Image src={actorAvatar} alt="" width={20} height={20} className="h-5 w-5 shrink-0 rounded-full object-cover" />
                                                 <Link
-                                                    href={`/profile/${creator.profileSlug}`}
+                                                    href={`/profile/${actorSlug}`}
                                                     onClick={(event) => event.stopPropagation()}
                                                     className="max-w-28 truncate font-bold text-[#4b382f] hover:text-[#8b5e3c]"
                                                 >
-                                                    {creator.username}
+                                                    {actorName}
                                                 </Link>
-                                                <span className="hidden shrink-0 sm:inline">created this</span>
+                                                <span className="min-w-0 truncate">{getActivityVerb(item.type)}</span>
                                                 <span className="text-[#c1aa9d]">·</span>
-                                                <span className="shrink-0 font-semibold text-emerald-700">{participantCount} joined</span>
+                                                <span className="shrink-0 font-bold text-emerald-700">{participantCount} joined</span>
                                                 <span className="hidden text-[#c1aa9d] sm:inline">·</span>
-                                                <span className="hidden shrink-0 sm:inline">{formatCurrency(totalPool)} pool</span>
+                                                <span className="hidden shrink-0 font-semibold sm:inline">{formatCurrency(totalPool)} pool</span>
                                             </div>
                                         </div>
 
@@ -665,10 +683,7 @@ export default function ActivityPage() {
                                                     {resolutionStatus}
                                                 </span>
                                             </div>
-                                            <div className="flex items-center gap-1 text-[11px] font-medium text-[#9a8274]">
-                                                <span>{formatTimeAgo(item.created_at)}</span>
-                                                <ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
-                                            </div>
+                                            <ChevronRight className="h-4 w-4 text-[#9a8274] transition-transform group-hover:translate-x-0.5" />
                                         </div>
                                     </div>
                                 </article>

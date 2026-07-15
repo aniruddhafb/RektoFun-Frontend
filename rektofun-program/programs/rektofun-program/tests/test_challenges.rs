@@ -200,7 +200,7 @@ fn test_create_and_accept_pvp_challenge() {
 
     let accept_params = AcceptChallengeParams {
         join_creator_side: false, // ignored for PVP
-        amount: 75_000_000,       // deliberately different from the creator's 100 USDC stake
+        amount: 100_000_000,      // PVP must match or exceed the creator's stake
     };
     let accept_data = rektofun_ix::AcceptChallenge { params: accept_params }.data();
 
@@ -322,7 +322,7 @@ fn test_create_team_challenge_and_join() {
         rektofun_ix::AcceptChallenge {
             params: AcceptChallengeParams {
                 join_creator_side: true,
-                amount: 30_000_000, // deliberately different from the creator's 50 USDC stake
+                amount: 50_000_000, // TEAM must match until opponents cover the creator stake
             },
         }
         .data(),

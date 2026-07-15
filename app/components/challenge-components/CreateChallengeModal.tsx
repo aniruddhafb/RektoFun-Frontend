@@ -84,6 +84,17 @@ const DEFAULT_BET_AMOUNT = 5;
 const DEFAULT_DURATION_MINUTES = 15;
 const DEFAULT_RESOLUTION_DELAY_MS = 7 * 24 * 60 * 60 * 1000;
 const DEFAULT_CHART_RANGE: ChartRange = "3M";
+const CREATE_SETTINGS_KEY = "rektofun:create-challenge-settings";
+
+type SavedCreateSettings = {
+    marketType: MarketType;
+    challengeFormat: ChallengeFormat;
+    challengeMode: ChallengeMode;
+    assetCategory: string;
+    betAmount: number;
+    durationMinutes: number;
+    resolutionDelayMinutes: number;
+};
 
 const formatDuration = (duration: { hours: number; minutes: number }) => {
     const totalMinutes = duration.hours * 60 + duration.minutes;
@@ -167,18 +178,66 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
     const [isLoadingCategories, setIsLoadingCategories] = useState(false);
     const [categoryError, setCategoryError] = useState<string | null>(null);
     const [formError, setFormError] = useState<string | null>(null);
+    const [rememberSettings, setRememberSettings] = useState(false);
 
     const [txStatus, setTxStatus] = useState<TxStatus>("idle");
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     const statementRef = useRef<HTMLTextAreaElement>(null);
     const priceRef = useRef<HTMLInputElement>(null);
+    const savedAssetCategoryRef = useRef<string | null>(null);
     const { user } = useUserStore();
     const { open } = useAppKit();
     const { address, isConnected } = useAppKitAccount();
     const { walletProvider } = useAppKitProvider("solana");
 
     useBodyScrollLock(isOpen);
+
+    /* eslint-disable react-hooks/set-state-in-effect -- restoring an explicitly saved form snapshot when the modal opens */
+    useEffect(() => {
+        if (!isOpen) return;
+        try {
+            const rawSettings = window.localStorage.getItem(CREATE_SETTINGS_KEY);
+            if (!rawSettings) {
+                setRememberSettings(false);
+                return;
+            }
+            const saved = JSON.parse(rawSettings) as Partial<SavedCreateSettings>;
+            if (saved.marketType === "crypto" || saved.marketType === "sports") {
+                setMarketType(saved.marketType);
+                setChallengeFormat(saved.marketType === "sports" ? "statement" : saved.challengeFormat === "statement" ? "statement" : "price");
+            }
+            if (saved.challengeMode === "pvp" || saved.challengeMode === "team") setChallengeMode(saved.challengeMode);
+            if (typeof saved.betAmount === "number" && Number.isFinite(saved.betAmount) && saved.betAmount > 0) setBetAmount(saved.betAmount);
+            if (typeof saved.durationMinutes === "number" && saved.durationMinutes >= MIN_DURATION_MINUTES) {
+                setDuration(durationFromMinutes(saved.durationMinutes));
+            }
+            if (typeof saved.resolutionDelayMinutes === "number" && saved.resolutionDelayMinutes >= MIN_DURATION_MINUTES) {
+                const safeDelay = Math.min(saved.resolutionDelayMinutes, MAX_RESOLUTION_DELAY_MINUTES);
+                setSelectedDate(new Date(Date.now() + safeDelay * 60 * 1000));
+            }
+            savedAssetCategoryRef.current = typeof saved.assetCategory === "string" ? saved.assetCategory : null;
+            setRememberSettings(true);
+        } catch {
+            window.localStorage.removeItem(CREATE_SETTINGS_KEY);
+            setRememberSettings(false);
+        }
+    }, [isOpen]);
+    /* eslint-enable react-hooks/set-state-in-effect */
+
+    useEffect(() => {
+        if (!rememberSettings || !isOpen) return;
+        const settings: SavedCreateSettings = {
+            marketType,
+            challengeFormat,
+            challengeMode,
+            assetCategory: selectedChildCategory?.category ?? savedAssetCategoryRef.current ?? "",
+            betAmount,
+            durationMinutes: duration.hours * 60 + duration.minutes,
+            resolutionDelayMinutes: Math.max(MIN_DURATION_MINUTES, Math.round((selectedDate.getTime() - Date.now()) / 60000)),
+        };
+        window.localStorage.setItem(CREATE_SETTINGS_KEY, JSON.stringify(settings));
+    }, [betAmount, challengeFormat, challengeMode, duration, isOpen, marketType, rememberSettings, selectedChildCategory, selectedDate]);
 
     useEffect(() => {
         if (!isOpen) return;
@@ -220,9 +279,9 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
                 setSelectedChildCategory((current) =>
                     current?.parent_category?.trim().toLowerCase() === currentMarket
                         ? current
-                        : currentMarket === "crypto"
+                        : children.find((category) => category.category === savedAssetCategoryRef.current) ?? (currentMarket === "crypto"
                             ? children.find((category) => stripUsdcQuote(category.category).trim().toUpperCase() === "BTC") ?? children[0] ?? null
-                            : children[0] ?? null,
+                            : children[0] ?? null),
                 );
             } catch (error) {
                 if (cancelled) return;
@@ -243,6 +302,7 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
         if (nextMarket === marketType) return;
         setMarketType(nextMarket);
         setChallengeFormat(nextMarket === "sports" ? "statement" : "price");
+        savedAssetCategoryRef.current = null;
         setSelectedChildCategory(null);
         setChildCategories([]);
         setFormError(null);
@@ -489,18 +549,20 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
             });
 
             setTxStatus("idle");
-            setMarketType("crypto");
-            setChallengeFormat("price");
-            setChallengeMode("pvp");
+            if (!rememberSettings) {
+                setMarketType("crypto");
+                setChallengeFormat("price");
+                setChallengeMode("pvp");
+                setBetAmount(DEFAULT_BET_AMOUNT);
+                setSelectedChildCategory(null);
+                const nextResolutionDate = getDefaultResolutionDate(composerNow);
+                setSelectedDate(nextResolutionDate);
+                setDuration(durationFromMinutes(DEFAULT_DURATION_MINUTES));
+            }
             setStatement("");
             setPredictionPrice("");
             setChartRange(DEFAULT_CHART_RANGE);
             setIsAdvancedPickerOpen(false);
-            setBetAmount(DEFAULT_BET_AMOUNT);
-            setSelectedChildCategory(null);
-            const nextResolutionDate = getDefaultResolutionDate(composerNow);
-            setSelectedDate(nextResolutionDate);
-            setDuration(durationFromMinutes(DEFAULT_DURATION_MINUTES));
             setActivePanel(null);
             setIsPreviewOpen(false);
             announceChallengeCreated();
@@ -803,42 +865,68 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
                                     </div>
                                 )}
 
-                                <div className="-mr-3 mt-2 flex items-center gap-1.5 overflow-x-auto border-t border-black/10 pb-1 pr-3 pt-2.5 scrollbar-hide sm:mr-0 sm:mt-3 sm:pb-0 sm:pr-0 sm:pt-3" aria-label="Customize challenge">
-                                    <ComposerButton
-                                        icon={marketType === "crypto" ? Coins : Trophy}
-                                        caption="Asset"
-                                        label={topicLabel}
-                                        isActive={activePanel === "topic"}
-                                        onClick={() => togglePanel("topic")}
-                                    />
-                                    <ComposerButton
-                                        icon={CircleDollarSign}
-                                        caption="Stake"
-                                        label={`${betAmount || 0} USDC`}
-                                        isActive={activePanel === "stake"}
-                                        onClick={() => togglePanel("stake")}
-                                    />
-                                    <ComposerButton
-                                        icon={Clock3}
-                                        caption="Window"
-                                        label={formatDuration(duration)}
-                                        isActive={activePanel === "window"}
-                                        onClick={() => togglePanel("window")}
-                                    />
-                                    <ComposerButton
-                                        icon={CalendarDays}
-                                        caption="Resolves by"
-                                        label={formatDate(selectedDate)}
-                                        isActive={activePanel === "resolution"}
-                                        onClick={() => togglePanel("resolution")}
-                                    />
-                                    <ComposerButton
-                                        icon={challengeMode === "pvp" ? Swords : Users}
-                                        caption="Mode"
-                                        label={challengeMode === "pvp" ? "1 vs 1" : "Teams"}
-                                        isActive={activePanel === "players"}
-                                        onClick={() => togglePanel("players")}
-                                    />
+                                <div className="mt-3 border-t-2 border-black/15 pt-3" aria-label="Challenge setup options">
+                                    <div className="mb-2 flex items-center justify-between gap-3">
+                                        <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#302722]">Challenge setup</p>
+                                        <p className="text-[9px] font-bold text-[#8b7a72]">Tap an option to edit</p>
+                                    </div>
+                                    <div className="grid grid-cols-6 gap-2">
+                                        <ComposerButton
+                                            icon={marketType === "crypto" ? Coins : Trophy}
+                                            caption="Asset"
+                                            label={topicLabel}
+                                            isActive={activePanel === "topic"}
+                                            onClick={() => togglePanel("topic")}
+                                            layoutClassName="col-span-2"
+                                        />
+                                        <ComposerButton
+                                            icon={CircleDollarSign}
+                                            caption="Stake"
+                                            label={`${betAmount || 0} USDC`}
+                                            isActive={activePanel === "stake"}
+                                            onClick={() => togglePanel("stake")}
+                                            layoutClassName="col-span-2"
+                                        />
+                                        <ComposerButton
+                                            icon={Clock3}
+                                            caption="Window"
+                                            label={formatDuration(duration)}
+                                            isActive={activePanel === "window"}
+                                            onClick={() => togglePanel("window")}
+                                            layoutClassName="col-span-2"
+                                        />
+                                        <ComposerButton
+                                            icon={CalendarDays}
+                                            caption="Resolves by"
+                                            label={formatDate(selectedDate)}
+                                            isActive={activePanel === "resolution"}
+                                            onClick={() => togglePanel("resolution")}
+                                            layoutClassName="col-span-3"
+                                        />
+                                        <ComposerButton
+                                            icon={challengeMode === "pvp" ? Swords : Users}
+                                            caption="Mode"
+                                            label={challengeMode === "pvp" ? "1 vs 1" : "Teams"}
+                                            isActive={activePanel === "players"}
+                                            onClick={() => togglePanel("players")}
+                                            layoutClassName="col-span-3"
+                                        />
+                                    </div>
+                                    <label className="mt-2.5 inline-flex cursor-pointer items-center gap-2 text-[10px] font-bold text-[#6d5d55] hover:text-[#302722]">
+                                        <input
+                                            type="checkbox"
+                                            checked={rememberSettings}
+                                            onChange={(event) => {
+                                                const shouldRemember = event.target.checked;
+                                                setRememberSettings(shouldRemember);
+                                                if (!shouldRemember) {
+                                                    window.localStorage.removeItem(CREATE_SETTINGS_KEY);
+                                                }
+                                            }}
+                                            className="h-3.5 w-3.5 cursor-pointer accent-[#11895a]"
+                                        />
+                                        Remember these settings for my next challenge
+                                    </label>
                                 </div>
                             </div>
                         </div>
@@ -1182,12 +1270,14 @@ function ComposerButton({
     label,
     isActive,
     onClick,
+    layoutClassName,
 }: {
     icon: typeof Coins;
     caption: string;
     label: string;
     isActive: boolean;
     onClick: () => void;
+    layoutClassName?: string;
 }) {
     return (
         <button
@@ -1195,17 +1285,23 @@ function ComposerButton({
             onClick={onClick}
             aria-pressed={isActive}
             title={`${caption}: ${label}`}
-            className={`inline-flex h-11 shrink-0 items-center gap-2 border px-2.5 text-left transition-colors ${isActive ? "border-black bg-[#f5d547] text-black" : "border-black/15 bg-white text-[#6d5d55] hover:border-black hover:text-black"}`}
+            className={`group relative inline-flex min-h-16 min-w-0 items-center gap-2 border-2 px-2.5 py-2 text-left transition-all ${layoutClassName ?? ""} ${isActive
+                ? "border-black bg-[#f5d547] text-black shadow-[3px_3px_0_#111]"
+                : "border-black/30 bg-[#fffaf7] text-[#302722] hover:border-black hover:bg-[#fff5c2]"
+                }`}
         >
-            <Icon className="h-3.5 w-3.5 shrink-0" />
-            <span className="min-w-0">
-                <span className="block text-[8px] font-black uppercase leading-none tracking-[0.08em] opacity-60">
+            <span className={`flex h-7 w-7 shrink-0 items-center justify-center border ${isActive ? "border-black bg-black text-[#f5d547]" : "border-black/20 bg-white text-[#e85a2d] group-hover:border-black"}`}>
+                <Icon className="h-4 w-4" strokeWidth={2.4} />
+            </span>
+            <span className="min-w-0 flex-1">
+                <span className="block whitespace-nowrap text-[9px] font-black uppercase leading-none tracking-[0.08em] text-[#75655d]">
                     {caption}
                 </span>
-                <span className="mt-1 block max-w-32 truncate text-[10px] font-black leading-none">
+                <span className="mt-1.5 block break-words text-[11px] font-black leading-tight text-[#17120f]">
                     {label}
                 </span>
             </span>
+            {isActive ? <span className="absolute right-1 top-1 h-1.5 w-1.5 bg-black" aria-hidden="true" /> : null}
         </button>
     );
 }
@@ -1414,31 +1510,31 @@ function TargetPricePicker({
                 </div>
             </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/15 bg-black/10 px-3 py-2 sm:px-4">
-                <div className="flex items-center gap-2">
+            <div className="grid gap-2 border-b border-white/15 bg-black/10 px-3 py-2 min-[460px]:grid-cols-2 sm:px-4">
+                <div className="flex min-w-0 items-center gap-2">
                     <span className="hidden text-[9px] font-black uppercase tracking-[0.1em] text-white/50 min-[430px]:inline">Range</span>
-                    <div className="grid grid-cols-4 border border-white/20 bg-black/15 p-0.5" aria-label="Market chart range">
+                    <div className="grid min-w-0 flex-1 grid-cols-4 border border-white/20 bg-black/15 p-0.5" aria-label="Market chart range">
                         {(["24H", "7D", "30D", "3M"] as const).map((option) => (
                             <button
                                 key={option}
                                 type="button"
                                 onClick={() => onRangeChange(option)}
                                 aria-pressed={range === option}
-                                className={`h-7 min-w-11 px-2 text-[9px] font-black transition-colors ${range === option ? "bg-white text-[#163f31]" : "text-white/60 hover:bg-white/10 hover:text-white"}`}
+                                className={`h-8 min-w-0 px-1 text-[9px] font-black transition-colors ${range === option ? "bg-white text-[#163f31]" : "text-white/60 hover:bg-white/10 hover:text-white"}`}
                             >
                                 {option}
                             </button>
                         ))}
                     </div>
                 </div>
-                <div className="grid grid-cols-2 border border-white/20 bg-black/15 p-0.5" aria-label="Chart interaction mode">
+                <div className="grid min-w-0 grid-cols-2 border border-white/20 bg-black/15 p-0.5" aria-label="Chart interaction mode">
                     {(["analyze", "target"] as const).map((mode) => (
                         <button
                             key={mode}
                             type="button"
                             onClick={() => setInteractionMode(mode)}
                             aria-pressed={interactionMode === mode}
-                            className={`inline-flex h-7 items-center justify-center gap-1 px-2 text-[9px] font-black uppercase transition-colors ${interactionMode === mode ? mode === "target" ? "bg-[#f5d547] text-black" : "bg-white text-[#163f31]" : "text-white/60 hover:bg-white/10 hover:text-white"}`}
+                            className={`inline-flex h-8 min-w-0 items-center justify-center gap-1 px-1 text-[9px] font-black uppercase transition-colors ${interactionMode === mode ? mode === "target" ? "bg-[#f5d547] text-black" : "bg-white text-[#163f31]" : "text-white/60 hover:bg-white/10 hover:text-white"}`}
                         >
                             {mode === "analyze" ? <Activity className="h-3 w-3" /> : <Crosshair className="h-3 w-3" />}
                             {mode === "analyze" ? "Analyze" : "Set target"}
@@ -1466,10 +1562,10 @@ function TargetPricePicker({
                 })}
             </div>
 
-            <div className="relative h-52 select-none sm:h-56">
+            <div className="relative h-48 min-w-0 select-none min-[400px]:h-52 sm:h-56">
                 <div ref={chartContainerRef} className="h-full w-full" />
                 {interactionMode === "analyze" && (
-                    <div className="absolute right-14 top-2 z-20 flex border border-white/20 bg-[#163f31]/90 p-0.5 shadow-sm" aria-label="Chart zoom controls">
+                    <div className="absolute bottom-2 right-2 z-20 flex border border-white/20 bg-[#163f31]/90 p-0.5 shadow-sm sm:bottom-auto sm:right-14 sm:top-2" aria-label="Chart zoom controls">
                         <button
                             type="button"
                             onClick={() => zoomChart(1.35)}
@@ -1526,8 +1622,8 @@ function TargetPricePicker({
                 </span>
             </div>
 
-            <div className="flex items-center justify-between gap-3 border-t border-white/15 px-3 py-2 text-[9px] font-bold text-white/50 sm:px-4">
-                <span>
+            <div className="flex flex-wrap items-center justify-between gap-1.5 border-t border-white/15 px-3 py-2 text-[8px] font-bold text-white/50 sm:px-4 sm:text-[9px]">
+                <span className="min-w-0">
                     <a href="https://www.tradingview.com/" target="_blank" rel="noopener noreferrer" className="pointer-events-auto text-white/65 hover:text-white">Charts by TradingView</a>
                     {` · ${range} Binance data`}
                 </span>

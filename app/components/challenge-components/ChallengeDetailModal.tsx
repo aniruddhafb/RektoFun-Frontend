@@ -10,6 +10,7 @@ import {
   ChevronDown,
   Clock3,
   Crosshair,
+  ExternalLink,
   Loader2,
   Share2,
   ShieldCheck,
@@ -34,7 +35,9 @@ import { getUserById, User as UserType } from "@/app/lib/users-service/users";
 import { getPositionsByChallenge, Position } from "@/app/lib/positions-service/positions";
 import { useChallengeDetail } from "@/app/hooks/useChallengeDetail";
 import { useChallengeCard } from "@/app/hooks/useChallengeCard";
+import { getSolscanClusterQuery } from "@/app/lib/solana-config";
 import { AcceptChallengeModal } from "./AcceptChallengeModal";
+import { ChallengeActionModal } from "./ChallengeActionModal";
 import { ProfileHoverPreview } from "./ProfileHoverPreview";
 import { ShareChallengeModal } from "./ShareChallengeModal";
 import { WinningsShareModal } from "./WinningsShareModal";
@@ -141,10 +144,17 @@ function ChallengeAcceptAction({ challenge, ctaState, canOpen, onOpenChange }: C
     usdcBalance,
     escrowAddress,
     modalMinAcceptBet,
+    requiresCreatorStakeMatch,
     modalMaxAcceptBet,
     betCurrency,
     exactCountdownDetails,
+    timeRemaining,
+    challengeEndTimeText,
+    teamATotalAmount,
+    teamBTotalAmount,
     isTeam,
+    isExpireTimeAchieved,
+    hasJoinedChallenge,
     setBetInput,
     setBetError,
     setJoinSide,
@@ -154,6 +164,9 @@ function ChallengeAcceptAction({ challenge, ctaState, canOpen, onOpenChange }: C
     challengeAction,
     actionError,
     handleChallengeAction,
+    pendingChallengeAction,
+    confirmChallengeAction,
+    closeChallengeActionConfirmation,
     ctaState: actionCtaState,
     claimedWinnings,
     closeWinningsShare,
@@ -168,7 +181,7 @@ function ChallengeAcceptAction({ challenge, ctaState, canOpen, onOpenChange }: C
     event.preventDefault();
     await handleJoinChallenge();
   };
-  const displayedCtaState = challengeAction ? actionCtaState : ctaState;
+  const displayedCtaState = challengeAction || hasJoinedChallenge ? actionCtaState : ctaState;
 
   return (
     <>
@@ -205,10 +218,15 @@ function ChallengeAcceptAction({ challenge, ctaState, canOpen, onOpenChange }: C
         betError={betError}
         betCurrency={betCurrency}
         minAcceptBet={modalMinAcceptBet}
+        requiresCreatorStakeMatch={requiresCreatorStakeMatch}
         maxAcceptBet={modalMaxAcceptBet}
         escrowAddress={escrowAddress}
         resolveCountdown={exactCountdownDetails.exactCountdown}
         resolveLabel={exactCountdownDetails.dayLabel}
+        joinCountdown={timeRemaining}
+        joinLabel={challengeEndTimeText}
+        currentPoolAmount={Math.max(teamATotalAmount + teamBTotalAmount, Number(challenge.initial_bet) || 0)}
+        selectedSidePoolAmount={joinSide === "TEAM_A" ? Math.max(teamATotalAmount, Number(challenge.initial_bet) || 0) : teamBTotalAmount}
         isTeam={isTeam}
         joinSide={joinSide}
         onClose={() => closeBetForm()}
@@ -218,6 +236,14 @@ function ChallengeAcceptAction({ challenge, ctaState, canOpen, onOpenChange }: C
           if (betError) setBetError("");
         }}
         onJoinSideChange={setJoinSide}
+      />
+      <ChallengeActionModal
+        action={pendingChallengeAction}
+        isExpired={isExpireTimeAchieved}
+        isLoading={isLoading}
+        error={actionError}
+        onClose={closeChallengeActionConfirmation}
+        onConfirm={() => void confirmChallengeAction()}
       />
       <WinningsShareModal
         challenge={challenge}
@@ -421,6 +447,13 @@ export default function ChallengeDetailModal({ challenge, creator, isOpen, onClo
   const teamBStake = teamB.reduce((sum, participant) => sum + participant.bet, 0);
   const recordedPool = teamAStake + teamBStake;
   const totalPool = recordedPool || challenge.total_pool || challenge.pool_size || challenge.initial_bet || 0;
+  const escrowAddress = typeof challenge.metadata?.onchain?.challenge_pda === "string"
+    ? challenge.metadata.onchain.challenge_pda
+    : "";
+  const escrowDisplay = escrowAddress ? `${escrowAddress.slice(0, 5)}…${escrowAddress.slice(-5)}` : "";
+  const escrowHref = escrowAddress
+    ? `https://solscan.io/account/${encodeURIComponent(escrowAddress)}${getSolscanClusterQuery()}`
+    : "";
   const participantLoading = participantState.key !== String(challenge.id) && !participantState.failed;
   const composerMarket = challenge.metadata?.composer?.market;
   const isSports = challenge.category?.toLowerCase() === "sports" || composerMarket === "sports" || challenge.ticker === "SPORTS";
@@ -457,7 +490,7 @@ export default function ChallengeDetailModal({ challenge, creator, isOpen, onClo
             <div className="mt-3 flex items-center gap-3 pr-11 sm:gap-4 sm:pr-12">
               <Image src={assetLogo} alt={challenge.ticker || "Challenge asset"} width={48} height={48} unoptimized className="h-10 w-10 shrink-0 object-contain sm:h-12 sm:w-12" />
               <div className="min-w-0 flex-1">
-                <h2 id="challenge-detail-title" className="whitespace-nowrap text-lg font-black leading-tight tracking-tight text-gray-900 sm:text-xl">
+                <h2 id="challenge-detail-title" className="max-w-full break-words text-base font-black leading-snug tracking-tight text-gray-900 [overflow-wrap:anywhere] sm:text-xl sm:leading-tight">
                   {isManualResolution || isResolveTimeAchieved ? (
                     <span className="text-black">
                       {primaryTitle}
@@ -551,17 +584,23 @@ export default function ChallengeDetailModal({ challenge, creator, isOpen, onClo
                   </span>
                 </div>
 
-                <div className="flex w-full items-center justify-center gap-2.5 py-1 max-[350px]:gap-1.5 sm:gap-5">
-                  <ClassicParticipantCard
-                    participants={teamA}
-                    label={isTeam ? "Challengers" : "Challenger"}
-                    emptyTitle={isTeam ? "Creator" : "Challenger"}
-                    subtitle={isTeam ? `${teamA.length} joined · ${formatMoney(teamAStake)}` : formatMoney(teamAStake)}
-                    onOpenProfile={openProfile}
-                    align="left"
-                  />
+                <div className="flex w-full items-end justify-center gap-2.5 py-1 max-[350px]:gap-1.5 sm:gap-5">
+                  <div className="flex min-w-0 flex-col items-center">
+                    <div className="mb-2 text-center">
+                      <p className="text-[8px] font-black uppercase tracking-[0.12em] text-[#8b7355] sm:text-[9px]">Challenger stake</p>
+                      <p className="mt-0.5 text-sm font-black text-emerald-700 sm:text-base">{formatMoney(teamAStake)}</p>
+                    </div>
+                    <ClassicParticipantCard
+                      participants={teamA}
+                      label={isTeam ? "Challengers" : "Challenger"}
+                      emptyTitle={isTeam ? "Creator" : "Challenger"}
+                      subtitle={`${teamA.length} ${teamA.length === 1 ? "bet" : "bets"}`}
+                      onOpenProfile={openProfile}
+                      align="left"
+                    />
+                  </div>
 
-                  <div className="flex w-16 shrink-0 items-center justify-center sm:w-20">
+                  <div className="flex w-16 shrink-0 items-center justify-center pb-10 sm:w-20 sm:pb-11">
                     {teamB.length ? (
                       <video
                         src="/animations/Sword%20Battle.webm"
@@ -576,16 +615,36 @@ export default function ChallengeDetailModal({ challenge, creator, isOpen, onClo
                     )}
                   </div>
 
-                  <ClassicParticipantCard
-                    participants={teamB}
-                    label={isTeam ? "Opponent side" : "Opponent"}
-                    emptyTitle="No one yet"
-                    subtitle={teamB.length ? (isTeam ? `${teamB.length} joined · ${formatMoney(teamBStake)}` : formatMoney(teamBStake)) : isExpireTimeAchieved ? "No opponent joined" : "Be the first to accept"}
-                    onOpenProfile={openProfile}
-                    dashed={!teamB.length}
-                    align="right"
-                  />
+                  <div className="flex min-w-0 flex-col items-center">
+                    <div className="mb-2 text-center">
+                      <p className="text-[8px] font-black uppercase tracking-[0.12em] text-[#8b7355] sm:text-[9px]">Opponent stake</p>
+                      <p className="mt-0.5 text-sm font-black text-emerald-700 sm:text-base">{formatMoney(teamBStake)}</p>
+                    </div>
+                    <ClassicParticipantCard
+                      participants={teamB}
+                      label={isTeam ? "Opponents" : "Opponent"}
+                      emptyTitle="No one yet"
+                      subtitle={teamB.length ? `${teamB.length} ${teamB.length === 1 ? "bet" : "bets"}` : isExpireTimeAchieved ? "No opponent joined" : "Open side"}
+                      onOpenProfile={openProfile}
+                      dashed={!teamB.length}
+                      align="right"
+                    />
+                  </div>
                 </div>
+
+                {escrowHref && (
+                  <div className="mt-3 flex justify-center border-t border-black/10 pt-2.5">
+                    <a
+                      href={escrowHref}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex max-w-full items-center gap-1.5 text-[8px] font-bold uppercase tracking-[0.08em] text-[#8b7a72] transition-colors hover:text-[#246044] sm:text-[9px]"
+                      title={escrowAddress}
+                    >
+                      <ShieldCheck className="h-3 w-3 text-[#246044]" /> Escrow {escrowDisplay} <ExternalLink className="h-2.5 w-2.5" />
+                    </a>
+                  </div>
+                )}
 
                 <BetActivityList activity={betActivity} onOpenProfile={openProfile} creatorLabel={isTeam ? "Creator" : "Challenger"} />
               </>
@@ -669,7 +728,7 @@ function LazyCryptoMarketPanel({ asset, target, direction }: {
           </span>
           <span className="min-w-0">
             <span className="block text-[10px] font-black uppercase tracking-[0.12em] text-[#8b7a72]">Analyze market</span>
-            <span className="block truncate text-sm font-black text-[#17120f]">View the {asset} price chart</span>
+            <span className="block break-words text-sm font-black text-[#17120f] [overflow-wrap:anywhere]">View the {asset} price chart</span>
           </span>
         </span>
         <ChevronDown className={`h-5 w-5 shrink-0 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`} />
@@ -727,8 +786,8 @@ function CryptoMarketPanel({ asset, target, direction }: {
 
   return (
     <section className="overflow-hidden bg-[#163f31] text-white">
-      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-white/15 px-4 py-3 sm:px-5">
-        <div>
+      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-white/15 px-3 py-3 sm:px-5">
+        <div className="min-w-0">
           <div className="flex items-center gap-2">
             <span className="flex h-8 w-8 items-center justify-center border border-white/20 bg-white/10"><Crosshair className="h-4 w-4" /></span>
             <div>
@@ -738,7 +797,7 @@ function CryptoMarketPanel({ asset, target, direction }: {
           </div>
           {currentPrice > 0 && (
             <div className="mt-3 flex items-end gap-2">
-              <span className="text-2xl font-black sm:text-3xl">{formatPrice(currentPrice)}</span>
+              <span className="break-all text-xl font-black sm:text-3xl">{formatPrice(currentPrice)}</span>
               <span className={`mb-1 inline-flex items-center gap-1 text-xs font-black ${isPositive ? "text-emerald-300" : "text-red-300"}`}>
                 {isPositive ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
                 {priceChange >= 0 ? "+" : ""}{priceChange.toFixed(2)}%
@@ -746,13 +805,13 @@ function CryptoMarketPanel({ asset, target, direction }: {
             </div>
           )}
         </div>
-        <div className="flex border border-white/20 bg-black/10 p-0.5">
+        <div className="grid w-full grid-cols-4 border border-white/20 bg-black/10 p-0.5 min-[430px]:w-auto">
           {(["24H", "7D", "30D", "3M"] as const).map((option) => (
             <button
               key={option}
               type="button"
               onClick={() => setRange(option)}
-              className={`h-7 px-2.5 text-[9px] font-black ${range === option ? "bg-white text-[#163f31]" : "text-white/65 hover:text-white"}`}
+              className={`h-8 min-w-0 px-2 text-[9px] font-black ${range === option ? "bg-white text-[#163f31]" : "text-white/65 hover:text-white"}`}
             >
               {option}
             </button>
@@ -760,7 +819,7 @@ function CryptoMarketPanel({ asset, target, direction }: {
         </div>
       </div>
 
-      <div className="relative h-64 sm:h-72">
+      <div className="relative h-56 min-w-0 sm:h-72">
         {isLoading ? (
           <div className="flex h-full items-center justify-center text-white/60"><Loader2 className="h-5 w-5 animate-spin" /></div>
         ) : state.failed || candles.length < 2 ? (
@@ -772,8 +831,8 @@ function CryptoMarketPanel({ asset, target, direction }: {
           <MarketCandlestickChart key={requestKey} candles={candles} asset={asset} target={target} direction={direction} />
         )}
       </div>
-      <div className="flex items-center justify-between border-t border-white/15 px-4 py-2 text-[9px] font-bold uppercase tracking-[0.08em] text-white/50">
-        <span>Pan, zoom and hover to inspect · Binance data</span><span>{range}</span>
+      <div className="flex flex-wrap items-center justify-between gap-1 border-t border-white/15 px-3 py-2 text-[8px] font-bold uppercase tracking-[0.06em] text-white/50 sm:px-4 sm:text-[9px]">
+        <span>Pan, zoom and hover · Binance data</span><span>{range}</span>
       </div>
     </section>
   );
@@ -901,11 +960,12 @@ function MarketCandlestickChart({ candles, asset, target, direction }: {
   return (
     <div className="relative h-full w-full select-none" aria-label={`${asset} interactive candlestick chart`}>
       <div ref={containerRef} className="h-full w-full" />
-      <div className="pointer-events-none absolute left-2 top-2 z-10 max-w-[calc(100%-8rem)] border border-white/20 bg-[#163f31]/90 px-2 py-1.5 text-[8px] font-bold text-white/65 shadow-sm sm:text-[9px]">
+      <div className="pointer-events-none absolute left-2 top-2 z-10 max-w-[calc(100%-1rem)] border border-white/20 bg-[#163f31]/90 px-2 py-1.5 text-[8px] font-bold text-white/65 shadow-sm sm:max-w-[calc(100%-8rem)] sm:text-[9px]">
         <span className="mr-2 text-white/90">{inspectedTime}</span>
-        <span>O {formatPrice(inspected.open)} · H {formatPrice(inspected.high)} · L {formatPrice(inspected.low)} · C {formatPrice(inspected.close)}</span>
+        <span className="hidden min-[430px]:inline">O {formatPrice(inspected.open)} · H {formatPrice(inspected.high)} · L {formatPrice(inspected.low)} · C {formatPrice(inspected.close)}</span>
+        <span className="min-[430px]:hidden">C {formatPrice(inspected.close)}</span>
       </div>
-      <div className="absolute right-14 top-2 z-20 flex border border-white/20 bg-[#163f31]/90 p-0.5 shadow-sm" aria-label="Chart zoom controls">
+      <div className="absolute bottom-2 right-2 z-20 flex border border-white/20 bg-[#163f31]/90 p-0.5 shadow-sm sm:bottom-auto sm:right-14 sm:top-2" aria-label="Chart zoom controls">
         <button type="button" onClick={() => zoomChart(1.35)} className="flex h-7 w-7 items-center justify-center text-sm font-black text-white/70 hover:bg-white/10 hover:text-white" aria-label="Zoom out">−</button>
         <button type="button" onClick={() => zoomChart(0.72)} className="flex h-7 w-7 items-center justify-center border-x border-white/15 text-sm font-black text-white/70 hover:bg-white/10 hover:text-white" aria-label="Zoom in">+</button>
         <button type="button" onClick={() => chartApiRef.current?.timeScale().fitContent()} className="flex h-7 items-center justify-center px-2 text-[8px] font-black uppercase text-white/70 hover:bg-white/10 hover:text-white" aria-label="Fit all candles">Fit</button>

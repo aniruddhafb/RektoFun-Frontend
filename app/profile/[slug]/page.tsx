@@ -49,6 +49,8 @@ export default function ProfilePage() {
     const [userChallenges, setUserChallenges] = useState<Challenge[]>([]);
     const [totalChallengesCreated, setTotalChallengesCreated] = useState(0);
     const [challengesLoading, setChallengesLoading] = useState(false);
+    const [challengesLoadingMore, setChallengesLoadingMore] = useState(false);
+    const [hasMoreChallenges, setHasMoreChallenges] = useState(true);
     const [isFollowActionLoading, setIsFollowActionLoading] = useState(false);
     const [rektoBalance, setRektoBalance] = useState(0);
     const [isRektoBalanceLoading, setIsRektoBalanceLoading] = useState(true);
@@ -59,6 +61,7 @@ export default function ProfilePage() {
     const isOwnProfile = connectedWalletAddress?.toLowerCase() === user?.wallet_address?.toLowerCase();
     const isFollowing = !!(currentUser?.id && user?.followers?.includes(currentUser.id));
     const profileWalletAddress = user?.wallet_address || walletFromSlug;
+    const profileUserId = user?.id;
 
     // Fetch user data by wallet address
     useEffect(() => {
@@ -118,11 +121,12 @@ export default function ProfilePage() {
                 setChallengesLoading(true);
                 const challengeData = await getChallenges({
                     created_by: user.id,
-                    limit: 100,
+                    limit: 6,
                     offset: 0,
                 });
                 setUserChallenges(challengeData.challenges || []);
                 setTotalChallengesCreated(challengeData.total ?? challengeData.challenges?.length ?? 0);
+                setHasMoreChallenges((challengeData.challenges?.length ?? 0) < (challengeData.total ?? 0));
             } catch (challengeError) {
                 console.error("Failed to fetch user challenges:", challengeError);
                 setUserChallenges([]);
@@ -134,6 +138,25 @@ export default function ProfilePage() {
 
         fetchUserChallenges();
     }, [user?.id, challengeRefreshKey]);
+
+    const loadMoreChallenges = useCallback(async () => {
+        if (!profileUserId || challengesLoading || challengesLoadingMore || !hasMoreChallenges) return;
+        try {
+            setChallengesLoadingMore(true);
+            const challengeData = await getChallenges({
+                created_by: profileUserId,
+                limit: 9,
+                offset: userChallenges.length,
+            });
+            setUserChallenges((current) => [...current, ...(challengeData.challenges || [])]);
+            setTotalChallengesCreated((current) => challengeData.total ?? current);
+            setHasMoreChallenges(userChallenges.length + (challengeData.challenges?.length ?? 0) < challengeData.total);
+        } catch (challengeError) {
+            console.error("Failed to load more user challenges:", challengeError);
+        } finally {
+            setChallengesLoadingMore(false);
+        }
+    }, [challengesLoading, challengesLoadingMore, hasMoreChallenges, profileUserId, userChallenges.length]);
 
     useEffect(() => {
         const refreshChallenges = () => setChallengeRefreshKey((key) => key + 1);
@@ -351,6 +374,9 @@ export default function ProfilePage() {
                                 loading={challengesLoading}
                                 onChallengeClick={handleChallengeClick}
                                 onCreateChallenge={isOwnProfile ? () => setIsCreateModalOpen(true) : undefined}
+                                hasMore={hasMoreChallenges}
+                                loadingMore={challengesLoadingMore}
+                                onLoadMore={loadMoreChallenges}
                             />
                         )}
 

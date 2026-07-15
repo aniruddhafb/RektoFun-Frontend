@@ -13,6 +13,7 @@ import { Challenge, getChallengeById } from "../lib/challenges-service/challenge
 import ChallengeDetailModal from "../components/challenge-components/ChallengeDetailModal";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { CHALLENGE_UPDATED_EVENT, type ChallengeUpdatedDetail } from "../lib/realtime-events";
+import { RefreshCw } from "lucide-react";
 
 const BOOKMARKS_STORAGE_KEY = "rektofun:challenge-bookmarks";
 
@@ -30,6 +31,7 @@ function ChallengesPageContent() {
   const [rektError, setRektError] = useState<string | null>(null);
   const [isRekting, setIsRekting] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [showCreateSuccessToast, setShowCreateSuccessToast] = useState(false);
   const [createToastProgress, setCreateToastProgress] = useState(100);
   const [bookmarkedChallengeIds, setBookmarkedChallengeIds] = useState<string[]>(() => {
@@ -113,6 +115,16 @@ function ChallengesPageContent() {
     setCreateToastProgress(100);
     setShowCreateSuccessToast(true);
   };
+
+  const handleRefreshChallenges = () => {
+    if (isRefreshing) return;
+    setIsRefreshing(true);
+    setRefreshKey((prev) => prev + 1);
+  };
+
+  const handleRefreshComplete = useCallback(() => {
+    setIsRefreshing(false);
+  }, []);
 
 
   useEffect(() => {
@@ -224,6 +236,20 @@ function ChallengesPageContent() {
         setSearchQuery={setSearchQuery}
       />
 
+      <div className="mx-auto flex max-w-7xl justify-end px-6 pb-3 lg:px-8">
+        <button
+          type="button"
+          onClick={handleRefreshChallenges}
+          disabled={isRefreshing}
+          className="inline-flex h-9 cursor-pointer items-center justify-center gap-2 border-2 border-black bg-white px-3 text-xs font-black uppercase tracking-[0.06em] text-black transition-colors hover:bg-[#f5d547] disabled:cursor-wait disabled:bg-[#f7efe9] disabled:text-black/55"
+          aria-label="Refresh challenges"
+          aria-live="polite"
+        >
+          <RefreshCw className={`h-3.5 w-3.5 ${isRefreshing ? "animate-spin" : ""}`} strokeWidth={2.7} />
+          {isRefreshing ? "Refreshing" : "Refresh"}
+        </button>
+      </div>
+
       <FeedbackBanner
         rektTxSig={rektTxSig}
         rektError={rektError}
@@ -238,6 +264,7 @@ function ChallengesPageContent() {
         onOpenModal={() => setIsCreateModalOpen(true)}
         onChallengesLoaded={handleChallengesLoaded}
         refreshKey={refreshKey}
+        onRefreshComplete={handleRefreshComplete}
         activeFilter={activeFilter}
         searchQuery={searchQuery}
         resolutionSource="PRICE_FEED"
