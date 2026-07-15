@@ -28,7 +28,7 @@ pub struct CancelChallenge<'info> {
         // Block cancellation if any opponent has joined — pot is contested at that point
         constraint = challenge.opponent_team.is_empty() @ RektoError::OpponentsJoined,
     )]
-    pub challenge: Account<'info, ChallengeAccount>,
+    pub challenge: Box<Account<'info, ChallengeAccount>>,
 
     /// USDC vault token account — owned by the challenge PDA
     #[account(

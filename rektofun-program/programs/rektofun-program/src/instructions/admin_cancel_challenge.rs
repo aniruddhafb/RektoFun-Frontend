@@ -35,7 +35,7 @@ pub struct AdminCancelChallenge<'info> {
             || challenge.status == ChallengeStatus::Active)
             @ RektoError::NotOpenOrActive,
     )]
-    pub challenge: Account<'info, ChallengeAccount>,
+    pub challenge: Box<Account<'info, ChallengeAccount>>,
 
     /// USDC vault token account — owned by the challenge PDA
     #[account(

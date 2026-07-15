@@ -144,6 +144,132 @@
       ]
     },
     {
+      "name": "admin_cancel_challenge",
+      "docs": [
+        "Admin-only: force-cancel any Open or Active challenge, regardless of",
+        "whether a PVP challenger has accepted or TEAM opponents have joined.",
+        "The creator's own bet is refunded immediately; every other depositor",
+        "(PVP challenger, TEAM creator_team/opponent_team members) reclaims",
+        "their own stake afterward via `claim_refund`."
+      ],
+      "discriminator": [
+        199,
+        8,
+        187,
+        96,
+        136,
+        222,
+        62,
+        253
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "docs": [
+            "The admin wallet — only `Config::admin` may force-cancel a challenge."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "challenge",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  104,
+                  97,
+                  108,
+                  108,
+                  101,
+                  110,
+                  103,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "challenge.creator",
+                "account": "ChallengeAccount"
+              },
+              {
+                "kind": "account",
+                "path": "challenge.challenge_id",
+                "account": "ChallengeAccount"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "docs": [
+            "USDC vault token account — owned by the challenge PDA"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "challenge"
+              }
+            ]
+          }
+        },
+        {
+          "name": "creator_usdc_account",
+          "docs": [
+            "Creator's USDC token account (refund destination for their own bet)"
+          ],
+          "writable": true
+        },
+        {
+          "name": "usdc_mint",
+          "docs": [
+            "USDC mint — validated by token account constraints above"
+          ]
+        },
+        {
+          "name": "token_program"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "cancel_challenge",
       "docs": [
         "Creator cancels an unaccepted challenge and reclaims their bet."
@@ -271,11 +397,12 @@
     {
       "name": "claim_refund",
       "docs": [
-        "TEAM mode only: a creator-side participant reclaims their bet after the creator",
-        "has cancelled a challenge where no opponents joined.",
-        "The creator's own refund is issued in `cancel_challenge`; this covers everyone",
-        "who joined the creator's side. Each participant can only call this once",
-        "(enforced by the ClaimRecord PDA)."
+        "Any non-creator depositor on a Cancelled challenge reclaims their own stake —",
+        "a PVP challenger, or a TEAM creator_team/opponent_team member. Covers refunds",
+        "left over after both `cancel_challenge` (creator self-cancel) and",
+        "`admin_cancel_challenge` (admin force-cancel); the creator's own refund is",
+        "always issued directly by whichever of those two cancelled the challenge.",
+        "Each participant can only call this once (enforced by the ClaimRecord PDA)."
       ],
       "discriminator": [
         15,
@@ -560,6 +687,32 @@
           ]
         },
         {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "docs": [
+            "Platform wallet — receives the reclaimed vault + challenge PDA rent once the",
+            "final winner has claimed (it originally paid this rent at challenge creation)."
+          ],
+          "writable": true
+        },
+        {
           "name": "token_program"
         },
         {
@@ -767,7 +920,7 @@
           "name": "admin",
           "writable": true,
           "signer": true,
-          "address": "7ezeyRB6Sp6QCMENmjXGWWzozyCWKsBSA1TxBi3oNS5U"
+          "address": "mo3uv8Ai9FJEB4TEfFmj8H5SAh2SArr4tgcqNz9K41n"
         },
         {
           "name": "config",
@@ -800,8 +953,10 @@
       "docs": [
         "Admin/oracle settles the challenge after expiry.",
         "",
-        "PVP: funds are sent directly to the winner's USDC account.",
-        "TEAM: the winning side is recorded on-chain; each winner must call",
+        "PVP: winner payout, platform fee, and creator-revenue fee are all sent",
+        "directly on-chain.",
+        "TEAM: platform fee and creator-revenue fee are paid immediately; the",
+        "winning side is recorded and each winner must call",
         "`claim_winnings` separately to pull their proportional share."
       ],
       "discriminator": [
@@ -925,6 +1080,16 @@
           "writable": true
         },
         {
+          "name": "creator_usdc_account",
+          "docs": [
+            "Creator-revenue USDC token account — receives creator_fee_bps of the pot",
+            "for BOTH PVP and TEAM, regardless of who wins. Required in both cases",
+            "(unlike winner_usdc_account's \"dummy for TEAM\" pattern), since this cut",
+            "is paid unconditionally on every settlement."
+          ],
+          "writable": true
+        },
+        {
           "name": "usdc_mint",
           "docs": [
             "USDC mint — validated by token account constraints above"
@@ -996,9 +1161,9 @@
     {
       "name": "update_platform_params",
       "docs": [
-        "Admin-only: tune platform_fee_bps / min_bet_amount / max_duration_secs /",
-        "min_duration_secs / max_team_size at runtime, without a redeploy.",
-        "Unset fields in `args` are left unchanged."
+        "Admin-only: tune platform_fee_bps / creator_fee_bps / min_bet_amount /",
+        "max_duration_secs / min_duration_secs / max_team_size at runtime, without",
+        "a redeploy. Unset fields in `args` are left unchanged."
       ],
       "discriminator": [
         24,
@@ -1231,6 +1396,11 @@
       "code": 6025,
       "name": "InvalidParam",
       "msg": "Invalid parameter value"
+    },
+    {
+      "code": 6026,
+      "name": "NotOpenOrActive",
+      "msg": "Challenge is already settled or cancelled; nothing to cancel"
     }
   ],
   "types": [
@@ -1369,6 +1539,16 @@
               "snapshotted at settle time and split proportionally in claim_winnings."
             ],
             "type": "u64"
+          },
+          {
+            "name": "winners_remaining",
+            "docs": [
+              "TEAM only: number of winning-side participants who still need to call",
+              "claim_winnings, snapshotted at settle time and decremented on each claim.",
+              "When it hits zero the vault and this account are closed, returning their",
+              "rent to the admin wallet that originally paid it."
+            ],
+            "type": "u16"
           },
           {
             "name": "challenge_type",
@@ -1545,7 +1725,10 @@
         "authorised to settle challenges and update these parameters — set once at",
         "`initialize_config`, changeable afterwards via `update_admin`. The other",
         "fields mirror the compile-time defaults in `constants.rs` but can be",
-        "tuned at runtime via `update_platform_params` without a program redeploy."
+        "tuned at runtime via `update_platform_params` without a program redeploy.",
+        "`platform_fee_bps` and `creator_fee_bps` are both deducted from the pot",
+        "at settlement — the former to the platform treasury, the latter to",
+        "`challenge.creator` regardless of who wins."
       ],
       "type": {
         "kind": "struct",
@@ -1556,6 +1739,10 @@
           },
           {
             "name": "platform_fee_bps",
+            "type": "u64"
+          },
+          {
+            "name": "creator_fee_bps",
             "type": "u64"
           },
           {
@@ -1701,6 +1888,12 @@
         "fields": [
           {
             "name": "platform_fee_bps",
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
+            "name": "creator_fee_bps",
             "type": {
               "option": "u64"
             }

@@ -393,11 +393,13 @@ export async function buildClaimWinningsTx(
 ): Promise<Transaction> {
   const [vault] = deriveVaultPDA(challengePDA);
   const [claimRecord] = deriveClaimPDA(challengePDA, participant);
+  const [config] = deriveConfigPDA();
+  const configAccount = await (program.account as any).config.fetch(config);
   const { participantUsdcAccount, preInstructions } = await getPayoutAccountSetup(participant);
   return (program.methods as any).claimWinnings().accounts({
     participant, creator, challenge: challengePDA, vault, participantUsdcAccount,
     claimRecord, usdcMint: USDC_MINT, tokenProgram: TOKEN_PROGRAM_ID,
-    systemProgram: SystemProgram.programId,
+    systemProgram: SystemProgram.programId, config, admin: configAccount.admin,
   }).preInstructions(preInstructions).transaction();
 }
 

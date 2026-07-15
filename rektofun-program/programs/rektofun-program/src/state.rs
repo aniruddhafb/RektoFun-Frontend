@@ -107,6 +107,12 @@ pub struct ChallengeAccount {
     /// snapshotted at settle time and split proportionally in claim_winnings.
     pub settled_net_pot: u64,
 
+    /// TEAM only: number of winning-side participants who still need to call
+    /// claim_winnings, snapshotted at settle time and decremented on each claim.
+    /// When it hits zero the vault and this account are closed, returning their
+    /// rent to the admin wallet that originally paid it.
+    pub winners_remaining: u16,
+
     // ── Common fields ────────────────────────────────────────────────────────
     /// Whether this is a PVP or TEAM challenge
     pub challenge_type: ChallengeType,

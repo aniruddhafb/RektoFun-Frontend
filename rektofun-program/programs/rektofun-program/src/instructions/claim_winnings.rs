@@ -1,10 +1,10 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token_interface::{self, Mint, TokenAccount, TokenInterface, TransferChecked};
+use anchor_spl::token_interface::{self, CloseAccount, Mint, TokenAccount, TokenInterface, TransferChecked};
 
 use crate::{
     constants::*,
     error::RektoError,
-    state::{ChallengeAccount, ChallengeStatus, ChallengeType, ClaimRecord, WinningSide},
+    state::{ChallengeAccount, ChallengeStatus, ChallengeType, ClaimRecord, Config, WinningSide},
 };
 
 /// TEAM mode only: a winner on the winning side calls this to pull their proportional
@@ -31,7 +31,7 @@ pub struct ClaimWinnings<'info> {
         constraint = challenge.challenge_type == ChallengeType::Team @ RektoError::WrongChallengeType,
         constraint = challenge.creator == creator.key() @ RektoError::UnauthorizedSettle,
     )]
-    pub challenge: Account<'info, ChallengeAccount>,
+    pub challenge: Box<Account<'info, ChallengeAccount>>,
 
     /// USDC vault token account — owned by the challenge PDA
     #[account(
@@ -67,6 +67,14 @@ pub struct ClaimWinnings<'info> {
     /// USDC mint
     pub usdc_mint: InterfaceAccount<'info, Mint>,
 
+    #[account(seeds = [CONFIG_SEED], bump = config.bump)]
+    pub config: Account<'info, Config>,
+
+    /// Platform wallet — receives the reclaimed vault + challenge PDA rent once the
+    /// final winner has claimed (it originally paid this rent at challenge creation).
+    #[account(mut, address = config.admin @ RektoError::Unauthorized)]
+    pub admin: SystemAccount<'info>,
+
     pub token_program: Interface<'info, TokenInterface>,
     pub system_program: Program<'info, System>,
 }
@@ -75,6 +83,7 @@ pub(crate) fn handler(ctx: Context<ClaimWinnings>) -> Result<()> {
     let challenge = &ctx.accounts.challenge;
     let participant_key = ctx.accounts.participant.key();
     let decimals = ctx.accounts.usdc_mint.decimals;
+    let challenge_id = challenge.challenge_id;
 
     // ── 1. Verify the participant is on the winning side ─────────────────────
     let on_winning_side = match challenge.winning_side {
@@ -120,15 +129,26 @@ pub(crate) fn handler(ctx: Context<ClaimWinnings>) -> Result<()> {
 
     let winning_side_total = challenge.winning_side_total_amount;
     let net_pot = challenge.settled_net_pot;
+    let winners_remaining = challenge.winners_remaining;
 
-    // Use u128 for the intermediate product to avoid overflow before dividing back down.
-    let payout: u64 = (participant_stake as u128)
-        .checked_mul(net_pot as u128)
-        .ok_or(RektoError::Overflow)?
-        .checked_div(winning_side_total as u128)
-        .ok_or(RektoError::Overflow)?
-        .try_into()
-        .map_err(|_| RektoError::Overflow)?;
+    // This is the final outstanding claim on the winning side — pay out the vault's
+    // exact remaining balance instead of the proportional formula, so it drains to
+    // zero and can be closed. This also absorbs any rounding dust left behind by
+    // earlier floor-divided claims rather than leaving it stranded.
+    let is_last_claim = winners_remaining == 1;
+
+    let payout: u64 = if is_last_claim {
+        ctx.accounts.vault.amount
+    } else {
+        // Use u128 for the intermediate product to avoid overflow before dividing back down.
+        (participant_stake as u128)
+            .checked_mul(net_pot as u128)
+            .ok_or(RektoError::Overflow)?
+            .checked_div(winning_side_total as u128)
+            .ok_or(RektoError::Overflow)?
+            .try_into()
+            .map_err(|_| RektoError::Overflow)?
+    };
 
     // ── 3. PDA signer seeds for the vault ────────────────────────────────────
     let challenge_bump = challenge.bump;
@@ -165,12 +185,33 @@ pub(crate) fn handler(ctx: Context<ClaimWinnings>) -> Result<()> {
     claim_record.amount_claimed = payout;
     claim_record.bump = ctx.bumps.claim_record;
 
+    // ── 6. Decrement the outstanding-claims counter ─────────────────────────
+    ctx.accounts.challenge.winners_remaining = winners_remaining
+        .checked_sub(1)
+        .ok_or(RektoError::Overflow)?;
+
     msg!(
         "TEAM Challenge #{}: {} claimed {} USDC micro-units",
-        challenge.challenge_id,
+        challenge_id,
         participant_key,
         payout,
     );
+
+    // ── 7. Last claimant closes out the vault + challenge PDA, returning their
+    //      rent to the admin wallet that originally paid it at creation. ─────
+    if is_last_claim {
+        token_interface::close_account(CpiContext::new_with_signer(
+            ctx.accounts.token_program.key(),
+            CloseAccount {
+                account: ctx.accounts.vault.to_account_info(),
+                destination: ctx.accounts.admin.to_account_info(),
+                authority: ctx.accounts.challenge.to_account_info(),
+            },
+            signer_seeds,
+        ))?;
+
+        ctx.accounts.challenge.close(ctx.accounts.admin.to_account_info())?;
+    }
 
     Ok(())
 }

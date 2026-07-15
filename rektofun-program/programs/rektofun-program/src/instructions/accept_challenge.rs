@@ -42,7 +42,7 @@ pub struct AcceptChallenge<'info> {
         constraint = challenge.status == ChallengeStatus::Open @ RektoError::NotOpen,
         constraint = challenge.creator != challenger.key() @ RektoError::CannotAcceptOwnChallenge,
     )]
-    pub challenge: Account<'info, ChallengeAccount>,
+    pub challenge: Box<Account<'info, ChallengeAccount>>,
 
     /// USDC vault token account — owned by the challenge PDA
     #[account(
