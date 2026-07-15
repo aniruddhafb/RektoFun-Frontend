@@ -4,6 +4,7 @@ import React from "react";
 import { createPortal } from "react-dom";
 import {
     Clock3,
+    Check,
     CircleAlert,
     CircleDollarSign,
     ExternalLink,
@@ -27,7 +28,12 @@ interface AcceptChallengeModalProps {
     escrowAddress?: string;
     resolveCountdown: string;
     resolveLabel: string;
+    joinCountdown: string;
+    joinLabel: string;
+    currentPoolAmount: number;
+    selectedSidePoolAmount: number;
     isTeam: boolean;
+    requiresCreatorStakeMatch: boolean;
     joinSide: "TEAM_A" | "TEAM_B";
     onClose: () => void;
     onSubmit: (event: React.SubmitEvent<HTMLFormElement>) => void;
@@ -50,7 +56,12 @@ export function AcceptChallengeModal({
     escrowAddress,
     resolveCountdown,
     resolveLabel,
+    joinCountdown,
+    joinLabel,
+    currentPoolAmount,
+    selectedSidePoolAmount,
     isTeam,
+    requiresCreatorStakeMatch,
     joinSide,
     onClose,
     onSubmit,
@@ -72,6 +83,16 @@ export function AcceptChallengeModal({
         typeof usdcBalance === "number" && Number.isFinite(usdcBalance)
             ? usdcBalance.toLocaleString(undefined, { maximumFractionDigits: 2 })
             : "0";
+    const validStake = Number.isFinite(parsedBet) && parsedBet > 0 ? parsedBet : 0;
+    const potentialPayout = validStake > 0
+        ? (validStake / Math.max(selectedSidePoolAmount + validStake, validStake))
+            * Math.max(currentPoolAmount + validStake, validStake)
+        : 0;
+    const potentialProfit = Math.max(potentialPayout - validStake, 0);
+    const formatAmount = (amount: number) => amount.toLocaleString(undefined, {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 2,
+    });
 
     const liveValidationError = React.useMemo(() => {
         if (!betInput.trim()) return "Enter a bet amount.";
@@ -89,7 +110,9 @@ export function AcceptChallengeModal({
         }
 
         if (typeof minAcceptBet === "number" && parsedBet < minAcceptBet) {
-            return `Minimum bet is ${minAcceptBet} ${betCurrency}.`;
+            return isTeam
+                ? `The opponent side must first match the creator's stake. Bet at least ${minAcceptBet} ${betCurrency}.`
+                : `Your bet must match or exceed the challenger's ${minAcceptBet} ${betCurrency} stake.`;
         }
 
         if (typeof maxAcceptBet === "number" && parsedBet > maxAcceptBet) {
@@ -97,7 +120,7 @@ export function AcceptChallengeModal({
         }
 
         return "";
-    }, [betInput, betCurrency, maxAcceptBet, minAcceptBet, parsedBet, usdcBalance]);
+    }, [betInput, betCurrency, isTeam, maxAcceptBet, minAcceptBet, parsedBet, usdcBalance]);
 
     const handleClose = React.useCallback(() => {
         if (!isLoading) onClose();
@@ -167,11 +190,11 @@ export function AcceptChallengeModal({
             : `Accept for ${parsedBet.toLocaleString()} ${betCurrency}`;
 
     return createPortal(
-        <div className="fixed inset-0 z-[10020] flex items-center justify-center p-3 sm:p-5">
+        <div className="fixed inset-0 z-[10020] flex items-center justify-center p-3 min-[380px]:p-4 sm:p-5">
             <button
                 type="button"
                 onClick={handleClose}
-                className="absolute inset-0 cursor-pointer bg-black/55 backdrop-blur-[3px]"
+                className="absolute inset-0 cursor-pointer bg-black/45 backdrop-blur-[2px]"
                 aria-label="Close accept challenge dialog"
             />
 
@@ -179,19 +202,19 @@ export function AcceptChallengeModal({
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="accept-challenge-title"
-                className="rekto-modal-panel relative z-10 flex max-h-[94vh] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-[#ddcabe] bg-[#fffaf7] shadow-2xl"
+                className="accept-challenge-modal rekto-modal-panel relative z-10 flex max-h-[calc(100dvh-1.5rem)] w-full max-w-lg flex-col overflow-hidden border-2 border-black bg-[#fffaf6] min-[380px]:max-h-[calc(100dvh-2rem)] sm:max-h-[90vh]"
             >
-                <header className="flex items-start gap-3 border-b border-[#eadbd2] bg-white/70 px-4 py-4 sm:gap-4 sm:px-6 sm:py-5">
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#f5d547] text-[#201a16] sm:h-12 sm:w-12">
-                        <Swords className="h-5 w-5 sm:h-6 sm:w-6" strokeWidth={2.4} />
+                <header className="flex shrink-0 items-center gap-2.5 border-b-2 border-black px-3 py-2.5 sm:px-5 sm:py-3.5">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center border-2 border-black bg-[#f5d547] text-black sm:h-9 sm:w-9">
+                        <Swords className="h-4 w-4 sm:h-4.5 sm:w-4.5" strokeWidth={2.5} />
                     </div>
 
                     <div className="min-w-0 flex-1">
-                        <h2 id="accept-challenge-title" className="text-xl font-black leading-tight text-[#201a16] sm:text-2xl">
+                        <h2 id="accept-challenge-title" className="text-base font-black tracking-tight text-[#17120f] sm:text-lg">
                             Accept challenge
                         </h2>
-                        <p className="mt-1 text-sm font-medium text-[#786a61]">
-                            Review your side and stake.
+                        <p className="text-[11px] font-bold text-[#7a6961]">
+                            Pick a side. Back your call.
                         </p>
                     </div>
 
@@ -199,47 +222,86 @@ export function AcceptChallengeModal({
                         type="button"
                         onClick={handleClose}
                         disabled={isLoading}
-                        className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-[#d9c8bd] bg-white text-[#665950] transition hover:border-[#201a16] hover:text-[#201a16] disabled:cursor-not-allowed disabled:opacity-50"
+                        className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center border-2 border-black bg-white text-black transition-colors hover:bg-[#f5d547] disabled:cursor-not-allowed disabled:opacity-50 sm:h-9 sm:w-9"
                         aria-label="Close"
                     >
                         <X className="h-4.5 w-4.5" strokeWidth={2.5} />
                     </button>
                 </header>
 
-                <form onSubmit={onSubmit} className="overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
-                    <div className="grid gap-0 overflow-hidden rounded-xl border border-[#e4d4ca] bg-white sm:grid-cols-[1.35fr_1fr] sm:divide-x sm:divide-[#eadbd2]">
-                        <div className="min-w-0 border-b border-[#eadbd2] px-4 py-3.5 sm:border-b-0">
-                            <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.08em] text-[#8a776b]">
-                                <Clock3 className="h-3.5 w-3.5" />
-                                Resolves
+                <form onSubmit={onSubmit} className="min-h-0 overflow-y-auto overscroll-contain bg-[#fffaf6] px-3 py-3 sm:px-4 sm:py-4">
+                    <div className="grid grid-cols-2 divide-x-2 divide-black overflow-hidden border-2 border-black bg-[#f3e1d7]">
+                        <div className="min-w-0 px-3 py-2" title={joinLabel || undefined}>
+                            <div className="flex items-center gap-1 text-[9px] font-black uppercase tracking-[0.1em] text-[#b45309]">
+                                <Clock3 className="h-3 w-3" />
+                                Joins close
                             </div>
-                            <p className="mt-1 text-base font-black leading-tight text-[#201a16] sm:text-lg">
-                                {resolveCountdown || "Resolution pending"}
-                            </p>
-                            <p className="mt-1 text-xs font-medium leading-snug text-[#786a61]">
-                                {resolveLabel || "The result will be verified after the challenge ends."}
+                            <p className="mt-0.5 truncate text-sm font-black leading-tight text-[#17120f]">
+                                {joinCountdown || "Closing soon"}
                             </p>
                         </div>
-                        <div className="px-4 py-3.5">
-                            <p className="text-xs font-bold uppercase tracking-[0.08em] text-[#8a776b]">Minimum</p>
-                            <p className="mt-1 text-base font-black text-[#201a16] sm:text-lg">
-                                {minAcceptBet ?? 0} {betCurrency}
+                        <div className="min-w-0 px-3 py-2" title={resolveLabel || undefined}>
+                            <p className="text-[9px] font-black uppercase tracking-[0.1em] text-[#8a776b]">Resolves in</p>
+                            <p className="mt-0.5 truncate text-sm font-black leading-tight text-[#201a16]">
+                                {resolveCountdown || "Resolution pending"}
                             </p>
-                            <p className="mt-0.5 text-xs font-medium text-[#786a61]">Match or raise the challenger&apos;s stake</p>
                         </div>
                     </div>
 
-                    <div className="mt-5">
+                    <div className="mt-4">
+                        <p className="mb-2 text-[10px] font-black uppercase tracking-[0.12em] text-[#302722]">Your side</p>
+                        {isTeam ? (
+                            <div className="grid grid-cols-2 gap-2 border-2 border-black bg-[#f3e1d7] p-1.5">
+                                <button
+                                    type="button"
+                                    onClick={() => onJoinSideChange("TEAM_A")}
+                                    aria-pressed={joinSide === "TEAM_A"}
+                                    className={`flex cursor-pointer items-center justify-center gap-1.5 border-2 px-3 py-2.5 text-sm font-black transition ${joinSide === "TEAM_A"
+                                        ? "border-black bg-black text-white shadow-[3px_3px_0_#f5d547]"
+                                        : "border-transparent bg-white text-[#6f6158] hover:border-black hover:text-black"
+                                        }`}
+                                >
+                                    {joinSide === "TEAM_A" ? <Check className="h-4 w-4" strokeWidth={3} /> : null}
+                                    Creator side
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => onJoinSideChange("TEAM_B")}
+                                    aria-pressed={joinSide === "TEAM_B"}
+                                    className={`flex cursor-pointer items-center justify-center gap-1.5 border-2 px-3 py-2.5 text-sm font-black transition ${joinSide === "TEAM_B"
+                                        ? "border-black bg-black text-white shadow-[3px_3px_0_#e85a2d]"
+                                        : "border-transparent bg-white text-[#6f6158] hover:border-black hover:text-black"
+                                        }`}
+                                >
+                                    {joinSide === "TEAM_B" ? <Check className="h-4 w-4" strokeWidth={3} /> : null}
+                                    Opponent side
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="flex items-center justify-between border-2 border-black bg-[#f3e1d7] px-3.5 py-2.5">
+                                <span className="text-sm font-semibold text-[#53635b]">Joining as</span>
+                                <span className="border border-black bg-black px-3 py-1 text-xs font-black text-white shadow-[2px_2px_0_#e85a2d]">Opponent</span>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="mt-4">
                         <div className="mb-2 flex items-center justify-between gap-3">
-                            <label htmlFor="accept-challenge-bet-amount" className="text-sm font-black text-[#302722]">
+                            <label htmlFor="accept-challenge-bet-amount" className="text-[10px] font-black uppercase tracking-[0.12em] text-[#302722]">
                                 Your stake
                             </label>
                             <p className="text-xs font-semibold text-[#786a61]">
-                                Balance <span className="text-[#302722]">{formattedBalance} {betCurrency}</span>
+                                Min {minAcceptBet ?? 0} · Balance <span className="text-[#302722]">{formattedBalance} {betCurrency}</span>
                             </p>
                         </div>
 
-                        <div className="flex items-center rounded-xl border-2 border-[#d8c7bc] bg-white px-4 transition focus-within:border-[#11895a] focus-within:ring-4 focus-within:ring-emerald-100">
+                        {isTeam && !requiresCreatorStakeMatch ? (
+                            <p className="mb-2 text-[10px] font-bold text-emerald-700">
+                                The opponent side has covered the creator stake. New bets can start from 1 {betCurrency}.
+                            </p>
+                        ) : null}
+
+                        <div className="flex items-center border-2 border-black bg-white px-4 transition focus-within:shadow-[3px_3px_0_#f5d547]">
                             <input
                                 id="accept-challenge-bet-amount"
                                 type="number"
@@ -267,9 +329,9 @@ export function AcceptChallengeModal({
                                         type="button"
                                         onClick={() => onBetInputChange(String(amount))}
                                         disabled={isDisabled}
-                                        className={`cursor-pointer rounded-lg border px-1 py-2 text-xs font-bold transition sm:text-sm ${isActive
-                                            ? "border-[#11895a] bg-emerald-50 text-[#08764b]"
-                                            : "border-[#e1d3ca] bg-white text-[#5d5048] hover:border-[#9d887b]"
+                                        className={`cursor-pointer border-2 px-1 py-2 text-xs font-black transition sm:text-sm ${isActive
+                                            ? "border-black bg-[#f5d547] text-black shadow-[2px_2px_0_#111]"
+                                            : "border-black/20 bg-white text-[#5d5048] hover:border-black"
                                             } disabled:cursor-not-allowed disabled:bg-[#f4efec] disabled:text-[#b5a8a0]`}
                                     >
                                         {amount}
@@ -279,11 +341,28 @@ export function AcceptChallengeModal({
                             <button
                                 type="button"
                                 onClick={handleMaxClick}
-                                className="cursor-pointer rounded-lg border border-[#e1d3ca] bg-white px-1 py-2 text-xs font-bold text-[#5d5048] transition hover:border-[#9d887b] sm:text-sm"
+                                className="cursor-pointer border-2 border-black/20 bg-white px-1 py-2 text-xs font-black text-[#5d5048] transition hover:border-black sm:text-sm"
                             >
                                 Max
                             </button>
                         </div>
+
+                        {validStake > 0 && !liveValidationError ? (
+                            <div className="mt-3 flex items-center justify-between gap-4 border-2 border-black bg-[#fff5bd] px-3 py-3 shadow-[2px_2px_0_#111] sm:px-4">
+                                <div className="min-w-0">
+                                    <p className="text-[11px] font-black uppercase tracking-[0.09em] text-[#8a6500]">If your side wins</p>
+                                    <p className="mt-0.5 text-xs font-semibold text-[#6f6259]">
+                                        +{formatAmount(potentialProfit)} {betCurrency} potential profit
+                                    </p>
+                                </div>
+                                <div className="shrink-0 text-right">
+                                    <p className="text-2xl font-black leading-none text-[#08764b]">
+                                        {formatAmount(potentialPayout)} <span className="text-xs">{betCurrency}</span>
+                                    </p>
+                                    <p className="mt-1 text-[10px] font-semibold text-[#807268]">estimated payout · before fees</p>
+                                </div>
+                            </div>
+                        ) : null}
 
                         {displayedError ? (
                             <p id="accept-challenge-error" className="mt-2 text-xs font-semibold text-red-600" role="alert">
@@ -292,7 +371,7 @@ export function AcceptChallengeModal({
                         ) : null}
 
                         {hasLowBalance ? (
-                            <div className="mt-3 flex flex-col gap-3 rounded-xl border border-amber-300 bg-amber-50 px-3.5 py-3 sm:flex-row sm:items-center">
+                            <div className="mt-3 flex flex-col gap-3 border-2 border-black bg-amber-50 px-3.5 py-3 sm:flex-row sm:items-center">
                                 <CircleAlert className="h-5 w-5 shrink-0 text-amber-700" />
                                 <div className="min-w-0 flex-1">
                                     <p className="text-sm font-black text-amber-950">More USDC needed</p>
@@ -303,7 +382,7 @@ export function AcceptChallengeModal({
                                 <button
                                     type="button"
                                     onClick={handleDeposit}
-                                    className="inline-flex shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-[#201a16] px-3 py-2 text-xs font-black text-white transition hover:bg-black"
+                                    className="inline-flex shrink-0 cursor-pointer items-center justify-center gap-1.5 border-2 border-black bg-black px-3 py-2 text-xs font-black text-white transition hover:bg-[#27211e] hover:shadow-[2px_2px_0_#e85a2d]"
                                 >
                                     <CircleDollarSign className="h-4 w-4" />
                                     Deposit USDC
@@ -312,64 +391,34 @@ export function AcceptChallengeModal({
                         ) : null}
                     </div>
 
-                    <div className="mt-5">
-                        <p className="mb-2 text-sm font-black text-[#302722]">Your side</p>
-                        {isTeam ? (
-                            <div className="grid grid-cols-2 gap-2 rounded-xl bg-[#eee6e1] p-1">
-                                <button
-                                    type="button"
-                                    onClick={() => onJoinSideChange("TEAM_A")}
-                                    aria-pressed={joinSide === "TEAM_A"}
-                                    className={`cursor-pointer rounded-lg px-3 py-2.5 text-sm font-bold transition ${joinSide === "TEAM_A"
-                                        ? "bg-white text-[#08764b] shadow-sm ring-1 ring-black/5"
-                                        : "text-[#6f6158] hover:text-[#302722]"
-                                        }`}
-                                >
-                                    Creator side
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => onJoinSideChange("TEAM_B")}
-                                    aria-pressed={joinSide === "TEAM_B"}
-                                    className={`cursor-pointer rounded-lg px-3 py-2.5 text-sm font-bold transition ${joinSide === "TEAM_B"
-                                        ? "bg-white text-[#08764b] shadow-sm ring-1 ring-black/5"
-                                        : "text-[#6f6158] hover:text-[#302722]"
-                                        }`}
-                                >
-                                    Opponent side
-                                </button>
-                            </div>
-                        ) : (
-                            <div className="flex items-center justify-between rounded-xl border border-[#cde6d9] bg-[#eff9f4] px-3.5 py-3">
-                                <span className="text-sm font-semibold text-[#53635b]">Joining as</span>
-                                <span className="rounded-full bg-[#11895a] px-3 py-1 text-xs font-black text-white">Opponent</span>
-                            </div>
-                        )}
-                    </div>
-
-                    <div className="mt-4 flex items-center gap-3 rounded-xl border border-[#d8e9df] bg-[#f3faf6] px-3.5 py-3">
-                        <ShieldCheck className="h-5 w-5 shrink-0 text-[#11895a]" strokeWidth={2.3} />
-                        <p className="min-w-0 flex-1 text-xs font-semibold text-[#53635b] sm:text-sm">
-                            Funds stay in escrow until resolution.
-                        </p>
-                        {escrowHref && escrowAddressDisplay ? (
+                    {escrowHref && escrowAddressDisplay ? (
+                        <div className="group relative mt-3 flex justify-end focus-within:z-10">
                             <a
                                 href={escrowHref}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="inline-flex shrink-0 cursor-pointer items-center gap-1 text-xs font-black text-[#08764b] hover:underline"
-                                title={`View escrow ${escrowAddressDisplay}`}
+                                className="inline-flex cursor-pointer items-center gap-1.5 border border-black/30 bg-white px-2.5 py-1.5 text-[10px] font-black uppercase tracking-[0.06em] text-[#6b5e56] transition hover:border-black hover:text-black focus:outline-none focus:ring-2 focus:ring-[#f5d547]"
+                                aria-describedby="accept-escrow-tooltip"
                             >
+                                <ShieldCheck className="h-3.5 w-3.5" strokeWidth={2.2} />
                                 View escrow
-                                <ExternalLink className="h-3.5 w-3.5" />
+                                <ExternalLink className="h-3 w-3" />
                             </a>
-                        ) : null}
-                    </div>
+                            <div
+                                id="accept-escrow-tooltip"
+                                role="tooltip"
+                                className="pointer-events-none absolute bottom-full right-0 z-20 mb-2 w-64 border border-black bg-black px-3 py-2 text-xs font-bold leading-relaxed text-white opacity-0 shadow-[2px_2px_0_#e85a2d] transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+                            >
+                                Your funds stay locked in escrow until resolution{resolveLabel ? ` on ${resolveLabel}` : ""}.
+                                <span className="absolute right-5 top-full border-4 border-transparent border-t-[#201a16]" />
+                            </div>
+                        </div>
+                    ) : null}
 
                     <button
                         type="submit"
                         disabled={isLoading || Boolean(liveValidationError)}
-                        className="mt-5 flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-[#0b6844] bg-[#11895a] px-5 py-3.5 text-base font-black text-white shadow-[0_3px_0_#0b6844] transition hover:-translate-y-0.5 hover:bg-[#0f7b50] disabled:cursor-not-allowed disabled:translate-y-0 disabled:opacity-50 sm:text-lg"
+                        className="rekto-button mt-5 flex h-12 w-full cursor-pointer items-center justify-center gap-2 border-2 border-black bg-black px-5 text-sm font-black text-white transition-all hover:-translate-y-0.5 hover:bg-[#27211e] hover:shadow-[3px_3px_0_#e85a2d] disabled:cursor-not-allowed disabled:translate-y-0 disabled:opacity-50 sm:text-base"
                     >
                         {isLoading ? <LoaderCircle className="h-5 w-5 animate-spin" /> : null}
                         {submitLabel}

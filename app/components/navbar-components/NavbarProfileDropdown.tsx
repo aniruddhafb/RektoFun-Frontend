@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { ReactNode } from "react";
+import { ReactNode, useRef, useState } from "react";
+import { Music, Pause } from "lucide-react";
 import favicon from "../../../public/logos/1.png";
 import Image from "next/image";
 
@@ -92,9 +93,26 @@ export function NavbarProfileDropdown({
     profileHref,
     isMobileViewport,
 }: NavbarProfileDropdownProps) {
+    const audioRef = useRef<HTMLAudioElement>(null);
+    const [isMusicPlaying, setIsMusicPlaying] = useState(false);
     const balanceDisplay = usdcBalance !== null
         ? `$${usdcBalance.toFixed(2)}`
         : '...';
+    const toggleMusic = async () => {
+        const audio = audioRef.current;
+        if (!audio) return;
+
+        if (audio.paused) {
+            try {
+                await audio.play();
+            } catch {
+                setIsMusicPlaying(false);
+            }
+        } else {
+            audio.pause();
+        }
+    };
+
     return (
         <div
             className="relative"
@@ -105,7 +123,7 @@ export function NavbarProfileDropdown({
             <button
                 type="button"
                 onClick={isMobileViewport ? onToggle : undefined}
-                className="flex items-center gap-2 border-2 border-black bg-white px-[4px] py-[2px] pr-3 shadow-[2px_2px_0_#111] transition-all hover:-translate-y-0.5 hover:bg-[#fffaf6] cursor-pointer"
+                className="flex items-center gap-1 border-2 border-black bg-white px-[3px] py-[2px] shadow-[2px_2px_0_#111] transition-all hover:-translate-y-0.5 hover:bg-[#fffaf6] cursor-pointer min-[380px]:gap-2 min-[380px]:pr-2 sm:pr-3"
             >
                 {displayProfileImage ? (
                     <Image
@@ -143,13 +161,13 @@ export function NavbarProfileDropdown({
             </button>
 
             {isOpen && (
-                <div className="absolute right-0 top-full pt-2 w-72 z-50">
+                <div className="absolute right-0 top-full z-50 w-[min(18rem,calc(100vw-1rem))] pt-2">
                     <div className="bg-white border-2 border-black overflow-hidden">
                         <div className="p-4 bg-[#fffaf6] border-b-2 border-black">
                             <Link
                                 href={profileHref}
                                 onClick={onClose}
-                                className="flex items-center gap-3"
+                                className="group flex items-center gap-3"
                             >
                                 {displayProfileImage ? (
                                     <Image
@@ -185,6 +203,10 @@ export function NavbarProfileDropdown({
                                     </div>
                                     <p className="text-xs text-gray-500 font-mono truncate">
                                         {displayAddress}
+                                    </p>
+                                    <p className="mt-1 flex items-center gap-1 text-[10px] font-black uppercase tracking-[0.08em] text-[#e85a2d] transition-colors group-hover:text-black">
+                                        View profile
+                                        <span aria-hidden="true">↗</span>
                                     </p>
                                 </div>
                             </Link>
@@ -317,6 +339,16 @@ export function NavbarProfileDropdown({
                                 }
                             >
                                 Settings
+                            </MenuAction>
+
+                            <MenuAction
+                                onClick={toggleMusic}
+                                icon={isMusicPlaying
+                                    ? <Pause className="h-5 w-5 text-gray-500" fill="currentColor" />
+                                    : <Music className="h-5 w-5 text-gray-500" />
+                                }
+                            >
+                                {isMusicPlaying ? "Pause music" : "Play music"}
                             </MenuAction>
 
                             <div className="my-2 border-t-2 border-black" />
@@ -487,6 +519,15 @@ export function NavbarProfileDropdown({
                     </div>
                 </div>
             )}
+            <audio
+                ref={audioRef}
+                src="/music.mp3"
+                loop
+                preload="none"
+                onPlay={() => setIsMusicPlaying(true)}
+                onPause={() => setIsMusicPlaying(false)}
+                onEnded={() => setIsMusicPlaying(false)}
+            />
         </div>
     );
 }

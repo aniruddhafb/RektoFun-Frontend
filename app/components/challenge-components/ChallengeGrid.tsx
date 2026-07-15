@@ -16,12 +16,25 @@ interface ChallengeGridProps {
     onOpenModal: () => void;
     onChallengesLoaded?: (challenges: Challenge[]) => void;
     refreshKey?: number;
+    onRefreshComplete?: () => void;
     activeFilter: string;
     searchQuery: string;
     resolutionSource?: string;
 }
 
-const PAGE_SIZE = 6;
+const INITIAL_PAGE_SIZE = 6;
+const NEXT_PAGE_SIZE = 9;
+const STATUS_PRIORITY: Record<string, number> = {
+    OPEN: 0,
+    PENDING_RESOLUTION: 1,
+    RESOLVED: 2,
+    EXPIRED: 3,
+    CANCELLED: 4,
+};
+
+const compareChallengeStatus = (a: Challenge, b: Challenge) =>
+    (STATUS_PRIORITY[a.status.trim().toUpperCase()] ?? 5)
+    - (STATUS_PRIORITY[b.status.trim().toUpperCase()] ?? 5);
 
 export function ChallengeGrid({
     onRekt,
@@ -31,6 +44,7 @@ export function ChallengeGrid({
     onOpenModal,
     onChallengesLoaded,
     refreshKey = 0,
+    onRefreshComplete,
     activeFilter,
     searchQuery,
     resolutionSource,
@@ -63,7 +77,14 @@ export function ChallengeGrid({
             const isPinnedFilter = activeFilter === "Pinned";
             const isMyBetsFilter = activeFilter === "My Bets";
             const isCreatedByMeFilter = activeFilter === "Created By Me";
-            const needsCompleteList = Boolean(resolutionSource) || isPinnedFilter || isMyBetsFilter || isCreatedByMeFilter || activeFilter === "Expiring Soon";
+            const isExpiringSoonFilter = activeFilter === "Expiring Soon";
+            const isOpenFilter = activeFilter === "Open";
+            const statusFilter = activeFilter === "Completed"
+                ? "RESOLVED"
+                : activeFilter === "Cancelled"
+                    ? "CANCELLED"
+                    : undefined;
+            const needsCompleteList = isPinnedFilter || isMyBetsFilter || isCreatedByMeFilter;
 
             if ((isMyBetsFilter || isCreatedByMeFilter) && userId == null) {
                 setChallenges([]);
@@ -72,7 +93,7 @@ export function ChallengeGrid({
                 return;
             }
 
-            const requestLimit = resolutionSource ? 1000 : needsCompleteList ? 100 : PAGE_SIZE;
+            const requestLimit = needsCompleteList ? 100 : append ? NEXT_PAGE_SIZE : INITIAL_PAGE_SIZE;
             const requestOffset = needsCompleteList ? 0 : currentOffset;
 
             const [response, positionsResponse] = await Promise.all([
@@ -81,6 +102,10 @@ export function ChallengeGrid({
                     offset: requestOffset,
                     search: searchQuery.trim() || undefined,
                     resolution_source: resolutionSource,
+                    open_first: activeFilter !== "Latest",
+                    status: statusFilter,
+                    expiring_soon: isExpiringSoonFilter || undefined,
+                    joinable: isOpenFilter || undefined,
                 }),
                 isMyBetsFilter ? getPositions({ limit: 100, offset: 0 }) : Promise.resolve(null),
             ]);
@@ -98,6 +123,8 @@ export function ChallengeGrid({
                 nextChunk = nextChunk.filter((challenge) => isBookmarked(challenge.id.toString()));
             } else {
                 nextChunk = [...nextChunk].sort((a, b) => {
+                    const statusOrder = compareChallengeStatus(a, b);
+                    if (statusOrder !== 0) return statusOrder;
                     const aBookmarked = isBookmarked(a.id.toString());
                     const bBookmarked = isBookmarked(b.id.toString());
                     if (aBookmarked === bBookmarked) return 0;
@@ -123,23 +150,24 @@ export function ChallengeGrid({
                 const query = searchQuery.toLowerCase();
                 nextChunk = nextChunk.filter((challenge) =>
                     challenge.statement.toLowerCase().includes(query) ||
+                    challenge.title.toLowerCase().includes(query) ||
                     challenge.ticker.toLowerCase().includes(query)
                 );
             }
 
             // Apply sort filter client-side
             if (activeFilter === "Expiring Soon") {
-                nextChunk = [...nextChunk].sort((a, b) =>
-                    new Date(a.expiry).getTime() - new Date(b.expiry).getTime()
-                );
+                nextChunk = [...nextChunk].sort((a, b) => {
+                    return new Date(a.expiry).getTime() - new Date(b.expiry).getTime();
+                });
             } else if (activeFilter === "Latest") {
-                nextChunk = [...nextChunk].sort((a, b) =>
-                    new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-                );
+                nextChunk = [...nextChunk].sort((a, b) => {
+                    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+                });
             }
 
             setChallenges((prev) => (append ? [...prev, ...nextChunk] : nextChunk));
-            setHasMore(!needsCompleteList && response.challenges.length === PAGE_SIZE);
+            setHasMore(!needsCompleteList && response.challenges.length === requestLimit);
             setOffset(needsCompleteList ? nextChunk.length : currentOffset + response.challenges.length);
         } catch (error) {
             console.error('Failed to fetch challenges:', error);
@@ -150,12 +178,14 @@ export function ChallengeGrid({
         } finally {
             if (!append) {
                 setIsLoading(false);
+                onRefreshComplete?.();
             } else {
                 setIsLoadingMore(false);
             }
         }
-    }, [activeFilter, isBookmarked, searchQuery, isLoadingMore, resolutionSource, userId]);
+    }, [activeFilter, isBookmarked, onRefreshComplete, searchQuery, isLoadingMore, resolutionSource, userId]);
 
+    /* eslint-disable react-hooks/set-state-in-effect -- reset pagination before fetching a newly selected challenge view */
     useEffect(() => {
         setIsLoadingMore(false);
         setChallenges([]);
@@ -163,6 +193,7 @@ export function ChallengeGrid({
         setHasMore(true);
         fetchChallenges(0, false);
     }, [refreshKey, retryNonce, activeFilter, searchQuery]);
+    /* eslint-enable react-hooks/set-state-in-effect */
 
     useEffect(() => {
         const refreshChallenges = () => setRetryNonce((nonce) => nonce + 1);
@@ -294,7 +325,7 @@ export function ChallengeGrid({
                     />
                 ))}
                 {isLoadingMore &&
-                    Array.from({ length: PAGE_SIZE }).map((_, index) => (
+                    Array.from({ length: NEXT_PAGE_SIZE }).map((_, index) => (
                         <div
                             key={`loading-more-skeleton-${index}`}
                             className="h-[300px] border-2 border-black bg-white/70 p-5 animate-pulse"

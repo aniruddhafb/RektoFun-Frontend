@@ -5,7 +5,7 @@ import Link from "next/link";
 
 export function NavbarBrand() {
     return (
-        <div className="flex items-center gap-2 relative">
+        <div className="relative flex min-w-0 shrink items-center gap-2">
             {/* <div className="absolute -top-3 -left-[-128px] hidden md:block">
                 <div className="relative w-10 h-10">
                     <svg viewBox="0 0 80 80" className="w-full h-full rotate-12">
@@ -20,13 +20,13 @@ export function NavbarBrand() {
                 </div>
             </div> */}
 
-            <Link href="/" className="border-2 border-transparent px-2 py-1 transition-all hover:border-black hover:bg-white hover:shadow-[2px_2px_0_#111]">
+            <Link href="/" className="min-w-0 border-2 border-transparent px-1 py-1 transition-all hover:border-black hover:bg-white hover:shadow-[2px_2px_0_#111] sm:px-2">
                 <Image
                     src="/logos/mainlogo.png"
                     alt="REKTO"
                     width={220}
                     height={60}
-                    className="h-6 sm:h-8 w-auto"
+                    className="h-5 w-auto min-[380px]:h-6 sm:h-8"
                     priority
                 />
             </Link>

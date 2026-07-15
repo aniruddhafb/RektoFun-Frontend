@@ -15,17 +15,17 @@ import {
 import ChallengeDetailModal from "@/app/components/challenge-components/ChallengeDetailModal";
 import {
     Challenge,
-    getChallenges,
 } from "@/app/lib/challenges-service/challenges";
+import { ChallengeActivity, getActivityLabel, getActivityVerb, getChallengeActivityPage } from "@/app/lib/activity-service/activity";
 import { useBodyScrollLock } from "@/app/lib/useBodyScrollLock";
 import { stripUsdcQuote } from "@/app/lib/format-market-label";
+import { getChallengeLifecycle, type ChallengeLifecycle } from "@/app/lib/challenge-lifecycle";
 
-type ActivityType = "All Activity" | "Sports" | "Crypto" | "PVP Mode" | "Multi Mode";
-type ActivityStatus = "All Status" | "Expired" | "Ongoing" | "Resolved" | "Resolving" | "Completed";
+type ActivityType = "All Activity" | "Sports" | "Crypto" | "PVP Mode" | "Team Mode";
+type ActivityStatus = "All Status" | "Open" | "Live" | "Resolving" | "Resolved" | "Expired" | "Cancelled";
 
-const activityTypeOptions: ActivityType[] = ["All Activity", "Sports", "Crypto", "PVP Mode", "Multi Mode"];
-const activityStatusOptions: ActivityStatus[] = ["All Status", "Expired", "Ongoing", "Resolved", "Resolving", "Completed"];
-const PAGE_SIZE = 5;
+const activityTypeOptions: ActivityType[] = ["All Activity", "Sports", "Crypto", "PVP Mode", "Team Mode"];
+const activityStatusOptions: ActivityStatus[] = ["All Status", "Open", "Live", "Resolving", "Resolved", "Expired", "Cancelled"];
 const SKELETON_CARDS_COUNT = 4;
 
 function getChallengeEndTime(challenge: Challenge): string {
@@ -70,8 +70,24 @@ function getShortWallet(address: string): string {
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
 }
 
-function getStatusKey(challenge: Challenge): string {
-    return (challenge.status || "").toLowerCase();
+function getActivityLifecycle(challenge: Challenge, currentTimeMs: number): ChallengeLifecycle {
+    const composerResolvesAt = challenge.metadata?.composer?.resolves_at;
+    const resolveValue = typeof composerResolvesAt === "string"
+        ? composerResolvesAt
+        : challenge.resolve_time || challenge.resolution_date;
+    const expiryValue = challenge.expire_time || challenge.expiry;
+    const resolveMs = resolveValue ? new Date(resolveValue).getTime() : Number.NaN;
+    const expiryMs = expiryValue ? new Date(expiryValue).getTime() : Number.NaN;
+    const hasOpponents = Boolean(challenge.bet_info?.highest_bet?.TEAM_B)
+        || Number(challenge.participants || 0) > 1;
+
+    return getChallengeLifecycle({
+        status: challenge.status,
+        hasOpponents,
+        resolveTimestamp: Number.isFinite(resolveMs) ? resolveMs : null,
+        expiryTimestamp: Number.isFinite(expiryMs) ? expiryMs : null,
+        now: currentTimeMs,
+    });
 }
 
 function getModeLabel(mode?: string): string {
@@ -82,32 +98,28 @@ function getModeLabel(mode?: string): string {
 }
 
 function getResolutionStatus(challenge: Challenge, currentTimeMs: number): string {
-    const challengeStatus = getStatusKey(challenge);
     const resolutionStatus = challenge.resolution_status?.trim().toLowerCase();
-    const resolveMs = new Date(challenge.resolve_time).getTime();
+    const lifecycle = getActivityLifecycle(challenge, currentTimeMs);
 
-    if (challengeStatus === "resolved" || Boolean(challenge.resolved_at)) return "Resolved";
-    if (challengeStatus === "cancelled") return "Cancelled";
+    if (lifecycle === "RESOLVED") return "Resolved";
+    if (lifecycle === "CANCELLED") return "Cancelled";
     if (resolutionStatus && !["none", "null", "pending"].includes(resolutionStatus)) {
         return resolutionStatus
             .split("_")
             .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
             .join(" ");
     }
-    if (
-        challengeStatus === "locked" ||
-        challengeStatus === "pending_resolution" ||
-        (Number.isFinite(resolveMs) && resolveMs <= currentTimeMs)
-    ) {
-        return "Resolving";
-    }
-    return "Pending";
+    if (lifecycle === "RESOLVING") return "Resolving";
+    if (lifecycle === "LIVE") return "Live";
+    if (lifecycle === "EXPIRED") return "Expired";
+    return "Open";
 }
 
 function getResolutionStatusClass(status: string): string {
     if (status === "Resolved") return "border-emerald-200 bg-emerald-50 text-emerald-700";
-    if (status === "Cancelled" || status === "Failed") return "border-red-200 bg-red-50 text-red-700";
+    if (status === "Cancelled" || status === "Expired" || status === "Failed") return "border-red-200 bg-red-50 text-red-700";
     if (status === "Resolving") return "border-amber-200 bg-amber-50 text-amber-700";
+    if (status === "Live") return "border-emerald-200 bg-emerald-50 text-emerald-700";
     return "border-sky-200 bg-sky-50 text-sky-700";
 }
 
@@ -162,12 +174,11 @@ export default function ActivityPage() {
     const [activeFilter, setActiveFilter] = useState<ActivityType>("All Activity");
     const [activeStatus, setActiveStatus] = useState<ActivityStatus>("All Status");
     const [searchQuery, setSearchQuery] = useState("");
-    const [activities, setActivities] = useState<Challenge[]>([]);
+    const [activities, setActivities] = useState<ChallengeActivity[]>([]);
     const [pageIndex, setPageIndex] = useState(1);
-    const [reloadKey, setReloadKey] = useState(0);
     const [isInitialLoading, setIsInitialLoading] = useState(true);
     const [isLoadingMore, setIsLoadingMore] = useState(false);
-    const [hasMore, setHasMore] = useState(true);
+    const [serverHasMore, setServerHasMore] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [selectedChallenge, setSelectedChallenge] = useState<Challenge | null>(null);
     const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
@@ -180,7 +191,6 @@ export default function ActivityPage() {
     const typeButtonRef = useRef<HTMLButtonElement>(null);
     const statusButtonRef = useRef<HTMLButtonElement>(null);
     const loadMoreRef = useRef<HTMLDivElement>(null);
-    const requestIdRef = useRef(0);
     const [typeDropdownStyle, setTypeDropdownStyle] = useState<React.CSSProperties | null>(null);
     const [statusDropdownStyle, setStatusDropdownStyle] = useState<React.CSSProperties | null>(null);
 
@@ -253,64 +263,110 @@ export default function ActivityPage() {
     }, [isStatusDropdownOpen, isTypeDropdownOpen]);
 
     useEffect(() => {
-        let isMounted = true;
-        const requestId = ++requestIdRef.current;
-        const offset = (pageIndex - 1) * PAGE_SIZE;
-        const normalizedSearch = searchQuery.trim();
+        let active = true;
 
-        const loadActivities = async () => {
+        const loadActivities = async (initial = false) => {
+            if (initial) {
+                setIsInitialLoading(true);
+                setError(null);
+            }
             try {
-                if (pageIndex === 1) {
-                    setIsInitialLoading(true);
-                    setActivities([]);
-                    setError(null);
-                    setHasMore(true);
-                } else {
-                    setIsLoadingMore(true);
+                const response = await getChallengeActivityPage(15, 0);
+                if (active) {
+                    setActivities((current) => {
+                        if (initial) return response.activities;
+                        const refreshedIds = new Set(response.activities.map((event) => event.id));
+                        return [...response.activities, ...current.filter((event) => !refreshedIds.has(event.id))];
+                    });
+                    setServerHasMore(response.has_more);
                 }
-
-                const response = await getChallenges(
-                    {
-                        limit: PAGE_SIZE,
-                        offset,
-                        search: normalizedSearch.length > 0 ? normalizedSearch : undefined,
-                        sort: "latest",
-                    },
-                    { bypassCache: true },
-                );
-
-                if (!isMounted || requestId !== requestIdRef.current) return;
-
-                const sorted = [...response.challenges].sort(
-                    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-                );
-
-                setActivities((current) => {
-                    if (pageIndex === 1) return sorted;
-
-                    const seen = new Set(current.map((item) => item.id));
-                    return [...current, ...sorted.filter((item) => !seen.has(item.id))];
-                });
-                setHasMore(sorted.length === PAGE_SIZE && offset + sorted.length < (response.count ?? offset + sorted.length));
             } catch (fetchError) {
-                if (!isMounted || requestId !== requestIdRef.current) return;
-                setError(fetchError instanceof Error ? fetchError.message : "Failed to load activity.");
-            } finally {
-                if (!isMounted || requestId !== requestIdRef.current) return;
-                if (pageIndex === 1) {
-                    setIsInitialLoading(false);
-                } else {
-                    setIsLoadingMore(false);
+                if (active && initial) {
+                    setError(fetchError instanceof Error ? fetchError.message : "Failed to load activity.");
                 }
+            } finally {
+                if (active && initial) setIsInitialLoading(false);
             }
         };
 
-        loadActivities();
+        void loadActivities(true);
+        const interval = window.setInterval(() => {
+            if (document.visibilityState === "visible") void loadActivities();
+        }, 60_000);
 
         return () => {
-            isMounted = false;
+            active = false;
+            window.clearInterval(interval);
         };
-    }, [pageIndex, reloadKey, searchQuery]);
+    }, []);
+
+    useEffect(() => {
+        if (pageIndex === 1) return;
+        let active = true;
+
+        const loadNextPage = async () => {
+            setIsLoadingMore(true);
+            try {
+                const offset = 15 + (pageIndex - 2) * 15;
+                const response = await getChallengeActivityPage(15, offset);
+                if (!active) return;
+                setActivities((current) => {
+                    const ids = new Set(current.map((event) => event.id));
+                    return [...current, ...response.activities.filter((event) => !ids.has(event.id))];
+                });
+                setServerHasMore(response.has_more);
+            } catch (fetchError) {
+                if (active) setError(fetchError instanceof Error ? fetchError.message : "Failed to load activity.");
+            } finally {
+                if (active) setIsLoadingMore(false);
+            }
+        };
+
+        void loadNextPage();
+        return () => { active = false; };
+    }, [pageIndex]);
+
+    const matchingActivities = useMemo(() => {
+        return activities.filter((activity) => {
+            const challenge = activity.challenge;
+            const mode = challenge.mode?.toLowerCase() ?? "";
+            const marketName = challenge.market?.name?.toLowerCase() ?? "";
+            const parentId = challenge.market?.parent_id?.toLowerCase() ?? "";
+            const resolutionSource = challenge.resolution_source?.toLowerCase() ?? "";
+            const normalizedSearch = searchQuery.trim().toLowerCase();
+            const lifecycle = getActivityLifecycle(challenge, currentTimeMs);
+            const creator = getActivityCreator(challenge);
+
+            const matchesType =
+                activeFilter === "All Activity" ||
+                (activeFilter === "Sports" &&
+                    (marketName.includes("sport") || parentId.includes("sport") || resolutionSource === "manual")) ||
+                (activeFilter === "Crypto" &&
+                    !marketName.includes("sport") &&
+                    !parentId.includes("sport") &&
+                    resolutionSource !== "manual") ||
+                (activeFilter === "PVP Mode" && mode.includes("pvp")) ||
+                (activeFilter === "Team Mode" && (mode.includes("multi") || mode.includes("team")));
+
+            const matchesStatus =
+                activeStatus === "All Status" ||
+                activeStatus.toUpperCase() === lifecycle;
+
+            const matchesSearch =
+                normalizedSearch.length === 0 ||
+                challenge.title?.toLowerCase().includes(normalizedSearch) ||
+                getActivityVerb(activity.type).includes(normalizedSearch) ||
+                activity.actor?.username?.toLowerCase().includes(normalizedSearch) ||
+                creator.username.toLowerCase().includes(normalizedSearch) ||
+                creator.wallet.toLowerCase().includes(normalizedSearch) ||
+                marketName.includes(normalizedSearch);
+
+            return matchesType && matchesStatus && matchesSearch;
+        });
+    }, [activeFilter, activeStatus, activities, currentTimeMs, searchQuery]);
+
+    const filteredActivities = matchingActivities;
+    const hasMore = serverHasMore;
 
     useEffect(() => {
         const target = loadMoreRef.current;
@@ -322,77 +378,21 @@ export default function ActivityPage() {
                     setPageIndex((current) => current + 1);
                 }
             },
-            {
-                rootMargin: "400px 0px",
-                threshold: 0,
-            },
+            { rootMargin: "400px 0px", threshold: 0 },
         );
 
         observer.observe(target);
         return () => observer.disconnect();
     }, [error, hasMore, isInitialLoading, isLoadingMore]);
 
-    const filteredActivities = useMemo(() => {
-        return activities.filter((activity) => {
-            const mode = activity.mode?.toLowerCase() ?? "";
-            const marketName = activity.market?.name?.toLowerCase() ?? "";
-            const parentId = activity.market?.parent_id?.toLowerCase() ?? "";
-            const resolutionSource = activity.resolution_source?.toLowerCase() ?? "";
-            const resolutionStatus = activity.resolution_status?.toLowerCase() ?? "";
-            const normalizedSearch = searchQuery.trim().toLowerCase();
-            const expireMs = new Date(activity.expire_time).getTime();
-            const resolveMs = new Date(activity.resolve_time).getTime();
-            const status = getStatusKey(activity);
-            const creator = getActivityCreator(activity);
-
-            const matchesType =
-                activeFilter === "All Activity" ||
-                (activeFilter === "Sports" &&
-                    (marketName.includes("sport") || parentId.includes("sport") || resolutionSource === "manual")) ||
-                (activeFilter === "Crypto" &&
-                    !marketName.includes("sport") &&
-                    !parentId.includes("sport") &&
-                    resolutionSource !== "manual") ||
-                (activeFilter === "PVP Mode" && mode.includes("pvp")) ||
-                (activeFilter === "Multi Mode" && (mode.includes("multi") || mode.includes("team")));
-
-            const matchesStatus =
-                activeStatus === "All Status" ||
-                (activeStatus === "Expired" && Number.isFinite(expireMs) && expireMs <= currentTimeMs && status !== "resolved") ||
-                (activeStatus === "Ongoing" && status === "open" && (!Number.isFinite(expireMs) || expireMs > currentTimeMs)) ||
-                (activeStatus === "Resolved" && status === "resolved") ||
-                (activeStatus === "Resolving" &&
-                    (status === "locked" ||
-                        status === "pending_resolution" ||
-                        resolutionStatus.includes("resolving") ||
-                        (Number.isFinite(resolveMs) && resolveMs <= currentTimeMs && status !== "resolved"))) ||
-                (activeStatus === "Completed" && (status === "resolved" || Boolean(activity.resolved_at)));
-
-            const matchesSearch =
-                normalizedSearch.length === 0 ||
-                activity.title?.toLowerCase().includes(normalizedSearch) ||
-                creator.username.toLowerCase().includes(normalizedSearch) ||
-                creator.wallet.toLowerCase().includes(normalizedSearch) ||
-                marketName.includes(normalizedSearch);
-
-            return matchesType && matchesStatus && matchesSearch;
-        });
-    }, [activeFilter, activeStatus, activities, currentTimeMs, searchQuery]);
-
     const handleActivityClick = (challenge: Challenge) => {
         setSelectedChallenge(challenge);
         setIsDetailModalOpen(true);
     };
 
-    const resetAndReload = (nextSearch: string) => {
+    const updateSearch = (nextSearch: string) => {
         setSearchQuery(nextSearch);
         setPageIndex(1);
-        setReloadKey((current) => current + 1);
-        setActivities([]);
-        setError(null);
-        setHasMore(true);
-        setIsInitialLoading(true);
-        setIsLoadingMore(false);
         setIsTypeDropdownOpen(false);
         setIsStatusDropdownOpen(false);
     };
@@ -430,7 +430,7 @@ export default function ActivityPage() {
                                     type="text"
                                     placeholder="Search activity..."
                                     value={searchQuery}
-                                    onChange={(e) => resetAndReload(e.target.value)}
+                                    onChange={(e) => updateSearch(e.target.value)}
                                     className="w-full rounded-xl border border-black/[0.07] py-3 pl-10 pr-4 text-sm text-gray-700 placeholder-gray-400 outline-none transition focus:border-gray-300 focus:ring-4 focus:ring-gray-900/[0.04]"
                                 />
                             </div>
@@ -504,7 +504,7 @@ export default function ActivityPage() {
                         <input
                             type="text"
                             value={searchQuery}
-                            onChange={(event) => resetAndReload(event.target.value)}
+                            onChange={(event) => updateSearch(event.target.value)}
                             placeholder="Search activity..."
                             className="w-full rounded-full border border-black/15 bg-white/70 py-2.5 pl-10 pr-4 text-sm text-gray-800 shadow-[2px_2px_0_rgba(0,0,0,0.16)] placeholder:text-gray-400 outline-none transition hover:shadow-[3px_3px_0_rgba(0,0,0,0.18)] focus:border-black/25 focus:bg-white focus:ring-4 focus:ring-gray-900/[0.04]"
                         />
@@ -599,34 +599,38 @@ export default function ActivityPage() {
 
                     {!isInitialLoading &&
                         filteredActivities.map((item) => {
-                            const creator = getActivityCreator(item);
-                            const marketIcon = item.market?.icon || "/scribbles/btc.png";
-                            const totalPool = item.total_pool || item.pool_size || item.initial_bet || 0;
-                            const participantCount = item.total_challengers || item.participants || 0;
-                            const resolutionStatus = getResolutionStatus(item, currentTimeMs);
-                            const modeLabel = getModeLabel(item.mode);
-                            const endTime = getChallengeEndTime(item);
-                            const activityHeadline = getActivityHeadline(item, endTime);
+                            const challenge = item.challenge;
+                            const creator = getActivityCreator(challenge);
+                            const actorName = item.actor?.username || creator.username;
+                            const actorAvatar = item.actor?.profile_image || creator.avatar;
+                            const actorSlug = item.actor?.wallet_address || item.actor?.pubkey || creator.profileSlug;
+                            const marketIcon = challenge.market?.icon || "/scribbles/btc.png";
+                            const totalPool = challenge.total_pool || challenge.pool_size || challenge.initial_bet || 0;
+                            const participantCount = challenge.total_challengers || challenge.participants || 0;
+                            const resolutionStatus = getResolutionStatus(challenge, currentTimeMs);
+                            const modeLabel = getModeLabel(challenge.mode);
+                            const endTime = getChallengeEndTime(challenge);
+                            const activityHeadline = getActivityHeadline(challenge, endTime);
 
                             return (
                                 <article
                                     key={item.id}
                                     role="button"
                                     tabIndex={0}
-                                    onClick={() => handleActivityClick(item)}
+                                    onClick={() => handleActivityClick(challenge)}
                                     onKeyDown={(event) => {
                                         if (event.key === "Enter" || event.key === " ") {
                                             event.preventDefault();
-                                            handleActivityClick(item);
+                                            handleActivityClick(challenge);
                                         }
                                     }}
-                                    className="group cursor-pointer rounded-xl border border-[#e6d8ce] bg-white px-3 py-3 transition-colors hover:border-[#c9a58b] hover:bg-[#fffcfa] sm:px-4"
+                                    className="group cursor-pointer overflow-hidden rounded-2xl border border-[#e7d8ce] bg-white p-3 shadow-[0_2px_10px_rgba(70,45,30,0.04)] transition-all hover:-translate-y-0.5 hover:border-[#c9a58b] hover:shadow-[0_8px_24px_rgba(70,45,30,0.09)] sm:p-4"
                                 >
                                     <div className="flex items-center gap-3">
-                                        <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-[#e5d6cb] bg-[#f7eee8] sm:h-14 sm:w-14">
+                                        <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-[#e5d6cb] bg-[#f7eee8] shadow-sm sm:h-14 sm:w-14">
                                             <Image
                                                 src={marketIcon}
-                                                alt={item.ticker || "Asset"}
+                                                alt={challenge.ticker || "Asset"}
                                                 width={56}
                                                 height={56}
                                                 className="h-full w-full object-cover"
@@ -634,24 +638,30 @@ export default function ActivityPage() {
                                         </div>
 
                                         <div className="min-w-0 flex-1">
-                                            <h2 className="line-clamp-2 text-sm font-black leading-snug text-[#17110e] sm:text-base">
+                                            <div className="mb-1 flex items-center gap-2">
+                                                <span className={`rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.08em] ${item.type === "joined" ? "bg-emerald-50 text-emerald-700" : item.type === "cancelled" ? "bg-rose-50 text-rose-700" : item.type === "expired" ? "bg-gray-100 text-gray-600" : "bg-sky-50 text-sky-700"}`}>
+                                                    {getActivityLabel(item.type)}
+                                                </span>
+                                                <span className="text-[10px] font-semibold text-[#9a8274]">{formatTimeAgo(item.occurredAt)}</span>
+                                            </div>
+                                            <h2 className="truncate text-sm font-black leading-snug text-[#17110e] sm:text-base" title={activityHeadline}>
                                                 {activityHeadline}
                                             </h2>
 
                                             <div className="mt-1.5 flex min-w-0 items-center gap-1.5 text-xs text-[#8b7467]">
-                                                <Image src={creator.avatar} alt="" width={20} height={20} className="h-5 w-5 shrink-0 rounded-full object-cover" />
+                                                <Image src={actorAvatar} alt="" width={20} height={20} className="h-5 w-5 shrink-0 rounded-full object-cover" />
                                                 <Link
-                                                    href={`/profile/${creator.profileSlug}`}
+                                                    href={`/profile/${actorSlug}`}
                                                     onClick={(event) => event.stopPropagation()}
                                                     className="max-w-28 truncate font-bold text-[#4b382f] hover:text-[#8b5e3c]"
                                                 >
-                                                    {creator.username}
+                                                    {actorName}
                                                 </Link>
-                                                <span className="hidden shrink-0 sm:inline">created this</span>
+                                                <span className="min-w-0 truncate">{getActivityVerb(item.type)}</span>
                                                 <span className="text-[#c1aa9d]">·</span>
-                                                <span className="shrink-0 font-semibold text-emerald-700">{participantCount} joined</span>
+                                                <span className="shrink-0 font-bold text-emerald-700">{participantCount} joined</span>
                                                 <span className="hidden text-[#c1aa9d] sm:inline">·</span>
-                                                <span className="hidden shrink-0 sm:inline">{formatCurrency(totalPool)} pool</span>
+                                                <span className="hidden shrink-0 font-semibold sm:inline">{formatCurrency(totalPool)} pool</span>
                                             </div>
                                         </div>
 
@@ -665,25 +675,14 @@ export default function ActivityPage() {
                                                     {resolutionStatus}
                                                 </span>
                                             </div>
-                                            <div className="flex items-center gap-1 text-[11px] font-medium text-[#9a8274]">
-                                                <span>{formatTimeAgo(item.created_at)}</span>
-                                                <ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
-                                            </div>
+                                            <ChevronRight className="h-4 w-4 text-[#9a8274] transition-transform group-hover:translate-x-0.5" />
                                         </div>
                                     </div>
                                 </article>
                             );
                         })}
 
-                    {!isInitialLoading && isLoadingMore && (
-                        <div className="space-y-4" aria-hidden="true">
-                            {Array.from({ length: SKELETON_CARDS_COUNT }).map((_, index) => (
-                                <ActivitySkeleton key={`activity-more-skeleton-${index}`} />
-                            ))}
-                        </div>
-                    )}
-
-                    <div ref={loadMoreRef} className="h-1 w-full" aria-hidden="true" />
+                    {hasMore && <div ref={loadMoreRef} className="h-1 w-full" aria-hidden="true" />}
 
                 </div>
             </div>

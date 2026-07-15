@@ -235,12 +235,12 @@ export function WaysToWinSection() {
                             <p className="text-gray-600 text-sm font-medium">Your skill. Your edge. Your rewards.</p>
                         </div>
                     </div>
-                <Link
-                    href="/challenges"
-                    className="pointer-events-auto inline-flex max-w-full items-center justify-center border-2 border-black bg-black px-5 py-2.5 text-xs font-black uppercase tracking-[0.08em] text-white shadow-[4px_4px_0_#e85a2d] transition-all hover:-translate-y-1 hover:shadow-[6px_6px_0_#e85a2d] active:translate-y-0 active:shadow-[2px_2px_0_#e85a2d] min-[380px]:px-7 min-[380px]:text-sm sm:px-8 sm:py-3"
-                >
-                    Start Battling {"\u279D"}
-                </Link>
+                    <Link
+                        href="/challenges"
+                        className="pointer-events-auto inline-flex max-w-full items-center justify-center border-2 border-black bg-black px-5 py-2.5 text-xs font-black uppercase tracking-[0.08em] text-white shadow-[4px_4px_0_#e85a2d] transition-all hover:-translate-y-1 hover:shadow-[6px_6px_0_#e85a2d] active:translate-y-0 active:shadow-[2px_2px_0_#e85a2d] min-[380px]:px-7 min-[380px]:text-sm sm:px-8 sm:py-3"
+                    >
+                        Explore Challenges {"\u279D"}
+                    </Link>
                 </div>
             </div>
 

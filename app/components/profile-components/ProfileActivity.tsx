@@ -5,8 +5,8 @@ import Image from "next/image";
 import { ChevronRight } from "lucide-react";
 import {
     Challenge,
-    getChallenges,
 } from "@/app/lib/challenges-service/challenges";
+import { ChallengeActivity, getActivityLabel, getActivityVerb, getChallengeActivities } from "@/app/lib/activity-service/activity";
 
 interface ProfileActivityProps {
     userId: string;
@@ -18,7 +18,8 @@ interface ProfileActivityProps {
     sortOrder: "latest" | "oldest";
 }
 
-const PAGE_SIZE = 10;
+const INITIAL_PAGE_SIZE = 6;
+const NEXT_PAGE_SIZE = 9;
 const SKELETON_CARDS_COUNT = 4;
 
 function formatTimeAgo(dateString: string): string {
@@ -79,19 +80,19 @@ function ActivitySkeleton({ id }: { id: string }) {
 }
 
 export function ProfileActivity({ userId, username, avatar, onActivityClick, searchQuery, sortOrder }: ProfileActivityProps) {
-    const [activities, setActivities] = useState<Challenge[]>([]);
+    const [activities, setActivities] = useState<ChallengeActivity[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+    const [visibleCount, setVisibleCount] = useState(INITIAL_PAGE_SIZE);
     const [isLoadingMore, setIsLoadingMore] = useState(false);
     const loadMoreRef = useRef<HTMLDivElement>(null);
     const filteredActivities = useMemo(() => {
         const query = searchQuery.trim().toLowerCase();
         return activities
-            .filter((activity) => !query || [activity.statement, activity.title, activity.ticker, activity.trading_pair]
+            .filter((activity) => !query || [activity.challenge.statement, activity.challenge.title, activity.challenge.ticker, activity.challenge.trading_pair, getActivityVerb(activity.type)]
                 .some((value) => value?.toLowerCase().includes(query)))
             .sort((a, b) => {
-                const difference = new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+                const difference = new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime();
                 return sortOrder === "latest" ? difference : -difference;
             });
     }, [activities, searchQuery, sortOrder]);
@@ -109,16 +110,13 @@ export function ProfileActivity({ userId, username, avatar, onActivityClick, sea
             try {
                 setIsLoading(true);
                 setError(null);
-                const response = await getChallenges({
-                    created_by: userId,
-                });
+                const response = await getChallengeActivities();
                 if (!isMounted) return;
 
-                const sorted = [...response.challenges].sort(
-                    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-                );
+                const numericUserId = Number(userId);
+                const sorted = response.filter((event) => Number(event.actor?.id) === numericUserId);
                 setActivities(sorted);
-                setVisibleCount(PAGE_SIZE);
+                setVisibleCount(INITIAL_PAGE_SIZE);
             } catch (fetchError) {
                 if (!isMounted) return;
                 setError(fetchError instanceof Error ? fetchError.message : "Failed to load user activity.");
@@ -141,7 +139,7 @@ export function ProfileActivity({ userId, username, avatar, onActivityClick, sea
             if (!entry.isIntersecting || isLoadingMore) return;
             setIsLoadingMore(true);
             window.setTimeout(() => {
-                setVisibleCount((count) => Math.min(count + PAGE_SIZE, activities.length));
+                setVisibleCount((count) => Math.min(count + NEXT_PAGE_SIZE, activities.length));
                 setIsLoadingMore(false);
             }, 250);
         }, { rootMargin: "300px" });
@@ -176,45 +174,52 @@ export function ProfileActivity({ userId, username, avatar, onActivityClick, sea
                 )}
 
                 {!isLoading && !error && filteredActivities.slice(0, visibleCount).map((item) => {
-                    const resolutionStatus = getResolutionStatus(item);
-                    const participantCount = item.total_challengers || item.participants || 0;
-                    const totalPool = item.total_pool || item.pool_size || item.initial_bet || 0;
+                    const challenge = item.challenge;
+                    const resolutionStatus = getResolutionStatus(challenge);
+                    const participantCount = challenge.total_challengers || challenge.participants || 0;
+                    const totalPool = challenge.total_pool || challenge.pool_size || challenge.initial_bet || 0;
+                    const actorName = item.actor?.username || username;
+                    const actorAvatar = item.actor?.profile_image || avatar || "/scribbles/btc.png";
                     return (
                     <article
                         key={item.id}
                         role="button"
                         tabIndex={0}
-                        onClick={() => onActivityClick?.(item)}
+                        onClick={() => onActivityClick?.(challenge)}
                         onKeyDown={(event) => {
-                            if (event.key === "Enter" || event.key === " ") onActivityClick?.(item);
+                            if (event.key === "Enter" || event.key === " ") onActivityClick?.(challenge);
                         }}
-                        className="group cursor-pointer rounded-xl border border-[#e6d8ce] bg-white px-3 py-3 transition-colors hover:border-[#c9a58b] hover:bg-[#fffcfa] sm:px-4"
+                        className="group cursor-pointer overflow-hidden rounded-2xl border border-[#e7d8ce] bg-white p-3 shadow-[0_2px_10px_rgba(70,45,30,0.04)] transition-all hover:-translate-y-0.5 hover:border-[#c9a58b] hover:shadow-[0_8px_24px_rgba(70,45,30,0.09)] sm:p-4"
                     >
                         <div className="flex items-center gap-3">
-                            <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-[#e5d6cb] bg-[#f7eee8] sm:h-14 sm:w-14">
-                                <Image src={item.market?.icon || "/scribbles/btc.png"} alt={item.ticker || "Asset"} width={56} height={56} className="h-full w-full object-cover" />
+                            <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-[#e5d6cb] bg-[#f7eee8] shadow-sm sm:h-14 sm:w-14">
+                                <Image src={challenge.market?.icon || "/scribbles/btc.png"} alt={challenge.ticker || "Asset"} width={56} height={56} className="h-full w-full object-cover" />
                             </div>
                             <div className="flex-1 min-w-0">
-                                <h2 className="line-clamp-2 text-sm font-black leading-snug text-[#17110e] sm:text-base">{item.statement?.trim() || item.title}</h2>
+                                <div className="mb-1 flex items-center gap-2">
+                                    <span className={`rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.08em] ${item.type === "joined" ? "bg-emerald-50 text-emerald-700" : item.type === "cancelled" ? "bg-rose-50 text-rose-700" : item.type === "expired" ? "bg-gray-100 text-gray-600" : "bg-sky-50 text-sky-700"}`}>{getActivityLabel(item.type)}</span>
+                                    <span className="text-[10px] font-semibold text-[#9a8274]">{formatTimeAgo(item.occurredAt)}</span>
+                                </div>
+                                <h2 className="truncate text-sm font-black leading-snug text-[#17110e] sm:text-base" title={challenge.statement?.trim() || challenge.title}>{challenge.statement?.trim() || challenge.title}</h2>
                                 <div className="mt-1.5 flex min-w-0 items-center gap-1.5 text-xs text-[#8b7467]">
-                                    <Image src={item.creator?.profile_image || avatar || "/scribbles/btc.png"} alt="" width={20} height={20} className="h-5 w-5 shrink-0 rounded-full object-cover" />
-                                    <span className="max-w-28 truncate font-bold text-[#4b382f]">{username}</span>
-                                    <span className="hidden shrink-0 sm:inline">created this</span><span className="text-[#c1aa9d]">·</span>
-                                    <span className="shrink-0 font-semibold text-emerald-700">{participantCount} joined</span><span className="hidden text-[#c1aa9d] sm:inline">·</span>
-                                    <span className="hidden shrink-0 sm:inline">${Number(totalPool).toLocaleString()} pool</span>
+                                    <Image src={actorAvatar} alt="" width={20} height={20} className="h-5 w-5 shrink-0 rounded-full object-cover" />
+                                    <span className="max-w-28 truncate font-bold text-[#4b382f]">{actorName}</span>
+                                    <span className="min-w-0 truncate">{getActivityVerb(item.type)}</span><span className="shrink-0 text-[#c1aa9d]">·</span>
+                                    <span className="shrink-0 font-bold text-emerald-700">{participantCount} joined</span><span className="hidden text-[#c1aa9d] sm:inline">·</span>
+                                    <span className="hidden shrink-0 font-semibold sm:inline">${Number(totalPool).toLocaleString()} pool</span>
                                 </div>
                             </div>
                             <div className="flex shrink-0 flex-col items-end gap-1.5">
                                 <div className="flex items-center gap-1.5">
-                                    <span className="rounded-full border border-[#dfd0c6] bg-[#f8f1ec] px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-[#60483b]">{getModeLabel(item.mode)}</span>
+                                    <span className="rounded-full border border-[#dfd0c6] bg-[#f8f1ec] px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-[#60483b]">{getModeLabel(challenge.mode)}</span>
                                     <span className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] font-bold ${getResolutionStatusClass(resolutionStatus)}`}><span className="h-1.5 w-1.5 rounded-full bg-current" />{resolutionStatus}</span>
                                 </div>
-                                <div className="flex items-center gap-1 text-[11px] font-medium text-[#9a8274]"><span>{formatTimeAgo(item.created_at)}</span><ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" /></div>
+                                <ChevronRight className="h-4 w-4 text-[#9a8274] transition-transform group-hover:translate-x-0.5" />
                             </div>
                         </div>
                     </article>);
                 })}
-                {isLoadingMore && Array.from({ length: 3 }).map((_, index) => (
+                {isLoadingMore && Array.from({ length: NEXT_PAGE_SIZE }).map((_, index) => (
                     <ActivitySkeleton key={`activity-more-${index}`} id={`activity-more-${index}`} />
                 ))}
                 <div ref={loadMoreRef} className="h-1 w-full" aria-hidden="true" />

@@ -17,9 +17,9 @@ pub struct AcceptChallengeParams {
     /// TEAM only: which side to join (true = creator's side, false = opponent's side).
     /// Ignored for PVP.
     pub join_creator_side: bool,
-    /// Amount this participant deposits, in USDC micro-units. Does not need to match
-    /// the creator's `bet_amount` — PVP pays the winner the full combined pot, and TEAM
-    /// pays each winner proportionally to their own stake. Must be >= MIN_BET_AMOUNT.
+    /// Amount this participant deposits, in USDC micro-units. PVP participants
+    /// must match the creator's stake. TEAM participants must match it until the
+    /// opponent side has collectively covered it, after which the platform minimum applies.
     pub amount: u64,
 }
 
@@ -101,6 +101,11 @@ pub(crate) fn handler(ctx: Context<AcceptChallenge>, params: AcceptChallengePara
                 challenge.challenger == Pubkey::default(),
                 RektoError::AlreadyAccepted
             );
+            // A head-to-head opponent must match or exceed the creator's stake.
+            require!(
+                deposit_amount >= challenge.bet_amount,
+                RektoError::BetTooSmall
+            );
 
             // Transfer the challenger's own bet from challenger to vault
             token_interface::transfer_checked(
@@ -142,6 +147,21 @@ pub(crate) fn handler(ctx: Context<AcceptChallenge>, params: AcceptChallengePara
                 !already_in_creator_team && !already_in_opponent_team,
                 RektoError::AlreadyJoined
             );
+
+            // Until the opponent side has collectively covered the creator's
+            // opening stake, every new participant must match that opening
+            // stake. Once covered, the platform-wide minimum applies.
+            let opponent_side_total = challenge
+                .opponent_team_amounts
+                .iter()
+                .try_fold(0u64, |total, amount| total.checked_add(*amount))
+                .ok_or(RektoError::Overflow)?;
+            if opponent_side_total < challenge.bet_amount {
+                require!(
+                    deposit_amount >= challenge.bet_amount,
+                    RektoError::BetTooSmall
+                );
+            }
 
             let max_size = challenge.max_team_size as usize;
 
