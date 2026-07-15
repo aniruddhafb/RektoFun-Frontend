@@ -8,19 +8,21 @@ export const metadata: Metadata = {
         index: true,
         follow: true,
     },
+    alternates: { canonical: "/privacy" },
     openGraph: {
         title: "Privacy Policy | RektoFun",
         description: "Read our Privacy Policy and learn how we protect your data.",
         url: "https://rekto.fun/privacy",
         images: [
             {
-                url: "/logos/BG.png",
-                width: 1200,
-                height: 630,
+                url: "/logos/social_share.png",
+                width: 1731,
+                height: 909,
                 alt: "RektoFun Privacy Policy",
             },
         ],
     },
+    twitter: { card: "summary_large_image", images: ["/logos/social_share.png"] },
 };
 
 export default function PrivacyPage() {

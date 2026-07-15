@@ -281,7 +281,6 @@ export default function ChallengeDetailModal({ challenge, creator, isOpen, onClo
     isResolveTimeAchieved,
     isResolutionPending,
     isResolutionResolved,
-    createdTimeText,
     endsInText,
     resolvesInText,
     expiresInTextForBox,
@@ -531,19 +530,6 @@ export default function ChallengeDetailModal({ challenge, creator, isOpen, onClo
               <SummaryStat icon={CalendarDays} label="Resolves" value={resolvesInText || "On result"} />
             </div>
 
-            <button
-              type="button"
-              onClick={() => openProfile(creatorWalletAddress)}
-              className="mt-4 flex max-w-full cursor-pointer items-center gap-2.5 border-t border-black/10 pt-3 text-left"
-            >
-              <span className="h-8 w-8 shrink-0 overflow-hidden rounded-full border-2 border-black bg-[#f5d547]">
-                <Image src={creatorAvatar || FALLBACK_AVATAR} alt="" width={32} height={32} className="h-full w-full object-cover" />
-              </span>
-              <span className="min-w-0">
-                <span className="block truncate text-xs font-black text-[#17120f]">{creatorName}</span>
-                <span className="block text-[9px] font-bold uppercase tracking-[0.08em] text-[#8b7a72]">{isTeam ? "Creator" : "Challenger"} · {createdTimeText}</span>
-              </span>
-            </button>
           </section>
 
           <div className="mt-3 sm:mt-4">
@@ -832,7 +818,7 @@ function CryptoMarketPanel({ asset, target, direction }: {
         )}
       </div>
       <div className="flex flex-wrap items-center justify-between gap-1 border-t border-white/15 px-3 py-2 text-[8px] font-bold uppercase tracking-[0.06em] text-white/50 sm:px-4 sm:text-[9px]">
-        <span>Pan, zoom and hover · Binance data</span><span>{range}</span>
+        <span>Pan, zoom and hover</span><span>{range}</span>
       </div>
     </section>
   );

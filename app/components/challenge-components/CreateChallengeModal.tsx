@@ -1625,7 +1625,7 @@ function TargetPricePicker({
             <div className="flex flex-wrap items-center justify-between gap-1.5 border-t border-white/15 px-3 py-2 text-[8px] font-bold text-white/50 sm:px-4 sm:text-[9px]">
                 <span className="min-w-0">
                     <a href="https://www.tradingview.com/" target="_blank" rel="noopener noreferrer" className="pointer-events-auto text-white/65 hover:text-white">Charts by TradingView</a>
-                    {` · ${range} Binance data`}
+                    {` · ${range}`}
                 </span>
                 <span>{interactionMode === "analyze" ? "Wheel/pinch to zoom" : "↑↓ keys adjust by 1%"}</span>
             </div>
