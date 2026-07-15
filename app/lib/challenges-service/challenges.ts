@@ -133,6 +133,7 @@ export interface GetChallengesOptions {
 }
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_BE_API_URL;
+const challengeListRequests = new Map<string, Promise<GetChallengesResponse>>();
 
 export async function createChallenge(params: CreateChallengeParams): Promise<Challenge> {
   const response = await fetch(`${API_BASE_URL}/challenges`, {
@@ -183,23 +184,24 @@ export async function getChallenges(
   const queryString = queryParams.toString();
   const url = `${API_BASE_URL}/challenges${queryString ? `?${queryString}` : ''}`;
   
-  const response = await fetch(url, {
+  const pending = challengeListRequests.get(url);
+  if (pending) return pending;
+
+  const request = fetch(url, {
     method: 'GET',
-    headers: {
-      'accept': 'application/json',
-    },
-  });
+    headers: { 'accept': 'application/json' },
+  }).then(async (response) => {
+    if (!response.ok) throw new Error(`Failed to fetch challenges: ${response.statusText}`);
+    const data = await response.json();
+    return {
+      challenges: data.challenges || [],
+      total: data.total || 0,
+      count: data.count ?? data.total ?? 0,
+    };
+  }).finally(() => challengeListRequests.delete(url));
 
-  if (!response.ok) {
-    throw new Error(`Failed to fetch challenges: ${response.statusText}`);
-  }
-
-  const data = await response.json();
-  return {
-    challenges: data.challenges || [],
-    total: data.total || 0,
-    count: data.count ?? data.total ?? 0,
-  };
+  challengeListRequests.set(url, request);
+  return request;
 }
 
 export async function getChallengeById(id: number): Promise<Challenge> {

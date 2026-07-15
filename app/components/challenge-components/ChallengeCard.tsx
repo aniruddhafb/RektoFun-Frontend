@@ -104,6 +104,7 @@ export function ChallengeCard({
     const [activeProfilePreview, setActiveProfilePreview] = React.useState<"creator" | "opponent" | null>(null);
     const [viewOverrides, setViewOverrides] = React.useState<Record<number, number>>({});
     const [teamParticipants, setTeamParticipants] = React.useState<{ challengeId: number; rows: TeamCardParticipant[] } | null>(null);
+    const [shouldLoadParticipants, setShouldLoadParticipants] = React.useState(false);
     const viewCount = Math.max(challenge.views ?? 0, viewOverrides[challenge.id] ?? 0);
     const {
         isLoading,
@@ -196,7 +197,7 @@ export function ChallengeCard({
     }, [challenge.id]);
 
     React.useEffect(() => {
-        if (!isTeam) return;
+        if (!isTeam || !shouldLoadParticipants) return;
         let cancelled = false;
 
         const load = (refresh = false) => {
@@ -241,7 +242,7 @@ export function ChallengeCard({
             cancelled = true;
             window.removeEventListener(CHALLENGE_UPDATED_EVENT, handleUpdated);
         };
-    }, [challenge.creator, challenge.creator_id, challenge.id, creatorDisplayName, creatorProfileImage, creatorWalletAddress, isTeam]);
+    }, [challenge.creator, challenge.creator_id, challenge.id, creatorDisplayName, creatorProfileImage, creatorWalletAddress, isTeam, shouldLoadParticipants]);
 
     const currentTeamParticipants = teamParticipants?.challengeId === challenge.id ? teamParticipants.rows : [];
     const challengerProfiles = isTeam
@@ -286,6 +287,9 @@ export function ChallengeCard({
     return (
         <>
             <div onClick={handleClick}
+                onMouseEnter={() => setShouldLoadParticipants(true)}
+                onFocusCapture={() => setShouldLoadParticipants(true)}
+                onTouchStart={() => setShouldLoadParticipants(true)}
                 className="challenge-card-shell group/card relative block cursor-pointer overflow-visible rounded-xl border border-gray-200 bg-[#fffaf6] p-3 transition-all duration-300 hover:z-30 hover:-translate-y-0.5 hover:border-gray-300 hover:shadow-md focus-within:z-30 sm:p-4"
             >
                 {/* Header */}

@@ -38,7 +38,7 @@ const joinedChallengeRequests = new Map<number, Promise<Set<number>>>();
 function loadJoinedChallengeIds(userId: number): Promise<Set<number>> {
   const pending = joinedChallengeRequests.get(userId);
   if (pending) return pending;
-  const request = getPositions({ limit: 1000, offset: 0 })
+  const request = getPositions({ limit: 1000, offset: 0, creator: userId })
     .then(({ positions }) => new Set(
       positions.filter((position) => position.creator === userId).map((position) => position.challenge_id)
     ))

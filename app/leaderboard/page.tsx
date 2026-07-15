@@ -1,16 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { getLeaderboard, type LeaderboardPeriod, type LeaderboardSort, type LeaderboardUser } from "../lib/users-service/users";
 import { Search } from "lucide-react";
-
-const SparkleIcon = ({ className }: { className?: string }) => (
-    <svg className={className} width="12" height="12" viewBox="0 0 12 12" fill="none">
-        <path d="M6 0L7 5L12 6L7 7L6 12L5 7L0 6L5 5L6 0Z" fill="currentColor" />
-    </svg>
-);
 
 const VerifiedBadge = ({ isModerator = false }: { isModerator?: boolean }) => (
     <svg className="h-4 w-4 shrink-0" viewBox="0 0 32 32" aria-hidden="true">
@@ -19,35 +13,6 @@ const VerifiedBadge = ({ isModerator = false }: { isModerator?: boolean }) => (
             d="M16 1.5l2.8 2.2 3.5-1 1.6 3.2 3.6.5.1 3.7 3 2-1.4 3.4 1.4 3.4-3 2-.1 3.7-3.6.5-1.6 3.2-3.5-1L16 30.5l-2.8-2.2-3.5 1-1.6-3.2-3.6-.5-.1-3.7-3-2 1.4-3.4-1.4-3.4 3-2 .1-3.7 3.6-.5 1.6-3.2 3.5 1L16 1.5Z"
         />
         <path d="m9.4 16.2 4.2 4.2 9-9" fill="none" stroke="white" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-);
-
-const ChallengeIcon = () => (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="text-amber-500">
-        <path d="M8 1L9.5 5.5L14 6L10.5 9L11.5 13.5L8 11L4.5 13.5L5.5 9L2 6L6.5 5.5L8 1Z" fill="currentColor" />
-    </svg>
-);
-
-const HandshakeIcon = () => (
-    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" className="text-amber-700">
-        <path d="M10 2C10 2 12 4 14 4C16 4 17 6 17 8C17 10 16 12 14 13L10 17L6 13C4 12 3 10 3 8C3 6 4 4 6 4C8 4 10 2 10 2Z" stroke="currentColor" strokeWidth="1.5" fill="none" />
-        <path d="M7 8C7 8 8 9 10 9C12 9 13 8 13 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-    </svg>
-);
-
-const CoinsIcon = () => (
-    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" className="text-amber-600">
-        <ellipse cx="10" cy="14" rx="6" ry="3" fill="currentColor" opacity="0.6" />
-        <ellipse cx="10" cy="11" rx="6" ry="3" fill="currentColor" opacity="0.8" />
-        <ellipse cx="10" cy="8" rx="6" ry="3" fill="currentColor" />
-        <ellipse cx="10" cy="8" rx="4" ry="2" fill="#fbbf24" />
-    </svg>
-);
-
-const SearchIcon = () => (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="text-gray-400">
-        <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.5" />
-        <path d="M11 11L14 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
     </svg>
 );
 
@@ -183,6 +148,7 @@ export default function LeaderboardPage() {
 
     useEffect(() => {
         const offset = (currentPage - 1) * ITEMS_PER_PAGE;
+        let cancelled = false;
 
         const loadUsers = async () => {
             try {
@@ -190,36 +156,27 @@ export default function LeaderboardPage() {
                 setError(null);
                 const apiSort: LeaderboardSort = ({ winRate: "win_rate", rekt: "lost", profit: "pnl" } as const)[sortField as "winRate" | "rekt" | "profit"] || sortField as LeaderboardSort;
                 const response = await getLeaderboard(ITEMS_PER_PAGE, offset, debouncedSearchQuery, period, apiSort, sortOrder);
+                if (cancelled) return;
                 const mapped = response.users.map((user, index) => mapUserToRow(user, offset + index + 1));
                 setRows(mapped);
                 setTotalCount(response.count);
             } catch {
+                if (cancelled) return;
                 setError("Failed to load leaderboard users.");
                 setRows([]);
                 setTotalCount(0);
             } finally {
-                setIsLoading(false);
+                if (!cancelled) setIsLoading(false);
             }
         };
 
         loadUsers();
+        return () => { cancelled = true; };
     }, [currentPage, debouncedSearchQuery, period, sortField, sortOrder]);
-
-    const sortedData = useMemo(() => {
-        const sorted = [...rows];
-        sorted.sort((a, b) => {
-            const direction = sortOrder === "asc" ? 1 : -1;
-            if (sortField === "profit" || sortField === "volume") {
-                return (Number(a[sortField]) - Number(b[sortField])) * direction;
-            }
-            return ((a[sortField] as number) - (b[sortField] as number)) * direction;
-        });
-        return sorted;
-    }, [rows, sortField, sortOrder]);
 
     const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE);
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-    const paginatedData = sortedData;
+    const paginatedData = rows;
 
     const handlePageChange = (page: number) => {
         if (page >= 1 && page <= totalPages && page !== currentPage) {

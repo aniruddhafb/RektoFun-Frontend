@@ -16,7 +16,7 @@ import ChallengeDetailModal from "@/app/components/challenge-components/Challeng
 import {
     Challenge,
 } from "@/app/lib/challenges-service/challenges";
-import { ChallengeActivity, getActivityLabel, getActivityVerb, getChallengeActivities } from "@/app/lib/activity-service/activity";
+import { ChallengeActivity, getActivityLabel, getActivityVerb, getChallengeActivityPage } from "@/app/lib/activity-service/activity";
 import { useBodyScrollLock } from "@/app/lib/useBodyScrollLock";
 import { stripUsdcQuote } from "@/app/lib/format-market-label";
 
@@ -163,10 +163,9 @@ export default function ActivityPage() {
     const [searchQuery, setSearchQuery] = useState("");
     const [activities, setActivities] = useState<ChallengeActivity[]>([]);
     const [pageIndex, setPageIndex] = useState(1);
-    const [reloadKey, setReloadKey] = useState(0);
     const [isInitialLoading, setIsInitialLoading] = useState(true);
     const [isLoadingMore, setIsLoadingMore] = useState(false);
-    const [hasMore, setHasMore] = useState(true);
+    const [serverHasMore, setServerHasMore] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [selectedChallenge, setSelectedChallenge] = useState<Challenge | null>(null);
     const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
@@ -179,7 +178,6 @@ export default function ActivityPage() {
     const typeButtonRef = useRef<HTMLButtonElement>(null);
     const statusButtonRef = useRef<HTMLButtonElement>(null);
     const loadMoreRef = useRef<HTMLDivElement>(null);
-    const requestIdRef = useRef(0);
     const [typeDropdownStyle, setTypeDropdownStyle] = useState<React.CSSProperties | null>(null);
     const [statusDropdownStyle, setStatusDropdownStyle] = useState<React.CSSProperties | null>(null);
 
@@ -205,23 +203,6 @@ export default function ActivityPage() {
     useEffect(() => {
         const interval = window.setInterval(() => setCurrentTimeMs(Date.now()), 60000);
         return () => window.clearInterval(interval);
-    }, []);
-
-    useEffect(() => {
-        let active = true;
-        const refreshActivity = async () => {
-            try {
-                const events = await getChallengeActivities();
-                if (active) setActivities(events);
-            } catch {
-                // Preserve the last successful feed if a background refresh fails.
-            }
-        };
-        const interval = window.setInterval(refreshActivity, 15_000);
-        return () => {
-            active = false;
-            window.clearInterval(interval);
-        };
     }, []);
 
     useEffect(() => {
@@ -269,75 +250,70 @@ export default function ActivityPage() {
     }, [isStatusDropdownOpen, isTypeDropdownOpen]);
 
     useEffect(() => {
-        let isMounted = true;
-        const requestId = ++requestIdRef.current;
-        const loadActivities = async () => {
+        let active = true;
+
+        const loadActivities = async (initial = false) => {
+            if (initial) {
+                setIsInitialLoading(true);
+                setError(null);
+            }
             try {
-                if (pageIndex === 1) {
-                    setIsInitialLoading(true);
-                    setActivities([]);
-                    setError(null);
-                    setHasMore(true);
-                } else {
-                    setIsLoadingMore(true);
+                const response = await getChallengeActivityPage(15, 0);
+                if (active) {
+                    setActivities((current) => {
+                        if (initial) return response.activities;
+                        const refreshedIds = new Set(response.activities.map((event) => event.id));
+                        return [...response.activities, ...current.filter((event) => !refreshedIds.has(event.id))];
+                    });
+                    setServerHasMore(response.has_more);
                 }
-
-                const response = await getChallengeActivities();
-
-                if (!isMounted || requestId !== requestIdRef.current) return;
-
-                const offset = pageIndex === 1 ? 0 : 6 + (pageIndex - 2) * 9;
-                const pageSize = pageIndex === 1 ? 6 : 9;
-                const sorted = response.slice(offset, offset + pageSize);
-
-                setActivities((current) => {
-                    if (pageIndex === 1) return sorted;
-
-                    const seen = new Set(current.map((item) => item.id));
-                    return [...current, ...sorted.filter((item) => !seen.has(item.id))];
-                });
-                setHasMore(offset + sorted.length < response.length);
             } catch (fetchError) {
-                if (!isMounted || requestId !== requestIdRef.current) return;
-                setError(fetchError instanceof Error ? fetchError.message : "Failed to load activity.");
-            } finally {
-                if (!isMounted || requestId !== requestIdRef.current) return;
-                if (pageIndex === 1) {
-                    setIsInitialLoading(false);
-                } else {
-                    setIsLoadingMore(false);
+                if (active && initial) {
+                    setError(fetchError instanceof Error ? fetchError.message : "Failed to load activity.");
                 }
+            } finally {
+                if (active && initial) setIsInitialLoading(false);
             }
         };
 
-        loadActivities();
+        void loadActivities(true);
+        const interval = window.setInterval(() => {
+            if (document.visibilityState === "visible") void loadActivities();
+        }, 60_000);
 
         return () => {
-            isMounted = false;
+            active = false;
+            window.clearInterval(interval);
         };
-    }, [pageIndex, reloadKey, searchQuery]);
+    }, []);
 
     useEffect(() => {
-        const target = loadMoreRef.current;
-        if (!target) return;
+        if (pageIndex === 1) return;
+        let active = true;
 
-        const observer = new IntersectionObserver(
-            ([entry]) => {
-                if (entry.isIntersecting && hasMore && !isInitialLoading && !isLoadingMore && !error) {
-                    setPageIndex((current) => current + 1);
-                }
-            },
-            {
-                rootMargin: "400px 0px",
-                threshold: 0,
-            },
-        );
+        const loadNextPage = async () => {
+            setIsLoadingMore(true);
+            try {
+                const offset = 15 + (pageIndex - 2) * 15;
+                const response = await getChallengeActivityPage(15, offset);
+                if (!active) return;
+                setActivities((current) => {
+                    const ids = new Set(current.map((event) => event.id));
+                    return [...current, ...response.activities.filter((event) => !ids.has(event.id))];
+                });
+                setServerHasMore(response.has_more);
+            } catch (fetchError) {
+                if (active) setError(fetchError instanceof Error ? fetchError.message : "Failed to load activity.");
+            } finally {
+                if (active) setIsLoadingMore(false);
+            }
+        };
 
-        observer.observe(target);
-        return () => observer.disconnect();
-    }, [error, hasMore, isInitialLoading, isLoadingMore]);
+        void loadNextPage();
+        return () => { active = false; };
+    }, [pageIndex]);
 
-    const filteredActivities = useMemo(() => {
+    const matchingActivities = useMemo(() => {
         return activities.filter((activity) => {
             const challenge = activity.challenge;
             const mode = challenge.mode?.toLowerCase() ?? "";
@@ -387,20 +363,34 @@ export default function ActivityPage() {
         });
     }, [activeFilter, activeStatus, activities, currentTimeMs, searchQuery]);
 
+    const filteredActivities = matchingActivities;
+    const hasMore = serverHasMore;
+
+    useEffect(() => {
+        const target = loadMoreRef.current;
+        if (!target) return;
+
+        const observer = new IntersectionObserver(
+            ([entry]) => {
+                if (entry.isIntersecting && hasMore && !isInitialLoading && !isLoadingMore && !error) {
+                    setPageIndex((current) => current + 1);
+                }
+            },
+            { rootMargin: "400px 0px", threshold: 0 },
+        );
+
+        observer.observe(target);
+        return () => observer.disconnect();
+    }, [error, hasMore, isInitialLoading, isLoadingMore]);
+
     const handleActivityClick = (challenge: Challenge) => {
         setSelectedChallenge(challenge);
         setIsDetailModalOpen(true);
     };
 
-    const resetAndReload = (nextSearch: string) => {
+    const updateSearch = (nextSearch: string) => {
         setSearchQuery(nextSearch);
         setPageIndex(1);
-        setReloadKey((current) => current + 1);
-        setActivities([]);
-        setError(null);
-        setHasMore(true);
-        setIsInitialLoading(true);
-        setIsLoadingMore(false);
         setIsTypeDropdownOpen(false);
         setIsStatusDropdownOpen(false);
     };
@@ -438,7 +428,7 @@ export default function ActivityPage() {
                                     type="text"
                                     placeholder="Search activity..."
                                     value={searchQuery}
-                                    onChange={(e) => resetAndReload(e.target.value)}
+                                    onChange={(e) => updateSearch(e.target.value)}
                                     className="w-full rounded-xl border border-black/[0.07] py-3 pl-10 pr-4 text-sm text-gray-700 placeholder-gray-400 outline-none transition focus:border-gray-300 focus:ring-4 focus:ring-gray-900/[0.04]"
                                 />
                             </div>
@@ -512,7 +502,7 @@ export default function ActivityPage() {
                         <input
                             type="text"
                             value={searchQuery}
-                            onChange={(event) => resetAndReload(event.target.value)}
+                            onChange={(event) => updateSearch(event.target.value)}
                             placeholder="Search activity..."
                             className="w-full rounded-full border border-black/15 bg-white/70 py-2.5 pl-10 pr-4 text-sm text-gray-800 shadow-[2px_2px_0_rgba(0,0,0,0.16)] placeholder:text-gray-400 outline-none transition hover:shadow-[3px_3px_0_rgba(0,0,0,0.18)] focus:border-black/25 focus:bg-white focus:ring-4 focus:ring-gray-900/[0.04]"
                         />
@@ -690,15 +680,7 @@ export default function ActivityPage() {
                             );
                         })}
 
-                    {!isInitialLoading && isLoadingMore && (
-                        <div className="space-y-4" aria-hidden="true">
-                            {Array.from({ length: SKELETON_CARDS_COUNT }).map((_, index) => (
-                                <ActivitySkeleton key={`activity-more-skeleton-${index}`} />
-                            ))}
-                        </div>
-                    )}
-
-                    <div ref={loadMoreRef} className="h-1 w-full" aria-hidden="true" />
+                    {hasMore && <div ref={loadMoreRef} className="h-1 w-full" aria-hidden="true" />}
 
                 </div>
             </div>

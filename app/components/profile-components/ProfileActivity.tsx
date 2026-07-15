@@ -133,24 +133,6 @@ export function ProfileActivity({ userId, username, avatar, onActivityClick, sea
     }, [userId]);
 
     useEffect(() => {
-        if (!userId) return;
-        let active = true;
-        const refresh = async () => {
-            try {
-                const events = await getChallengeActivities();
-                if (active) setActivities(events.filter((event) => Number(event.actor?.id) === Number(userId)));
-            } catch {
-                // Keep the last successful feed during a background refresh failure.
-            }
-        };
-        const interval = window.setInterval(refresh, 15_000);
-        return () => {
-            active = false;
-            window.clearInterval(interval);
-        };
-    }, [userId]);
-
-    useEffect(() => {
         const target = loadMoreRef.current;
         if (!target || visibleCount >= activities.length) return;
         const observer = new IntersectionObserver(([entry]) => {

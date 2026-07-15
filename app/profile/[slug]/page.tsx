@@ -14,6 +14,7 @@ import {
 import { LoadingPage } from "@/app/components/LoadingPage";
 import { followUser, getLeaderboard, getUserByWallet, LeaderboardUser, unfollowUser, User } from "@/app/lib/users-service/users";
 import { useUserStore } from "@/app/store/useUserStore";
+import { useTokenBalanceStore } from "@/app/store/useTokenBalanceStore";
 import {
     Challenge,
     getChallengeById,
@@ -32,6 +33,10 @@ export default function ProfilePage() {
     const params = useParams();
     const { address: connectedWalletAddress } = useAppKitAccount();
     const { user: currentUser } = useUserStore();
+    const storedBalanceWallet = useTokenBalanceStore((state) => state.walletAddress);
+    const storedRektoBalance = useTokenBalanceStore((state) => state.rektoBalance);
+    const storedUsdcBalance = useTokenBalanceStore((state) => state.usdcBalance);
+    const storedBalancesLoading = useTokenBalanceStore((state) => state.isLoading);
     
     const slug = params.slug as string;
     const walletFromSlug = decodeURIComponent(slug || "");
@@ -70,7 +75,10 @@ export default function ProfilePage() {
             
             try {
                 setLoading(true);
-                const userData = await getUserByWallet(walletFromSlug);
+                const isConnectedUser = connectedWalletAddress?.toLowerCase() === walletFromSlug.toLowerCase();
+                const userData = isConnectedUser && currentUser
+                    ? currentUser
+                    : await getUserByWallet(walletFromSlug);
                 setUser(userData);
                 setError(null);
             } catch (err) {
@@ -82,7 +90,7 @@ export default function ProfilePage() {
         }
 
         fetchUser();
-    }, [walletFromSlug]);
+    }, [connectedWalletAddress, currentUser, walletFromSlug]);
 
     useEffect(() => {
         if (!user?.wallet_address) {
@@ -180,72 +188,52 @@ export default function ProfilePage() {
     useEffect(() => {
         let cancelled = false;
 
-        async function fetchProfileRektoBalance() {
+        async function fetchProfileBalances() {
             if (!profileWalletAddress) {
                 setRektoBalance(0);
+                setUsdcBalance(0);
                 setIsRektoBalanceLoading(false);
+                setIsUsdcBalanceLoading(false);
+                return;
+            }
+
+            const hasStoredBalances = storedBalanceWallet?.toLowerCase() === profileWalletAddress.toLowerCase();
+            if (hasStoredBalances) {
+                setRektoBalance(storedRektoBalance ?? 0);
+                setUsdcBalance(storedUsdcBalance ?? 0);
+                setIsRektoBalanceLoading(storedBalancesLoading && storedRektoBalance === null);
+                setIsUsdcBalanceLoading(storedBalancesLoading && storedUsdcBalance === null);
                 return;
             }
 
             try {
                 setIsRektoBalanceLoading(true);
-                const balance = await fetchRektoBalance(profileWalletAddress);
+                setIsUsdcBalanceLoading(true);
+                const [rektoResult, usdcResult] = await Promise.allSettled([
+                    fetchRektoBalance(profileWalletAddress),
+                    fetchUsdcBalance(profileWalletAddress),
+                ]);
                 if (!cancelled) {
-                    setRektoBalance(balance);
+                    setRektoBalance(rektoResult.status === "fulfilled" ? rektoResult.value : 0);
+                    setUsdcBalance(usdcResult.status === "fulfilled" ? usdcResult.value : 0);
                 }
             } catch (balanceError) {
-                console.error("Failed to fetch REKTO balance:", balanceError);
-                if (!cancelled) {
-                    setRektoBalance(0);
-                }
+                console.error("Failed to fetch profile balances:", balanceError);
+                if (!cancelled) { setRektoBalance(0); setUsdcBalance(0); }
             } finally {
                 if (!cancelled) {
                     setIsRektoBalanceLoading(false);
-                }
-            }
-        }
-
-        fetchProfileRektoBalance();
-
-        return () => {
-            cancelled = true;
-        };
-    }, [profileWalletAddress]);
-
-    useEffect(() => {
-        let cancelled = false;
-
-        async function fetchProfileUsdcBalance() {
-            if (!profileWalletAddress) {
-                setUsdcBalance(0);
-                setIsUsdcBalanceLoading(false);
-                return;
-            }
-
-            try {
-                setIsUsdcBalanceLoading(true);
-                const balance = await fetchUsdcBalance(profileWalletAddress);
-                if (!cancelled) {
-                    setUsdcBalance(balance);
-                }
-            } catch (balanceError) {
-                console.error("Failed to fetch USDC balance:", balanceError);
-                if (!cancelled) {
-                    setUsdcBalance(0);
-                }
-            } finally {
-                if (!cancelled) {
                     setIsUsdcBalanceLoading(false);
                 }
             }
         }
 
-        fetchProfileUsdcBalance();
+        fetchProfileBalances();
 
         return () => {
             cancelled = true;
         };
-    }, [profileWalletAddress]);
+    }, [profileWalletAddress, storedBalanceWallet, storedBalancesLoading, storedRektoBalance, storedUsdcBalance]);
 
     const handleChallengeClick = (challenge: Challenge) => {
         setSelectedChallenge(challenge);

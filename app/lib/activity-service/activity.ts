@@ -1,6 +1,6 @@
-import { Challenge, getChallenges } from "@/app/lib/challenges-service/challenges";
-import { getPositions, Position } from "@/app/lib/positions-service/positions";
-import { getUsers, User } from "@/app/lib/users-service/users";
+import { Challenge } from "@/app/lib/challenges-service/challenges";
+import { Position } from "@/app/lib/positions-service/positions";
+import { User } from "@/app/lib/users-service/users";
 
 export type ChallengeActivityType = "created" | "joined" | "cancelled" | "expired";
 
@@ -12,6 +12,14 @@ export interface ChallengeActivity {
   actor: User | null;
   position?: Position;
 }
+
+export interface ChallengeActivityPage {
+  activities: ChallengeActivity[];
+  has_more: boolean;
+}
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_BE_API_URL || "http://localhost:8000/api";
+const activityRequests = new Map<string, Promise<ChallengeActivityPage>>();
 
 type TimestampedChallenge = Challenge & { updated_at?: string; cancelled_at?: string };
 
@@ -98,11 +106,22 @@ export function buildChallengeActivities(
   return events.sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime());
 }
 
+export async function getChallengeActivityPage(limit = 15, offset = 0): Promise<ChallengeActivityPage> {
+  const key = `${limit}:${offset}`;
+  const existing = activityRequests.get(key);
+  if (existing) return existing;
+
+  const request = fetch(`${API_BASE_URL}/activity?limit=${limit}&offset=${offset}`, {
+    headers: { accept: "application/json" },
+  }).then(async (response) => {
+    if (!response.ok) throw new Error(`Failed to fetch activity: ${response.statusText}`);
+    return response.json() as Promise<ChallengeActivityPage>;
+  }).finally(() => activityRequests.delete(key));
+
+  activityRequests.set(key, request);
+  return request;
+}
+
 export async function getChallengeActivities(): Promise<ChallengeActivity[]> {
-  const [challengeResponse, positionResponse, userResponse] = await Promise.all([
-    getChallenges({ limit: 1000 }, { bypassCache: true }),
-    getPositions({ limit: 1000 }),
-    getUsers({ limit: 1000 }),
-  ]);
-  return buildChallengeActivities(challengeResponse.challenges, positionResponse.positions, userResponse.users);
+  return (await getChallengeActivityPage(50, 0)).activities;
 }
