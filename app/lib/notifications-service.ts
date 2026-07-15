@@ -10,6 +10,7 @@ export type AppNotification = {
   created_at: string;
   actor_username: string | null;
   actor_profile_image: string | null;
+  actor_wallet_address: string | null;
 };
 
 export async function getNotifications(walletAddress: string, limit = 50) {

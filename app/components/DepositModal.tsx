@@ -23,6 +23,10 @@ const ASSET_CONFIG = {
   usdc: { mint: new PublicKey(getTokenMintAddress("usdc")) },
   rekto: { mint: new PublicKey(getTokenMintAddress("rekto")) },
 } as const;
+const MIN_WITHDRAW_AMOUNT: Record<Asset, number> = {
+  usdc: 5,
+  rekto: 1_000,
+};
 const activeNetwork = SOLANA_CLUSTER === "devnet" ? solanaDevnet : solana;
 
 function formatAssetBalance(balance: number | null, maximumFractionDigits = 2) {
@@ -119,6 +123,7 @@ export function DepositModal({ isOpen, onClose, initialMode = "deposit", usdcBal
 
   const selectedBalance = asset === "usdc" ? usdcBalance : rektoBalance;
   const assetLabel = asset.toUpperCase();
+  const minimumWithdrawAmount = MIN_WITHDRAW_AMOUNT[asset];
   const solscanUrl = address
     ? `https://solscan.io/account/${address}${getSolscanClusterQuery()}`
     : undefined;
@@ -164,8 +169,8 @@ export function DepositModal({ isOpen, onClose, initialMode = "deposit", usdcBal
       return;
     }
 
-    if (parsedAmount <= 0) {
-      setError(`Please enter a valid ${assetLabel} amount.`);
+    if (parsedAmount < minimumWithdrawAmount) {
+      setError(`Minimum withdrawal amount is ${minimumWithdrawAmount.toLocaleString()} ${assetLabel}.`);
       return;
     }
 
@@ -449,7 +454,7 @@ export function DepositModal({ isOpen, onClose, initialMode = "deposit", usdcBal
                 <input
                   type="number"
                   inputMode="decimal"
-                  min="0"
+                  min={minimumWithdrawAmount}
                   step="0.000001"
                   value={amountInput}
                   onChange={(e) => setAmountInput(e.target.value)}
@@ -457,6 +462,9 @@ export function DepositModal({ isOpen, onClose, initialMode = "deposit", usdcBal
                   disabled={!isConnected}
                   className="w-full rounded-md border border-[#d7c5ba] bg-[#fffaf7] px-3 py-2.5 text-sm font-semibold text-gray-900 placeholder-gray-500 focus:border-[#e85a2d] focus:outline-none focus:ring-4 focus:ring-[#e85a2d]/15 disabled:opacity-50"
                 />
+                <p className="mt-2 text-xs font-semibold text-[#7c6a60]">
+                  Minimum withdrawal: {minimumWithdrawAmount.toLocaleString()} {assetLabel}
+                </p>
               </div>
 
               {/* Error */}

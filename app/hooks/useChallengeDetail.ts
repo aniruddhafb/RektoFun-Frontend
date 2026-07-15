@@ -6,6 +6,7 @@ import { User } from "@/app/lib/users-service/users";
 import { useUserStore } from "@/app/store/useUserStore";
 import { useBodyScrollLock } from "@/app/lib/useBodyScrollLock";
 import { stripUsdcQuote } from "@/app/lib/format-market-label";
+import { getChallengeLifecycle } from "@/app/lib/challenge-lifecycle";
 
 // Types
 interface CTAState {
@@ -197,12 +198,17 @@ export function useChallengeDetail(
   const resolutionMethod = String(challenge?.resolution_method || challenge?.resolution_source || "").toUpperCase();
   const isManualResolution = resolutionMethod !== "PRICE_FEED";
   const isResolutionPending = challenge?.status === "PENDING_RESOLUTION";
-  const isResolutionResolved = challenge?.status === "RESOLVED";
-  const isCancelled = challenge?.status === "CANCELLED";
-  const isAccepted = isResolutionPending || isResolutionResolved || hasOpponents;
+  const lifecycle = getChallengeLifecycle({
+    status: challenge?.status,
+    hasOpponents,
+    expiryTimestamp,
+    resolveTimestamp,
+    now: currentTime,
+  });
+  const isResolutionResolved = lifecycle === "RESOLVED";
 
   const hasResolveTimePassed = Boolean(resolveTimestamp && resolveTimestamp <= currentTime);
-  const showResolvesBox = !isExpireTimeAchieved || hasOpponents;
+  const showResolvesBox = lifecycle !== "EXPIRED" || hasOpponents;
   const hideExpiresBox = !isTeam && hasOpponents;
   const timelineColumns = (!hideExpiresBox ? 1 : 0) + 2 + (showResolvesBox ? 1 : 0);
 
@@ -225,34 +231,34 @@ export function useChallengeDetail(
     })
     : "Unknown date";
 
-  const resolvesInText = hasResolveTimePassed
-    ? isResolutionResolved
-      ? "Completed"
-      : "Resolving"
-    : endsInText;
+  const resolvesInText = lifecycle === "RESOLVED"
+    ? "Completed"
+    : lifecycle === "RESOLVING"
+      ? "Resolving"
+      : endsInText;
   const resolvesInSubtext = hasResolveTimePassed ? null : `(${resolveDayDateText})`;
-  const expiresInTextForBox = isExpireTimeAchieved && !hasOpponents ? "Expired" : expiresInText;
+  const expiresInTextForBox = lifecycle === "EXPIRED" ? "Expired" : expiresInText;
 
   // Status label
-  const statusLabel = isCancelled
+  const statusLabel = lifecycle === "CANCELLED"
     ? "Cancelled"
-    : isResolutionResolved
+    : lifecycle === "RESOLVED"
       ? "Resolved"
-      : isResolutionPending || hasResolveTimePassed
+      : lifecycle === "RESOLVING"
         ? "Resolving"
-        : isAccepted
+        : lifecycle === "LIVE"
           ? "Live"
-          : isExpireTimeAchieved
+          : lifecycle === "EXPIRED"
             ? "Expired"
             : "Open";
 
-  const statusClassName = isCancelled
+  const statusClassName = lifecycle === "CANCELLED"
     ? "border-gray-300 bg-gray-100 text-gray-700"
-    : isResolutionResolved
+    : lifecycle === "RESOLVED"
       ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-      : isResolutionPending || hasResolveTimePassed
+      : lifecycle === "RESOLVING"
         ? "border-amber-200 bg-amber-50 text-amber-700"
-        : isExpireTimeAchieved && !isAccepted
+        : lifecycle === "EXPIRED"
           ? "border-red-200 bg-red-50 text-red-700"
           : "border-[#b9dec9] bg-[#f1fbf5] text-[#246044]";
 
@@ -286,6 +292,8 @@ export function useChallengeDetail(
   const resolvingCtaClassName =
     `${ctaBaseClassName} bg-amber-100 text-amber-700 shadow-[2px_2px_0_#111] cursor-not-allowed`;
   const completedCtaClassName =
+    `${ctaBaseClassName} bg-[#008080] opacity-80 text-white shadow-[2px_2px_0_#111] cursor-not-allowed`;
+  const cancelledCtaClassName =
     `${ctaBaseClassName} bg-gray-200 text-gray-700 shadow-[2px_2px_0_#111] cursor-not-allowed`;
 
   const getCTAState = (): CTAState => {
@@ -293,62 +301,44 @@ export function useChallengeDetail(
     let ctaDisabled = false;
     let ctaClassName = "";
 
-    if (isCancelled) {
+    if (lifecycle === "CANCELLED") {
       ctaLabel = "CANCELLED";
       ctaDisabled = true;
+      ctaClassName = cancelledCtaClassName;
+    } else if (lifecycle === "RESOLVED") {
+      ctaLabel = "COMPLETED";
+      ctaDisabled = true;
       ctaClassName = completedCtaClassName;
-    } else if (!isTeam) {
-      if (isResolveTimeAchieved && isResolutionResolved) {
-        ctaLabel = "COMPLETED ✅";
-        ctaDisabled = true;
-        ctaClassName = completedCtaClassName;
-      } else if (isExpireTimeAchieved && !hasOpponents) {
-        ctaLabel = "EXPIRED!";
-        ctaDisabled = true;
-        ctaClassName = expiredCtaClassName;
-      } else if (isResolveTimeAchieved && isResolutionPending) {
-        ctaLabel = "RESOLVING ⌛";
-        ctaDisabled = true;
-        ctaClassName = resolvingCtaClassName;
-      } else if (!isResolveTimeAchieved && hasOpponents) {
-        ctaLabel = "ONGOING ⚔️";
-        ctaDisabled = true;
-        ctaClassName = ongoingCtaClassName;
-      } else {
-        ctaLabel = "Join Challenge ⚔️";
+    } else if (lifecycle === "RESOLVING") {
+      ctaLabel = "RESOLVING";
+      ctaDisabled = true;
+      ctaClassName = resolvingCtaClassName;
+    } else if (lifecycle === "LIVE") {
+      if (isTeam && !isExpireTimeAchieved) {
+        ctaLabel = "JOIN CHALLENGE";
         ctaDisabled = isCreator;
-        ctaClassName = activePvpCtaClassName;
-      }
-    } else {
-      if (isResolveTimeAchieved && isResolutionResolved) {
-        ctaLabel = "COMPLETED";
-        ctaDisabled = true;
-        ctaClassName = completedCtaClassName;
-      } else if (isExpireTimeAchieved && !hasOpponents) {
-        ctaLabel = "EXPIRED!";
-        ctaDisabled = true;
-        ctaClassName = expiredCtaClassName;
-      } else if (isResolveTimeAchieved && isResolutionPending) {
-        ctaLabel = "RESOLVING ⌛";
-        ctaDisabled = true;
-        ctaClassName = resolvingCtaClassName;
-      } else if (!isExpireTimeAchieved) {
-        ctaLabel = "JOIN CHALLENGE ⚔️";
-        ctaDisabled = false;
         ctaClassName = activeCtaClassName;
       } else {
-        ctaLabel = "ONGOING ⚔️";
+        ctaLabel = isTeam ? "BATTLE ONGOING" : "LIVE";
         ctaDisabled = true;
         ctaClassName = ongoingCtaClassName;
       }
+    } else if (lifecycle === "EXPIRED") {
+      ctaLabel = "EXPIRED";
+      ctaDisabled = true;
+      ctaClassName = expiredCtaClassName;
+    } else {
+      ctaLabel = "JOIN CHALLENGE";
+      ctaDisabled = isCreator;
+      ctaClassName = isTeam ? activeCtaClassName : activePvpCtaClassName;
     }
 
     return {
       label: ctaLabel,
       disabled: ctaDisabled,
       className: ctaClassName,
-      isOngoing: ctaLabel.startsWith("ONGOING"),
-      showCreatorHint: isCreator && ctaLabel === "Join Challenge ⚔️",
+      isOngoing: lifecycle === "LIVE" && (!isTeam || isExpireTimeAchieved),
+      showCreatorHint: isCreator && lifecycle === "OPEN",
     };
   };
 
@@ -484,6 +474,7 @@ export function useChallengeDetail(
     isManualResolution,
     isResolutionPending,
     isResolutionResolved,
+    lifecycle,
     showResolvesBox,
     hideExpiresBox,
     timelineColumns,
@@ -495,7 +486,7 @@ export function useChallengeDetail(
     statusLabel,
     statusClassName,
     canToggleDescription: isDescriptionTruncatable,
-    modeLabel: isTeam ? "Multi Mode" : "PvP Mode",
+    modeLabel: isTeam ? "Team Mode" : "PvP Mode",
     totalPoolLabel: `$${Number(betAmount || 0).toLocaleString()}`,
     primaryTitle: displayedTitle + (!isManualResolution && isResolveTimeAchieved && resolveDateByText ? ` by ${resolveDateByText}` : ""),
     resolutionLabel: isManualResolution ? "Community resolution" : "Price feed resolution",

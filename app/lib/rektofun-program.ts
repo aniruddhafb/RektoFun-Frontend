@@ -277,7 +277,8 @@ export async function buildAcceptChallengeTx(
   challengePDA: PublicKey,
   creatorPubkey: PublicKey,
   joinCreatorSide: boolean = false,
-  amountMicroUsdc: BN | bigint | number
+  amountMicroUsdc: BN | bigint | number,
+  feePayer: PublicKey = challenger
 ): Promise<Transaction> {
   const connection = getReadonlyConnection();
   const [vaultPDA] = deriveVaultPDA(challengePDA);
@@ -295,7 +296,7 @@ export async function buildAcceptChallengeTx(
   if (!ataInfo) {
     preTxInstructions.push(
       createAssociatedTokenAccountInstruction(
-        challenger,
+        feePayer,
         challengerUsdcAta,
         challenger,
         USDC_MINT
@@ -370,13 +371,13 @@ function enumVariant(value: Record<string, unknown>): string {
   return key ? `${key[0].toUpperCase()}${key.slice(1)}` : "";
 }
 
-async function getPayoutAccountSetup(participant: PublicKey) {
+async function getPayoutAccountSetup(participant: PublicKey, feePayer: PublicKey = participant) {
   const connection = getReadonlyConnection();
   const participantUsdcAccount = await getAssociatedTokenAddress(USDC_MINT, participant, false);
   const preInstructions = [];
   if (!(await connection.getAccountInfo(participantUsdcAccount))) {
     preInstructions.push(createAssociatedTokenAccountInstruction(
-      participant,
+      feePayer,
       participantUsdcAccount,
       participant,
       USDC_MINT
@@ -389,11 +390,12 @@ export async function buildClaimWinningsTx(
   program: Program,
   participant: PublicKey,
   creator: PublicKey,
-  challengePDA: PublicKey
+  challengePDA: PublicKey,
+  feePayer: PublicKey = participant
 ): Promise<Transaction> {
   const [vault] = deriveVaultPDA(challengePDA);
   const [claimRecord] = deriveClaimPDA(challengePDA, participant);
-  const { participantUsdcAccount, preInstructions } = await getPayoutAccountSetup(participant);
+  const { participantUsdcAccount, preInstructions } = await getPayoutAccountSetup(participant, feePayer);
   return (program.methods as any).claimWinnings().accounts({
     participant, creator, challenge: challengePDA, vault, participantUsdcAccount,
     claimRecord, usdcMint: USDC_MINT, tokenProgram: TOKEN_PROGRAM_ID,
@@ -405,13 +407,14 @@ export async function buildClaimRefundTx(
   program: Program,
   participant: PublicKey,
   creator: PublicKey,
-  challengePDA: PublicKey
+  challengePDA: PublicKey,
+  feePayer: PublicKey = participant
 ): Promise<Transaction> {
   const [vault] = deriveVaultPDA(challengePDA);
   const [claimRecord] = deriveClaimPDA(challengePDA, participant);
   const [config] = deriveConfigPDA();
   const configAccount = await (program.account as any).config.fetch(config);
-  const { participantUsdcAccount, preInstructions } = await getPayoutAccountSetup(participant);
+  const { participantUsdcAccount, preInstructions } = await getPayoutAccountSetup(participant, feePayer);
   return (program.methods as any).claimRefund().accounts({
     participant, creator, challenge: challengePDA, vault, participantUsdcAccount,
     claimRecord, usdcMint: USDC_MINT, tokenProgram: TOKEN_PROGRAM_ID,

@@ -57,7 +57,7 @@ export function HeroSection() {
 
     return (
         <section
-            className="relative flex min-h-[calc(100vh-80px-64px)] items-center justify-center overflow-hidden px-3 py-8 cursor-pointer sm:px-4"
+            className="relative flex min-h-[calc(100svh-80px)] items-center justify-center overflow-hidden px-3 py-6 cursor-pointer sm:px-4 md:py-8"
             onClick={handleHeroClick}
         >
             {bubbles.map((bubble) => (
@@ -85,9 +85,9 @@ export function HeroSection() {
                 </svg>
             </div>
 
-            <div className="pointer-events-none relative z-10 mx-auto w-full max-w-4xl px-2 text-center sm:px-6">
+            <div className="pointer-events-none relative z-10 mx-auto w-full max-w-3xl px-2 text-center sm:px-6 xl:max-w-4xl">
 
-                <div className="mb-10 flex flex-wrap items-center justify-center gap-3 text-[11px] font-black uppercase tracking-[0.14em] text-black">
+                <div className="mb-7 flex flex-wrap items-center justify-center gap-3 text-[10px] font-black uppercase tracking-[0.14em] text-black md:text-[11px] xl:mb-8">
                     <span className="border border-black bg-[#a8d85b] px-3 py-2 shadow-[2px_2px_0_#111] animate-float-gentle">
                         Permissionless
                     </span>
@@ -99,11 +99,11 @@ export function HeroSection() {
                     </span>
                 </div>
 
-                <h1 className="mb-4 break-words text-4xl font-black tracking-tight text-black drop-shadow-[4px_4px_0_#f5d547] animate-airdrop min-[380px]:text-5xl md:text-6xl lg:text-8xl">
+                <h1 className="mb-4 break-words text-4xl font-black tracking-tight text-black drop-shadow-[4px_4px_0_#f5d547] animate-airdrop min-[380px]:text-5xl md:text-6xl lg:text-7xl 2xl:text-8xl">
                     REKTO.FUN
                 </h1>
 
-                <p className="mx-auto mb-8 max-w-xl break-words text-base font-semibold text-gray-800 min-[380px]:text-lg lg:text-xl">
+                <p className="mx-auto mb-7 max-w-xl break-words text-base font-semibold leading-snug text-gray-800 min-[380px]:text-lg lg:text-xl xl:mb-8">
                     The PvP Battleground For Predictions {"\u{1FA84}"}
                     <br />
                     Crypto & Sports 🏀
@@ -113,12 +113,12 @@ export function HeroSection() {
                     href="/challenges"
                     className="pointer-events-auto inline-flex max-w-full items-center justify-center border-2 border-black bg-black px-5 py-2.5 text-xs font-black uppercase tracking-[0.08em] text-white shadow-[4px_4px_0_#e85a2d] transition-all hover:-translate-y-1 hover:shadow-[6px_6px_0_#e85a2d] active:translate-y-0 active:shadow-[2px_2px_0_#e85a2d] min-[380px]:px-7 min-[380px]:text-sm sm:px-8 sm:py-3 cursor-pointer"
                 >
-                    Start Battling {"\u279D"}
+                    Get Started {"\u279D"}
                 </Link>
 
             </div>
 
-            <div className="absolute bottom-12 left-1/2 -translate-x-1/2 w-32 h-14 opacity-35 blur-[0.2px] animate-float-gentle sm:bottom-16 sm:w-40 sm:h-16 sm:opacity-45 md:bottom-14 md:w-40 md:h-16 md:opacity-45 lg:bottom-16 lg:w-44 lg:h-[4.5rem] lg:opacity-60 xl:bottom-20 xl:w-48 xl:h-20 xl:opacity-100 md:blur-0">
+            <div className="absolute bottom-8 left-1/2 -translate-x-1/2 w-32 h-14 opacity-35 blur-[0.2px] animate-float-gentle sm:w-40 sm:h-16 sm:opacity-45 md:bottom-10 md:opacity-45 lg:w-44 lg:h-[4.5rem] lg:opacity-55 2xl:bottom-16 2xl:w-48 2xl:h-20 2xl:opacity-80 md:blur-0">
                 <svg viewBox="0 0 200 80" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
                     <ellipse cx="100" cy="40" rx="100" ry="40" fill="#f5d547" />
                     <path

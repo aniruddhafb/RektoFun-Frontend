@@ -8,6 +8,79 @@ import { Challenge } from "@/app/lib/challenges-service/challenges";
 import { ShareChallengeModal } from "./ShareChallengeModal";
 import { ProfileHoverPreview } from "./ProfileHoverPreview";
 import { WinningsShareModal } from "./WinningsShareModal";
+import { ChallengeActionModal } from "./ChallengeActionModal";
+import { getPositionsByChallenge, type Position } from "@/app/lib/positions-service/positions";
+import { getUserById, type User as UserType } from "@/app/lib/users-service/users";
+import { CHALLENGE_UPDATED_EVENT, type ChallengeUpdatedDetail } from "@/app/lib/realtime-events";
+
+type TeamCardParticipant = {
+    key: string;
+    name: string;
+    avatar: string;
+    wallet: string;
+    side: "TEAM_A" | "TEAM_B";
+};
+
+const cardParticipantRequests = new Map<number, Promise<Array<{ position: Position; user: UserType | null }>>>();
+
+function loadCardParticipants(challengeId: number, refresh = false) {
+    if (refresh) cardParticipantRequests.delete(challengeId);
+    const cached = cardParticipantRequests.get(challengeId);
+    if (cached) return cached;
+    const request = getPositionsByChallenge(challengeId).then(async (positions) => {
+        const userIds = [...new Set(positions.map((position) => position.creator).filter(Boolean))];
+        const users = await Promise.allSettled(userIds.map((id) => getUserById(id)));
+        const usersById = new Map<number, UserType>();
+        users.forEach((result) => {
+            if (result.status === "fulfilled") usersById.set(result.value.id, result.value);
+        });
+        return positions.map((position) => ({ position, user: usersById.get(position.creator) ?? null }));
+    }).catch((error) => {
+        cardParticipantRequests.delete(challengeId);
+        throw error;
+    });
+    cardParticipantRequests.set(challengeId, request);
+    return request;
+}
+
+function CompactProfileStack({
+    participants,
+    fallback,
+    onOpenProfile,
+}: {
+    participants: TeamCardParticipant[];
+    fallback: TeamCardParticipant;
+    onOpenProfile: (event: React.MouseEvent, wallet: string) => void;
+}) {
+    const profiles = participants.length ? participants : [fallback];
+    const visible = profiles.slice(0, 3);
+    return (
+        <div className="relative flex h-14 w-full items-center justify-center">
+            {visible.map((participant, index) => (
+                <button
+                    key={participant.key}
+                    type="button"
+                    disabled={!participant.wallet}
+                    onClick={(event) => onOpenProfile(event, participant.wallet)}
+                    className="challenge-card-avatar absolute h-11 w-11 overflow-hidden rounded-full border-2 border-[#d4a574] bg-[#f5d547] shadow-sm transition-transform hover:-translate-y-0.5 disabled:cursor-default sm:h-12 sm:w-12"
+                    style={{
+                        transform: `translateX(${(index - (visible.length - 1) / 2) * 17}px)`,
+                        zIndex: visible.length - index,
+                    }}
+                    aria-label={`Open ${participant.name}'s profile`}
+                    title={participant.name}
+                >
+                    <Image src={participant.avatar} alt={participant.name} width={48} height={48} className="h-full w-full rounded-full object-cover" />
+                </button>
+            ))}
+            {profiles.length > 3 && (
+                <span className="absolute -right-1 -top-1 z-10 rounded-full border-2 border-white bg-emerald-600 px-1.5 py-0.5 text-[8px] font-black text-white">
+                    +{profiles.length - 3}
+                </span>
+            )}
+        </div>
+    );
+}
 
 interface ChallengeCardProps {
     challenge: Challenge;
@@ -30,6 +103,8 @@ export function ChallengeCard({
     const [isShareModalOpen, setIsShareModalOpen] = React.useState(false);
     const [activeProfilePreview, setActiveProfilePreview] = React.useState<"creator" | "opponent" | null>(null);
     const [viewOverrides, setViewOverrides] = React.useState<Record<number, number>>({});
+    const [teamParticipants, setTeamParticipants] = React.useState<{ challengeId: number; rows: TeamCardParticipant[] } | null>(null);
+    const [shouldLoadParticipants, setShouldLoadParticipants] = React.useState(false);
     const viewCount = Math.max(challenge.views ?? 0, viewOverrides[challenge.id] ?? 0);
     const {
         isLoading,
@@ -41,6 +116,7 @@ export function ChallengeCard({
         setBetError,
         setJoinSide,
         openBetForm,
+        openProfile,
         closeBetForm,
         handleJoinChallenge,
         assetIcon,
@@ -70,7 +146,6 @@ export function ChallengeCard({
         resolveDateByText,
         endsByCountdown,
         exactCountdownDetails,
-        isCreator,
         isPvpMode,
         isTeam,
         isManualResolution,
@@ -81,18 +156,21 @@ export function ChallengeCard({
         challengeAction,
         actionError,
         handleChallengeAction,
+        pendingChallengeAction,
+        confirmChallengeAction,
+        closeChallengeActionConfirmation,
         claimedWinnings,
         closeWinningsShare,
         isBattleOnState,
+        isCancelledState,
         isResolvingState,
         isCompletedState,
         isExpiresInState,
         expiryStatusText,
         expiryTooltipText,
-        hasWon,
-        hasLost,
         usdcBalance,
         modalMinAcceptBet,
+        requiresCreatorStakeMatch,
         modalMaxAcceptBet,
         escrowAddress,
     } = useChallengeCard(challenge);
@@ -115,6 +193,62 @@ export function ChallengeCard({
         window.addEventListener("rektofun:challenge-viewed", handleChallengeViewed);
         return () => window.removeEventListener("rektofun:challenge-viewed", handleChallengeViewed);
     }, [challenge.id]);
+
+    React.useEffect(() => {
+        if (!isTeam || !shouldLoadParticipants) return;
+        let cancelled = false;
+
+        const load = (refresh = false) => {
+            loadCardParticipants(challenge.id, refresh)
+                .then((records) => {
+                    if (cancelled) return;
+                    const grouped = new Map<string, TeamCardParticipant>();
+                    records.forEach(({ position, user }) => {
+                        const side = position.side === "TEAM_B" ? "TEAM_B" : "TEAM_A";
+                        const key = `${side}:${position.creator}`;
+                        if (grouped.has(key)) return;
+                        grouped.set(key, {
+                            key,
+                            name: user?.username || `Player ${position.creator}`,
+                            avatar: user?.profile_image || "/scribbles/btc.png",
+                            wallet: user?.pubkey || user?.wallet_address || "",
+                            side,
+                        });
+                    });
+                    const creatorId = Number(challenge.creator_id ?? challenge.creator ?? 0);
+                    if (![...grouped.values()].some((participant) => participant.side === "TEAM_A" && participant.key.endsWith(`:${creatorId}`))) {
+                        grouped.set(`TEAM_A:${creatorId}`, {
+                            key: `TEAM_A:${creatorId}`,
+                            name: creatorDisplayName,
+                            avatar: creatorProfileImage,
+                            wallet: creatorWalletAddress,
+                            side: "TEAM_A",
+                        });
+                    }
+                    setTeamParticipants({ challengeId: challenge.id, rows: [...grouped.values()] });
+                })
+                .catch((error) => console.error("Failed to load card participants:", error));
+        };
+
+        load();
+        const handleUpdated = (event: Event) => {
+            const detail = (event as CustomEvent<ChallengeUpdatedDetail>).detail;
+            if (detail.challengeId === challenge.id && detail.action === "joined") load(true);
+        };
+        window.addEventListener(CHALLENGE_UPDATED_EVENT, handleUpdated);
+        return () => {
+            cancelled = true;
+            window.removeEventListener(CHALLENGE_UPDATED_EVENT, handleUpdated);
+        };
+    }, [challenge.creator, challenge.creator_id, challenge.id, creatorDisplayName, creatorProfileImage, creatorWalletAddress, isTeam, shouldLoadParticipants]);
+
+    const currentTeamParticipants = teamParticipants?.challengeId === challenge.id ? teamParticipants.rows : [];
+    const challengerProfiles = isTeam
+        ? currentTeamParticipants.filter((participant) => participant.side === "TEAM_A")
+        : [];
+    const opponentProfiles = isTeam
+        ? currentTeamParticipants.filter((participant) => participant.side === "TEAM_B")
+        : [];
 
     const handleClick = (e: React.MouseEvent) => {
         e.stopPropagation();
@@ -151,6 +285,9 @@ export function ChallengeCard({
     return (
         <>
             <div onClick={handleClick}
+                onMouseEnter={() => setShouldLoadParticipants(true)}
+                onFocusCapture={() => setShouldLoadParticipants(true)}
+                onTouchStart={() => setShouldLoadParticipants(true)}
                 className="challenge-card-shell group/card relative block cursor-pointer overflow-visible rounded-xl border border-gray-200 bg-[#fffaf6] p-3 transition-all duration-300 hover:z-30 hover:-translate-y-0.5 hover:border-gray-300 hover:shadow-md focus-within:z-30 sm:p-4"
             >
                 {/* Header */}
@@ -255,7 +392,7 @@ export function ChallengeCard({
                 {/* Challenge Mode Info */}
                 <div className="mb-4 flex items-center justify-center">
                     <div className="group relative inline-flex cursor-pointer">
-                        <h2 className="border border-black bg-[#f5d547] px-3 py-1 text-xs font-black uppercase tracking-[0.12em] text-black hover:shadow-[2px_2px_0_#111]">
+                        <h2 className={`border border-black px-3 py-1 text-xs font-black uppercase tracking-[0.12em] text-black hover:shadow-[2px_2px_0_#111] ${isTeam ? "bg-[#67d5c4]" : "bg-[#f5d547]"}`}>
                             {isPvpMode ? "PVP Mode" : "Team Mode"}
                         </h2>
                         <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 text-center pointer-events-none">
@@ -283,29 +420,17 @@ export function ChallengeCard({
                             }}
                             className={`relative group flex flex-col items-center ${activeProfilePreview === "creator" ? "z-30" : ""}`}
                         >
-                            <div className={`challenge-card-profile-tile relative flex h-[132px] w-[98px] max-w-full flex-col items-center justify-center rounded-xl p-2 transition-all duration-300 sm:h-[140px] sm:w-[120px] sm:p-3 ${hasWon
-                                ? "bg-gradient-to-br from-amber-100 to-yellow-50 border-2 border-amber-400"
-                                : hasLost
-                                    ? "bg-gradient-to-br from-red-100 to-rose-50 border-2 border-red-300"
-                                    : "bg-white/80 border-2 border-[#d4a574]/30"
-                                }`}>
-                                {/* Winner Crown */}
-                                {hasWon && (
-                                    <div className="text-2xl">
-                                        👑
-                                    </div>
-                                )}
-
-                                {/* Backers Count Badge */}
-                                {isTeam && teamATotalBets > 1 && (
-                                    <div className="absolute top-1 right-1 w-5 h-5 bg-emerald-600 rounded-full flex items-center justify-center border-2 border-white">
-                                        <span className="text-[9px] font-bold text-white">+{teamATotalBets - 1}</span>
-                                    </div>
-                                )}
+                            <div className={`challenge-card-profile-tile relative flex h-[132px] w-[98px] max-w-full flex-col items-center justify-center border-2 border-[#d4a574]/30 bg-white/80 p-2 transition-all duration-300 sm:h-[140px] sm:w-[120px] sm:p-3 ${isPvpMode ? "rounded-none" : "rounded-xl"}`}>
 
                                 {/* Avatar */}
-                                <div className="relative">
-                                    <div className={`h-11 w-11 overflow-hidden rounded-full border-2 sm:h-14 sm:w-14 ${hasWon ? "border-amber-400" : "border-[#d4a574]"}`}>
+                                {isTeam ? (
+                                    <CompactProfileStack
+                                        participants={challengerProfiles}
+                                        fallback={{ key: "creator", name: creatorDisplayName, avatar: creatorProfileImage, wallet: creatorWalletAddress, side: "TEAM_A" }}
+                                        onOpenProfile={openProfile}
+                                    />
+                                ) : <div className="relative">
+                                    <div className="h-11 w-11 overflow-hidden rounded-full border-2 border-[#d4a574] sm:h-14 sm:w-14">
                                         <Image
                                             src={creatorProfileImage}
                                             alt={creatorDisplayName}
@@ -315,24 +440,24 @@ export function ChallengeCard({
                                         />
                                     </div>
                                     {creatorIsVerified && <AvatarVerifiedBadge isModerator={creatorIsModerator} name={creatorDisplayName} />}
-                                </div>
+                                </div>}
                                 {/* Label */}
                                 <div className="mt-1 px-1.5 py-0.5 bg-[#2d1f1a] text-white text-[9px] font-bold rounded-full">
                                     {isTeam ? "CHALLENGERS" : "CHALLENGER"}
                                 </div>
 
                                 {/* Info */}
-                                <div className="mt-2 w-full text-center">
-                                    <p className="break-words font-bold text-[#2d1f1a] text-xs">{creatorDisplayName}</p>
+                                <div className="mt-2 w-full min-w-0 text-center">
+                                    <p className="w-full truncate px-0.5 text-xs font-bold text-[#2d1f1a]" title={creatorDisplayName}>
+                                        {creatorDisplayName}
+                                    </p>
                                     {teamATotalAmount > 0 ? (
-                                        <p className="mt-0.5 break-all text-[10px] font-semibold text-emerald-600">
-                                            ${teamATotalAmount}{isTeam ? ` from ${teamATotalBets}` : ""}
+                                        <p className="mt-0.5 truncate px-0.5 text-[10px] font-bold text-emerald-600">
+                                            {isTeam
+                                                ? `${teamATotalBets} ${teamATotalBets === 1 ? "bet" : "bets"}`
+                                                : `Has bet $${teamATotalAmount}`}
                                         </p>
-                                    ) : (
-                                        <p className="mt-0.5 break-all text-[10px] text-[#8b7355]">
-                                            {hasWon ? "Won!" : hasLost ? "Lost" : ""}
-                                        </p>
-                                    )}
+                                    ) : null}
                                 </div>
                             </div>
 
@@ -344,21 +469,6 @@ export function ChallengeCard({
                                     align="left"
                                 />
                             )}
-
-                            {/* <button
-                                type="button"
-                                onClick={(e) => openBetForm(e)}
-                                className={`absolute -bottom-4.5 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border-2 text-[28px] font-black leading-none transition hover:scale-105 hover:shadow-md ${hasWon
-                                    ? "border-amber-400 bg-gradient-to-br from-amber-100 to-yellow-50 text-amber-700 hover:from-amber-200 hover:to-yellow-100"
-                                    : hasLost
-                                        ? "border-red-300 bg-gradient-to-br from-red-100 to-rose-50 text-red-700 hover:from-red-200 hover:to-rose-100"
-                                        : "border-[#d4a574]/40 bg-white/90 text-[#2d1f1a] hover:bg-white"
-                                    }`}
-                                aria-label="Join Challenge"
-                                title="Join Challenge"
-                            >
-                                +
-                            </button> */}
 
                         </div>
 
@@ -420,22 +530,17 @@ export function ChallengeCard({
                                 }}
                                 className={`relative group flex flex-col items-center ${activeProfilePreview === "opponent" ? "z-30" : ""}`}
                             >
-                                <div className={`challenge-card-profile-tile flex h-[132px] w-[98px] max-w-full flex-col items-center justify-center rounded-xl p-2 transition-all duration-300 sm:h-[140px] sm:w-[120px] sm:p-3 ${hasLost
-                                    ? "bg-gradient-to-br from-amber-100 to-yellow-50 border-2 border-amber-400"
-                                    : hasWon
-                                        ? "bg-gradient-to-br from-red-100 to-rose-50 border-2 border-red-300"
-                                        : "bg-white/80 border-2 border-[#d4a574]/30"
-                                    }`}>
-                                    {/* Winner Crown */}
-                                    {hasLost && (
-                                        <div className="text-2xl">
-                                            👑
-                                        </div>
-                                    )}
+                                <div className={`challenge-card-profile-tile relative flex h-[132px] w-[98px] max-w-full flex-col items-center justify-center border-2 border-[#d4a574]/30 bg-white/80 p-2 transition-all duration-300 sm:h-[140px] sm:w-[120px] sm:p-3 ${isPvpMode ? "rounded-none" : "rounded-xl"}`}>
 
                                     {/* Avatar */}
-                                    <div className="relative">
-                                        <div className={`h-11 w-11 overflow-hidden rounded-full border-2 sm:h-14 sm:w-14 ${hasLost ? "border-amber-400" : "border-[#d4a574]"}`}>
+                                    {isTeam ? (
+                                        <CompactProfileStack
+                                            participants={opponentProfiles}
+                                            fallback={{ key: "opponent", name: opponentDisplayName, avatar: opponentProfileImage, wallet: opponentInfo?.wallet_address || "", side: "TEAM_B" }}
+                                            onOpenProfile={openProfile}
+                                        />
+                                    ) : <div className="relative">
+                                        <div className="h-11 w-11 overflow-hidden rounded-full border-2 border-[#d4a574] sm:h-14 sm:w-14">
                                             <Image
                                                 src={opponentProfileImage}
                                                 alt={opponentDisplayName}
@@ -445,30 +550,24 @@ export function ChallengeCard({
                                             />
                                         </div>
                                         {opponentIsVerified && <AvatarVerifiedBadge isModerator={opponentIsModerator} name={opponentDisplayName} />}
-                                    </div>
-                                    {/* Count Badge */}
-                                    {isTeam && teamBTotalBets > 1 && (
-                                        <div className="absolute top-1 right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center border-2 border-white">
-                                            <span className="text-[9px] font-bold text-white">+{teamBTotalBets - 1}</span>
-                                        </div>
-                                    )}
+                                    </div>}
                                     {/* Label */}
                                     <div className="mt-1 px-1.5 py-0.5 bg-[#2d1f1a] text-white text-[9px] font-bold rounded-full">
-                                        {isTeam ? "POOL" : "Opponent"}
+                                        {isTeam ? "OPPONENTS" : "Opponent"}
                                     </div>
 
                                     {/* Info */}
-                                    <div className="mt-2 w-full text-center">
-                                        <p className="break-words font-bold text-[#2d1f1a] text-xs">{opponentDisplayName}</p>
+                                    <div className="mt-2 w-full min-w-0 text-center">
+                                        <p className="w-full truncate px-0.5 text-xs font-bold text-[#2d1f1a]" title={opponentDisplayName}>
+                                            {opponentDisplayName}
+                                        </p>
                                         {teamBTotalAmount > 0 ? (
-                                            <p className="mt-0.5 break-all text-[10px] font-semibold text-emerald-600">
-                                                ${teamBTotalAmount}{isTeam ? ` from ${teamBTotalBets}` : ""}
+                                            <p className="mt-0.5 truncate px-0.5 text-[10px] font-bold text-emerald-600">
+                                                {isTeam
+                                                    ? `${teamBTotalBets} ${teamBTotalBets === 1 ? "bet" : "bets"}`
+                                                    : `Has bet $${teamBTotalAmount}`}
                                             </p>
-                                        ) : (
-                                            <p className="mt-0.5 break-all text-[10px] text-[#8b7355]">
-                                                {hasLost ? "Won!" : hasWon ? "Lost" : ""}
-                                            </p>
-                                        )}
+                                        ) : null}
                                     </div>
                                 </div>
                                 {activeProfilePreview === "opponent" && (
@@ -479,27 +578,11 @@ export function ChallengeCard({
                                         align="right"
                                     />
                                 )}
-                                {!isExpireTimeAchieved && !isCreator && isTeam && (
-                                    <button
-                                        type="button"
-                                        onClick={(e) => openBetForm(e)}
-                                        className={`absolute -bottom-4.5 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border-2 text-[28px] font-black leading-none transition hover:scale-105 hover:shadow-md ${hasLost
-                                            ? "border-amber-400 bg-gradient-to-br from-amber-100 to-yellow-50 text-amber-700 hover:from-amber-200 hover:to-yellow-100"
-                                            : hasWon
-                                                ? "border-red-300 bg-gradient-to-br from-red-100 to-rose-50 text-red-700 hover:from-red-200 hover:to-rose-100"
-                                                : "border-[#d4a574]/40 bg-white/90 text-[#2d1f1a] hover:bg-white"
-                                            }`}
-                                        aria-label="Join Challenge"
-                                        title="Join Challenge"
-                                    >
-                                        +
-                                    </button>
-                                )}
                             </div>
                         ) : (
                             /* Placeholder for pending state */
                             <div className="flex flex-col items-center">
-                                <div className="challenge-card-profile-tile relative flex h-[132px] w-[98px] max-w-full flex-col items-center justify-center rounded-xl border-2 border-dashed border-[#d4a574]/30 p-2 transition-colors hover:border-[#e85a2d] hover:bg-[#fff1e8] hover:!shadow-none sm:h-[140px] sm:w-[120px] sm:p-3">
+                                <div className={`challenge-card-profile-tile relative flex h-[132px] w-[98px] max-w-full flex-col items-center justify-center border-2 border-dashed border-[#d4a574]/30 p-2 transition-colors hover:border-[#e85a2d] hover:bg-[#fff1e8] hover:!shadow-none sm:h-[140px] sm:w-[120px] sm:p-3 ${isPvpMode ? "rounded-none" : "rounded-xl"}`}>
                                     <div
                                         className="flex h-11 w-11 items-center justify-center rounded-full border-2 border-[#d4a574]/50 bg-gradient-to-br from-gray-200 to-gray-300 sm:h-14 sm:w-14"
                                         aria-label={isExpireTimeAchieved ? "No opponent joined" : "Searching for an opponent"}
@@ -525,22 +608,6 @@ export function ChallengeCard({
                                         (<div className="mt-2 text-center">
                                             <p className="font-bold text-[#8b7355] text-xs">No one yet!</p>
                                         </div>)}
-                                    {!isExpireTimeAchieved && !isCreator && isTeam && (
-                                        <button
-                                            type="button"
-                                            onClick={(e) => openBetForm(e)}
-                                            className={`absolute -bottom-4.5 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border-2 text-[28px] font-black leading-none transition hover:scale-105 hover:shadow-md ${hasWon
-                                                ? "border-amber-400 bg-gradient-to-br from-amber-100 to-yellow-50 text-amber-700 hover:from-amber-200 hover:to-yellow-100"
-                                                : hasLost
-                                                    ? "border-red-300 bg-gradient-to-br from-red-100 to-rose-50 text-red-700 hover:from-red-200 hover:to-rose-100"
-                                                    : "border-[#d4a574]/40 bg-white/90 text-[#2d1f1a] hover:bg-white"
-                                                }`}
-                                            aria-label="Join Challenge"
-                                            title="Join Challenge"
-                                        >
-                                            +
-                                        </button>
-                                    )}
                                 </div>
                             </div>
                         )}
@@ -577,31 +644,32 @@ export function ChallengeCard({
                 </div>
 
                 {/* Challenge Expiry */}
-                {!isExpireTimeAchieved && (
-                    <div className="mt-1.5 flex flex-wrap items-center justify-center gap-1.5 text-center text-xs text-gray-600">
-                        {isExpiresInState ? (
+                <div className="mt-1.5 flex flex-wrap items-center justify-center gap-1.5 text-center text-xs text-gray-600">
+                        {isExpiresInState || isBattleOnState ? (
                             <>
                                 <span>{expiryStatusText}</span>
-                                <span className={`font-medium ${isExpiryUnderOneHour ? "text-red-600" : "text-gray-900"}`}>
-                                    {timeRemaining}
+                                <span className={`font-medium ${isExpiresInState && isExpiryUnderOneHour ? "text-gray-700" : isBattleOnState ? "text-[#008080]" : "text-gray-900"}`}>
+                                    {isBattleOnState ? endsByCountdown : timeRemaining}
                                 </span>
                             </>
                         ) : (
                             <span
                                 className={`font-semibold ${isCompletedState
                                     ? "text-gray-700"
-                                    : isResolvingState
+                                    : isCancelledState
+                                        ? "text-gray-600"
+                                        : isResolvingState
                                         ? "text-amber-700"
                                         : isBattleOnState
                                             ? "text-[#008080]"
-                                            : "text-red-600"
+                                            : "text-gray-600"
                                     }`}
                             >
                                 {expiryStatusText}
                             </span>
                         )}
                         <div className="group relative">
-                            <svg className="w-3.5 h-3.5 text-gray-400 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="h-3.5 w-3.5 cursor-help !text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                             <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10">
@@ -609,8 +677,7 @@ export function ChallengeCard({
                                 <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
                             </div>
                         </div>
-                    </div>
-                )}
+                </div>
 
                 {/* Divider */}
                 <div className="border-t border-gray-200 my-2"></div>
@@ -623,7 +690,7 @@ export function ChallengeCard({
                         </svg>
                         <span className="min-w-0 break-words text-xs sm:text-sm"><span className="font-semibold text-gray-900">{createdTimeText}</span></span>
                         <div className="group relative">
-                            <svg className="w-3.5 h-3.5 text-gray-400 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="h-3.5 w-3.5 cursor-help !text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                             <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-44 p-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10">
@@ -662,10 +729,15 @@ export function ChallengeCard({
                 betError={betError}
                 betCurrency={betCurrency}
                 minAcceptBet={modalMinAcceptBet}
+                requiresCreatorStakeMatch={requiresCreatorStakeMatch}
                 maxAcceptBet={modalMaxAcceptBet}
                 escrowAddress={escrowAddress}
                 resolveCountdown={exactCountdownDetails.exactCountdown}
                 resolveLabel={exactCountdownDetails.dayLabel}
+                joinCountdown={timeRemaining}
+                joinLabel={challengeEndTimeText}
+                currentPoolAmount={Math.max(teamATotalAmount + teamBTotalAmount, Number(challenge.initial_bet) || 0)}
+                selectedSidePoolAmount={joinSide === "TEAM_A" ? Math.max(teamATotalAmount, Number(challenge.initial_bet) || 0) : teamBTotalAmount}
                 isTeam={isTeam}
                 joinSide={joinSide}
                 onClose={() => closeBetForm()}
@@ -677,6 +749,14 @@ export function ChallengeCard({
                     }
                 }}
                 onJoinSideChange={(side) => setJoinSide(side)}
+            />
+            <ChallengeActionModal
+                action={pendingChallengeAction}
+                isExpired={isExpireTimeAchieved}
+                isLoading={isLoading}
+                error={actionError}
+                onClose={closeChallengeActionConfirmation}
+                onConfirm={() => void confirmChallengeAction()}
             />
             <ShareChallengeModal challenge={challenge} isOpen={isShareModalOpen} onClose={() => setIsShareModalOpen(false)} />
             <WinningsShareModal

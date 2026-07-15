@@ -21,7 +21,7 @@ export const TOKEN_MINT_ADDRESSES: Record<
   },
   rekto: {
     // Replace the devnet value here when the dedicated devnet mint is deployed.
-    devnet: "13QUwwFK5bMTrxZ9xhYpD8oEVizRSFk79nTQqtvFEASY",
+    devnet: "HHSfQJEhWkXQZbxuNzmtCwZGNYwAX2VNezdXuVYJbrgE",
     mainnet: "13QUwwFK5bMTrxZ9xhYpD8oEVizRSFk79nTQqtvFEASY",
   },
 };

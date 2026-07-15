@@ -11,39 +11,38 @@ import { WelcomeTutorialModal } from "./components/homepage-components";
 
 export const metadata: Metadata = {
   title: {
-    default: "RektoFun | The First PvP Battleground For Predictions",
-    template: " | RektoFun",
+    default: "The PvP Battleground For Predictions On Solana | RektoFun",
+    template: "%s | RektoFun",
   },
-  description: "The first PvP battleground for predictions. Create permissionless prediciton challenges around crypto & sports. Compete other traders, and win rewards. Prediction Markets 2.0",
-  keywords: ["prediction markets", " PvP trading", " crypto predictions", " price prediction", "permissionless prediction markets", " solana meme projects", " pump fun alternative", " prediction markets on solana", "pvp battleground for predictions", " Solana", " Bitcoin", " Ethereum"],
+  description: "Explore RektoFun, a Solana challenge market where users create permissionless crypto and sports challenges, compete, and win rewards.",
+  applicationName: "RektoFun",
+  keywords: ["RektoFun", "prediction markets", "challenge markets", "Solana dapps", "prediction markets on Solana", "trending prediction markets", "crypto predictions", "sports predictions", "PvP predictions"],
   authors: [{ name: "RektoFun" }],
   creator: "RektoFun",
   publisher: "RektoFun",
   metadataBase: new URL("https://rekto.fun"),
-  alternates: {
-    canonical: "/",
-  },
+  category: "finance",
   openGraph: {
     type: "website",
     locale: "en_US",
     url: "https://rekto.fun",
     siteName: "RektoFun",
-    title: "RektoFun | The First PvP Battleground For Predictions",
-    description: "The first PvP battleground for predictions. Compete, battle, and win rewards.",
+    title: "The PvP Battleground For Predictions On Solana | RektoFun",
+    description: "Create and join permissionless crypto and sports challenge markets on Solana.",
     images: [
       {
-        url: "/logos/BG.png",
-        width: 1200,
-        height: 630,
-        alt: "RektoFun - PvP Prediction Markets",
+        url: "/logos/social_share.png",
+        width: 1731,
+        height: 909,
+        alt: "RektoFun prediction and challenge markets on Solana",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "RektoFun | The First PvP Battleground For Predictions",
-    description: "The first PvP battleground for predictions. Compete, battle, and win rewards.",
-    images: ["/logos/BG.png"],
+    title: "The PvP Battleground For Predictions On Solana | RektoFun",
+    description: "Create and join permissionless crypto and sports challenge markets on Solana.",
+    images: ["/logos/social_share.png"],
     creator: "@rekto_fun",
   },
   robots: {
@@ -63,9 +62,6 @@ export const metadata: Metadata = {
     apple: "/fav_old.png",
   },
   manifest: "/manifest.json",
-  verification: {
-    google: "your-google-verification-code",
-  },
 };
 
 export default function RootLayout({

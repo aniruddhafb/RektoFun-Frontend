@@ -88,8 +88,8 @@ export function ProfileHeader({
 
     const formattedRektoBalance = formatTokenBalance(balance.rekto);
     const formattedPnl = Number.isFinite(stats.pnl)
-        ? `${stats.pnl > 0 ? "+" : ""}${stats.pnl.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
-        : "0";
+        ? `${stats.pnl > 0 ? "+" : stats.pnl < 0 ? "-" : ""}$${Math.abs(stats.pnl).toLocaleString(undefined, { maximumFractionDigits: 2 })}`
+        : "$0";
 
     return (
         <div className="profile-header-shell flex flex-col lg:flex-row lg:items-stretch gap-4 sm:gap-6 lg:gap-8 p-4 sm:p-6 bg-white/40 backdrop-blur-xl rounded-2xl sm:rounded-3xl items-center sm:items-start">

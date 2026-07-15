@@ -22,6 +22,7 @@ export interface GetPositionsResponse {
 export interface GetPositionsParams {
   limit?: number;
   offset?: number;
+  creator?: number;
 }
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_BE_API_URL || 'http://localhost:8000/api';
@@ -52,6 +53,10 @@ export async function getPositions(params?: GetPositionsParams): Promise<GetPosi
   
   if (params?.offset !== undefined) {
     queryParams.append('offset', params.offset.toString());
+  }
+
+  if (params?.creator !== undefined) {
+    queryParams.append('creator', params.creator.toString());
   }
   
   const queryString = queryParams.toString();

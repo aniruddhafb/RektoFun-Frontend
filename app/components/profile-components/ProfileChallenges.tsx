@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef } from "react";
 import { ChallengeCard } from "@/app/components/challenge-components/ChallengeCard";
 import { Challenge } from "@/app/lib/challenges-service/challenges";
 
@@ -9,6 +9,9 @@ interface ProfileChallengesProps {
     loading?: boolean;
     onChallengeClick: (challenge: Challenge) => void;
     onCreateChallenge?: () => void;
+    hasMore?: boolean;
+    loadingMore?: boolean;
+    onLoadMore?: () => void;
 }
 
 export function ProfileChallenges({
@@ -16,26 +19,21 @@ export function ProfileChallenges({
     loading,
     onChallengeClick,
     onCreateChallenge,
+    hasMore = false,
+    loadingMore = false,
+    onLoadMore,
 }: ProfileChallengesProps) {
-    const PAGE_SIZE = 6;
-    const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
-    const [isLoadingMore, setIsLoadingMore] = useState(false);
     const loadMoreRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         const target = loadMoreRef.current;
-        if (!target || visibleCount >= challenges.length) return;
+        if (!target || !hasMore || loadingMore) return;
         const observer = new IntersectionObserver(([entry]) => {
-            if (!entry.isIntersecting || isLoadingMore) return;
-            setIsLoadingMore(true);
-            window.setTimeout(() => {
-                setVisibleCount((count) => Math.min(count + PAGE_SIZE, challenges.length));
-                setIsLoadingMore(false);
-            }, 250);
+            if (entry.isIntersecting) onLoadMore?.();
         }, { rootMargin: "300px" });
         observer.observe(target);
         return () => observer.disconnect();
-    }, [challenges.length, isLoadingMore, visibleCount]);
+    }, [hasMore, loadingMore, onLoadMore]);
 
     const skeletons = (count: number) => Array.from({ length: count }, (_, index) => (
         <div key={index} className="h-[300px] border-2 border-black bg-white/70 p-5 animate-pulse" aria-hidden="true">
@@ -78,7 +76,7 @@ export function ProfileChallenges({
 
     return (
         <div className="mt-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {challenges.slice(0, visibleCount).map((challenge) => (
+            {challenges.map((challenge) => (
                 <ChallengeCard
                     key={challenge.id}
                     challenge={challenge}
@@ -86,8 +84,8 @@ export function ProfileChallenges({
                     showPin={false}
                 />
             ))}
-            {isLoadingMore && skeletons(3)}
-            <div ref={loadMoreRef} className="col-span-full h-1" aria-hidden="true" />
+            {loadingMore && skeletons(9)}
+            {hasMore && <div ref={loadMoreRef} className="col-span-full h-1" aria-hidden="true" />}
         </div>
     );
 }

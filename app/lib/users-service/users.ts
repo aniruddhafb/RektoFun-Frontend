@@ -87,6 +87,12 @@ export interface UsernameCheckResponse {
 }
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_BE_API_URL || "http://localhost:8000/api";
+const USER_CACHE_TTL_MS = 30_000;
+const LEADERBOARD_CACHE_TTL_MS = 15_000;
+const userRequests = new Map<string, Promise<User>>();
+const userCache = new Map<string, { user: User; expiresAt: number }>();
+const leaderboardRequests = new Map<string, Promise<LeaderboardResponse>>();
+const leaderboardCache = new Map<string, { response: LeaderboardResponse; expiresAt: number }>();
 
 type BackendUser = {
   id: number;
@@ -255,18 +261,27 @@ export async function checkUsernameExists(username: string): Promise<boolean> {
 }
 
 export async function getUserByPubkey(pubkey: string): Promise<User> {
-  const response = await fetch(`${API_BASE_URL}/users/by-pubkey/${encodeURIComponent(pubkey)}`, {
+  const key = pubkey.trim().toLowerCase();
+  const cached = userCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) return cached.user;
+
+  const pending = userRequests.get(key);
+  if (pending) return pending;
+
+  const request = fetch(`${API_BASE_URL}/users/by-pubkey/${encodeURIComponent(pubkey)}`, {
     method: "GET",
-    headers: {
-      accept: "application/json",
-    },
-  });
+    headers: { accept: "application/json" },
+  }).then(async (response) => {
+    if (!response.ok) {
+      throw await parseError(response, `User with pubkey ${pubkey} not found`);
+    }
+    const user = normalizeUser(await response.json());
+    userCache.set(key, { user, expiresAt: Date.now() + USER_CACHE_TTL_MS });
+    return user;
+  }).finally(() => userRequests.delete(key));
 
-  if (!response.ok) {
-    throw await parseError(response, `User with pubkey ${pubkey} not found`);
-  }
-
-  return normalizeUser(await response.json());
+  userRequests.set(key, request);
+  return request;
 }
 
 export const getUserByWallet = getUserByPubkey;
@@ -309,33 +324,43 @@ export async function getLeaderboard(
   queryParams.append("order", order);
   if (search?.trim()) queryParams.append("search", search.trim());
 
-  const response = await fetch(`${API_BASE_URL}/users/leaderboard?${queryParams.toString()}`, {
+  const url = `${API_BASE_URL}/users/leaderboard?${queryParams.toString()}`;
+  const cached = leaderboardCache.get(url);
+  if (cached && cached.expiresAt > Date.now()) return cached.response;
+
+  const pending = leaderboardRequests.get(url);
+  if (pending) return pending;
+
+  const request = fetch(url, {
     method: "GET",
-    headers: {
-      accept: "application/json",
-    },
-  });
+    headers: { accept: "application/json" },
+  }).then(async (response) => {
+    if (!response.ok) {
+      throw await parseError(response, `Failed to fetch leaderboard: ${response.statusText}`);
+    }
 
-  if (!response.ok) {
-    throw await parseError(response, `Failed to fetch leaderboard: ${response.statusText}`);
-  }
+    const data = await response.json();
+    const users = (data.users || []).map((rawUser: BackendUser & {
+      rank: number; won: number; lost: number; win_rate: number; pnl: number; volume: number;
+    }) => ({ ...normalizeUser(rawUser), ...rawUser }));
 
-  const data = await response.json();
-  const users = (data.users || []).map((rawUser: BackendUser & {
-    rank: number; won: number; lost: number; win_rate: number; pnl: number; volume: number;
-  }) => ({ ...normalizeUser(rawUser), ...rawUser }));
+    const result: LeaderboardResponse = {
+      users: users.map((user: User & { rank: number; won: number; lost: number; win_rate: number; pnl: number; volume: number }) => ({
+        ...user,
+        id: String(user.id),
+        followers: (user.followers || []).map(String),
+        following: (user.following || []).map(String),
+      })),
+      count: data.total || 0,
+      period: data.period || period,
+      summary: data.summary || { total_users: 0, total_challenges: 0, total_volume: 0, total_pnl: 0 },
+    };
+    leaderboardCache.set(url, { response: result, expiresAt: Date.now() + LEADERBOARD_CACHE_TTL_MS });
+    return result;
+  }).finally(() => leaderboardRequests.delete(url));
 
-  return {
-    users: users.map((user: User & { rank: number; won: number; lost: number; win_rate: number; pnl: number; volume: number }) => ({
-      ...user,
-      id: String(user.id),
-      followers: (user.followers || []).map(String),
-      following: (user.following || []).map(String),
-    })),
-    count: data.total || 0,
-    period: data.period || period,
-    summary: data.summary || { total_users: 0, total_challenges: 0, total_volume: 0, total_pnl: 0 },
-  };
+  leaderboardRequests.set(url, request);
+  return request;
 }
 
 async function setFollowing(targetWalletAddress: string, viewerWalletAddress: string, follow: boolean): Promise<User> {

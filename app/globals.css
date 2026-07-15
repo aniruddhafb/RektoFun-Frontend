@@ -711,6 +711,16 @@ body {
   animation: pop-in-spring 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 
+.accept-challenge-modal.accept-challenge-modal {
+  background: #fffaf6 !important;
+  animation: none !important;
+  box-shadow: none !important;
+}
+
+.accept-challenge-modal.accept-challenge-modal * {
+  box-shadow: none !important;
+}
+
 .rekto-card-hover,
 .pixel-shell :is(.rounded-xl, .rounded-2xl, .rounded-3xl)[class*="bg-white"] {
   transition:
@@ -760,6 +770,11 @@ body {
 
 .pixel-shell .challenge-card-shell .challenge-card-profile-tile.challenge-card-profile-tile:hover {
   box-shadow: 4px 4px 0 #111 !important;
+}
+
+.pixel-shell .challenge-card-shell .challenge-card-avatar,
+.pixel-shell .challenge-card-shell .challenge-card-avatar img {
+  border-radius: 9999px !important;
 }
 
 .pixel-shell .master-card-shell.master-card-shell {
