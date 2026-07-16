@@ -209,7 +209,8 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
                 setMarketType(saved.marketType);
                 setChallengeFormat(saved.marketType === "sports" ? "statement" : saved.challengeFormat === "statement" ? "statement" : "price");
             }
-            if (saved.challengeMode === "pvp" || saved.challengeMode === "team") setChallengeMode(saved.challengeMode);
+            // Team mode is not available yet, so stale saved settings must not re-enable it.
+            setChallengeMode("pvp");
             if (typeof saved.betAmount === "number" && Number.isFinite(saved.betAmount) && saved.betAmount > 0) setBetAmount(saved.betAmount);
             if (typeof saved.durationMinutes === "number" && saved.durationMinutes >= MIN_DURATION_MINUTES) {
                 setDuration(durationFromMinutes(saved.durationMinutes));
@@ -330,11 +331,16 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
     const isPriceFeed = marketType === "crypto" && challengeFormat === "price";
     const rawTopicLabel = selectedChildCategory?.category ?? (marketType === "sports" ? "All sports" : "Choose asset");
     const topicLabel = stripUsdcQuote(rawTopicLabel);
-    const selectedAssetSymbol = stripUsdcQuote(selectedChildCategory?.category)
+    const selectedMarketPair = (selectedChildCategory?.category ?? "")
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, "")
+        .slice(0, 20);
+    const selectedAssetSymbol = (selectedChildCategory?.category ?? "")
+        .split("/", 1)[0]
         .toUpperCase()
         .replace(/[^A-Z0-9]/g, "")
         .slice(0, 10);
-    const assetPriceRequestKey = `${selectedAssetSymbol}:${chartRange}`;
+    const assetPriceRequestKey = `${selectedMarketPair}:${chartRange}`;
     const isAssetPriceLoading = isPriceFeed
         && Boolean(selectedAssetSymbol)
         && assetPriceState.key !== assetPriceRequestKey;
@@ -349,10 +355,10 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
     const maxResolutionDate = new Date(composerNow + MAX_RESOLUTION_DELAY_MINUTES * 60 * 1000);
 
     useEffect(() => {
-        if (!isOpen || !isPriceFeed || !selectedAssetSymbol) return;
+        if (!isOpen || !isPriceFeed || !selectedAssetSymbol || !selectedMarketPair) return;
         let cancelled = false;
 
-        fetch(`/api/market-chart?asset=${encodeURIComponent(selectedAssetSymbol)}&range=${chartRange}`)
+        fetch(`/api/market-chart?pair=${encodeURIComponent(selectedChildCategory?.category ?? "")}&range=${chartRange}`)
             .then(async (response) => {
                 if (!response.ok) throw new Error("Asset price unavailable");
                 return response.json() as Promise<{ candles: MarketCandle[] }>;
@@ -393,7 +399,7 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
         return () => {
             cancelled = true;
         };
-    }, [assetPriceRequestKey, chartRange, isOpen, isPriceFeed, selectedAssetSymbol]);
+    }, [assetPriceRequestKey, chartRange, isOpen, isPriceFeed, selectedAssetSymbol, selectedMarketPair, selectedChildCategory?.category]);
 
     const validateForm = ({ requireProfile = true }: { requireProfile?: boolean } = {}) => {
         if (marketType === "crypto" && !selectedChildCategory) {
@@ -485,8 +491,12 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
             const expiresAt = nowSec + duration.hours * 3600 + duration.minutes * 60;
             const resolvesAt = Math.max(Math.floor(selectedDate.getTime() / 1000), expiresAt);
             const topic = selectedChildCategory?.category?.trim() || (marketType === "sports" ? "SPORTS" : "CRYPTO");
-            const onchainAsset = topic.replace(/[^a-zA-Z0-9/]/g, "").slice(0, 10) || marketType.toUpperCase();
-            const ticker = onchainAsset.split("/", 1)[0].toUpperCase();
+            // The program's asset label is capped at 10 characters. Store the
+            // base ticker there, while preserving the complete pair in
+            // `tradingPair`/`trading_pair` for charts and price settlement.
+            const ticker = topic.split("/", 1)[0].replace(/[^a-zA-Z0-9]/g, "").slice(0, 10).toUpperCase()
+                || marketType.toUpperCase();
+            const onchainAsset = ticker;
             const targetPrice = isPriceFeed ? Number(predictionPrice) : 0;
             const challengeStatement = isPriceFeed ? generatedStatement : statement.trim();
 
@@ -809,13 +819,15 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
                                                     min="0"
                                                     step="any"
                                                     value={predictionPrice}
+                                                    disabled={isAssetPriceLoading}
                                                     onChange={(event) => {
                                                         setPredictionPrice(event.target.value);
                                                         setFormError(null);
                                                     }}
-                                                    className="create-challenge-composer-input min-w-0 flex-1 border-0 bg-transparent px-1 py-1 text-xl font-black text-black outline-none placeholder:text-[#b7a9a2] sm:text-2xl"
+                                                    className="create-challenge-composer-input min-w-0 flex-1 border-0 bg-transparent px-1 py-1 text-xl font-black text-black outline-none placeholder:text-[#b7a9a2] disabled:cursor-not-allowed disabled:opacity-60 sm:text-2xl"
                                                     placeholder={isAssetPriceLoading ? "loading" : "target"}
                                                     aria-label="Target price"
+                                                    aria-busy={isAssetPriceLoading}
                                                 />
                                                 {isAssetPriceLoading && <Loader2 className="h-4 w-4 shrink-0 animate-spin text-[#8b7a72]" />}
                                                 {hasAssetPriceError && <span className="shrink-0 text-xs font-black text-[#e85a2d]" title="Price unavailable">!</span>}
@@ -1118,17 +1130,16 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
                                             </button>
                                             <button
                                                 type="button"
-                                                onClick={() => {
-                                                    setChallengeMode("team");
-                                                    setActivePanel(null);
-                                                }}
-                                                className={`flex items-center gap-3 border-2 p-3 text-left ${challengeMode === "team" ? "border-black bg-black text-white shadow-[3px_3px_0_#f5d547]" : "border-black/20 bg-white text-black hover:border-black"}`}
+                                                disabled
+                                                aria-label="Team mode coming soon"
+                                                className="flex cursor-not-allowed items-center gap-3 border-2 border-black/10 bg-black/5 p-3 text-left text-black/40"
                                             >
                                                 <Users className="h-5 w-5 shrink-0" />
-                                                <span>
+                                                <span className="min-w-0 flex-1">
                                                     <span className="block text-xs font-black">Team</span>
-                                                    <span className={`text-[10px] font-bold ${challengeMode === "team" ? "text-white/65" : "text-[#8b7a72]"}`}>Multiplayer Mode</span>
+                                                    <span className="text-[10px] font-bold">Coming soon</span>
                                                 </span>
+                                                <Lock className="h-4 w-4 shrink-0" aria-hidden="true" />
                                             </button>
                                         </div>
                                     </div>
@@ -1759,8 +1770,8 @@ function ChallengePreview({
     const username = user?.username || "You";
     const profileImage = user?.profile_image || "/scribbles/btc.png";
     const creatorId = user?.id ?? -1;
-    const pair = stripUsdcQuote(pairTag);
-    const ticker = pair.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10) || marketType.toUpperCase();
+    const pair = pairTag.trim();
+    const ticker = pair.split("/", 1)[0].toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10) || marketType.toUpperCase();
     const safeBetAmount = Number.isFinite(betAmount) ? betAmount : 0;
 
     const previewChallenge: Challenge = {

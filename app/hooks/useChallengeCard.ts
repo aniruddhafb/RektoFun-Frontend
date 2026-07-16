@@ -895,7 +895,7 @@ export function useChallengeCard(challenge: Challenge) {
         ctaDisabled = isLoading || isCreator || isJoinedStatusLoading;
         ctaClassName = activeCtaClassName;
       } else {
-        ctaLabel = isTeam ? "Battle ongoing" : "Live";
+        ctaLabel = "Battle live";
         ctaDisabled = true;
         ctaClassName = ongoingCtaClassName;
       }

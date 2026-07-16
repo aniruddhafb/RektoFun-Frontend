@@ -118,11 +118,21 @@ export async function getPositionById(id: number): Promise<Position> {
   return response.json();
 }
 
-const participantRequests = new Map<number, Promise<ChallengeParticipantPosition[]>>();
+const PARTICIPANT_CACHE_TTL_MS = 30_000;
+const participantRequests = new Map<number, {
+  promise: Promise<ChallengeParticipantPosition[]>;
+  expiresAt: number;
+}>();
 
-export async function getPositionsByChallenge(challengeId: number): Promise<ChallengeParticipantPosition[]> {
-  const pending = participantRequests.get(challengeId);
-  if (pending) return pending;
+export async function getPositionsByChallenge(
+  challengeId: number,
+  refresh = false,
+): Promise<ChallengeParticipantPosition[]> {
+  if (refresh) participantRequests.delete(challengeId);
+
+  const cached = participantRequests.get(challengeId);
+  if (cached && cached.expiresAt > Date.now()) return cached.promise;
+  if (cached) participantRequests.delete(challengeId);
 
   const request = fetch(`${API_BASE_URL}/positions/by-challenge/${encodeURIComponent(challengeId)}`, {
     method: 'GET',
@@ -135,11 +145,12 @@ export async function getPositionsByChallenge(challengeId: number): Promise<Chal
     }
     return response.json() as Promise<ChallengeParticipantPosition[]>;
   });
-  participantRequests.set(challengeId, request);
-  // Deduplicate simultaneous modal/card requests without keeping betting data stale.
-  void request.then(
-    () => participantRequests.delete(challengeId),
-    () => participantRequests.delete(challengeId),
-  );
+  participantRequests.set(challengeId, {
+    promise: request,
+    expiresAt: Date.now() + PARTICIPANT_CACHE_TTL_MS,
+  });
+  // Keep successful participant data briefly so a card prefetch can make the
+  // detail modal instant. Failed requests are always retried.
+  void request.catch(() => participantRequests.delete(challengeId));
   return request;
 }

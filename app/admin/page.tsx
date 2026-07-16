@@ -15,6 +15,7 @@ import {
   ImageUp,
   RefreshCw,
   Search,
+  Server,
   ShieldCheck,
   Swords,
   Trash2,
@@ -43,7 +44,16 @@ import {
   type AdminReferralUser,
 } from "@/app/lib/admin-service";
 
-type Tab = "stats" | "resolution" | "users" | "categories" | "referrals";
+type Tab = "stats" | "status" | "resolution" | "users" | "categories" | "referrals";
+type ServiceHealth = {
+  id: string;
+  name: string;
+  status: "operational" | "degraded" | "down";
+  message: string;
+  responseTimeMs: number | null;
+  checkedAt: string;
+  details?: Record<string, string | boolean | number | null>;
+};
 type UserSort = "verified" | "followers" | "role";
 type PriceFeedFilter = "due" | "resolved" | "completed" | "cancelled" | "expired";
 const CATEGORY_PAGE_SIZE = 10;
@@ -69,6 +79,8 @@ export default function AdminPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [referralUsers, setReferralUsers] = useState<AdminReferralUser[]>([]);
   const [redemptions, setRedemptions] = useState<AdminRedemption[]>([]);
+  const [serviceHealth, setServiceHealth] = useState<ServiceHealth[]>([]);
+  const [healthCheckedAt, setHealthCheckedAt] = useState("");
   const [resolutionChallenges, setResolutionChallenges] = useState<Challenge[]>([]);
   const [manualWinners, setManualWinners] = useState<Record<number, "creator" | "opponent">>({});
   const [manualPrices, setManualPrices] = useState<Record<number, string>>({});
@@ -84,6 +96,7 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [loaded, setLoaded] = useState<Record<Tab, boolean>>({
     stats: false,
+    status: false,
     resolution: false,
     users: false,
     categories: false,
@@ -114,7 +127,13 @@ export default function AdminPage() {
       setLoading(true);
       setError("");
       try {
-        if (section === "stats") {
+        if (section === "status") {
+          const response = await fetch("/api/admin/status", { cache: "no-store" });
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.error || "Could not check services.");
+          setServiceHealth(data.services || []);
+          setHealthCheckedAt(data.checkedAt || "");
+        } else if (section === "stats") {
           const [userData, challengeData] = await Promise.all([
             getUsers({ limit: 1, offset: 0 }),
             getChallenges({ limit: 1000, offset: 0 }, { bypassCache: true }),
@@ -407,6 +426,7 @@ export default function AdminPage() {
     );
   const tabs: Array<{ id: Tab; label: string }> = [
     { id: "stats", label: "Stats" },
+    { id: "status", label: "System status" },
     { id: "resolution", label: "Resolution" },
     { id: "users", label: "Users" },
     { id: "categories", label: "Categories" },
@@ -503,6 +523,62 @@ export default function AdminPage() {
                 <p className="text-3xl font-black">{loading ? "—" : value}</p>
               </div>
             ))}
+          </section>
+        )}
+
+        {tab === "status" && (
+          <section className="space-y-5">
+            <div className="flex flex-col gap-2 border-2 border-black bg-[#fffaf6] p-5 shadow-[4px_4px_0_#111] sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="text-2xl font-black">Service health</h2>
+                <p className="text-sm font-semibold text-black/55">
+                  Live checks for the application and its APIs
+                </p>
+              </div>
+              <p className="text-xs font-black uppercase tracking-wider text-black/50">
+                {healthCheckedAt ? `Checked ${new Date(healthCheckedAt).toLocaleString()}` : "Checking now…"}
+              </p>
+            </div>
+            <div className="grid gap-4 lg:grid-cols-3">
+              {serviceHealth.map((service) => {
+                const color = service.status === "operational"
+                  ? "bg-[#a8d85b]"
+                  : service.status === "degraded" ? "bg-[#f5d547]" : "bg-[#ff8c79]";
+                return (
+                  <article key={service.id} className="border-2 border-black bg-[#fffaf6] shadow-[4px_4px_0_#111]">
+                    <div className={`${color} flex items-center justify-between border-b-2 border-black p-4`}>
+                      <div className="flex items-center gap-2">
+                        <Server className="h-5 w-5" />
+                        <h3 className="text-lg font-black">{service.name}</h3>
+                      </div>
+                      <span className="border-2 border-black bg-white px-2 py-1 text-[10px] font-black uppercase tracking-wider">
+                        {service.status}
+                      </span>
+                    </div>
+                    <div className="space-y-4 p-5">
+                      <p className="font-bold">{service.message}</p>
+                      <dl className="space-y-2 border-t-2 border-black/10 pt-4 text-sm">
+                        <div className="flex justify-between gap-3">
+                          <dt className="font-bold text-black/50">Response time</dt>
+                          <dd className="font-black">{service.responseTimeMs === null ? "—" : `${service.responseTimeMs} ms`}</dd>
+                        </div>
+                        {Object.entries(service.details || {}).map(([key, value]) => (
+                          <div key={key} className="flex justify-between gap-3">
+                            <dt className="font-bold capitalize text-black/50">{key === "url" ? "URL" : key.replace(/([A-Z])/g, " $1")}</dt>
+                            <dd className="max-w-[65%] break-all text-right font-mono text-xs font-bold" title={String(value)}>{String(value)}</dd>
+                          </div>
+                        ))}
+                      </dl>
+                    </div>
+                  </article>
+                );
+              })}
+              {!loading && !serviceHealth.length && (
+                <div className="border-2 border-black bg-[#ff8c79] p-5 font-bold shadow-[4px_4px_0_#111] lg:col-span-3">
+                  No service health results were returned.
+                </div>
+              )}
+            </div>
           </section>
         )}
 

@@ -27,7 +27,7 @@ function loadCardParticipants(challengeId: number, refresh = false) {
     if (refresh) cardParticipantRequests.delete(challengeId);
     const cached = cardParticipantRequests.get(challengeId);
     if (cached) return cached;
-    const request = getPositionsByChallenge(challengeId).then(async (positions) => {
+    const request = getPositionsByChallenge(challengeId, refresh).then(async (positions) => {
         const userIds = [...new Set(positions.map((position) => position.creator).filter(Boolean))];
         const users = await Promise.allSettled(userIds.map((id) => getUserById(id)));
         const usersById = new Map<number, UserType>();

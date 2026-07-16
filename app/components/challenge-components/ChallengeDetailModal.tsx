@@ -102,8 +102,8 @@ const FALLBACK_AVATAR = "/scribbles/btc.png";
 function cleanCtaLabel(label: string) {
   const normalized = label.toLowerCase();
   if (normalized.includes("join")) return "Join challenge";
-  if (normalized.includes("battle ongoing")) return "Battle ongoing";
-  if (normalized.includes("ongoing") || normalized.includes("battle") || normalized === "live") return "Live";
+  if (normalized.includes("battle live") || normalized.includes("battle ongoing")) return "Battle live";
+  if (normalized.includes("ongoing") || normalized.includes("battle") || normalized === "live") return "Battle live";
   if (normalized.includes("resolving")) return "Resolving";
   if (normalized.includes("complete")) return "Completed";
   if (normalized.includes("expired")) return "Expired";
@@ -560,6 +560,7 @@ export default function ChallengeDetailModal({ challenge, creator, isOpen, onClo
               <LazyCryptoMarketPanel
                 key={challenge.id}
                 asset={challenge.ticker}
+                pair={challenge.trading_pair}
                 target={isManualResolution ? undefined : targetPrice}
                 direction={isDirectionalBelow ? "below" : "above"}
               />
@@ -719,8 +720,9 @@ function SummaryStat({ icon: Icon, label, value, accent = false }: {
   );
 }
 
-function LazyCryptoMarketPanel({ asset, target, direction }: {
+function LazyCryptoMarketPanel({ asset, pair, target, direction }: {
   asset: string;
+  pair?: string;
   target?: number;
   direction: "above" | "below";
 }) {
@@ -749,15 +751,16 @@ function LazyCryptoMarketPanel({ asset, target, direction }: {
 
       {isExpanded && (
         <div id="challenge-market-analysis" className="border-t-2 border-black">
-          <CryptoMarketPanel asset={asset} target={target} direction={direction} />
+          <CryptoMarketPanel asset={asset} pair={pair} target={target} direction={direction} />
         </div>
       )}
     </section>
   );
 }
 
-function CryptoMarketPanel({ asset, target, direction }: {
+function CryptoMarketPanel({ asset, pair, target, direction }: {
   asset: string;
+  pair?: string;
   target?: number;
   direction: "above" | "below";
 }) {
@@ -767,11 +770,14 @@ function CryptoMarketPanel({ asset, target, direction }: {
     candles: MarketCandle[];
     failed: boolean;
   }>({ key: "", candles: [], failed: false });
-  const requestKey = `${asset}:${range}`;
+  const requestKey = `${pair || asset}:${range}`;
 
   React.useEffect(() => {
     let cancelled = false;
-    fetch(`/api/market-chart?asset=${encodeURIComponent(asset)}&range=${range}`)
+    const marketQuery = pair
+      ? `pair=${encodeURIComponent(pair)}`
+      : `asset=${encodeURIComponent(asset)}`;
+    fetch(`/api/market-chart?${marketQuery}&range=${range}`)
       .then(async (response) => {
         if (!response.ok) throw new Error("Chart unavailable");
         return response.json() as Promise<{ candles: MarketCandle[] }>;
@@ -785,7 +791,7 @@ function CryptoMarketPanel({ asset, target, direction }: {
     return () => {
       cancelled = true;
     };
-  }, [asset, range, requestKey]);
+  }, [asset, pair, range, requestKey]);
 
   const candles = React.useMemo(
     () => state.key === requestKey ? state.candles : [],
