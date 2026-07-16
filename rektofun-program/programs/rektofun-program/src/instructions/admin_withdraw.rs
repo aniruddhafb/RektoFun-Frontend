@@ -4,22 +4,30 @@ use anchor_spl::token_interface::{self, Mint, TokenAccount, TokenInterface, Tran
 use crate::{
     constants::*,
     error::RektoError,
-    state::{ChallengeAccount, Config},
+    state::{ChallengeAccount, WithdrawAuthority},
 };
 
-/// Admin-only emergency backstop: withdraw USDC out of any challenge's vault
-/// to any recipient token account, in any amount up to the vault balance,
+/// Emergency backstop: withdraw USDC out of any challenge's vault to any
+/// recipient token account, in any amount up to the vault balance,
 /// regardless of the challenge's status. Not tied into `ClaimRecord` or
 /// `winners_remaining` bookkeeping — intended for cases where a participant
-/// is unable to complete the normal settle/claim flow themselves and the
-/// admin needs to send their funds to them (or wherever verified off-chain).
+/// is unable to complete the normal settle/claim flow themselves and their
+/// funds need to be sent to them (or wherever verified off-chain).
+///
+/// Gated on the dedicated `WithdrawAuthority` PDA, not `Config::admin` — this
+/// instruction has full custody of every escrowed vault, so it is signed by
+/// a wallet that is deliberately kept separate from (and never loaded into
+/// the same hot service as) the admin key used for `settle_challenge` /
+/// `admin_cancel_challenge` / `update_admin`.
 #[derive(Accounts)]
 pub struct AdminWithdraw<'info> {
-    #[account(seeds = [CONFIG_SEED], bump = config.bump)]
-    pub config: Account<'info, Config>,
+    #[account(seeds = [WITHDRAW_AUTHORITY_SEED], bump = withdraw_authority.bump)]
+    pub withdraw_authority: Account<'info, WithdrawAuthority>,
 
-    /// The admin wallet — only `Config::admin` may withdraw from a vault.
-    pub admin: Signer<'info>,
+    /// Must match `withdraw_authority.authority` — a dedicated wallet kept
+    /// separate from `Config::admin`.
+    #[account(address = withdraw_authority.authority @ RektoError::UnauthorizedWithdrawAuthority)]
+    pub authority: Signer<'info>,
 
     #[account(
         mut,

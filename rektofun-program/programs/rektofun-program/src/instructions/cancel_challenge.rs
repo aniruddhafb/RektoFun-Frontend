@@ -128,5 +128,11 @@ pub(crate) fn handler(ctx: Context<CancelChallenge>) -> Result<()> {
         },
     );
 
+    // Reclaim the challenge PDA's rent to admin once no creator-side participants
+    // remain to claim refunds via claim_refund (which needs this account to still exist).
+    if !has_creator_side_members {
+        ctx.accounts.challenge.close(ctx.accounts.admin.to_account_info())?;
+    }
+
     Ok(())
 }

@@ -239,6 +239,21 @@ pub struct ClaimRecord {
     pub bump: u8,
 }
 
+/// Dedicated authority allowed to call `admin_withdraw`, kept separate from
+/// `Config::admin` so a leaked/compromised admin hot wallet (the one loaded
+/// into the settlement service) cannot on its own drain escrowed vaults.
+/// Seeds: [b"withdraw_authority"]
+///
+/// Bootstrapped once via `initialize_withdraw_authority` (admin-gated);
+/// after that only this authority can rotate itself via
+/// `update_withdraw_authority` — `Config::admin` has no path to reassign it.
+#[account]
+#[derive(InitSpace)]
+pub struct WithdrawAuthority {
+    pub authority: Pubkey,
+    pub bump: u8,
+}
+
 /// Global platform configuration — a single singleton PDA.
 /// Seeds: [b"config"]
 ///
