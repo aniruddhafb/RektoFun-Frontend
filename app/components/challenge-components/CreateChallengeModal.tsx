@@ -49,6 +49,7 @@ import { stripUsdcQuote } from "@/app/lib/format-market-label";
 import { ChallengeCard } from "./ChallengeCard";
 import type { User } from "@/app/lib/users-service/users";
 import { announceChallengeCreated } from "@/app/lib/realtime-events";
+import { fetchUsdcBalance } from "@/app/lib/token-balances";
 
 interface CreateChallengeModalProps {
     isOpen: boolean;
@@ -178,6 +179,7 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
     const [isLoadingCategories, setIsLoadingCategories] = useState(false);
     const [categoryError, setCategoryError] = useState<string | null>(null);
     const [formError, setFormError] = useState<string | null>(null);
+    const [balanceShortfall, setBalanceShortfall] = useState<number | null>(null);
     const [rememberSettings, setRememberSettings] = useState(false);
 
     const [txStatus, setTxStatus] = useState<TxStatus>("idle");
@@ -461,8 +463,22 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
         setIsSubmitting(true);
         setTxStatus("building");
         setFormError(null);
+        setBalanceShortfall(null);
 
         try {
+            const usdcBalance = await fetchUsdcBalance(address);
+            if (usdcBalance < betAmount) {
+                setBalanceShortfall(Math.max(betAmount - usdcBalance, 0));
+                setFormError(
+                    usdcBalance <= 0
+                        ? "You don’t have enough USDC to create this challenge."
+                        : `Your balance is ${usdcBalance.toLocaleString(undefined, { maximumFractionDigits: 6 })} USDC, but this challenge requires ${betAmount.toLocaleString()} USDC.`,
+                );
+                setTxStatus("idle");
+                setIsPreviewOpen(false);
+                return;
+            }
+
             // Transaction timestamps must be calculated at submission time, not at render time.
             // eslint-disable-next-line react-hooks/purity
             const nowSec = Math.floor(Date.now() / 1000);
@@ -581,6 +597,13 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
         } finally {
             setIsSubmitting(false);
         }
+    };
+
+    const handleDeposit = () => {
+        onClose();
+        window.setTimeout(() => {
+            window.dispatchEvent(new Event("rektofun:open-deposit"));
+        }, 0);
     };
 
     if (!isOpen) return null;
@@ -991,6 +1014,7 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
                                                     onClick={() => {
                                                         setBetAmount(amount);
                                                         setFormError(null);
+                                                        setBalanceShortfall(null);
                                                     }}
                                                     className={`h-10 min-w-0 border-2 px-1 text-xs font-black sm:px-3 ${betAmount === amount ? "border-black bg-[#f5d547] shadow-[2px_2px_0_#111]" : "border-black/20 bg-white hover:border-black"}`}
                                                 >
@@ -1007,6 +1031,7 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
                                                     onChange={(event) => {
                                                         setBetAmount(Number(event.target.value));
                                                         setFormError(null);
+                                                        setBalanceShortfall(null);
                                                     }}
                                                     className="h-11 w-full border-2 border-black bg-white pl-7 pr-14 text-base font-black outline-none sm:h-10 sm:text-sm"
                                                     aria-label="Custom stake"
@@ -1115,6 +1140,25 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
                             <div role="alert" className="mt-3 flex items-start gap-2 border border-red-300 bg-red-50 px-3 py-2 text-xs font-bold text-red-700">
                                 <span className="mt-1 h-1.5 w-1.5 shrink-0 bg-red-600" />
                                 {formError}
+                            </div>
+                        )}
+                        {balanceShortfall !== null && (
+                            <div className="mt-3 flex flex-col gap-3 border-2 border-black bg-amber-50 px-3 py-3 sm:flex-row sm:items-center">
+                                <CircleDollarSign className="h-5 w-5 shrink-0 text-amber-700" />
+                                <div className="min-w-0 flex-1">
+                                    <p className="text-sm font-black text-amber-950">Deposit USDC to continue</p>
+                                    <p className="text-xs font-medium text-amber-800">
+                                        Add at least {balanceShortfall.toLocaleString(undefined, { maximumFractionDigits: 6 })} USDC, then create the challenge again.
+                                    </p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={handleDeposit}
+                                    className="inline-flex shrink-0 cursor-pointer items-center justify-center gap-1.5 border-2 border-black bg-black px-3 py-2 text-xs font-black text-white transition hover:bg-[#27211e] hover:shadow-[2px_2px_0_#e85a2d]"
+                                >
+                                    <CircleDollarSign className="h-4 w-4" />
+                                    Deposit funds
+                                </button>
                             </div>
                         )}
                     </div>

@@ -3,7 +3,7 @@ import { useRouter } from "next/navigation";
 import { useAppKit, useAppKitAccount, useAppKitProvider } from "@reown/appkit/react";
 import { PublicKey, Transaction } from "@solana/web3.js";
 import { Challenge, getChallengeById, getChallengeCategoryImage, updateChallengeStatus } from "@/app/lib/challenges-service/challenges";
-import { createPosition, getPositions } from "@/app/lib/positions-service/positions";
+import { createPosition, getJoinedChallengeIds } from "@/app/lib/positions-service/positions";
 import { useUserStore } from "@/app/store/useUserStore";
 import {
   deriveClaimPDA,
@@ -39,10 +39,8 @@ const joinedChallengeRequests = new Map<number, Promise<Set<number>>>();
 function loadJoinedChallengeIds(userId: number): Promise<Set<number>> {
   const pending = joinedChallengeRequests.get(userId);
   if (pending) return pending;
-  const request = getPositions({ limit: 1000, offset: 0, creator: userId })
-    .then(({ positions }) => new Set(
-      positions.filter((position) => position.creator === userId).map((position) => position.challenge_id)
-    ))
+  const request = getJoinedChallengeIds(userId)
+    .then((challengeIds) => new Set(challengeIds))
     .catch((error) => {
       joinedChallengeRequests.delete(userId);
       throw error;

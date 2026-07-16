@@ -11,6 +11,7 @@ import {
   Clock3,
   Crosshair,
   ExternalLink,
+  Info,
   Loader2,
   Share2,
   ShieldCheck,
@@ -31,8 +32,8 @@ import {
   type UTCTimestamp,
 } from "lightweight-charts";
 import { Challenge, incrementChallengeViews } from "@/app/lib/challenges-service/challenges";
-import { getUserById, User as UserType } from "@/app/lib/users-service/users";
-import { getPositionsByChallenge, Position } from "@/app/lib/positions-service/positions";
+import { User as UserType } from "@/app/lib/users-service/users";
+import { getPositionsByChallenge, ParticipantUser, Position } from "@/app/lib/positions-service/positions";
 import { useChallengeDetail } from "@/app/hooks/useChallengeDetail";
 import { useChallengeCard } from "@/app/hooks/useChallengeCard";
 import { getSolscanClusterQuery } from "@/app/lib/solana-config";
@@ -61,7 +62,7 @@ interface ChallengeAcceptActionProps {
   onOpenChange: (isOpen: boolean) => void;
 }
 
-type ParticipantRecord = { position: Position; user: UserType | null };
+type ParticipantRecord = { position: Position; user: UserType | ParticipantUser | null };
 type ParticipantView = {
   key: string;
   id: number;
@@ -303,10 +304,11 @@ export default function ChallengeDetailModal({ challenge, creator, isOpen, onClo
   } = useChallengeDetail(challenge, resolvedCreator, isOpen && !isAcceptModalOpen && !isShareModalOpen, onClose);
 
   React.useEffect(() => {
-    if (!isOpen || challengeId === undefined) {
+    if (challengeId === undefined) {
       lastCountedChallengeIdRef.current = null;
       return;
     }
+    if (!isOpen) return;
     if (lastCountedChallengeIdRef.current === challengeId) return;
     lastCountedChallengeIdRef.current = challengeId;
 
@@ -326,13 +328,10 @@ export default function ChallengeDetailModal({ challenge, creator, isOpen, onClo
 
     getPositionsByChallenge(challengeId)
       .then(async (positions) => {
-        const userIds = [...new Set(positions.map((position) => position.creator).filter(Boolean))];
-        const settledUsers = await Promise.allSettled(userIds.map((id) => getUserById(id)));
-        const usersById = new Map<number, UserType>();
-        settledUsers.forEach((result) => {
-          if (result.status === "fulfilled") usersById.set(result.value.id, result.value);
-        });
-        return positions.map((position) => ({ position, user: usersById.get(position.creator) ?? null }));
+        return positions.map((position) => ({
+          position,
+          user: position.user ?? null,
+        }));
       })
       .then((rows) => {
         if (!cancelled) setParticipantState({ key, rows, failed: false });
@@ -614,12 +613,12 @@ export default function ChallengeDetailModal({ challenge, creator, isOpen, onClo
 
                   <div className="flex w-16 shrink-0 items-center justify-center pb-10 sm:w-20 sm:pb-11">
                     {lifecycle === "LIVE" && hasOpponents ? (
-                      <video
-                        src="/animations/Sword%20Battle.webm"
-                        autoPlay
-                        loop
-                        muted
-                        playsInline
+                      <Image
+                        src="/animations/Sword%20Battle.gif"
+                        alt="Battle in progress"
+                        width={150}
+                        height={150}
+                        unoptimized
                         className="h-10 w-10 rounded-full bg-gradient-to-br from-[#2d1f1a] to-[#4a3830] object-contain p-1 sm:h-12 sm:w-12"
                       />
                     ) : (
@@ -932,7 +931,7 @@ function MarketCandlestickChart({ candles, asset, target, direction }: {
         lineWidth: 2,
         lineStyle: LineStyle.Dashed,
         axisLabelVisible: true,
-        title: `${direction.toUpperCase()} TARGET`,
+        title: "TARGET",
       });
     }
 
@@ -974,6 +973,17 @@ function MarketCandlestickChart({ candles, asset, target, direction }: {
   return (
     <div className="relative h-full w-full select-none" aria-label={`${asset} interactive candlestick chart`}>
       <div ref={containerRef} className="h-full w-full" />
+      {target && target > 0 ? (
+        <div className="absolute bottom-2 left-2 z-20 inline-flex items-center gap-1 border border-[#f5d547]/50 bg-[#163f31]/90 px-2 py-1 text-[8px] font-black uppercase tracking-[0.08em] text-[#f5d547] shadow-sm sm:text-[9px]">
+          <span>Target</span>
+          <span className="group relative inline-flex" tabIndex={0} aria-label="Target set by creator">
+            <Info className="h-3 w-3" aria-hidden="true" />
+            <span role="tooltip" className="pointer-events-none absolute bottom-full left-0 mb-2 hidden w-max max-w-40 border border-white/20 bg-[#201a16] px-2 py-1.5 text-[9px] font-bold normal-case tracking-normal text-white shadow-lg group-hover:block group-focus:block">
+              Target set by creator
+            </span>
+          </span>
+        </div>
+      ) : null}
       <div className="pointer-events-none absolute left-2 top-2 z-10 max-w-[calc(100%-1rem)] border border-white/20 bg-[#163f31]/90 px-2 py-1.5 text-[8px] font-bold text-white/65 shadow-sm sm:max-w-[calc(100%-8rem)] sm:text-[9px]">
         <span className="mr-2 text-white/90">{inspectedTime}</span>
         <span className="hidden min-[430px]:inline">O {formatPrice(inspected.open)} · H {formatPrice(inspected.high)} · L {formatPrice(inspected.low)} · C {formatPrice(inspected.close)}</span>

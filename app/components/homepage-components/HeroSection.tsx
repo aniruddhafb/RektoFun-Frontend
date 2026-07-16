@@ -99,9 +99,14 @@ export function HeroSection() {
                     </span>
                 </div>
 
-                <h1 className="mb-4 break-words text-4xl font-black tracking-tight text-black drop-shadow-[4px_4px_0_#f5d547] animate-airdrop min-[380px]:text-5xl md:text-6xl lg:text-7xl 2xl:text-8xl">
-                    REKTO.FUN
-                </h1>
+                <div className="mb-4 inline-block animate-airdrop">
+                    <h1 className="relative break-words text-4xl font-black tracking-tight text-black drop-shadow-[4px_4px_0_#f5d547] min-[380px]:text-5xl md:text-6xl lg:text-7xl 2xl:text-8xl">
+                        REKTO.FUN
+                        <span className="absolute -right-4 -top-3 rotate-6 border-2 border-black bg-[#e85a2d] px-1.5 py-0.5 text-[8px] font-black leading-none tracking-[0.12em] text-white shadow-[2px_2px_0_#111] min-[380px]:-right-6 min-[380px]:text-[9px] md:-right-8 md:-top-4 md:px-2 md:py-1 md:text-[10px]">
+                            BETA
+                        </span>
+                    </h1>
+                </div>
 
                 <p className="mx-auto mb-7 max-w-xl break-words text-base font-semibold leading-snug text-gray-800 min-[380px]:text-lg lg:text-xl xl:mb-8">
                     The PvP Battleground For Predictions {"\u{1FA84}"}

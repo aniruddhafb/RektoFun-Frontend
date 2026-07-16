@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createHmac, timingSafeEqual } from "crypto";
+import { internalApiHeaders } from "@/app/lib/server-api";
 
 const COOKIE_NAME = "rekto_x_oauth";
 
@@ -80,7 +81,7 @@ export async function GET(request: NextRequest) {
     const apiBase = process.env.NEXT_PUBLIC_BE_API_URL || "http://localhost:8000/api";
     const updateResponse = await fetch(`${apiBase}/users/${session.userId}`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...internalApiHeaders() },
       body: JSON.stringify({
         twitter_username: username,
         ...(profileImage ? {

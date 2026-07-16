@@ -6,7 +6,7 @@ import { ChevronRight } from "lucide-react";
 import {
     Challenge,
 } from "@/app/lib/challenges-service/challenges";
-import { ChallengeActivity, getActivityLabel, getActivityVerb, getChallengeActivities } from "@/app/lib/activity-service/activity";
+import { ChallengeActivity, getActivityLabel, getActivityVerb, getUserChallengeActivities } from "@/app/lib/activity-service/activity";
 
 interface ProfileActivityProps {
     userId: string;
@@ -110,12 +110,10 @@ export function ProfileActivity({ userId, username, avatar, onActivityClick, sea
             try {
                 setIsLoading(true);
                 setError(null);
-                const response = await getChallengeActivities();
+                const response = await getUserChallengeActivities(Number(userId));
                 if (!isMounted) return;
 
-                const numericUserId = Number(userId);
-                const sorted = response.filter((event) => Number(event.actor?.id) === numericUserId);
-                setActivities(sorted);
+                setActivities(response);
                 setVisibleCount(INITIAL_PAGE_SIZE);
             } catch (fetchError) {
                 if (!isMounted) return;

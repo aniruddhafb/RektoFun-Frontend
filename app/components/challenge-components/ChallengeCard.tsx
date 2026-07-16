@@ -480,12 +480,12 @@ export function ChallengeCard({
                                     className={`flex h-10 w-10 items-center sm:h-12 sm:w-12 justify-center ${ctaState.isOngoing ? "rounded-full bg-gradient-to-br from-[#2d1f1a] to-[#4a3830] hover:shadow-lg" : ""}`}
                                 >
                                     {ctaState.isOngoing ? (
-                                        <video
-                                            src="/animations/Sword%20Battle.webm"
-                                            autoPlay
-                                            loop
-                                            muted
-                                            playsInline
+                                        <Image
+                                            src="/animations/Sword%20Battle.gif"
+                                            alt="Battle in progress"
+                                            width={150}
+                                            height={150}
+                                            unoptimized
                                             className="h-8 w-8 object-contain sm:h-10 sm:w-10"
                                         />
                                     ) : (
