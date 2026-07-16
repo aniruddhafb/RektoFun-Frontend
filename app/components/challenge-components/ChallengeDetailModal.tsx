@@ -614,12 +614,12 @@ export default function ChallengeDetailModal({ challenge, creator, isOpen, onClo
 
                   <div className="flex w-16 shrink-0 items-center justify-center pb-10 sm:w-20 sm:pb-11">
                     {lifecycle === "LIVE" && hasOpponents ? (
-                      <video
-                        src="/animations/Sword%20Battle.webm"
-                        autoPlay
-                        loop
-                        muted
-                        playsInline
+                      <Image
+                        src="/animations/Sword%20Battle.gif"
+                        alt="Battle in progress"
+                        width={150}
+                        height={150}
+                        unoptimized
                         className="h-10 w-10 rounded-full bg-gradient-to-br from-[#2d1f1a] to-[#4a3830] object-contain p-1 sm:h-12 sm:w-12"
                       />
                     ) : (
