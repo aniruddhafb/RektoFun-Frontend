@@ -247,7 +247,7 @@ export function useChallengeDetail(
       : lifecycle === "RESOLVING"
         ? "Resolving"
         : lifecycle === "LIVE"
-          ? "Live"
+          ? "Battle live"
           : lifecycle === "EXPIRED"
             ? "Expired"
             : "Open";
@@ -319,7 +319,7 @@ export function useChallengeDetail(
         ctaDisabled = isCreator;
         ctaClassName = activeCtaClassName;
       } else {
-        ctaLabel = isTeam ? "BATTLE ONGOING" : "LIVE";
+        ctaLabel = "BATTLE LIVE";
         ctaDisabled = true;
         ctaClassName = ongoingCtaClassName;
       }

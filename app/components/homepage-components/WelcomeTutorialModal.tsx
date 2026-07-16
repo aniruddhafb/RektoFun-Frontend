@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import type { ComponentType, ReactNode } from "react";
 import { useEffect, useState, useSyncExternalStore } from "react";
+import { useAppKit } from "@reown/appkit/react";
 import { useBodyScrollLock } from "@/app/lib/useBodyScrollLock";
 
 type Slide = {
@@ -74,6 +75,7 @@ const TUTORIAL_COMPLETED_KEY = "rektofun_tutorial_completed";
 export function WelcomeTutorialModal() {
     const [isDismissedForSession, setIsDismissedForSession] = useState(false);
     const [activeSlide, setActiveSlide] = useState(0);
+    const { open } = useAppKit();
     const isCompleted = useSyncExternalStore(
         () => () => { },
         () => window.localStorage.getItem(TUTORIAL_COMPLETED_KEY) === "true",
@@ -102,6 +104,11 @@ export function WelcomeTutorialModal() {
     const handleClosePermanently = () => {
         window.localStorage.setItem(TUTORIAL_COMPLETED_KEY, "true");
         setIsDismissedForSession(true);
+    };
+
+    const handleEnterArena = () => {
+        handleClosePermanently();
+        window.setTimeout(() => void open({ view: "Connect" }), 50);
     };
 
     if (!isOpen) return null;
@@ -138,7 +145,7 @@ export function WelcomeTutorialModal() {
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-[#201430]/80 via-transparent to-transparent lg:bg-gradient-to-r lg:from-transparent lg:via-transparent lg:to-[#1a1028]/20" />
 
-                    <div className="absolute left-4 top-4 flex items-center gap-2 border-2 border-[#211530] bg-[#211530]/90 px-3 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-[#fff5dc] sm:left-6 sm:top-6 sm:text-xs">
+                    <div className="absolute left-4 top-4 hidden items-center gap-2 border-2 border-[#211530] bg-[#211530]/90 px-3 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-[#fff5dc] sm:left-6 sm:top-6 sm:flex sm:text-xs">
                         <ShieldCheck className="h-4 w-4 text-[#d8b4fe]" />
                         Rekto.Fun is in beta
                     </div>
@@ -219,7 +226,7 @@ export function WelcomeTutorialModal() {
                             </button>
                             <button
                                 type="button"
-                                onClick={() => isLastSlide ? handleClosePermanently() : setActiveSlide((prev) => prev + 1)}
+                                onClick={() => isLastSlide ? handleEnterArena() : setActiveSlide((prev) => prev + 1)}
                                 className="rekto-button group flex h-12 flex-1 cursor-pointer items-center justify-center gap-2 border-2 border-[#211530] bg-[#211530] px-5 text-sm font-black uppercase tracking-[0.08em] text-[#fff8ea] transition hover:-translate-y-1 hover:bg-[#7c3aed]"
                             >
                                 {currentSlide.cta}
