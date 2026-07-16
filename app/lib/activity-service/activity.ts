@@ -17,7 +17,7 @@ export interface ChallengeActivityPage {
   has_more: boolean;
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_BE_API_URL || "http://localhost:8000/api";
+const API_BASE_URL = "/api/backend";
 const activityRequests = new Map<string, Promise<ChallengeActivityPage>>();
 
 type TimestampedChallenge = Challenge & { updated_at?: string; cancelled_at?: string };

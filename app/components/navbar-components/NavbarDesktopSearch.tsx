@@ -123,7 +123,16 @@ function formatMode(mode: string) {
 }
 
 function formatCompactNumber(value: number) {
-    return new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(value);
+    const numericValue = Number(value);
+    return new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 })
+        .format(Number.isFinite(numericValue) ? numericValue : 0);
+}
+
+function formatPnl(value: number) {
+    const numericValue = Number(value);
+    const safeValue = Number.isFinite(numericValue) ? numericValue : 0;
+    const amount = Math.abs(safeValue).toLocaleString("en-US", { maximumFractionDigits: 2 });
+    return `${safeValue > 0 ? "+" : safeValue < 0 ? "-" : ""}$${amount}`;
 }
 
 function UserVerifiedBadge({ isModerator, username }: { isModerator: boolean; username: string }) {
@@ -532,7 +541,7 @@ export function NavbarDesktopSearch({
                             <div className="mb-4 flex items-center justify-between">
                                 <div>
                                     <h3 className="text-lg font-black text-[#1e293b] md:text-xl">Users</h3>
-                                    <p className="text-xs font-semibold text-[#7c6a60]">Top performers</p>
+                                    <p className="text-xs font-semibold text-[#7c6a60]">Most followed users first</p>
                                 </div>
                                 <Link href="/leaderboard" onClick={closeModal} className="text-[#f97316] text-xs md:text-sm font-bold">View all →</Link>
                             </div>
@@ -566,10 +575,18 @@ export function NavbarDesktopSearch({
                                                     <p className="mt-0.5 line-clamp-2 text-xs font-semibold leading-4 text-[#64748b]">{user.bio || "No bio yet"}</p>
                                                 </div>
                                             </div>
-                                            <div className="mt-3 border-t border-[#f0dfd2] pt-3 text-center">
+                                            <div className="mt-3 grid grid-cols-3 divide-x divide-[#f0dfd2] border-t border-[#f0dfd2] pt-3 text-center">
                                                 <div className="min-w-0 px-1">
                                                     <p className="truncate text-sm font-black text-[#111827]">{formatCompactNumber(followerCount)}</p>
                                                     <p className="mt-0.5 text-[9px] font-black uppercase tracking-[0.07em] text-[#8a7468]">Followers</p>
+                                                </div>
+                                                <div className="min-w-0 px-1">
+                                                    <p className="truncate text-sm font-black text-emerald-700">{formatCompactNumber(user.won)}</p>
+                                                    <p className="mt-0.5 text-[9px] font-black uppercase tracking-[0.07em] text-[#8a7468]">Wins</p>
+                                                </div>
+                                                <div className="min-w-0 px-1">
+                                                    <p className={`truncate text-sm font-black ${user.pnl > 0 ? "text-emerald-700" : user.pnl < 0 ? "text-red-600" : "text-[#111827]"}`} title={formatPnl(user.pnl)}>{formatPnl(user.pnl)}</p>
+                                                    <p className="mt-0.5 text-[9px] font-black uppercase tracking-[0.07em] text-[#8a7468]">P&amp;L</p>
                                                 </div>
                                             </div>
                                         </Link>

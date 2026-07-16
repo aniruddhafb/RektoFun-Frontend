@@ -145,7 +145,7 @@ export interface GetChallengesOptions {
   bypassCache?: boolean;
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_BE_API_URL;
+const API_BASE_URL = "/api/backend";
 const challengeListRequests = new Map<string, Promise<GetChallengesResponse>>();
 
 export async function createChallenge(params: CreateChallengeParams): Promise<Challenge> {

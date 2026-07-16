@@ -10,6 +10,8 @@ export type SearchModalUser = {
   twitter_username?: string | null;
   user_type?: "user" | "moderator" | null;
   follower_count: number;
+  won: number;
+  pnl: number;
 };
 
 export type SearchModalResponse = {
@@ -17,7 +19,7 @@ export type SearchModalResponse = {
   users: SearchModalUser[];
 };
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_BE_API_URL || "http://localhost:8000/api";
+const API_BASE_URL = "/api/backend";
 const requests = new Map<string, Promise<SearchModalResponse>>();
 const cache = new Map<string, { data: SearchModalResponse; expiresAt: number }>();
 const CACHE_TTL_MS = 30_000;

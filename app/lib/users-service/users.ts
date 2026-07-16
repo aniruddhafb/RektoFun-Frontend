@@ -95,7 +95,7 @@ export interface UsernameCheckResponse {
   exists: boolean;
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_BE_API_URL || "http://localhost:8000/api";
+const API_BASE_URL = "/api/backend";
 const USER_CACHE_TTL_MS = 30_000;
 const LEADERBOARD_CACHE_TTL_MS = 15_000;
 const userRequests = new Map<string, Promise<User>>();
