@@ -6,20 +6,14 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Search, X } from "lucide-react";
-import { getChallengeCategoryImage, getChallenges, type Challenge } from "@/app/lib/challenges-service/challenges";
-import { getLeaderboard, getUsers, type LeaderboardUser, type User } from "@/app/lib/users-service/users";
+import { getChallengeCategoryImage, type Challenge } from "@/app/lib/challenges-service/challenges";
+import { getSearchModalResults, type SearchModalUser } from "@/app/lib/search-service";
 import { useBodyScrollLock } from "@/app/lib/useBodyScrollLock";
 import { stripUsdcQuote } from "@/app/lib/format-market-label";
 
 type SearchTab = "all" | "challenges" | "users";
-const CHALLENGE_RESULT_LIMIT = 8;
-const USER_RESULT_LIMIT = 5;
-const USER_CANDIDATE_LIMIT = 1000;
-
-type SearchUser = User & {
-    won: number;
-    pnl: number;
-};
+const CHALLENGE_RESULT_LIMIT = 6;
+const USER_RESULT_LIMIT = 6;
 
 type NavbarDesktopSearchProps = {
     searchQuery: string;
@@ -132,77 +126,6 @@ function formatCompactNumber(value: number) {
     return new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(value);
 }
 
-function formatPnl(value: number) {
-    const amount = Math.abs(value).toLocaleString("en-US", { maximumFractionDigits: 2 });
-    return `${value > 0 ? "+" : value < 0 ? "-" : ""}$${amount}`;
-}
-
-function filterChallenges(challenges: Challenge[], searchTerm: string) {
-    const query = searchTerm.trim().toLowerCase();
-    if (!query) return challenges;
-
-    return challenges.filter((challenge) =>
-        [
-            challenge.statement,
-            challenge.ticker,
-            challenge.trading_pair,
-            challenge.creator_details?.username,
-            challenge.creator_details?.pubkey,
-        ]
-            .filter(Boolean)
-            .some((value) => value!.toLowerCase().includes(query))
-    );
-}
-
-function filterUsers(users: User[], searchTerm: string) {
-    const query = searchTerm.trim().toLowerCase();
-    if (!query) return users;
-
-    return users.filter((user) =>
-        [user.username, user.pubkey, user.email]
-            .filter(Boolean)
-            .some((value) => value!.toLowerCase().includes(query))
-    );
-}
-
-function leaderboardUsersAsUsers(users: LeaderboardUser[]): User[] {
-    return users.map((user) => ({
-        ...user,
-        id: Number(user.id),
-        followers: user.followers,
-        following: user.following,
-    }));
-}
-
-function buildSearchUsers(users: User[], leaderboardUsers: LeaderboardUser[], searchTerm = ""): SearchUser[] {
-    const metricsByWallet = new Map<string, LeaderboardUser>();
-    const metricsById = new Map<string, LeaderboardUser>();
-
-    leaderboardUsers.forEach((user) => {
-        const wallet = (user.wallet_address || user.pubkey || "").toLowerCase();
-        if (wallet) metricsByWallet.set(wallet, user);
-        metricsById.set(String(user.id), user);
-    });
-
-    return filterUsers(users, searchTerm)
-        .map((user) => {
-            const wallet = (user.wallet_address || user.pubkey || "").toLowerCase();
-            const metrics = metricsByWallet.get(wallet) ?? metricsById.get(String(user.id));
-            return {
-                ...user,
-                followers: user.followers?.length ? user.followers : metrics?.followers ?? [],
-                won: metrics?.won ?? 0,
-                pnl: metrics?.pnl ?? 0,
-            };
-        })
-        .sort((a, b) =>
-            (b.followers?.length ?? 0) - (a.followers?.length ?? 0)
-            || b.won - a.won
-            || b.pnl - a.pnl
-        )
-        .slice(0, USER_RESULT_LIMIT);
-}
-
 function UserVerifiedBadge({ isModerator, username }: { isModerator: boolean; username: string }) {
     const label = isModerator ? `${username} is a verified KOL` : `${username} is verified on X`;
     return (
@@ -230,7 +153,7 @@ export function NavbarDesktopSearch({
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [challengeResults, setChallengeResults] = useState<Challenge[]>([]);
-    const [userResults, setUserResults] = useState<SearchUser[]>([]);
+    const [userResults, setUserResults] = useState<SearchModalUser[]>([]);
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const requestIdRef = useRef(0);
     const hasInitializedOpenStateRef = useRef(false);
@@ -245,21 +168,12 @@ export function NavbarDesktopSearch({
         setError(null);
 
         try {
-            const [challengesRes, usersRes, leaderboardRes] = await Promise.all([
-                getChallenges({ limit: CHALLENGE_RESULT_LIMIT }).catch(() => null),
-                getUsers({ limit: USER_CANDIDATE_LIMIT }).catch(() => null),
-                getLeaderboard(USER_CANDIDATE_LIMIT, 0, undefined, "all", "rank", "asc").catch(() => null),
-            ]);
+            const response = await getSearchModalResults();
 
             if (requestIdRef.current !== reqId) return;
 
-            setChallengeResults((challengesRes?.challenges ?? []).slice(0, CHALLENGE_RESULT_LIMIT));
-            const baseUsers = usersRes?.users ?? leaderboardUsersAsUsers(leaderboardRes?.users ?? []);
-            setUserResults(buildSearchUsers(baseUsers, leaderboardRes?.users ?? []));
-
-            if (!challengesRes && !usersRes && !leaderboardRes) {
-                setError("Could not load search results.");
-            }
+            setChallengeResults(response.challenges);
+            setUserResults(response.users);
         } catch {
             if (requestIdRef.current !== reqId) return;
             setError("Could not load search results.");
@@ -296,21 +210,12 @@ export function NavbarDesktopSearch({
         setError(null);
 
         try {
-            const [challengesRes, usersRes, leaderboardRes] = await Promise.all([
-                getChallenges({ limit: CHALLENGE_RESULT_LIMIT }).catch(() => null),
-                getUsers({ limit: USER_CANDIDATE_LIMIT }).catch(() => null),
-                getLeaderboard(USER_CANDIDATE_LIMIT, 0, nextQuery, "all", "rank", "asc").catch(() => null),
-            ]);
+            const response = await getSearchModalResults(nextQuery);
 
             if (requestIdRef.current !== reqId) return;
 
-            setChallengeResults(filterChallenges(challengesRes?.challenges ?? [], nextQuery).slice(0, CHALLENGE_RESULT_LIMIT));
-            const baseUsers = usersRes?.users ?? leaderboardUsersAsUsers(leaderboardRes?.users ?? []);
-            setUserResults(buildSearchUsers(baseUsers, leaderboardRes?.users ?? [], nextQuery));
-
-            if (!challengesRes && !usersRes && !leaderboardRes) {
-                setError("Could not fetch search results. Please try again.");
-            }
+            setChallengeResults(response.challenges);
+            setUserResults(response.users);
         } catch {
             if (requestIdRef.current !== reqId) return;
             setError("Could not fetch search results. Please try again.");
@@ -627,7 +532,7 @@ export function NavbarDesktopSearch({
                             <div className="mb-4 flex items-center justify-between">
                                 <div>
                                     <h3 className="text-lg font-black text-[#1e293b] md:text-xl">Users</h3>
-                                    <p className="text-xs font-semibold text-[#7c6a60]">Most followed users first</p>
+                                    <p className="text-xs font-semibold text-[#7c6a60]">Top performers</p>
                                 </div>
                                 <Link href="/leaderboard" onClick={closeModal} className="text-[#f97316] text-xs md:text-sm font-bold">View all →</Link>
                             </div>
@@ -635,8 +540,8 @@ export function NavbarDesktopSearch({
                                 {userResults.map((user, index) => {
                                     const username = user.username || "Unnamed";
                                     const isVerified = Boolean(user.twitter_username || user.user_type === "moderator");
-                                    const followerCount = user.followers?.length ?? 0;
-                                    const wallet = user.wallet_address || user.pubkey;
+                                    const followerCount = user.follower_count;
+                                    const wallet = user.pubkey;
                                     return (
                                         <Link
                                             key={user.id}
@@ -658,21 +563,13 @@ export function NavbarDesktopSearch({
                                                 </div>
                                                 <div className="min-w-0 flex-1 pr-7">
                                                     <p className="truncate text-sm font-black text-[#0f172a] group-hover:text-[#e85a2d]">{username}</p>
-                                                    <p className="mt-0.5 line-clamp-2 text-xs font-semibold leading-4 text-[#64748b]">{user.description || user.bio || "No bio yet"}</p>
+                                                    <p className="mt-0.5 line-clamp-2 text-xs font-semibold leading-4 text-[#64748b]">{user.bio || "No bio yet"}</p>
                                                 </div>
                                             </div>
-                                            <div className="mt-3 grid grid-cols-3 divide-x divide-[#f0dfd2] border-t border-[#f0dfd2] pt-3 text-center">
+                                            <div className="mt-3 border-t border-[#f0dfd2] pt-3 text-center">
                                                 <div className="min-w-0 px-1">
                                                     <p className="truncate text-sm font-black text-[#111827]">{formatCompactNumber(followerCount)}</p>
                                                     <p className="mt-0.5 text-[9px] font-black uppercase tracking-[0.07em] text-[#8a7468]">Followers</p>
-                                                </div>
-                                                <div className="min-w-0 px-1">
-                                                    <p className="truncate text-sm font-black text-emerald-700">{formatCompactNumber(user.won)}</p>
-                                                    <p className="mt-0.5 text-[9px] font-black uppercase tracking-[0.07em] text-[#8a7468]">Wins</p>
-                                                </div>
-                                                <div className="min-w-0 px-1">
-                                                    <p className={`truncate text-sm font-black ${user.pnl > 0 ? "text-emerald-700" : user.pnl < 0 ? "text-red-600" : "text-[#111827]"}`} title={formatPnl(user.pnl)}>{formatPnl(user.pnl)}</p>
-                                                    <p className="mt-0.5 text-[9px] font-black uppercase tracking-[0.07em] text-[#8a7468]">P&amp;L</p>
                                                 </div>
                                             </div>
                                         </Link>

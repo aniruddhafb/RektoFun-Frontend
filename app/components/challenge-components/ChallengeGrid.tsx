@@ -23,7 +23,7 @@ interface ChallengeGridProps {
 }
 
 const INITIAL_PAGE_SIZE = 6;
-const NEXT_PAGE_SIZE = 9;
+const NEXT_PAGE_SIZE = 6;
 const STATUS_PRIORITY: Record<string, number> = {
     OPEN: 0,
     PENDING_RESOLUTION: 1,
@@ -52,6 +52,9 @@ export function ChallengeGrid({
     const { address } = useAppKitAccount();
     const { user } = useUserStore();
     const userId = user?.id;
+    const filterUserId = activeFilter === "My Bets" || activeFilter === "Created By Me"
+        ? userId
+        : undefined;
     const ownerAddress = address || '';
 
     const [challenges, setChallenges] = useState<Challenge[]>([]);
@@ -88,7 +91,7 @@ export function ChallengeGrid({
                     : undefined;
             const needsCompleteList = isPinnedFilter || isMyBetsFilter || isCreatedByMeFilter;
 
-            if ((isMyBetsFilter || isCreatedByMeFilter) && userId == null) {
+            if ((isMyBetsFilter || isCreatedByMeFilter) && filterUserId == null) {
                 setChallenges([]);
                 setHasMore(false);
                 setOffset(0);
@@ -108,6 +111,7 @@ export function ChallengeGrid({
                     status: statusFilter,
                     expiring_soon: isExpiringSoonFilter || undefined,
                     joinable: isOpenFilter || undefined,
+                    include_total: false,
                 }),
                 isMyBetsFilter ? getPositions({ limit: 100, offset: 0 }) : Promise.resolve(null),
             ]);
@@ -137,14 +141,14 @@ export function ChallengeGrid({
             if (isMyBetsFilter) {
                 const joinedChallengeIds = new Set(
                     (positionsResponse?.positions ?? [])
-                        .filter((position) => position.creator === userId)
+                        .filter((position) => position.creator === filterUserId)
                         .map((position) => position.challenge_id),
                 );
                 nextChunk = nextChunk.filter((challenge) => joinedChallengeIds.has(challenge.id));
             }
 
             if (isCreatedByMeFilter) {
-                nextChunk = nextChunk.filter((challenge) => challenge.creator === userId);
+                nextChunk = nextChunk.filter((challenge) => challenge.creator === filterUserId);
             }
 
             // Keep a client-side search pass for APIs that do not support search yet.
@@ -174,7 +178,7 @@ export function ChallengeGrid({
 
             if (requestId !== requestIdRef.current) return;
             setChallenges((prev) => (append ? [...prev, ...nextChunk] : nextChunk));
-            setHasMore(!needsCompleteList && response.challenges.length === requestLimit);
+            setHasMore(!needsCompleteList && response.has_more);
             setOffset(needsCompleteList ? nextChunk.length : currentOffset + response.challenges.length);
         } catch (error) {
             if (requestId !== requestIdRef.current) return;
@@ -192,7 +196,7 @@ export function ChallengeGrid({
                 setIsLoadingMore(false);
             }
         }
-    }, [activeFilter, isBookmarked, onRefreshComplete, searchQuery, isLoadingMore, resolutionSource, userId]);
+    }, [activeFilter, filterUserId, isBookmarked, onRefreshComplete, searchQuery, isLoadingMore, resolutionSource]);
 
     /* eslint-disable react-hooks/set-state-in-effect -- reset pagination before fetching a newly selected challenge view */
     useEffect(() => {
@@ -201,7 +205,7 @@ export function ChallengeGrid({
         setOffset(0);
         setHasMore(true);
         fetchChallenges(0, false);
-    }, [refreshKey, retryNonce, activeFilter, searchQuery, resolutionSource, userId]);
+    }, [refreshKey, retryNonce, activeFilter, searchQuery, resolutionSource, filterUserId]);
     /* eslint-enable react-hooks/set-state-in-effect */
 
     useEffect(() => {

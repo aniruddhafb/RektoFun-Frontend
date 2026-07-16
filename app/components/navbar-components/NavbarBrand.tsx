@@ -20,7 +20,7 @@ export function NavbarBrand() {
                 </div>
             </div> */}
 
-            <Link href="/" className="min-w-0 border-2 border-transparent px-1 py-1 transition-all hover:border-black hover:bg-white hover:shadow-[2px_2px_0_#111] sm:px-2">
+            <Link href="/" className="relative min-w-0 border-2 border-transparent px-1 py-1 transition-all hover:border-black hover:bg-white hover:shadow-[2px_2px_0_#111] sm:px-2">
                 <Image
                     src="/logos/mainlogo.png"
                     alt="REKTO"
@@ -29,6 +29,9 @@ export function NavbarBrand() {
                     className="h-7 w-auto min-[380px]:h-8 sm:h-8"
                     priority
                 />
+                <span className="absolute -right-1 -top-1 rotate-3 border border-black bg-[#e85a2d] px-1 py-px text-[7px] font-black leading-none tracking-[0.08em] text-white shadow-[1px_1px_0_#111] sm:right-0 sm:text-[8px]">
+                    BETA
+                </span>
             </Link>
         </div>
     );

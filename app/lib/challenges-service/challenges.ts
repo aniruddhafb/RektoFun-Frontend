@@ -124,6 +124,7 @@ export interface GetChallengesResponse {
   challenges: Challenge[];
   total: number;
   count: number;
+  has_more: boolean;
 }
 
 export interface GetChallengesParams {
@@ -137,6 +138,7 @@ export interface GetChallengesParams {
   status?: string;
   expiring_soon?: boolean;
   joinable?: boolean;
+  include_total?: boolean;
 }
 
 export interface GetChallengesOptions {
@@ -224,6 +226,10 @@ export async function getChallenges(
   if (params?.joinable !== undefined) {
     queryParams.append('joinable', params.joinable.toString());
   }
+
+  if (params?.include_total !== undefined) {
+    queryParams.append('include_total', params.include_total.toString());
+  }
   
   const queryString = queryParams.toString();
   const url = `${API_BASE_URL}/challenges${queryString ? `?${queryString}` : ''}`;
@@ -241,6 +247,7 @@ export async function getChallenges(
       challenges: data.challenges || [],
       total: data.total || 0,
       count: data.count ?? data.total ?? 0,
+      has_more: data.has_more ?? false,
     };
   }).finally(() => challengeListRequests.delete(url));
 
