@@ -92,4 +92,7 @@ pub enum RektoError {
 
     #[msg("Withdrawal amount exceeds the vault's balance")]
     InsufficientVaultBalance,
+
+    #[msg("Only the designated withdraw authority may perform this action")]
+    UnauthorizedWithdrawAuthority,
 }

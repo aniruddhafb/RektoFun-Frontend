@@ -90,12 +90,42 @@ pub mod rektofun_program {
         instructions::admin_cancel_challenge::handler(ctx)
     }
 
-    /// Admin-only emergency backstop: withdraw USDC from any challenge's vault
-    /// to any recipient token account, in any amount up to the vault balance,
+    /// Emergency backstop: withdraw USDC from any challenge's vault to any
+    /// recipient token account, in any amount up to the vault balance,
     /// regardless of challenge status. For cases where a participant cannot
     /// complete the normal settle/claim flow themselves.
+    ///
+    /// Gated on the dedicated `WithdrawAuthority` PDA (see
+    /// `initialize_withdraw_authority` / `update_withdraw_authority`), not
+    /// `Config::admin` — this instruction has full custody of every escrowed
+    /// vault, so it is signed by a wallet kept deliberately separate from the
+    /// hot admin key used elsewhere.
     pub fn admin_withdraw(ctx: Context<AdminWithdraw>, amount: u64) -> Result<()> {
         instructions::admin_withdraw::handler(ctx, amount)
+    }
+
+    /// One-time bootstrap: creates the `WithdrawAuthority` PDA and sets the
+    /// dedicated wallet that will be the sole signer for `admin_withdraw`
+    /// going forward. Callable only by `Config::admin`; after this call
+    /// succeeds, `Config::admin` has no further authority over
+    /// `admin_withdraw` — only `WithdrawAuthority::authority` (rotatable via
+    /// `update_withdraw_authority`) does.
+    pub fn initialize_withdraw_authority(
+        ctx: Context<InitializeWithdrawAuthority>,
+        authority: Pubkey,
+    ) -> Result<()> {
+        instructions::initialize_withdraw_authority::handler(ctx, authority)
+    }
+
+    /// Rotates the dedicated `admin_withdraw` signer. Callable only by the
+    /// *current* withdraw authority itself, not by `Config::admin` — keeps a
+    /// compromised admin hot wallet from ever reassigning this authority to
+    /// itself.
+    pub fn update_withdraw_authority(
+        ctx: Context<UpdateWithdrawAuthority>,
+        new_authority: Pubkey,
+    ) -> Result<()> {
+        instructions::update_withdraw_authority::handler(ctx, new_authority)
     }
 
     /// TEAM mode only: a winner on the winning side claims their proportional
