@@ -134,5 +134,11 @@ pub(crate) fn handler(ctx: Context<AdminCancelChallenge>) -> Result<()> {
         },
     );
 
+    // Reclaim the challenge PDA's rent to admin once no other depositors remain
+    // to claim refunds via claim_refund (which needs this account to still exist).
+    if !other_depositors_remain {
+        ctx.accounts.challenge.close(ctx.accounts.admin.to_account_info())?;
+    }
+
     Ok(())
 }

@@ -56,8 +56,15 @@ pub struct SettleChallenge<'info> {
     /// PVP only: winner's USDC token account — must actually belong to whichever
     /// side `creator_wins` declares as the winner (creator or challenger).
     /// For TEAM challenges pass any valid USDC token account — it won't be written to.
+    ///
+    /// `dup`: when the creator wins, this is the same account as
+    /// `creator_usdc_account` (both are the creator's ATA). That's safe to alias —
+    /// SPL token accounts are owned by the token program, not this one, so Anchor
+    /// never re-serializes them on exit; balance changes only happen via the
+    /// `transfer_checked` CPIs below, which are correct regardless of aliasing.
     #[account(
         mut,
+        dup,
         token::mint = usdc_mint,
         token::token_program = token_program,
         constraint = challenge.challenge_type != ChallengeType::Pvp

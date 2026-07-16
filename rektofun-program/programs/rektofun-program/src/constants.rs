@@ -55,3 +55,4 @@ pub const VAULT_SEED: &[u8] = b"vault";
 pub const COUNTER_SEED: &[u8] = b"creator_counter";
 pub const CLAIM_SEED: &[u8] = b"claim";
 pub const CONFIG_SEED: &[u8] = b"config";
+pub const WITHDRAW_AUTHORITY_SEED: &[u8] = b"withdraw_authority";
