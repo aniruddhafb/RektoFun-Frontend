@@ -178,5 +178,11 @@ pub(crate) fn handler(ctx: Context<ClaimRefund>) -> Result<()> {
         refund_amount,
     );
 
+    // Last claimant also reclaims the challenge PDA's rent — no further refund
+    // claims can occur once the vault is drained.
+    if is_last_claim {
+        ctx.accounts.challenge.close(ctx.accounts.admin.to_account_info())?;
+    }
+
     Ok(())
 }
