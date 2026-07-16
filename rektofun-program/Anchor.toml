@@ -11,7 +11,7 @@ rektofun_program = "4t5KYdKFmPw49yo6Bm1TV2ZDEi6k3Ns4eJLeNhgbVSzJ"
 
 [provider]
 cluster = "devnet"
-wallet = "~/.config/solana/id.json"
+wallet = "~/.config/solana/rekto-deploy.json"
 
 [scripts]
 test = "cargo test"

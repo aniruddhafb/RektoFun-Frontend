@@ -86,4 +86,10 @@ pub enum RektoError {
 
     #[msg("Challenge is already settled or cancelled; nothing to cancel")]
     NotOpenOrActive,
+
+    #[msg("Withdrawal amount must be greater than zero")]
+    InvalidWithdrawAmount,
+
+    #[msg("Withdrawal amount exceeds the vault's balance")]
+    InsufficientVaultBalance,
 }

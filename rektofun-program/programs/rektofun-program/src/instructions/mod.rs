@@ -1,5 +1,6 @@
 pub mod accept_challenge;
 pub mod admin_cancel_challenge;
+pub mod admin_withdraw;
 pub mod cancel_challenge;
 pub mod claim_refund;
 pub mod claim_winnings;
@@ -11,6 +12,7 @@ pub mod update_platform_params;
 
 pub use accept_challenge::*;
 pub use admin_cancel_challenge::*;
+pub use admin_withdraw::*;
 pub use cancel_challenge::*;
 pub use claim_refund::*;
 pub use claim_winnings::*;

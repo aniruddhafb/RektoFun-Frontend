@@ -90,6 +90,14 @@ pub mod rektofun_program {
         instructions::admin_cancel_challenge::handler(ctx)
     }
 
+    /// Admin-only emergency backstop: withdraw USDC from any challenge's vault
+    /// to any recipient token account, in any amount up to the vault balance,
+    /// regardless of challenge status. For cases where a participant cannot
+    /// complete the normal settle/claim flow themselves.
+    pub fn admin_withdraw(ctx: Context<AdminWithdraw>, amount: u64) -> Result<()> {
+        instructions::admin_withdraw::handler(ctx, amount)
+    }
+
     /// TEAM mode only: a winner on the winning side claims their proportional
     /// share of the pot after the challenge has been settled.
     /// Each participant can only call this once (enforced by the ClaimRecord PDA).
