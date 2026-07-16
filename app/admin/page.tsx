@@ -22,7 +22,10 @@ import {
 } from "lucide-react";
 import { isAdminWallet } from "@/app/lib/admin";
 import { getUsers, type User } from "@/app/lib/users-service/users";
-import { getChallenges } from "@/app/lib/challenges-service/challenges";
+import {
+  getChallenges,
+  type Challenge,
+} from "@/app/lib/challenges-service/challenges";
 import {
   createCategory,
   deleteCategory,
@@ -32,6 +35,7 @@ import {
 } from "@/app/lib/category-service/category";
 import {
   getAdminReferrals,
+  resolveChallenge,
   updateRedemptionStatus,
   updateUserRole,
   uploadCategoryImage,
@@ -39,8 +43,10 @@ import {
   type AdminReferralUser,
 } from "@/app/lib/admin-service";
 
-type Tab = "stats" | "users" | "categories" | "referrals";
+type Tab = "stats" | "resolution" | "users" | "categories" | "referrals";
 type UserSort = "verified" | "followers" | "role";
+type PriceFeedFilter = "due" | "resolved" | "completed" | "cancelled" | "expired";
+const CATEGORY_PAGE_SIZE = 10;
 const shortWallet = (wallet?: string | null) =>
   wallet ? `${wallet.slice(0, 5)}…${wallet.slice(-4)}` : "—";
 const money = (value: number) =>
@@ -63,6 +69,10 @@ export default function AdminPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [referralUsers, setReferralUsers] = useState<AdminReferralUser[]>([]);
   const [redemptions, setRedemptions] = useState<AdminRedemption[]>([]);
+  const [resolutionChallenges, setResolutionChallenges] = useState<Challenge[]>([]);
+  const [manualWinners, setManualWinners] = useState<Record<number, "creator" | "opponent">>({});
+  const [manualPrices, setManualPrices] = useState<Record<number, string>>({});
+  const [priceFeedFilter, setPriceFeedFilter] = useState<PriceFeedFilter>("due");
   const [stats, setStats] = useState({
     users: 0,
     challenges: 0,
@@ -70,9 +80,11 @@ export default function AdminPage() {
     volume: 0,
   });
   const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [loaded, setLoaded] = useState<Record<Tab, boolean>>({
     stats: false,
+    resolution: false,
     users: false,
     categories: false,
     referrals: false,
@@ -83,6 +95,7 @@ export default function AdminPage() {
   const [categoryName, setCategoryName] = useState("");
   const [parentCategory, setParentCategory] = useState("");
   const [categoryImage, setCategoryImage] = useState<File | null>(null);
+  const [categoryPage, setCategoryPage] = useState(1);
   const [userSort, setUserSort] = useState<UserSort>("followers");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [userPage, setUserPage] = useState(1);
@@ -117,10 +130,17 @@ export default function AdminPage() {
               0,
             ),
           });
+        } else if (section === "resolution") {
+          const challengeData = await getChallenges(
+            { limit: 1000, offset: 0 },
+            { bypassCache: true },
+          );
+          setResolutionChallenges(challengeData.challenges);
         } else if (section === "users") {
           const data = await getUsers({
             limit: 10,
             offset: (userPage - 1) * 10,
+            search: debouncedQuery || undefined,
           });
           setUsers(data.users);
           setUserTotal(data.total);
@@ -140,8 +160,17 @@ export default function AdminPage() {
         setLoading(false);
       }
     },
-    [allowed, loaded, userPage],
+    [allowed, loaded, userPage, debouncedQuery],
   );
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setUserPage(1);
+      setLoaded((current) => ({ ...current, users: false }));
+      setDebouncedQuery(query.trim());
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [query]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => void loadSection(tab), 0);
@@ -149,14 +178,7 @@ export default function AdminPage() {
   }, [loadSection, tab]);
 
   const filteredUsers = useMemo(() => {
-    const value = query.trim().toLowerCase();
-    const rows = users.filter(
-      (user) =>
-        !value ||
-        `${user.username} ${user.wallet_address} ${user.twitter_username || ""}`
-          .toLowerCase()
-          .includes(value),
-    );
+    const rows = [...users];
     const score = (user: User) =>
       userSort === "verified"
         ? Number(Boolean(user.twitter_username))
@@ -166,7 +188,7 @@ export default function AdminPage() {
     return rows.sort(
       (a, b) => (score(a) - score(b)) * (sortDirection === "asc" ? 1 : -1),
     );
-  }, [query, users, userSort, sortDirection]);
+  }, [users, userSort, sortDirection]);
   const referralUserByWallet = useMemo(
     () => new Map(referralUsers.map((user) => [user.pubkey, user])),
     [referralUsers],
@@ -187,6 +209,36 @@ export default function AdminPage() {
   );
   const userPages = Math.max(1, Math.ceil(userTotal / 10));
   const referralPages = Math.max(1, Math.ceil(referralLeaderboard.length / 10));
+  const categoryPages = Math.max(1, Math.ceil(categories.length / CATEGORY_PAGE_SIZE));
+  const categoryPageRows = categories.slice(
+    (categoryPage - 1) * CATEGORY_PAGE_SIZE,
+    categoryPage * CATEGORY_PAGE_SIZE,
+  );
+  const today = new Date().toISOString().slice(0, 10);
+  const dueChallenges = resolutionChallenges
+    .filter(
+      (challenge) =>
+        (challenge.status === "OPEN" || challenge.status === "RESOLVED")
+        && Boolean(challenge.resolution_date)
+        && challenge.resolution_date.slice(0, 10) <= today,
+    )
+    .sort((a, b) => a.resolution_date.localeCompare(b.resolution_date));
+  const isPriceFeed = (challenge: Challenge) =>
+    String(challenge.resolution_method || challenge.resolution_source || "").toUpperCase() === "PRICE_FEED";
+  const hasOpponent = (challenge: Challenge) =>
+    Number(challenge.bet_info?.team_count?.TEAM_B?.total_bets ?? 0) > 0
+    || Number(challenge.total_opponents ?? 0) > 0
+    || Boolean(challenge.bet_info?.highest_bet?.TEAM_B);
+  const priceFeedChallenges = dueChallenges.filter(isPriceFeed);
+  const allPriceFeedChallenges = resolutionChallenges.filter(isPriceFeed);
+  const filteredPriceFeedChallenges = priceFeedFilter === "due"
+    ? priceFeedChallenges
+    : allPriceFeedChallenges.filter((challenge) => {
+        const status = String(challenge.status || "").toLowerCase();
+        const resolutionStatus = String(challenge.resolution_status || "").toLowerCase();
+        return status === priceFeedFilter || resolutionStatus === priceFeedFilter;
+      });
+  const manualChallenges = dueChallenges.filter((challenge) => !isPriceFeed(challenge));
 
   const changeRole = async (user: User) => {
     const next = user.user_type === "moderator" ? "user" : "moderator";
@@ -207,6 +259,41 @@ export default function AdminPage() {
     }
   };
 
+  const resolveOne = async (challenge: Challenge) => {
+    if (!hasOpponent(challenge)) {
+      setError("This challenge cannot be resolved because no opponent joined.");
+      return;
+    }
+    const priceFeed = isPriceFeed(challenge);
+    const winner = manualWinners[challenge.id];
+    if (!priceFeed && !winner) {
+      setError("Select the winning side before resolving a manual challenge.");
+      return;
+    }
+    if (!window.confirm(`Resolve only challenge #${challenge.id}? This may trigger an on-chain payout.`)) return;
+
+    setBusyId(challenge.id);
+    setError("");
+    setNotice("");
+    try {
+      const manualPrice = Number(manualPrices[challenge.id]);
+      const result = await resolveChallenge(challenge.id, priceFeed ? {} : {
+        creator_wins: winner === "creator",
+        ...(Number.isFinite(manualPrice) && manualPrice > 0 ? { final_price: manualPrice } : {}),
+      });
+      setNotice(
+        result.settlement_succeeded
+          ? `Challenge #${challenge.id} resolved and settled on-chain.`
+          : `Challenge #${challenge.id} resolved in the database. ${result.settlement_note || "On-chain settlement was not completed."}`,
+      );
+      await loadSection("resolution", true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Challenge resolution failed.");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   const addCategory = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!categoryName.trim()) return;
@@ -222,6 +309,7 @@ export default function AdminPage() {
         metadata: imageUrl ? { image_url: imageUrl } : undefined,
       });
       setCategories((items) => [...items, created]);
+      setCategoryPage(Math.ceil((categories.length + 1) / CATEGORY_PAGE_SIZE));
       setCategoryName("");
       setParentCategory("");
       setCategoryImage(null);
@@ -245,6 +333,9 @@ export default function AdminPage() {
     try {
       await deleteCategory(category.id);
       setCategories((items) => items.filter((item) => item.id !== category.id));
+      setCategoryPage((current) =>
+        Math.min(current, Math.max(1, Math.ceil((categories.length - 1) / CATEGORY_PAGE_SIZE))),
+      );
       setNotice(`Category “${category.category}” removed.`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Category removal failed.");
@@ -316,6 +407,7 @@ export default function AdminPage() {
     );
   const tabs: Array<{ id: Tab; label: string }> = [
     { id: "stats", label: "Stats" },
+    { id: "resolution", label: "Resolution" },
     { id: "users", label: "Users" },
     { id: "categories", label: "Categories" },
     { id: "referrals", label: "Referrals" },
@@ -414,6 +506,151 @@ export default function AdminPage() {
           </section>
         )}
 
+        {tab === "resolution" && (
+          <div className="space-y-6">
+            <section className="grid gap-4 sm:grid-cols-3">
+              {[
+                { label: "Due now", value: dueChallenges.length, color: "bg-[#f5d547]" },
+                { label: "Price feed", value: priceFeedChallenges.length, color: "bg-[#ff8c79]" },
+                { label: "Manual", value: manualChallenges.length, color: "bg-[#a8d85b]" },
+              ].map((item) => (
+                <div
+                  key={item.label}
+                  className={`${item.color} border-2 border-black p-5 shadow-[4px_4px_0_#111]`}
+                >
+                  <p className="text-xs font-black uppercase tracking-[.12em] text-black/60">
+                    {item.label}
+                  </p>
+                  <p className="mt-3 text-3xl font-black">{loading ? "—" : item.value}</p>
+                </div>
+              ))}
+            </section>
+
+            {[
+              {
+                key: "price",
+                title: "Price feed resolution",
+                description: "The backend fetches the current Binance price and calculates the winner automatically.",
+                rows: filteredPriceFeedChallenges,
+                headingColor: "bg-[#f5d547]",
+              },
+              {
+                key: "manual",
+                title: "Manual resolution",
+                description: "Choose the winning side explicitly. A final value is optional for non-price challenges.",
+                rows: manualChallenges,
+                headingColor: "bg-[#ff8c79]",
+              },
+            ].map((section) => (
+              <section key={section.key} className="border-2 border-black bg-[#fffaf6] shadow-[5px_5px_0_#111]">
+                <div className="border-b-2 border-black p-5">
+                  <h2 className="text-xl font-black">{section.title} ({section.rows.length})</h2>
+                  <p className="text-sm font-semibold text-black/50">{section.description}</p>
+                  {section.key === "price" && (
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {(["due", "resolved", "completed", "cancelled", "expired"] as PriceFeedFilter[]).map((filter) => {
+                        const count = filter === "due"
+                          ? priceFeedChallenges.length
+                          : allPriceFeedChallenges.filter((challenge) =>
+                              String(challenge.status || "").toLowerCase() === filter
+                              || String(challenge.resolution_status || "").toLowerCase() === filter,
+                            ).length;
+                        return (
+                          <button
+                            key={filter}
+                            type="button"
+                            onClick={() => setPriceFeedFilter(filter)}
+                            className={`cursor-pointer border-2 border-black px-3 py-1.5 text-xs font-black uppercase shadow-[2px_2px_0_#111] ${priceFeedFilter === filter ? "bg-black text-white" : "bg-white text-black"}`}
+                          >
+                            {filter === "due" ? "Due now" : filter} ({count})
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[1100px] text-left">
+                    <thead className={section.headingColor}>
+                      <tr>
+                        {["Challenge", "Market", "Mode", "Target", "Due", "Status", "Winner / value", "Action"].map((heading) => (
+                          <th key={heading} className="px-4 py-3 text-xs font-black uppercase">{heading}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y-2 divide-black/10">
+                      {section.rows.map((challenge) => {
+                        const opponentJoined = hasOpponent(challenge);
+                        const canResolve = (challenge.status === "OPEN" || challenge.status === "RESOLVED")
+                          && Boolean(challenge.resolution_date)
+                          && challenge.resolution_date.slice(0, 10) <= today;
+                        return (
+                        <tr key={challenge.id} className="hover:bg-white">
+                          <td className="max-w-[260px] px-4 py-3">
+                            <p className="truncate font-black" title={challenge.statement || challenge.title}>
+                              {challenge.statement || challenge.title || `Challenge #${challenge.id}`}
+                            </p>
+                            <p className="text-xs font-bold text-black/40">#{challenge.id}</p>
+                          </td>
+                          <td className="px-4 py-3 font-black">{challenge.trading_pair || challenge.ticker || "—"}</td>
+                          <td className="px-4 py-3 font-bold">{challenge.mode}</td>
+                          <td className="px-4 py-3 font-bold">{challenge.direction || "—"} {challenge.target ? money(challenge.target) : "—"}</td>
+                          <td className="px-4 py-3 font-bold">{date(challenge.resolution_date)}</td>
+                          <td className="px-4 py-3">
+                            <span className={`border-2 border-black px-2 py-1 text-xs font-black ${challenge.status === "OPEN" ? "bg-[#ff8c79]" : "bg-[#a8d85b]"}`}>{challenge.status}</span>
+                          </td>
+                          <td className="px-4 py-3">
+                            {section.key === "price" ? (
+                              <span className="text-sm font-bold">Calculated automatically</span>
+                            ) : (
+                              <div className="flex min-w-[230px] gap-2">
+                                <select
+                                  value={manualWinners[challenge.id] || ""}
+                                  onChange={(event) => setManualWinners((current) => ({ ...current, [challenge.id]: event.target.value as "creator" | "opponent" }))}
+                                  disabled={!opponentJoined}
+                                  className="border-2 border-black bg-white px-2 py-1.5 text-sm font-black"
+                                >
+                                  <option value="">Select winner</option>
+                                  <option value="creator">Creator / Team A</option>
+                                  <option value="opponent">Opponent / Team B</option>
+                                </select>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="any"
+                                  value={manualPrices[challenge.id] || ""}
+                                  onChange={(event) => setManualPrices((current) => ({ ...current, [challenge.id]: event.target.value }))}
+                                  disabled={!opponentJoined}
+                                  placeholder="Final value"
+                                  className="w-28 border-2 border-black bg-white px-2 py-1.5 text-sm font-bold"
+                                />
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            <button
+                              onClick={() => void resolveOne(challenge)}
+                              disabled={!canResolve || !opponentJoined || busyId === challenge.id || (section.key === "manual" && !manualWinners[challenge.id])}
+                              title={!opponentJoined ? "Cannot resolve until an opponent joins" : !canResolve ? "This challenge is not awaiting resolution" : undefined}
+                              className="cursor-pointer border-2 border-black bg-[#a8d85b] px-3 py-2 text-sm font-black shadow-[2px_2px_0_#111] disabled:cursor-not-allowed disabled:opacity-40"
+                            >
+                              {busyId === challenge.id ? "Resolving…" : !opponentJoined ? "No opponent" : canResolve ? "Resolve" : challenge.status}
+                            </button>
+                          </td>
+                        </tr>
+                        );
+                      })}
+                      {!section.rows.length && (
+                        <tr><td colSpan={8} className="p-10 text-center font-bold text-black/45">{section.key === "price" && priceFeedFilter !== "due" ? `No ${priceFeedFilter} price-feed challenges.` : "No due challenges in this section."}</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            ))}
+          </div>
+        )}
+
         {tab === "users" && (
           <section className="border-2 border-black bg-[#fffaf6] shadow-[5px_5px_0_#111]">
             <div className="flex flex-col gap-4 border-b-2 border-black p-5 md:flex-row md:items-center md:justify-between">
@@ -429,10 +666,11 @@ export default function AdminPage() {
                   strokeWidth={2.5}
                 />
                 <input
+                  type="search"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder="Search name, wallet or X…"
-                  className="min-w-0 flex-1 bg-transparent text-sm font-bold outline-none placeholder:text-black/35"
+                  className="admin-user-search-input min-w-0 flex-1 appearance-none border-0 bg-transparent p-0 text-sm font-bold shadow-none outline-none ring-0 placeholder:text-black/35 focus:border-0 focus:outline-none focus:ring-0 [&::-webkit-search-cancel-button]:hidden"
                 />
                 {query && (
                   <button
@@ -561,8 +799,41 @@ export default function AdminPage() {
                       </td>
                     </tr>
                   ))}
+                  {!filteredUsers.length && !loading && (
+                    <tr>
+                      <td colSpan={7} className="p-8 text-center font-bold text-black/45">
+                        {debouncedQuery ? "No users match this search." : "No users found."}
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
+            </div>
+            <div className="flex flex-col gap-3 border-t-2 border-black bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm font-bold text-black/55">
+                {userTotal > 0
+                  ? `Showing ${(userPage - 1) * 10 + 1}–${Math.min(userPage * 10, userTotal)} of ${userTotal} ${debouncedQuery ? "matching " : ""}users`
+                  : `0 ${debouncedQuery ? "matching " : ""}users`}
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => goToUserPage(userPage - 1)}
+                  disabled={userPage === 1 || loading}
+                  className="cursor-pointer border-2 border-black bg-white px-3 py-1.5 text-sm font-black disabled:cursor-not-allowed disabled:opacity-35"
+                >
+                  Previous
+                </button>
+                <span className="border-2 border-black bg-[#f5d547] px-3 py-1.5 text-sm font-black">
+                  {userPage} / {userPages}
+                </span>
+                <button
+                  onClick={() => goToUserPage(userPage + 1)}
+                  disabled={userPage === userPages || loading}
+                  className="cursor-pointer border-2 border-black bg-white px-3 py-1.5 text-sm font-black disabled:cursor-not-allowed disabled:opacity-35"
+                >
+                  Next
+                </button>
+              </div>
             </div>
           </section>
         )}
@@ -633,7 +904,7 @@ export default function AdminPage() {
                 </p>
               </div>
               <div className="divide-y-2 divide-black/10">
-                {categories.map((item) => (
+                {categoryPageRows.map((item) => (
                   <div
                     key={item.id}
                     className="grid grid-cols-[1fr_auto] items-center gap-4 p-4"
@@ -699,6 +970,39 @@ export default function AdminPage() {
                     </div>
                   </div>
                 ))}
+                {!categoryPageRows.length && !loading && (
+                  <div className="p-8 text-center font-bold text-black/45">
+                    No categories found.
+                  </div>
+                )}
+              </div>
+              <div className="flex flex-col gap-3 border-t-2 border-black bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm font-bold text-black/55">
+                  {categories.length > 0
+                    ? `Showing ${(categoryPage - 1) * CATEGORY_PAGE_SIZE + 1}–${Math.min(categoryPage * CATEGORY_PAGE_SIZE, categories.length)} of ${categories.length} categories`
+                    : "0 categories"}
+                </p>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setCategoryPage((page) => Math.max(1, page - 1))}
+                    disabled={categoryPage === 1 || loading}
+                    className="cursor-pointer border-2 border-black bg-white px-3 py-1.5 text-sm font-black disabled:cursor-not-allowed disabled:opacity-35"
+                  >
+                    Previous
+                  </button>
+                  <span className="border-2 border-black bg-[#f5d547] px-3 py-1.5 text-sm font-black">
+                    {categoryPage} / {categoryPages}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setCategoryPage((page) => Math.min(categoryPages, page + 1))}
+                    disabled={categoryPage === categoryPages || loading}
+                    className="cursor-pointer border-2 border-black bg-white px-3 py-1.5 text-sm font-black disabled:cursor-not-allowed disabled:opacity-35"
+                  >
+                    Next
+                  </button>
+                </div>
               </div>
             </section>
           </div>
@@ -795,31 +1099,6 @@ export default function AdminPage() {
                     )}
                   </tbody>
                 </table>
-              </div>
-              <div className="flex flex-col gap-3 border-t-2 border-black bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-sm font-bold text-black/55">
-                  Showing {(userPage - 1) * 10 + 1}–
-                  {Math.min(userPage * 10, userTotal)} of {userTotal} users
-                </p>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => goToUserPage(userPage - 1)}
-                    disabled={userPage === 1 || loading}
-                    className="cursor-pointer border-2 border-black bg-white px-3 py-1.5 text-sm font-black disabled:cursor-not-allowed disabled:opacity-35"
-                  >
-                    Previous
-                  </button>
-                  <span className="border-2 border-black bg-[#f5d547] px-3 py-1.5 text-sm font-black">
-                    {userPage} / {userPages}
-                  </span>
-                  <button
-                    onClick={() => goToUserPage(userPage + 1)}
-                    disabled={userPage === userPages || loading}
-                    className="cursor-pointer border-2 border-black bg-white px-3 py-1.5 text-sm font-black disabled:cursor-not-allowed disabled:opacity-35"
-                  >
-                    Next
-                  </button>
-                </div>
               </div>
             </section>
             <section className="border-2 border-black bg-[#fffaf6] shadow-[5px_5px_0_#111]">

@@ -79,6 +79,7 @@ export interface LeaderboardResponse {
 export interface GetUsersParams {
   limit?: number;
   offset?: number;
+  search?: string;
 }
 
 export interface UsernameCheckResponse {
@@ -189,6 +190,10 @@ export async function getUsers(params?: GetUsersParams): Promise<GetUsersRespons
 
   if (params?.offset !== undefined) {
     queryParams.append("offset", params.offset.toString());
+  }
+
+  if (params?.search) {
+    queryParams.append("search", params.search);
   }
 
   const queryString = queryParams.toString();

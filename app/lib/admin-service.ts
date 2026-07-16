@@ -5,6 +5,45 @@ const headers = { accept: "application/json", "Content-Type": "application/json"
 
 export type AdminReferralUser = { id: number; username: string | null; pubkey: string; referral_code: string | null; referred_by: string | null; referrals: string[]; earnings: number };
 export type AdminRedemption = { id: number; user_id: number; username: string | null; wallet_address: string | null; amount: number; status: string; requested_at: string };
+export type ResolutionRunResult = {
+  status: string;
+  message: string;
+  remaining_active_challenges: number;
+};
+export type ChallengeResolutionResult = {
+  challenge_id: number;
+  status: string;
+  resolution_method: "PRICE_FEED" | "MANUAL";
+  creator_wins: boolean;
+  final_price: number | null;
+  settlement_attempted: boolean;
+  settlement_succeeded: boolean;
+  settlement_note?: string | null;
+};
+
+export async function resolveChallenge(
+  challengeId: number,
+  resolution: { creator_wins?: boolean; final_price?: number },
+): Promise<ChallengeResolutionResult> {
+  const response = await fetch(`/api/admin/challenges/resolve/${challengeId}`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(resolution),
+  });
+  const data = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(data?.error || "Failed to resolve challenge");
+  return data;
+}
+
+export async function resolveDueChallenges(): Promise<ResolutionRunResult> {
+  const response = await fetch("/api/admin/challenges/resolve-due", {
+    method: "POST",
+    headers,
+  });
+  const data = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(data?.error || "Failed to resolve due challenges");
+  return data;
+}
 
 export async function updateUserRole(userId: number, userType: "user" | "moderator") {
   const response = await fetch(`${API_BASE_URL}/admin/users/${userId}/role`, { method: "PATCH", headers, body: JSON.stringify({ user_type: userType }) });

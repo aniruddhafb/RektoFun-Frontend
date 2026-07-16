@@ -62,9 +62,11 @@ export function ChallengeGrid({
     const [hasMore, setHasMore] = useState(true);
     const [isLoadingMore, setIsLoadingMore] = useState(false);
     const loadMoreRef = useRef<HTMLDivElement | null>(null);
+    const requestIdRef = useRef(0);
 
     const fetchChallenges = useCallback(async (currentOffset: number, append: boolean) => {
         if (append && isLoadingMore) return;
+        const requestId = ++requestIdRef.current;
 
         if (!append) {
             setIsLoading(true);
@@ -149,9 +151,13 @@ export function ChallengeGrid({
             if (searchQuery.trim()) {
                 const query = searchQuery.toLowerCase();
                 nextChunk = nextChunk.filter((challenge) =>
-                    challenge.statement.toLowerCase().includes(query) ||
-                    challenge.title.toLowerCase().includes(query) ||
-                    challenge.ticker.toLowerCase().includes(query)
+                    [
+                        challenge.statement,
+                        challenge.title,
+                        challenge.ticker,
+                        challenge.trading_pair,
+                        challenge.category,
+                    ].some((value) => String(value ?? "").toLowerCase().includes(query))
                 );
             }
 
@@ -166,16 +172,19 @@ export function ChallengeGrid({
                 });
             }
 
+            if (requestId !== requestIdRef.current) return;
             setChallenges((prev) => (append ? [...prev, ...nextChunk] : nextChunk));
             setHasMore(!needsCompleteList && response.challenges.length === requestLimit);
             setOffset(needsCompleteList ? nextChunk.length : currentOffset + response.challenges.length);
         } catch (error) {
+            if (requestId !== requestIdRef.current) return;
             console.error('Failed to fetch challenges:', error);
             if (!append) {
                 setChallenges([]);
             }
             setLoadError('Could not load challenges. Please try again.');
         } finally {
+            if (requestId !== requestIdRef.current) return;
             if (!append) {
                 setIsLoading(false);
                 onRefreshComplete?.();
@@ -192,7 +201,7 @@ export function ChallengeGrid({
         setOffset(0);
         setHasMore(true);
         fetchChallenges(0, false);
-    }, [refreshKey, retryNonce, activeFilter, searchQuery]);
+    }, [refreshKey, retryNonce, activeFilter, searchQuery, resolutionSource, userId]);
     /* eslint-enable react-hooks/set-state-in-effect */
 
     useEffect(() => {
