@@ -502,7 +502,7 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
                     expiresAt,
                     resolvesAt,
                     challengeType: challengeMode,
-                    maxTeamSize: 0,
+                    maxTeamSize: 20,
                     statement: challengeStatement,
                     ticker,
                     tradingPair: topic,

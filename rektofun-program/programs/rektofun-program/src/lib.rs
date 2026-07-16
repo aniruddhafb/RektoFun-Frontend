@@ -9,7 +9,7 @@ pub use constants::*;
 pub use instructions::*;
 pub use state::*;
 
-declare_id!("4t5KYdKFmPw49yo6Bm1TV2ZDEi6k3Ns4eJLeNhgbVSzJ");
+declare_id!("4i89kL32hf4AzZwgqboFEVgJxAgVXxpDkyrGeJRnZtHT");
 
 #[program]
 pub mod rektofun_program {
@@ -88,6 +88,14 @@ pub mod rektofun_program {
     /// their own stake afterward via `claim_refund`.
     pub fn admin_cancel_challenge(ctx: Context<AdminCancelChallenge>) -> Result<()> {
         instructions::admin_cancel_challenge::handler(ctx)
+    }
+
+    /// Admin-only emergency backstop: withdraw USDC from any challenge's vault
+    /// to any recipient token account, in any amount up to the vault balance,
+    /// regardless of challenge status. For cases where a participant cannot
+    /// complete the normal settle/claim flow themselves.
+    pub fn admin_withdraw(ctx: Context<AdminWithdraw>, amount: u64) -> Result<()> {
+        instructions::admin_withdraw::handler(ctx, amount)
     }
 
     /// TEAM mode only: a winner on the winning side claims their proportional

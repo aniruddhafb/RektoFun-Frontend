@@ -31,7 +31,7 @@ import { getSolanaRpcEndpoint, getTokenMintAddress } from "./solana-config";
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 export const PROGRAM_ID = new PublicKey(
-  "4t5KYdKFmPw49yo6Bm1TV2ZDEi6k3Ns4eJLeNhgbVSzJ"
+  "4i89kL32hf4AzZwgqboFEVgJxAgVXxpDkyrGeJRnZtHT"
 );
 
 export const RPC_ENDPOINT =
