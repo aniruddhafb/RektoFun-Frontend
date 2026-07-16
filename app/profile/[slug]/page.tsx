@@ -12,7 +12,7 @@ import {
     ProfileActivity,
 } from "@/app/components/profile-components";
 import { LoadingPage } from "@/app/components/LoadingPage";
-import { followUser, getLeaderboard, getUserByWallet, LeaderboardUser, unfollowUser, User } from "@/app/lib/users-service/users";
+import { followUser, getUserProfile, unfollowUser, UserProfile } from "@/app/lib/users-service/users";
 import { useUserStore } from "@/app/store/useUserStore";
 import { useTokenBalanceStore } from "@/app/store/useTokenBalanceStore";
 import {
@@ -48,7 +48,7 @@ export default function ProfilePage() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [challengeRefreshKey, setChallengeRefreshKey] = useState(0);
-    const [user, setUser] = useState<User | null>(null);
+    const [user, setUser] = useState<UserProfile | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [userChallenges, setUserChallenges] = useState<Challenge[]>([]);
@@ -61,7 +61,6 @@ export default function ProfilePage() {
     const [isRektoBalanceLoading, setIsRektoBalanceLoading] = useState(true);
     const [usdcBalance, setUsdcBalance] = useState(0);
     const [isUsdcBalanceLoading, setIsUsdcBalanceLoading] = useState(true);
-    const [profileMetrics, setProfileMetrics] = useState<LeaderboardUser | null>(null);
 
     const isOwnProfile = connectedWalletAddress?.toLowerCase() === user?.wallet_address?.toLowerCase();
     const isFollowing = !!(currentUser?.id && user?.followers?.includes(currentUser.id));
@@ -82,10 +81,7 @@ export default function ProfilePage() {
             
             try {
                 setLoading(true);
-                const isConnectedUser = connectedWalletAddress?.toLowerCase() === walletFromSlug.toLowerCase();
-                const userData = isConnectedUser && currentUser
-                    ? currentUser
-                    : await getUserByWallet(walletFromSlug);
+                const userData = await getUserProfile(walletFromSlug);
                 setUser(userData);
                 setError(null);
             } catch (err) {
@@ -97,31 +93,7 @@ export default function ProfilePage() {
         }
 
         fetchUser();
-    }, [connectedWalletAddress, currentUser, walletFromSlug]);
-
-    useEffect(() => {
-        if (!user?.wallet_address) {
-            return;
-        }
-
-        let cancelled = false;
-
-        // The leaderboard is the source of truth for resolved wins/losses. Search
-        // by wallet so duplicate/similar usernames cannot show another user's stats.
-        getLeaderboard(1, 0, user.wallet_address, "all")
-            .then(({ users }) => {
-                if (cancelled) return;
-                const walletAddress = user.wallet_address.toLowerCase();
-                setProfileMetrics(
-                    users.find((item) => item.wallet_address.toLowerCase() === walletAddress) ?? null,
-                );
-            })
-            .catch(() => {
-                if (!cancelled) setProfileMetrics(null);
-            });
-
-        return () => { cancelled = true; };
-    }, [user?.wallet_address]);
+    }, [walletFromSlug]);
 
     // Fetch challenges created by this user
     useEffect(() => {
@@ -162,10 +134,10 @@ export default function ProfilePage() {
                 created_by: profileUserId,
                 limit: 9,
                 offset: userChallenges.length,
+                include_total: false,
             });
             setUserChallenges((current) => [...current, ...(challengeData.challenges || [])]);
-            setTotalChallengesCreated((current) => challengeData.total ?? current);
-            setHasMoreChallenges(userChallenges.length + (challengeData.challenges?.length ?? 0) < challengeData.total);
+            setHasMoreChallenges(challengeData.has_more);
         } catch (challengeError) {
             console.error("Failed to load more user challenges:", challengeError);
         } finally {
@@ -271,7 +243,7 @@ export default function ProfilePage() {
             const updatedTarget = isFollowing
                 ? await unfollowUser(user.wallet_address, connectedWalletAddress)
                 : await followUser(user.wallet_address, connectedWalletAddress);
-            setUser(updatedTarget);
+            setUser((current) => current ? { ...current, followers: updatedTarget.followers, following: updatedTarget.following } : current);
         } catch (followError) {
             console.error("Failed to toggle follow:", followError);
         } finally {
@@ -344,12 +316,12 @@ export default function ProfilePage() {
                             isRektoBalanceLoading={isRektoBalanceLoading}
                             isUsdcBalanceLoading={isUsdcBalanceLoading}
                             stats={{
-                                wins: profileMetrics?.won ?? 0,
-                                rekts: profileMetrics?.lost ?? 0,
+                                wins: user.metrics.won,
+                                rekts: user.metrics.lost,
                                 totalChallenges: totalChallengesCreated,
-                                winRatio: profileMetrics?.win_rate ?? 0,
-                                pnl: profileMetrics?.pnl ?? 0,
-                                volume: profileMetrics?.volume ?? 0,
+                                winRatio: user.metrics.win_rate,
+                                pnl: user.metrics.pnl,
+                                volume: user.metrics.volume,
                             }}
                         />
 

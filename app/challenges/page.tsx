@@ -22,6 +22,7 @@ function ChallengesPageContent() {
   const CREATE_TOAST_DURATION_MS = 3000;
   const [activeFilter, setActiveFilter] = useState("Latest");
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [selectedChallenge, setSelectedChallenge] = useState<Challenge | null>(null);
   const [challenges, setChallenges] = useState([]);
@@ -47,6 +48,14 @@ function ChallengesPageContent() {
       return [];
     }
   });
+
+  useEffect(() => {
+    const timer = window.setTimeout(
+      () => setDebouncedSearchQuery(searchQuery.trim()),
+      300,
+    );
+    return () => window.clearTimeout(timer);
+  }, [searchQuery]);
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -266,7 +275,7 @@ function ChallengesPageContent() {
         refreshKey={refreshKey}
         onRefreshComplete={handleRefreshComplete}
         activeFilter={activeFilter}
-        searchQuery={searchQuery}
+        searchQuery={debouncedSearchQuery}
       />
 
       <RektLoadingOverlay isLoading={isRekting} />

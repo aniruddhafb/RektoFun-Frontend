@@ -15,6 +15,7 @@ import {
 import ChallengeDetailModal from "@/app/components/challenge-components/ChallengeDetailModal";
 import {
     Challenge,
+    getChallengeById,
 } from "@/app/lib/challenges-service/challenges";
 import { ChallengeActivity, getActivityLabel, getActivityVerb, getChallengeActivityPage } from "@/app/lib/activity-service/activity";
 import { useBodyScrollLock } from "@/app/lib/useBodyScrollLock";
@@ -330,7 +331,7 @@ export default function ActivityPage() {
         return activities.filter((activity) => {
             const challenge = activity.challenge;
             const mode = challenge.mode?.toLowerCase() ?? "";
-            const marketName = challenge.market?.name?.toLowerCase() ?? "";
+            const marketName = (challenge.market?.name || challenge.category || "").toLowerCase();
             const parentId = challenge.market?.parent_id?.toLowerCase() ?? "";
             const resolutionSource = challenge.resolution_source?.toLowerCase() ?? "";
             const normalizedSearch = searchQuery.trim().toLowerCase();
@@ -385,8 +386,13 @@ export default function ActivityPage() {
         return () => observer.disconnect();
     }, [error, hasMore, isInitialLoading, isLoadingMore]);
 
-    const handleActivityClick = (challenge: Challenge) => {
-        setSelectedChallenge(challenge);
+    const handleActivityClick = async (challenge: Challenge) => {
+        try {
+            setSelectedChallenge(await getChallengeById(challenge.id));
+        } catch (fetchError) {
+            console.error("Failed to load challenge details:", fetchError);
+            setSelectedChallenge(challenge);
+        }
         setIsDetailModalOpen(true);
     };
 

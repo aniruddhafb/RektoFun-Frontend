@@ -59,6 +59,14 @@ export type LeaderboardUser = Omit<User, "id" | "followers" | "following"> & {
   volume: number;
 };
 
+export type UserProfile = Pick<User,
+  "id" | "username" | "pubkey" | "wallet_address" | "profile_image" |
+  "bio" | "description" | "twitter_username" | "created_at" | "followers" |
+  "following" | "user_type"
+> & {
+  metrics: Pick<LeaderboardUser, "won" | "lost" | "win_rate" | "pnl" | "volume">;
+};
+
 export interface GetUsersResponse {
   users: User[];
   total: number;
@@ -79,6 +87,7 @@ export interface LeaderboardResponse {
 export interface GetUsersParams {
   limit?: number;
   offset?: number;
+  search?: string;
 }
 
 export interface UsernameCheckResponse {
@@ -86,7 +95,7 @@ export interface UsernameCheckResponse {
   exists: boolean;
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_BE_API_URL || "http://localhost:8000/api";
+const API_BASE_URL = "/api/backend";
 const USER_CACHE_TTL_MS = 30_000;
 const LEADERBOARD_CACHE_TTL_MS = 15_000;
 const userRequests = new Map<string, Promise<User>>();
@@ -191,6 +200,10 @@ export async function getUsers(params?: GetUsersParams): Promise<GetUsersRespons
     queryParams.append("offset", params.offset.toString());
   }
 
+  if (params?.search) {
+    queryParams.append("search", params.search);
+  }
+
   const queryString = queryParams.toString();
   const url = `${API_BASE_URL}/users${queryString ? `?${queryString}` : ""}`;
 
@@ -285,6 +298,30 @@ export async function getUserByPubkey(pubkey: string): Promise<User> {
 }
 
 export const getUserByWallet = getUserByPubkey;
+
+export async function getUserProfile(pubkey: string): Promise<UserProfile> {
+  const response = await fetch(`${API_BASE_URL}/users/profile/${encodeURIComponent(pubkey)}`, {
+    headers: { accept: "application/json" },
+  });
+  if (!response.ok) throw await parseError(response, `User with pubkey ${pubkey} not found`);
+  const raw = await response.json();
+  const user = normalizeUser(raw);
+  return {
+    id: user.id,
+    username: user.username,
+    pubkey: user.pubkey,
+    wallet_address: user.wallet_address,
+    profile_image: user.profile_image,
+    bio: user.bio,
+    description: user.description,
+    twitter_username: user.twitter_username,
+    created_at: user.created_at,
+    followers: user.followers,
+    following: user.following,
+    user_type: user.user_type,
+    metrics: raw.metrics || { won: 0, lost: 0, win_rate: 0, pnl: 0, volume: 0 },
+  };
+}
 
 export type ReferralHistory = {
   commissions: Array<{ amount: number; created_at: string }>;

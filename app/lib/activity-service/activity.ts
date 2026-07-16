@@ -10,7 +10,6 @@ export interface ChallengeActivity {
   occurredAt: string;
   challenge: Challenge;
   actor: User | null;
-  position?: Position;
 }
 
 export interface ChallengeActivityPage {
@@ -18,7 +17,7 @@ export interface ChallengeActivityPage {
   has_more: boolean;
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_BE_API_URL || "http://localhost:8000/api";
+const API_BASE_URL = "/api/backend";
 const activityRequests = new Map<string, Promise<ChallengeActivityPage>>();
 
 type TimestampedChallenge = Challenge & { updated_at?: string; cancelled_at?: string };
@@ -68,7 +67,6 @@ export function buildChallengeActivities(
       occurredAt: position.created_at,
       challenge,
       actor: userById.get(Number(position.creator)) ?? null,
-      position,
     });
   }
 
@@ -106,12 +104,14 @@ export function buildChallengeActivities(
   return events.sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime());
 }
 
-export async function getChallengeActivityPage(limit = 15, offset = 0): Promise<ChallengeActivityPage> {
-  const key = `${limit}:${offset}`;
+export async function getChallengeActivityPage(limit = 15, offset = 0, userId?: number): Promise<ChallengeActivityPage> {
+  const key = `${limit}:${offset}:${userId ?? "all"}`;
   const existing = activityRequests.get(key);
   if (existing) return existing;
 
-  const request = fetch(`${API_BASE_URL}/activity?limit=${limit}&offset=${offset}`, {
+  const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+  if (userId) params.set("user_id", String(userId));
+  const request = fetch(`${API_BASE_URL}/activity?${params}`, {
     headers: { accept: "application/json" },
   }).then(async (response) => {
     if (!response.ok) throw new Error(`Failed to fetch activity: ${response.statusText}`);
@@ -124,4 +124,8 @@ export async function getChallengeActivityPage(limit = 15, offset = 0): Promise<
 
 export async function getChallengeActivities(): Promise<ChallengeActivity[]> {
   return (await getChallengeActivityPage(50, 0)).activities;
+}
+
+export async function getUserChallengeActivities(userId: number): Promise<ChallengeActivity[]> {
+  return (await getChallengeActivityPage(50, 0, userId)).activities;
 }
