@@ -61,8 +61,18 @@ impl Space for WinningSide {
 ///
 /// PVP seeds:  [b"challenge", creator.key(), challenge_id.to_le_bytes()]
 /// TEAM seeds: same — challenge_type differentiates behaviour at runtime.
+///
+/// Sizing note: this struct does NOT use `#[derive(InitSpace)]` /
+/// `#[max_len(..)]`. The four TEAM-roster vecs below are the overwhelming
+/// majority of this account's bytes (up to ~4KB at the platform-wide
+/// `MAX_TEAM_SIZE` ceiling), and a PVP challenge — or a small TEAM one —
+/// never needs that much room. Reserving the worst case on every challenge
+/// means admin (the `fee_payer` in `create_challenge`) pays multiple times
+/// more rent than necessary for the common case. Instead, `space_for` below
+/// computes exactly the bytes needed for the roster capacity a given
+/// challenge was actually created with — see
+/// `instructions::create_challenge::effective_team_size`.
 #[account]
-#[derive(InitSpace)]
 pub struct ChallengeAccount {
     /// The wallet that created the challenge
     pub creator: Pubkey,
@@ -76,20 +86,19 @@ pub struct ChallengeAccount {
     pub challenger_bet_amount: u64,
 
     // ── TEAM fields ─────────────────────────────────────────────────────────
-    /// TEAM only: participants who joined the creator's side (creator is implicitly included)
-    #[max_len(50)]
+    /// TEAM only: participants who joined the creator's side (creator is implicitly included).
+    /// Capacity is fixed at `init` time to this challenge's own `max_team_size`
+    /// (see `ChallengeAccount::space_for`), not the platform-wide `MAX_TEAM_SIZE`.
     pub creator_team: Vec<Pubkey>,
 
     /// TEAM only: amount each `creator_team` participant deposited, parallel to `creator_team`
-    #[max_len(50)]
     pub creator_team_amounts: Vec<u64>,
 
-    /// TEAM only: participants who joined the opponent's side
-    #[max_len(50)]
+    /// TEAM only: participants who joined the opponent's side. Same per-challenge
+    /// capacity note as `creator_team`.
     pub opponent_team: Vec<Pubkey>,
 
     /// TEAM only: amount each `opponent_team` participant deposited, parallel to `opponent_team`
-    #[max_len(50)]
     pub opponent_team_amounts: Vec<u64>,
 
     /// TEAM only: maximum participants per side (0 = no limit up to 50)
@@ -120,8 +129,8 @@ pub struct ChallengeAccount {
     /// Unique numeric ID for this challenge (per creator)
     pub challenge_id: u64,
 
-    /// Asset symbol, e.g. "BTC", "SOL", "ETH"
-    #[max_len(10)]
+    /// Asset symbol, e.g. "BTC", "SOL", "ETH". Capped at 10 bytes — see
+    /// `ChallengeAccount::FIXED_SPACE`, which reserves exactly 4 + 10 for it.
     pub asset: String,
 
     /// The creator's own stake, in USDC micro-units. Other participants may deposit a
@@ -149,6 +158,61 @@ pub struct ChallengeAccount {
 
     /// PDA bump for this account
     pub bump: u8,
+}
+
+impl ChallengeAccount {
+    /// Size (bytes) of every field except the four TEAM-roster vecs
+    /// (`creator_team`, `creator_team_amounts`, `opponent_team`,
+    /// `opponent_team_amounts`) — i.e. everything a PVP challenge needs.
+    /// Kept in sync manually with the field list above since this struct no
+    /// longer derives `InitSpace`.
+    const FIXED_SPACE: usize = 32 // creator
+        + 32 // challenger
+        + 8  // challenger_bet_amount
+        + 1  // max_team_size
+        + 1  // winning_side (1-byte enum)
+        + 8  // winning_side_total_amount
+        + 8  // settled_net_pot
+        + 2  // winners_remaining
+        + 1  // challenge_type (1-byte enum)
+        + 8  // challenge_id
+        + (4 + 10) // asset: String, 4-byte Borsh length prefix + 10-byte cap
+        + 8  // bet_amount
+        + 8  // target_price_usd_cents
+        + 1  // direction (1-byte enum)
+        + 8  // expires_at
+        + 8  // resolves_at
+        + 1  // status (1-byte enum)
+        + 1  // vault_bump
+        + 1; // bump
+
+    /// Bytes needed for the four TEAM-roster vecs when capacity is
+    /// `roster_capacity` participants per side: each vec costs a 4-byte
+    /// Borsh length prefix plus `roster_capacity` elements, and there are
+    /// two vecs (members + amounts) per side, times two sides.
+    /// `roster_capacity = 0` (PVP, or a TEAM challenge created with no
+    /// roster) costs only the four empty-length prefixes (16 bytes).
+    fn team_roster_space(roster_capacity: u8) -> usize {
+        let n = roster_capacity as usize;
+        let pubkey_vecs = 2 * (4 + n * 32); // creator_team + opponent_team
+        let amount_vecs = 2 * (4 + n * 8); // creator_team_amounts + opponent_team_amounts
+        pubkey_vecs + amount_vecs
+    }
+
+    /// Total on-chain account size, including the 8-byte Anchor
+    /// discriminator, for a challenge whose TEAM roster is capped at
+    /// `roster_capacity` participants per side. This is what
+    /// `create_challenge` passes as `space` — see
+    /// `instructions::create_challenge::effective_team_size` for how
+    /// `roster_capacity` is derived from `CreateChallengeParams`.
+    ///
+    /// Rent scales directly with this value, so sizing to the challenge's
+    /// own requested roster (instead of always paying for the
+    /// platform-wide `MAX_TEAM_SIZE` ceiling) is what keeps PVP and
+    /// small-team challenges cheap for the admin wallet that sponsors it.
+    pub fn space_for(roster_capacity: u8) -> usize {
+        8 + Self::FIXED_SPACE + Self::team_roster_space(roster_capacity)
+    }
 }
 
 /// A per-creator counter so each creator can have multiple challenges.

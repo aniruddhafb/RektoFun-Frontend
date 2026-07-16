@@ -9,7 +9,7 @@ pub use constants::*;
 pub use instructions::*;
 pub use state::*;
 
-declare_id!("4t5KYdKFmPw49yo6Bm1TV2ZDEi6k3Ns4eJLeNhgbVSzJ");
+declare_id!("4i89kL32hf4AzZwgqboFEVgJxAgVXxpDkyrGeJRnZtHT");
 
 #[program]
 pub mod rektofun_program {

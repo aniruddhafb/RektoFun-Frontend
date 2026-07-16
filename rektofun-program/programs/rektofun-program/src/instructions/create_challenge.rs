@@ -25,9 +25,40 @@ pub struct CreateChallengeParams {
     pub resolves_at: i64,
     /// PVP = single opponent; Team = any number of participants per side
     pub challenge_type: ChallengeType,
-    /// TEAM only: max participants per side (0 = no limit, capped at MAX_TEAM_SIZE = 50).
+    /// TEAM only: max participants per side (0 = platform default, capped at
+    /// the live `Config::max_team_size`, itself capped at `MAX_TEAM_SIZE` = 50).
     /// Ignored for PVP challenges.
+    ///
+    /// This directly determines how many bytes the `challenge` account is
+    /// allocated with (see `effective_team_size` / `ChallengeAccount::space_for`),
+    /// and therefore how much SOL rent `fee_payer` (admin) pays to create it —
+    /// a small `max_team_size` costs proportionally less than a large one.
     pub max_team_size: u8,
+}
+
+/// The actual TEAM roster capacity (participants per side) a challenge's
+/// account gets sized and capped to.
+///
+/// PVP challenges never use a roster, so this is always `0` regardless of
+/// what `params.max_team_size` was set to — keeping the challenge account
+/// (and the rent `fee_payer` pays for it) minimal. For TEAM challenges,
+/// `0` means "use the platform default" and any value above the live
+/// `Config::max_team_size` ceiling is clamped down to it — mirroring the
+/// join-cap check `accept_challenge` enforces at runtime.
+///
+/// Called from both the `space = ...` constraint on `CreateChallenge::challenge`
+/// (account size must be decided before `init` runs, ahead of the handler body)
+/// and from the handler (to store the same value into `challenge.max_team_size`)
+/// — kept as one function so on-chain capacity and the stored cap can never drift apart.
+fn effective_team_size(params: &CreateChallengeParams, config: &Config) -> u8 {
+    if params.challenge_type != ChallengeType::Team {
+        return 0;
+    }
+    if params.max_team_size == 0 || params.max_team_size > config.max_team_size {
+        config.max_team_size
+    } else {
+        params.max_team_size
+    }
 }
 
 #[derive(Accounts)]
@@ -53,11 +84,14 @@ pub struct CreateChallenge<'info> {
     )]
     pub creator_counter: Account<'info, CreatorCounter>,
 
-    /// The challenge account itself
+    /// The challenge account itself. Sized dynamically to this challenge's
+    /// own requested TEAM roster (see `effective_team_size`) instead of
+    /// always reserving room for the platform-wide `MAX_TEAM_SIZE` cap —
+    /// keeps rent proportional to what the challenge actually needs.
     #[account(
         init,
         payer = fee_payer,
-        space = 8 + ChallengeAccount::INIT_SPACE,
+        space = ChallengeAccount::space_for(effective_team_size(&params, &config)),
         seeds = [
             CHALLENGE_SEED,
             creator.key().as_ref(),
@@ -123,16 +157,9 @@ pub(crate) fn handler(ctx: Context<CreateChallenge>, params: CreateChallengePara
         RektoError::InvalidResolvesAt
     );
 
-    // For TEAM challenges, clamp max_team_size to the configured cap
-    let effective_max_team_size = if params.challenge_type == ChallengeType::Team {
-        if params.max_team_size == 0 || params.max_team_size > config.max_team_size {
-            config.max_team_size
-        } else {
-            params.max_team_size
-        }
-    } else {
-        0 // unused for PVP
-    };
+    // Same clamp already applied when sizing `challenge` in the accounts struct —
+    // reusing `effective_team_size` keeps stored capacity and allocated space in lockstep.
+    let effective_max_team_size = effective_team_size(&params, config);
 
     // --- Initialise / update counter ---
     let counter = &mut ctx.accounts.creator_counter;

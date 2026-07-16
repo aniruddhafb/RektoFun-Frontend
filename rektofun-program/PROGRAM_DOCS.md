@@ -1,6 +1,6 @@
 # RektoFun Solana Program — Complete Documentation
 
-> **Program ID:** `4t5KYdKFmPw49yo6Bm1TV2ZDEi6k3Ns4eJLeNhgbVSzJ`  
+> **Program ID:** `4i89kL32hf4AzZwgqboFEVgJxAgVXxpDkyrGeJRnZtHT`  
 > **Framework:** Anchor v1  
 > **Token:** USDC (SPL Token, 6 decimals)  
 > **Cluster:** Solana Devnet (USDC mint: `4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU`)
@@ -91,9 +91,9 @@ The main account for a single challenge. Holds all state.
 |-------|------|-------------|
 | `creator` | `Pubkey` | Wallet that created the challenge |
 | `challenger` | `Pubkey` | **PVP only** — the single opponent (zero if not yet accepted) |
-| `creator_team` | `Vec<Pubkey>` (max 50) | **TEAM only** — extra members on creator's side (creator is implicit) |
-| `opponent_team` | `Vec<Pubkey>` (max 50) | **TEAM only** — members on the opponent's side |
-| `max_team_size` | `u8` | **TEAM only** — max participants per side (0 = no limit, hard cap 50) |
+| `creator_team` | `Vec<Pubkey>` | **TEAM only** — extra members on creator's side (creator is implicit) |
+| `opponent_team` | `Vec<Pubkey>` | **TEAM only** — members on the opponent's side |
+| `max_team_size` | `u8` | **TEAM only** — max participants per side for *this* challenge (0 = platform default, hard cap 50) |
 | `winning_side` | `WinningSide` | Set after settlement (`None` / `CreatorTeam` / `OpponentTeam`) |
 | `challenge_type` | `ChallengeType` | `Pvp` or `Team` |
 | `challenge_id` | `u64` | Unique ID per creator (from `CreatorCounter`) |
@@ -108,6 +108,38 @@ The main account for a single challenge. Holds all state.
 | `bump` | `u8` | Challenge PDA bump |
 
 **Seeds:** `["challenge", creator.key(), challenge_id.to_le_bytes()]`
+
+#### Account sizing & rent (why `creator_team`/`opponent_team` have no fixed "max" above)
+
+`ChallengeAccount` does **not** allocate a fixed size at compile time. `creator_team`,
+`creator_team_amounts`, `opponent_team`, and `opponent_team_amounts` together make up
+roughly 96% of the account's bytes at the platform-wide `MAX_TEAM_SIZE` = 50 ceiling —
+so reserving that much space on every challenge, including PVP ones that never use
+these fields at all, would mean the admin wallet (`fee_payer` in `create_challenge`)
+massively overpays rent for the common case.
+
+Instead, `ChallengeAccount::space_for(roster_capacity)` (in `state.rs`) computes the
+exact byte size needed for a given per-side roster capacity, and `create_challenge`
+passes it a value derived from `CreateChallengeParams::max_team_size` — clamped to
+`Config::max_team_size` — via the `effective_team_size` helper. PVP challenges always
+get `roster_capacity = 0`.
+
+Approximate rent by roster capacity (2 devnet/mainnet rent-exempt SOL, at default
+`lamports_per_byte_year`):
+
+| `max_team_size` requested | Challenge account rent |
+|---|---|
+| PVP / TEAM roster = 0 | ~0.0021 SOL |
+| 2 per side | ~0.0032 SOL |
+| 4 per side | ~0.0043 SOL |
+| 10 per side | ~0.0077 SOL |
+| 20 per side | ~0.0132 SOL |
+| 50 per side (the `MAX_TEAM_SIZE` ceiling) | ~0.0299 SOL |
+
+This rent is paid by `fee_payer` (admin) at `create_challenge` time and is returned to
+admin when the vault + challenge account are closed — for TEAM challenges, on the last
+`claim_winnings` call (see §6.5); PVP and cancellation paths should be checked for the
+same close-and-refund behavior if optimizing further.
 
 ---
 
@@ -142,7 +174,7 @@ Created when a TEAM winner calls `claim_winnings`. Its existence on-chain is the
 | `MIN_BET_AMOUNT` | `5_000_000` | Minimum bet: 5 USDC |
 | `MIN_DURATION_SECS` | `300` | Minimum challenge duration: 5 minutes |
 | `MAX_DURATION_SECS` | `604_800` | Maximum challenge duration: 7 days |
-| `MAX_TEAM_SIZE` | `50` | Hard cap on participants per side (TEAM) |
+| `MAX_TEAM_SIZE` | `50` | Absolute ceiling on `Config::max_team_size`; not a storage limit — bounds worst-case rent and roster-scan compute per challenge (see §3.2) |
 | `CHALLENGE_SEED` | `b"challenge"` | PDA seed |
 | `VAULT_SEED` | `b"vault"` | PDA seed |
 | `COUNTER_SEED` | `b"creator_counter"` | PDA seed |
@@ -201,7 +233,8 @@ After settlement:
 
 **What it does:**
 1. Initialises (or increments) the creator's `CreatorCounter`.
-2. Creates the `ChallengeAccount` PDA.
+2. Creates the `ChallengeAccount` PDA, sized to fit `max_team_size` (see §3.2) —
+   PVP challenges get the minimum size regardless of what's passed.
 3. Creates the USDC vault `TokenAccount` PDA.
 4. Transfers `bet_amount` USDC from the creator's token account to the vault.
 
@@ -216,7 +249,7 @@ After settlement:
 | `expires_at` | `i64` | Unix timestamp: join deadline (5 min – 7 days from now) |
 | `resolves_at` | `i64` | Unix timestamp: price evaluation time (≥ `expires_at`) |
 | `challenge_type` | `ChallengeType` | `Pvp` or `Team` |
-| `max_team_size` | `u8` | TEAM only: max per side (0 = 50, ignored for PVP) |
+| `max_team_size` | `u8` | TEAM only: max per side (0 = platform default, capped at `Config::max_team_size` ≤ 50; ignored — forced to 0 — for PVP). Directly sets `ChallengeAccount`'s on-chain size, and therefore the SOL rent `fee_payer` (admin) pays — see §3.2. |
 
 **Required accounts:**
 
@@ -411,7 +444,7 @@ ClaimRecord:
 **TypeScript example:**
 ```typescript
 import { PublicKey } from "@solana/web3.js";
-const PROGRAM_ID = new PublicKey("4t5KYdKFmPw49yo6Bm1TV2ZDEi6k3Ns4eJLeNhgbVSzJ");
+const PROGRAM_ID = new PublicKey("4i89kL32hf4AzZwgqboFEVgJxAgVXxpDkyrGeJRnZtHT");
 
 // Creator counter
 const [counterPda] = PublicKey.findProgramAddressSync(

@@ -39,9 +39,14 @@ pub const MIN_DURATION_SECS: i64 = 5 * 60;
 
 /// Initial maximum participants per side in a TEAM challenge, seeded into
 /// `Config` at `initialize_config` time. Live value lives in
-/// `Config::max_team_size`. Absolute ceiling regardless of `Config` value —
-/// `ChallengeAccount.creator_team`/`opponent_team` are fixed `max_len(50)`
-/// vecs, so a configured value above this would never actually fit.
+/// `Config::max_team_size`. Absolute ceiling regardless of `Config` value.
+///
+/// Each TEAM challenge's on-chain account is sized to fit exactly the
+/// roster capacity it was created with (see `ChallengeAccount::space_for`
+/// and `instructions::create_challenge::effective_team_size`), so this
+/// isn't a storage limit — it bounds the worst-case rent `fee_payer` pays
+/// per challenge, and the worst-case compute cost of the roster-scanning
+/// loops in `accept_challenge` / `claim_winnings`.
 pub const MAX_TEAM_SIZE: u8 = 50;
 
 /// Seed prefixes
