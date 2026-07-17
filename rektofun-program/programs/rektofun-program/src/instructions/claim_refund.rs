@@ -4,7 +4,7 @@ use anchor_spl::token_interface::{self, CloseAccount, Mint, TokenAccount, TokenI
 use crate::{
     constants::*,
     error::RektoError,
-    state::{ChallengeAccount, ChallengeStatus, ChallengeType, ClaimRecord, Config},
+    state::{ChallengeAccount, ChallengeStatus, ChallengeType, ClaimRecord},
 };
 
 /// Any non-creator depositor on a Cancelled challenge claims their stake back — a PVP
@@ -43,6 +43,7 @@ pub struct ClaimRefund<'info> {
         bump = challenge.bump,
         constraint = challenge.status == ChallengeStatus::Cancelled @ RektoError::NotCancelled,
         constraint = challenge.creator == creator.key() @ RektoError::UnauthorizedSettle,
+        has_one = rent_payer @ RektoError::Unauthorized,
     )]
     pub challenge: Box<Account<'info, ChallengeAccount>>,
 
@@ -82,12 +83,11 @@ pub struct ClaimRefund<'info> {
     pub token_program: Interface<'info, TokenInterface>,
     pub system_program: Program<'info, System>,
 
-    #[account(seeds = [CONFIG_SEED], bump = config.bump)]
-    pub config: Account<'info, Config>,
-
-    /// Platform wallet — receives reclaimed vault rent (it originally paid it).
-    #[account(mut, address = config.admin @ RektoError::Unauthorized)]
-    pub admin: SystemAccount<'info>,
+    /// Wallet that paid this challenge's rent at creation (`challenge.rent_payer`,
+    /// enforced via `has_one` on `challenge` above) — receives the reclaimed
+    /// vault + challenge PDA rent.
+    #[account(mut)]
+    pub rent_payer: SystemAccount<'info>,
 }
 
 pub(crate) fn handler(ctx: Context<ClaimRefund>) -> Result<()> {
@@ -157,7 +157,7 @@ pub(crate) fn handler(ctx: Context<ClaimRefund>) -> Result<()> {
             ctx.accounts.token_program.key(),
             CloseAccount {
                 account: ctx.accounts.vault.to_account_info(),
-                destination: ctx.accounts.admin.to_account_info(),
+                destination: ctx.accounts.rent_payer.to_account_info(),
                 authority: ctx.accounts.challenge.to_account_info(),
             },
             signer_seeds,
@@ -181,7 +181,7 @@ pub(crate) fn handler(ctx: Context<ClaimRefund>) -> Result<()> {
     // Last claimant also reclaims the challenge PDA's rent — no further refund
     // claims can occur once the vault is drained.
     if is_last_claim {
-        ctx.accounts.challenge.close(ctx.accounts.admin.to_account_info())?;
+        ctx.accounts.challenge.close(ctx.accounts.rent_payer.to_account_info())?;
     }
 
     Ok(())

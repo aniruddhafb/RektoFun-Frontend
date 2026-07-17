@@ -260,6 +260,19 @@
           ]
         },
         {
+          "name": "rent_payer",
+          "docs": [
+            "Wallet that paid this challenge's rent at creation (`challenge.rent_payer`,",
+            "enforced via `has_one` on `challenge` above) — receives the reclaimed",
+            "vault + challenge PDA rent. Distinct from `admin`, which only gates who",
+            "may force-cancel."
+          ],
+          "writable": true,
+          "relations": [
+            "challenge"
+          ]
+        },
+        {
           "name": "token_program"
         },
         {
@@ -268,6 +281,151 @@
         }
       ],
       "args": []
+    },
+    {
+      "name": "admin_withdraw",
+      "docs": [
+        "Emergency backstop: withdraw USDC from any challenge's vault to any",
+        "recipient token account, in any amount up to the vault balance,",
+        "regardless of challenge status. For cases where a participant cannot",
+        "complete the normal settle/claim flow themselves.",
+        "",
+        "Gated on the dedicated `WithdrawAuthority` PDA (see",
+        "`initialize_withdraw_authority` / `update_withdraw_authority`), not",
+        "`Config::admin` — this instruction has full custody of every escrowed",
+        "vault, so it is signed by a wallet kept deliberately separate from the",
+        "hot admin key used elsewhere."
+      ],
+      "discriminator": [
+        160,
+        166,
+        147,
+        222,
+        46,
+        220,
+        75,
+        224
+      ],
+      "accounts": [
+        {
+          "name": "withdraw_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  119,
+                  105,
+                  116,
+                  104,
+                  100,
+                  114,
+                  97,
+                  119,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "docs": [
+            "Must match `withdraw_authority.authority` — a dedicated wallet kept",
+            "separate from `Config::admin`."
+          ],
+          "signer": true
+        },
+        {
+          "name": "challenge",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  104,
+                  97,
+                  108,
+                  108,
+                  101,
+                  110,
+                  103,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "challenge.creator",
+                "account": "ChallengeAccount"
+              },
+              {
+                "kind": "account",
+                "path": "challenge.challenge_id",
+                "account": "ChallengeAccount"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "docs": [
+            "USDC vault token account — owned by the challenge PDA"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "challenge"
+              }
+            ]
+          }
+        },
+        {
+          "name": "recipient_usdc_account",
+          "docs": [
+            "Destination for the withdrawn USDC — any token account chosen by the",
+            "admin (e.g. the affected participant's own wallet, verified off-chain)."
+          ],
+          "writable": true
+        },
+        {
+          "name": "usdc_mint",
+          "docs": [
+            "USDC mint — validated by token account constraints above"
+          ]
+        },
+        {
+          "name": "token_program"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
     },
     {
       "name": "cancel_challenge",
@@ -360,29 +518,16 @@
           ]
         },
         {
-          "name": "config",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "name": "admin",
+          "name": "rent_payer",
           "docs": [
-            "Platform wallet — receives reclaimed vault rent (it originally paid it)."
+            "Wallet that paid this challenge's rent at creation (`challenge.rent_payer`,",
+            "enforced via `has_one` on `challenge` above) — receives the reclaimed",
+            "vault + challenge PDA rent."
           ],
-          "writable": true
+          "writable": true,
+          "relations": [
+            "challenge"
+          ]
         },
         {
           "name": "token_program"
@@ -531,29 +676,16 @@
           "address": "11111111111111111111111111111111"
         },
         {
-          "name": "config",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "name": "admin",
+          "name": "rent_payer",
           "docs": [
-            "Platform wallet — receives reclaimed vault rent (it originally paid it)."
+            "Wallet that paid this challenge's rent at creation (`challenge.rent_payer`,",
+            "enforced via `has_one` on `challenge` above) — receives the reclaimed",
+            "vault + challenge PDA rent."
           ],
-          "writable": true
+          "writable": true,
+          "relations": [
+            "challenge"
+          ]
         }
       ],
       "args": []
@@ -687,30 +819,16 @@
           ]
         },
         {
-          "name": "config",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "name": "admin",
+          "name": "rent_payer",
           "docs": [
-            "Platform wallet — receives the reclaimed vault + challenge PDA rent once the",
-            "final winner has claimed (it originally paid this rent at challenge creation)."
+            "Wallet that paid this challenge's rent at creation (`challenge.rent_payer`,",
+            "enforced via `has_one` on `challenge` above) — receives the reclaimed",
+            "vault + challenge PDA rent once the final winner has claimed."
           ],
-          "writable": true
+          "writable": true,
+          "relations": [
+            "challenge"
+          ]
         },
         {
           "name": "token_program"
@@ -766,7 +884,12 @@
         {
           "name": "fee_payer",
           "docs": [
-            "Platform wallet that sponsors all SOL rent for account creation."
+            "Pays the SOL rent for account creation — either `creator` themself",
+            "(self-pay, when they have enough SOL) or `config.admin` (sponsored).",
+            "Chosen client-side by checking the creator's SOL balance before",
+            "building this instruction. Stored as `challenge.rent_payer` so every",
+            "later close instruction refunds rent to whichever of the two actually",
+            "paid here, instead of unconditionally to admin."
           ],
           "writable": true,
           "signer": true
@@ -809,7 +932,10 @@
         {
           "name": "challenge",
           "docs": [
-            "The challenge account itself"
+            "The challenge account itself. Sized dynamically to this challenge's",
+            "own requested TEAM roster (see `effective_team_size`) instead of",
+            "always reserving room for the platform-wide `MAX_TEAM_SIZE` cap —",
+            "keeps rent proportional to what the challenge actually needs."
           ],
           "writable": true,
           "pda": {
@@ -949,6 +1075,93 @@
       "args": []
     },
     {
+      "name": "initialize_withdraw_authority",
+      "docs": [
+        "One-time bootstrap: creates the `WithdrawAuthority` PDA and sets the",
+        "dedicated wallet that will be the sole signer for `admin_withdraw`",
+        "going forward. Callable only by `Config::admin`; after this call",
+        "succeeds, `Config::admin` has no further authority over",
+        "`admin_withdraw` — only `WithdrawAuthority::authority` (rotatable via",
+        "`update_withdraw_authority`) does."
+      ],
+      "discriminator": [
+        201,
+        179,
+        178,
+        206,
+        183,
+        71,
+        120,
+        107
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "withdraw_authority",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  119,
+                  105,
+                  116,
+                  104,
+                  100,
+                  114,
+                  97,
+                  119,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "authority",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
       "name": "settle_challenge",
       "docs": [
         "Admin/oracle settles the challenge after expiry.",
@@ -1068,7 +1281,13 @@
           "docs": [
             "PVP only: winner's USDC token account — must actually belong to whichever",
             "side `creator_wins` declares as the winner (creator or challenger).",
-            "For TEAM challenges pass any valid USDC token account — it won't be written to."
+            "For TEAM challenges pass any valid USDC token account — it won't be written to.",
+            "",
+            "`dup`: when the creator wins, this is the same account as",
+            "`creator_usdc_account` (both are the creator's ATA). That's safe to alias —",
+            "SPL token accounts are owned by the token program, not this one, so Anchor",
+            "never re-serializes them on exit; balance changes only happen via the",
+            "`transfer_checked` CPIs below, which are correct regardless of aliasing."
           ],
           "writable": true
         },
@@ -1093,6 +1312,20 @@
           "name": "usdc_mint",
           "docs": [
             "USDC mint — validated by token account constraints above"
+          ]
+        },
+        {
+          "name": "rent_payer",
+          "docs": [
+            "Wallet that paid this challenge's rent at creation (`challenge.rent_payer`,",
+            "enforced via `has_one` on `challenge` above) — receives the vault +",
+            "challenge PDA rent refund when a PVP settlement fully closes them out.",
+            "Unused for TEAM (nothing closes here; the last `claim_winnings` caller",
+            "closes them instead)."
+          ],
+          "writable": true,
+          "relations": [
+            "challenge"
           ]
         },
         {
@@ -1210,6 +1443,68 @@
           }
         }
       ]
+    },
+    {
+      "name": "update_withdraw_authority",
+      "docs": [
+        "Rotates the dedicated `admin_withdraw` signer. Callable only by the",
+        "*current* withdraw authority itself, not by `Config::admin` — keeps a",
+        "compromised admin hot wallet from ever reassigning this authority to",
+        "itself."
+      ],
+      "discriminator": [
+        52,
+        41,
+        198,
+        125,
+        57,
+        44,
+        51,
+        109
+      ],
+      "accounts": [
+        {
+          "name": "withdraw_authority",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  119,
+                  105,
+                  116,
+                  104,
+                  100,
+                  114,
+                  97,
+                  119,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "new_authority",
+          "type": "pubkey"
+        }
+      ]
     }
   ],
   "accounts": [
@@ -1263,6 +1558,19 @@
         138,
         248,
         82
+      ]
+    },
+    {
+      "name": "WithdrawAuthority",
+      "discriminator": [
+        16,
+        165,
+        23,
+        178,
+        148,
+        90,
+        107,
+        103
       ]
     }
   ],
@@ -1401,6 +1709,21 @@
       "code": 6026,
       "name": "NotOpenOrActive",
       "msg": "Challenge is already settled or cancelled; nothing to cancel"
+    },
+    {
+      "code": 6027,
+      "name": "InvalidWithdrawAmount",
+      "msg": "Withdrawal amount must be greater than zero"
+    },
+    {
+      "code": 6028,
+      "name": "InsufficientVaultBalance",
+      "msg": "Withdrawal amount exceeds the vault's balance"
+    },
+    {
+      "code": 6029,
+      "name": "UnauthorizedWithdrawAuthority",
+      "msg": "Only the designated withdraw authority may perform this action"
     }
   ],
   "types": [
@@ -1427,9 +1750,9 @@
           {
             "name": "amount",
             "docs": [
-              "Amount this participant deposits, in USDC micro-units. Does not need to match",
-              "the creator's `bet_amount` — PVP pays the winner the full combined pot, and TEAM",
-              "pays each winner proportionally to their own stake. Must be >= MIN_BET_AMOUNT."
+              "Amount this participant deposits, in USDC micro-units. PVP participants",
+              "must match the creator's stake. TEAM participants must match it until the",
+              "opponent side has collectively covered it, after which the platform minimum applies."
             ],
             "type": "u64"
           }
@@ -1442,7 +1765,18 @@
         "The main challenge account stored on-chain.",
         "",
         "PVP seeds:  [b\"challenge\", creator.key(), challenge_id.to_le_bytes()]",
-        "TEAM seeds: same — challenge_type differentiates behaviour at runtime."
+        "TEAM seeds: same — challenge_type differentiates behaviour at runtime.",
+        "",
+        "Sizing note: this struct does NOT use `#[derive(InitSpace)]` /",
+        "`#[max_len(..)]`. The four TEAM-roster vecs below are the overwhelming",
+        "majority of this account's bytes (up to ~4KB at the platform-wide",
+        "`MAX_TEAM_SIZE` ceiling), and a PVP challenge — or a small TEAM one —",
+        "never needs that much room. Reserving the worst case on every challenge",
+        "means admin (the `fee_payer` in `create_challenge`) pays multiple times",
+        "more rent than necessary for the common case. Instead, `space_for` below",
+        "computes exactly the bytes needed for the roster capacity a given",
+        "challenge was actually created with — see",
+        "`instructions::create_challenge::effective_team_size`."
       ],
       "type": {
         "kind": "struct",
@@ -1451,6 +1785,18 @@
             "name": "creator",
             "docs": [
               "The wallet that created the challenge"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "rent_payer",
+            "docs": [
+              "The wallet that paid the SOL rent for this challenge account + vault at",
+              "creation — either `creator` self-paying (if they had enough SOL) or",
+              "`config.admin` sponsoring. Every later close instruction",
+              "(`settle_challenge`, `cancel_challenge`, `admin_cancel_challenge`,",
+              "`claim_winnings`, `claim_refund`) refunds reclaimed rent to this same",
+              "wallet, not unconditionally to admin."
             ],
             "type": "pubkey"
           },
@@ -1472,7 +1818,9 @@
           {
             "name": "creator_team",
             "docs": [
-              "TEAM only: participants who joined the creator's side (creator is implicitly included)"
+              "TEAM only: participants who joined the creator's side (creator is implicitly included).",
+              "Capacity is fixed at `init` time to this challenge's own `max_team_size`",
+              "(see `ChallengeAccount::space_for`), not the platform-wide `MAX_TEAM_SIZE`."
             ],
             "type": {
               "vec": "pubkey"
@@ -1490,7 +1838,8 @@
           {
             "name": "opponent_team",
             "docs": [
-              "TEAM only: participants who joined the opponent's side"
+              "TEAM only: participants who joined the opponent's side. Same per-challenge",
+              "capacity note as `creator_team`."
             ],
             "type": {
               "vec": "pubkey"
@@ -1571,7 +1920,8 @@
           {
             "name": "asset",
             "docs": [
-              "Asset symbol, e.g. \"BTC\", \"SOL\", \"ETH\""
+              "Asset symbol, e.g. \"BTC\", \"SOL\", \"ETH\". Capped at 10 bytes — see",
+              "`ChallengeAccount::FIXED_SPACE`, which reserves exactly 4 + 10 for it."
             ],
             "type": "string"
           },
@@ -1829,8 +2179,14 @@
           {
             "name": "max_team_size",
             "docs": [
-              "TEAM only: max participants per side (0 = no limit, capped at MAX_TEAM_SIZE = 50).",
-              "Ignored for PVP challenges."
+              "TEAM only: max participants per side (0 = platform default, capped at",
+              "the live `Config::max_team_size`, itself capped at `MAX_TEAM_SIZE` = 50).",
+              "Ignored for PVP challenges.",
+              "",
+              "This directly determines how many bytes the `challenge` account is",
+              "allocated with (see `effective_team_size` / `ChallengeAccount::space_for`),",
+              "and therefore how much SOL rent `fee_payer` (admin) pays to create it —",
+              "a small `max_team_size` costs proportionally less than a large one."
             ],
             "type": "u8"
           }
@@ -1941,6 +2297,32 @@
           },
           {
             "name": "OpponentTeam"
+          }
+        ]
+      }
+    },
+    {
+      "name": "WithdrawAuthority",
+      "docs": [
+        "Dedicated authority allowed to call `admin_withdraw`, kept separate from",
+        "`Config::admin` so a leaked/compromised admin hot wallet (the one loaded",
+        "into the settlement service) cannot on its own drain escrowed vaults.",
+        "Seeds: [b\"withdraw_authority\"]",
+        "",
+        "Bootstrapped once via `initialize_withdraw_authority` (admin-gated);",
+        "after that only this authority can rotate itself via",
+        "`update_withdraw_authority` — `Config::admin` has no path to reassign it."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
           }
         ]
       }

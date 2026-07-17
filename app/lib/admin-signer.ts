@@ -30,6 +30,7 @@ import {
   buildCancelChallengeTx,
   buildClaimRefundTx,
   buildClaimWinningsTx,
+  estimateCreateChallengeRentLamports,
   CreateChallengeArgs,
   deriveChallengePDA,
   deriveCreatorCounter,
@@ -170,15 +171,20 @@ export async function buildAdminSignedTokenTransferTx(args: {
 
 /**
  * Build a `create_challenge` transaction where:
- *   - `creator`  = user's wallet (their USDC ATA is debited)
- *   - `feePayer` = admin wallet  (admin pays all SOL rent / tx fees)
+ *   - `creator`   = user's wallet (their USDC ATA is debited)
+ *   - `feePayer`  = the user's own wallet, if their SOL balance comfortably
+ *                   covers the required rent (self-pay); otherwise the admin
+ *                   wallet sponsors it, same as before.
  *
- * The admin partially signs the transaction and returns it as a base64 string
- * so the frontend can collect the user's signature and broadcast it.
+ * In the self-pay case `feePayer` and `creator` are the same key, so only the
+ * user's own signature (collected client-side, same as always) is required —
+ * the admin never signs, and the challenge's `rent_payer` is recorded
+ * on-chain as the user, so *they* get the rent back when the challenge later
+ * settles/cancels/closes, instead of it going to admin.
  *
  * @param userWallet  - The user's Solana wallet address (base58)
  * @param args        - Challenge creation parameters
- * @returns           - base64-encoded partially-signed transaction + metadata
+ * @returns           - base64-encoded (partially-)signed transaction + metadata
  */
 export async function buildAdminSignedCreateChallengeTx(
   userWallet: string,
@@ -219,9 +225,24 @@ export async function buildAdminSignedCreateChallengeTx(
     nextChallengeId = 0;
   }
 
+  // Decide who pays SOL rent: the user self-pays when their balance
+  // comfortably covers it; otherwise admin sponsors, as before. Checking here
+  // — server-side, before any signing — means an underfunded user still gets
+  // a working sponsored transaction rather than a self-pay attempt that fails
+  // at broadcast for insufficient funds.
+  const requiredLamports = await estimateCreateChallengeRentLamports(
+    program,
+    connection,
+    userPubkey,
+    args
+  );
+  const userBalance = await connection.getBalance(userPubkey);
+  const selfPay = userBalance >= requiredLamports;
+  const feePayerPubkey = selfPay ? userPubkey : adminPubkey;
+
   // Build the transaction:
-  //   creator  = userPubkey  → USDC is transferred from user's ATA
-  //   feePayer = adminPubkey → admin pays all SOL (rent, tx fee)
+  //   creator  = userPubkey      → USDC is transferred from user's ATA
+  //   feePayer = feePayerPubkey  → pays all SOL (rent, tx fee)
   const tx = await buildCreateChallengeTx(
     program,
     userPubkey,
@@ -230,17 +251,21 @@ export async function buildAdminSignedCreateChallengeTx(
       expiresAt: Math.floor(args.expiresAt),
       resolvesAt: Math.floor(args.resolvesAt),
     },
-    adminPubkey  // feePayer
+    feePayerPubkey
   );
 
   // Set fee payer and fetch a fresh blockhash.
-  tx.feePayer = adminPubkey;
+  tx.feePayer = feePayerPubkey;
   const { blockhash, lastValidBlockHeight } =
     await connection.getLatestBlockhash("confirmed");
   tx.recentBlockhash = blockhash;
 
-  // Admin partially signs (covers fee payer signature requirement).
-  tx.partialSign(adminKeypair);
+  // Only the sponsored path needs a server-side signature — in the self-pay
+  // path feePayer === creator, so the user's own wallet signature (collected
+  // client-side, as always) is the only one required.
+  if (!selfPay) {
+    tx.partialSign(adminKeypair);
+  }
 
   // Serialize allowing incomplete signatures (user hasn't signed yet).
   const serializedTx = tx.serialize({ requireAllSignatures: false }).toString("base64");
@@ -251,7 +276,8 @@ export async function buildAdminSignedCreateChallengeTx(
     serializedTx,
     blockhash,
     lastValidBlockHeight,
-    admin: adminPubkey.toBase58(),
+    admin: selfPay ? null : adminPubkey.toBase58(),
+    rentSponsored: !selfPay,
     creator: userPubkey.toBase58(),
     challengePDA: challengePDA.toBase58(),
     challengeId: nextChallengeId,

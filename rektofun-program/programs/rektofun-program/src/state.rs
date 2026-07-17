@@ -77,6 +77,14 @@ pub struct ChallengeAccount {
     /// The wallet that created the challenge
     pub creator: Pubkey,
 
+    /// The wallet that paid the SOL rent for this challenge account + vault at
+    /// creation — either `creator` self-paying (if they had enough SOL) or
+    /// `config.admin` sponsoring. Every later close instruction
+    /// (`settle_challenge`, `cancel_challenge`, `admin_cancel_challenge`,
+    /// `claim_winnings`, `claim_refund`) refunds reclaimed rent to this same
+    /// wallet, not unconditionally to admin.
+    pub rent_payer: Pubkey,
+
     // ── PVP fields ──────────────────────────────────────────────────────────
     /// PVP only: the single wallet that accepted the challenge (zero if not yet accepted)
     pub challenger: Pubkey,
@@ -167,6 +175,7 @@ impl ChallengeAccount {
     /// Kept in sync manually with the field list above since this struct no
     /// longer derives `InitSpace`.
     const FIXED_SPACE: usize = 32 // creator
+        + 32 // rent_payer
         + 32 // challenger
         + 8  // challenger_bet_amount
         + 1  // max_team_size

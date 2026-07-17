@@ -9,8 +9,8 @@ use anchor_lang::prelude::*;
 pub const ADMIN_PUBKEY: Pubkey = pubkey!("mo3uv8Ai9FJEB4TEfFmj8H5SAh2SArr4tgcqNz9K41n");
 
 /// USDC mint on Solana devnet
-pub const USDC_MINT: &str = "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU";
-// pub const USDC_MINT: &str = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+// pub const USDC_MINT: &str = "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU";
+pub const USDC_MINT: &str = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 
 /// Initial platform fee in basis points (e.g. 200 = 2%), seeded into `Config`
 /// at `initialize_config` time. Live value lives in `Config::platform_fee_bps`.

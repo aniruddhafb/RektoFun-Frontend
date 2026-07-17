@@ -34,6 +34,7 @@ pub struct AdminCancelChallenge<'info> {
         constraint = (challenge.status == ChallengeStatus::Open
             || challenge.status == ChallengeStatus::Active)
             @ RektoError::NotOpenOrActive,
+        has_one = rent_payer @ RektoError::Unauthorized,
     )]
     pub challenge: Box<Account<'info, ChallengeAccount>>,
 
@@ -59,6 +60,13 @@ pub struct AdminCancelChallenge<'info> {
 
     /// USDC mint — validated by token account constraints above
     pub usdc_mint: InterfaceAccount<'info, Mint>,
+
+    /// Wallet that paid this challenge's rent at creation (`challenge.rent_payer`,
+    /// enforced via `has_one` on `challenge` above) — receives the reclaimed
+    /// vault + challenge PDA rent. Distinct from `admin`, which only gates who
+    /// may force-cancel.
+    #[account(mut)]
+    pub rent_payer: SystemAccount<'info>,
 
     pub token_program: Interface<'info, TokenInterface>,
     pub system_program: Program<'info, System>,
@@ -112,7 +120,7 @@ pub(crate) fn handler(ctx: Context<AdminCancelChallenge>) -> Result<()> {
             ctx.accounts.token_program.key(),
             CloseAccount {
                 account: ctx.accounts.vault.to_account_info(),
-                destination: ctx.accounts.admin.to_account_info(),
+                destination: ctx.accounts.rent_payer.to_account_info(),
                 authority: ctx.accounts.challenge.to_account_info(),
             },
             signer_seeds_nested,
@@ -134,10 +142,10 @@ pub(crate) fn handler(ctx: Context<AdminCancelChallenge>) -> Result<()> {
         },
     );
 
-    // Reclaim the challenge PDA's rent to admin once no other depositors remain
+    // Reclaim the challenge PDA's rent to rent_payer once no other depositors remain
     // to claim refunds via claim_refund (which needs this account to still exist).
     if !other_depositors_remain {
-        ctx.accounts.challenge.close(ctx.accounts.admin.to_account_info())?;
+        ctx.accounts.challenge.close(ctx.accounts.rent_payer.to_account_info())?;
     }
 
     Ok(())

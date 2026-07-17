@@ -39,6 +39,7 @@ pub struct SettleChallenge<'info> {
             &challenge.challenge_id.to_le_bytes(),
         ],
         bump = challenge.bump,
+        has_one = rent_payer @ RektoError::Unauthorized,
     )]
     pub challenge: Box<Account<'info, ChallengeAccount>>,
 
@@ -95,6 +96,14 @@ pub struct SettleChallenge<'info> {
 
     /// USDC mint — validated by token account constraints above
     pub usdc_mint: InterfaceAccount<'info, Mint>,
+
+    /// Wallet that paid this challenge's rent at creation (`challenge.rent_payer`,
+    /// enforced via `has_one` on `challenge` above) — receives the vault +
+    /// challenge PDA rent refund when a PVP settlement fully closes them out.
+    /// Unused for TEAM (nothing closes here; the last `claim_winnings` caller
+    /// closes them instead).
+    #[account(mut)]
+    pub rent_payer: SystemAccount<'info>,
 
     pub token_program: Interface<'info, TokenInterface>,
     pub system_program: Program<'info, System>,
@@ -231,7 +240,7 @@ pub(crate) fn handler(ctx: Context<SettleChallenge>, creator_wins: bool) -> Resu
                 ctx.accounts.token_program.key(),
                 CloseAccount {
                     account: ctx.accounts.vault.to_account_info(),
-                    destination: ctx.accounts.admin.to_account_info(),
+                    destination: ctx.accounts.rent_payer.to_account_info(),
                     authority: ctx.accounts.challenge.to_account_info(),
                 },
                 signer_seeds,
@@ -239,7 +248,7 @@ pub(crate) fn handler(ctx: Context<SettleChallenge>, creator_wins: bool) -> Resu
 
             // PVP has no further claims after settlement (payout is atomic above) —
             // reclaim the challenge PDA's rent too.
-            ctx.accounts.challenge.close(ctx.accounts.admin.to_account_info())?;
+            ctx.accounts.challenge.close(ctx.accounts.rent_payer.to_account_info())?;
         }
 
         // ── TEAM ─────────────────────────────────────────────────────────────

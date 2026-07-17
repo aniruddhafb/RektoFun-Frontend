@@ -4,7 +4,7 @@ use anchor_spl::token_interface::{self, CloseAccount, Mint, TokenAccount, TokenI
 use crate::{
     constants::*,
     error::RektoError,
-    state::{ChallengeAccount, ChallengeStatus, ChallengeType, ClaimRecord, Config, WinningSide},
+    state::{ChallengeAccount, ChallengeStatus, ChallengeType, ClaimRecord, WinningSide},
 };
 
 /// TEAM mode only: a winner on the winning side calls this to pull their proportional
@@ -30,6 +30,7 @@ pub struct ClaimWinnings<'info> {
         constraint = challenge.status == ChallengeStatus::Settled @ RektoError::NotSettled,
         constraint = challenge.challenge_type == ChallengeType::Team @ RektoError::WrongChallengeType,
         constraint = challenge.creator == creator.key() @ RektoError::UnauthorizedSettle,
+        has_one = rent_payer @ RektoError::Unauthorized,
     )]
     pub challenge: Box<Account<'info, ChallengeAccount>>,
 
@@ -67,13 +68,11 @@ pub struct ClaimWinnings<'info> {
     /// USDC mint
     pub usdc_mint: InterfaceAccount<'info, Mint>,
 
-    #[account(seeds = [CONFIG_SEED], bump = config.bump)]
-    pub config: Account<'info, Config>,
-
-    /// Platform wallet — receives the reclaimed vault + challenge PDA rent once the
-    /// final winner has claimed (it originally paid this rent at challenge creation).
-    #[account(mut, address = config.admin @ RektoError::Unauthorized)]
-    pub admin: SystemAccount<'info>,
+    /// Wallet that paid this challenge's rent at creation (`challenge.rent_payer`,
+    /// enforced via `has_one` on `challenge` above) — receives the reclaimed
+    /// vault + challenge PDA rent once the final winner has claimed.
+    #[account(mut)]
+    pub rent_payer: SystemAccount<'info>,
 
     pub token_program: Interface<'info, TokenInterface>,
     pub system_program: Program<'info, System>,
@@ -204,13 +203,13 @@ pub(crate) fn handler(ctx: Context<ClaimWinnings>) -> Result<()> {
             ctx.accounts.token_program.key(),
             CloseAccount {
                 account: ctx.accounts.vault.to_account_info(),
-                destination: ctx.accounts.admin.to_account_info(),
+                destination: ctx.accounts.rent_payer.to_account_info(),
                 authority: ctx.accounts.challenge.to_account_info(),
             },
             signer_seeds,
         ))?;
 
-        ctx.accounts.challenge.close(ctx.accounts.admin.to_account_info())?;
+        ctx.accounts.challenge.close(ctx.accounts.rent_payer.to_account_info())?;
     }
 
     Ok(())

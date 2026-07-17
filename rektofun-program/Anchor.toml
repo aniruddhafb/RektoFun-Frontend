@@ -9,8 +9,11 @@ skip-lint = false
 [programs.devnet]
 rektofun_program = "4i89kL32hf4AzZwgqboFEVgJxAgVXxpDkyrGeJRnZtHT"
 
+[programs.mainnet]
+rektofun_program = "4i89kL32hf4AzZwgqboFEVgJxAgVXxpDkyrGeJRnZtHT"
+
 [provider]
-cluster = "devnet"
+cluster = "mainnet"
 wallet = "~/.config/solana/rekto-deploy.json"
 
 [scripts]
