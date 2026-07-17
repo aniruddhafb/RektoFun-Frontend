@@ -95,6 +95,30 @@ export default function ProfilePage() {
         fetchUser();
     }, [walletFromSlug]);
 
+    // Profile edits are saved from the navbar modal, which updates the global
+    // user store. Reflect those changes in an already-open owner profile
+    // immediately instead of waiting for a navigation or another API fetch.
+    useEffect(() => useUserStore.subscribe((state) => {
+        const updated = state.user;
+        if (!updated) return;
+        setUser((profile) => {
+            if (!profile || profile.id !== updated.id) return profile;
+            return {
+                ...profile,
+                username: updated.username,
+                pubkey: updated.pubkey,
+                wallet_address: updated.wallet_address,
+                profile_image: updated.profile_image,
+                bio: updated.bio,
+                description: updated.description,
+                twitter_username: updated.twitter_username,
+                followers: updated.followers,
+                following: updated.following,
+                user_type: updated.user_type,
+            };
+        });
+    }), []);
+
     // Fetch challenges created by this user
     useEffect(() => {
         async function fetchUserChallenges() {

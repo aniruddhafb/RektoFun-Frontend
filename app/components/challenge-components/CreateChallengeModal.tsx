@@ -80,6 +80,7 @@ type AssetPriceState = {
 
 const MAX_STATEMENT_LENGTH = 220;
 const MIN_DURATION_MINUTES = 15;
+const MAX_JOIN_WINDOW_MINUTES = 7 * 24 * 60;
 const MAX_RESOLUTION_DELAY_MINUTES = 14 * 24 * 60;
 const DEFAULT_BET_AMOUNT = 5;
 const DEFAULT_DURATION_MINUTES = 15;
@@ -120,6 +121,9 @@ const toDateTimeLocalValue = (date: Date) => {
     const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60 * 1000);
     return localDate.toISOString().slice(0, 16);
 };
+
+const toDateInputValue = (date: Date) => toDateTimeLocalValue(date).slice(0, 10);
+const toTimeInputValue = (date: Date) => toDateTimeLocalValue(date).slice(11, 16);
 
 const durationFromMinutes = (totalMinutes: number) => ({
     hours: Math.floor(totalMinutes / 60),
@@ -213,7 +217,7 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
             setChallengeMode("pvp");
             if (typeof saved.betAmount === "number" && Number.isFinite(saved.betAmount) && saved.betAmount > 0) setBetAmount(saved.betAmount);
             if (typeof saved.durationMinutes === "number" && saved.durationMinutes >= MIN_DURATION_MINUTES) {
-                setDuration(durationFromMinutes(saved.durationMinutes));
+                setDuration(durationFromMinutes(Math.min(saved.durationMinutes, MAX_JOIN_WINDOW_MINUTES)));
             }
             if (typeof saved.resolutionDelayMinutes === "number" && saved.resolutionDelayMinutes >= MIN_DURATION_MINUTES) {
                 const safeDelay = Math.min(saved.resolutionDelayMinutes, MAX_RESOLUTION_DELAY_MINUTES);
@@ -320,12 +324,54 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
     };
 
     const handleDurationChange = (nextDuration: { hours: number; minutes: number }) => {
-        setDuration(nextDuration);
+        const totalMinutes = Math.min(
+            MAX_JOIN_WINDOW_MINUTES,
+            Math.max(0, nextDuration.hours * 60 + nextDuration.minutes),
+        );
+        setDuration(durationFromMinutes(totalMinutes));
+        setFormError(null);
+    };
+
+    const handleCustomDurationChange = (part: "days" | "hours" | "minutes", rawValue: string) => {
+        const value = Math.max(0, Number.parseInt(rawValue || "0", 10) || 0);
+        const currentDays = Math.floor(totalDurationMinutes / 1440);
+        const currentHours = Math.floor((totalDurationMinutes % 1440) / 60);
+        const currentMinutes = totalDurationMinutes % 60;
+        const days = part === "days" ? Math.min(value, 7) : currentDays;
+        const hours = part === "hours" ? Math.min(value, 23) : currentHours;
+        const minutes = part === "minutes" ? Math.min(value, 59) : currentMinutes;
+        handleDurationChange(durationFromMinutes(Math.min(
+            MAX_JOIN_WINDOW_MINUTES,
+            days * 1440 + hours * 60 + minutes,
+        )));
     };
 
     const handleResolutionDateChange = (nextDate: Date) => {
         if (!Number.isFinite(nextDate.getTime())) return;
         setSelectedDate(nextDate);
+        setFormError(null);
+    };
+
+    const handleResolutionDayChange = (value: string) => {
+        if (!value) return;
+        const [year, month, day] = value.split("-").map(Number);
+        const nextDate = new Date(selectedDate);
+        nextDate.setFullYear(year, month - 1, day);
+        handleResolutionDateChange(nextDate);
+    };
+
+    const handleResolutionTimeChange = (value: string) => {
+        if (!value) return;
+        const [hours, minutes] = value.split(":").map(Number);
+        const nextDate = new Date(selectedDate);
+        nextDate.setHours(hours, minutes, 0, 0);
+        handleResolutionDateChange(nextDate);
+    };
+
+    const selectResolutionOffset = (days: number) => {
+        const nextDate = new Date(composerNow + days * 24 * 60 * 60 * 1000);
+        nextDate.setHours(selectedDate.getHours(), selectedDate.getMinutes(), 0, 0);
+        handleResolutionDateChange(nextDate);
     };
 
     const isPriceFeed = marketType === "crypto" && challengeFormat === "price";
@@ -422,9 +468,13 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
             setActivePanel("resolution");
             return "Resolution must be between 15 minutes and 14 days from now.";
         }
-        if (totalDurationMinutes < MIN_DURATION_MINUTES || totalDurationMinutes > timeUntilResolutionMinutes) {
+        if (
+            totalDurationMinutes < MIN_DURATION_MINUTES
+            || totalDurationMinutes > MAX_JOIN_WINDOW_MINUTES
+            || totalDurationMinutes > timeUntilResolutionMinutes
+        ) {
             setActivePanel("window");
-            return "Join window must be at least 15 minutes and cannot extend beyond the resolution time.";
+            return "Join window must be between 15 minutes and 7 days, and cannot extend beyond the resolution time.";
         }
         if (requireProfile && !user?.id) return "Finish your profile before creating a challenge.";
         return null;
@@ -831,8 +881,8 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
                                                 />
                                                 {isAssetPriceLoading && <Loader2 className="h-4 w-4 shrink-0 animate-spin text-[#8b7a72]" />}
                                                 {hasAssetPriceError && <span className="shrink-0 text-xs font-black text-[#e85a2d]" title="Price unavailable">!</span>}
-                                             </label>
-                                         </div>
+                                            </label>
+                                        </div>
                                         <button
                                             type="button"
                                             onClick={() => {
@@ -881,9 +931,9 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
                                                 ) : null}
                                             </div>
                                         )}
-                                         <p className="mt-4 inline-flex items-center gap-1.5 text-xs font-bold text-[#7c6b63]">
-                                             <CalendarDays className="h-3.5 w-3.5 text-[#e85a2d]" /> by {formatDate(selectedDate)}
-                                         </p>
+                                        <p className="mt-4 inline-flex items-center gap-1.5 text-xs font-bold text-[#7c6b63]">
+                                            <CalendarDays className="h-3.5 w-3.5 text-[#e85a2d]" /> by {formatDate(selectedDate)}
+                                        </p>
                                     </div>
                                 ) : (
                                     <div>
@@ -1061,7 +1111,7 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
 
                                 {activePanel === "window" && (
                                     <div>
-                                        <PanelHeading info="The challenge expires in the selected window time, no participant can join and you will get refunded.">
+                                        <PanelHeading info="After this window closes, nobody new can join. The maximum is 7 days.">
                                             Join window
                                         </PanelHeading>
                                         <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
@@ -1083,6 +1133,38 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
                                                 </button>
                                             ))}
                                         </div>
+                                        <div className="mt-3 border-t-2 border-black/10 pt-3">
+                                            <div className="mb-2 flex items-center justify-between gap-3">
+                                                <p className="text-[10px] font-black uppercase tracking-[0.1em] text-[#594b44]">Custom time</p>
+                                                <p className="text-[10px] font-bold text-[#8b7a72]">15 min – 7 days</p>
+                                            </div>
+                                            <div className="grid grid-cols-3 gap-2">
+                                                {([
+                                                    { part: "days", label: "Days", value: Math.floor(totalDurationMinutes / 1440), max: 7 },
+                                                    { part: "hours", label: "Hours", value: Math.floor((totalDurationMinutes % 1440) / 60), max: 23 },
+                                                    { part: "minutes", label: "Minutes", value: totalDurationMinutes % 60, max: 59 },
+                                                ] as const).map((field) => (
+                                                    <label key={field.part} className="min-w-0">
+                                                        <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.08em] text-[#7b6a62]">{field.label}</span>
+                                                        <input
+                                                            type="number"
+                                                            inputMode="numeric"
+                                                            min={0}
+                                                            max={field.max}
+                                                            value={field.value}
+                                                            onChange={(event) => handleCustomDurationChange(field.part, event.target.value)}
+                                                            className="h-11 w-full border-2 border-black bg-white px-2 text-center text-base font-black outline-none focus:bg-[#fff9d9]"
+                                                            aria-label={`Custom join window ${field.label.toLowerCase()}`}
+                                                        />
+                                                    </label>
+                                                ))}
+                                            </div>
+                                            <div className="mt-2 flex items-center gap-2 bg-[#163f31] px-3 py-2 text-white">
+                                                <Clock3 className="h-4 w-4 shrink-0 text-[#f5d547]" />
+                                                <span className="text-[10px] font-bold">Open for</span>
+                                                <span className="ml-auto text-xs font-black">{formatDuration(duration)}</span>
+                                            </div>
+                                        </div>
                                     </div>
                                 )}
 
@@ -1091,22 +1173,70 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
                                         <PanelHeading info="The challenge will resolve on or before the selected time.">
                                             Resolves by
                                         </PanelHeading>
-                                        <label className="block">
-                                            <span className="sr-only">Resolution date and time</span>
-                                            <span className="flex items-center gap-2 border-2 border-black/20 bg-white px-3 focus-within:border-black">
-                                                <CalendarDays className="h-4 w-4 shrink-0 text-[#e85a2d]" />
-                                                <input
-                                                    type="datetime-local"
-                                                    required
-                                                    step={60}
-                                                    value={toDateTimeLocalValue(selectedDate)}
-                                                    min={toDateTimeLocalValue(minResolutionDate)}
-                                                    max={toDateTimeLocalValue(maxResolutionDate)}
-                                                    onChange={(event) => handleResolutionDateChange(new Date(event.target.value))}
-                                                    className="create-challenge-date-input h-12 w-full min-w-0 flex-1 border-0 bg-transparent text-base font-black text-black outline-none sm:h-11 sm:text-xs"
-                                                />
+                                        <div className="mb-3 grid grid-cols-3 gap-2" aria-label="Quick resolution dates">
+                                            {[
+                                                { label: "Tomorrow", days: 1 },
+                                                { label: "In 3 days", days: 3 },
+                                                { label: "In 7 days", days: 7 },
+                                            ].map((option) => (
+                                                <button
+                                                    key={option.days}
+                                                    type="button"
+                                                    onClick={() => selectResolutionOffset(option.days)}
+                                                    className="min-h-9 border-2 border-black/20 bg-white px-1 text-[10px] font-black text-[#594b44] hover:border-black hover:bg-[#f5d547]"
+                                                >
+                                                    {option.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                        <div className="grid grid-cols-5 gap-2">
+                                            <label className="col-span-3 min-w-0">
+                                                <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.08em] text-[#7b6a62]">Date</span>
+                                                <span className="flex h-12 items-center gap-2 border-2 border-black bg-white px-3 focus-within:bg-[#fff9d9]">
+                                                    <CalendarDays className="h-4 w-4 shrink-0 text-[#e85a2d]" />
+                                                    <input
+                                                        type="date"
+                                                        required
+                                                        value={toDateInputValue(selectedDate)}
+                                                        min={toDateInputValue(minResolutionDate)}
+                                                        max={toDateInputValue(maxResolutionDate)}
+                                                        onChange={(event) => handleResolutionDayChange(event.target.value)}
+                                                        className="create-challenge-date-input h-full w-full min-w-0 border-0 bg-transparent text-xs font-black text-black outline-none"
+                                                        aria-label="Resolution date"
+                                                    />
+                                                </span>
+                                            </label>
+                                            <label className="col-span-2 min-w-0">
+                                                <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.08em] text-[#7b6a62]">Time</span>
+                                                <span className="flex h-12 items-center gap-2 border-2 border-black bg-white px-2 focus-within:bg-[#fff9d9]">
+                                                    <Clock3 className="hidden h-4 w-4 shrink-0 text-[#11895a] min-[390px]:block" />
+                                                    <input
+                                                        type="time"
+                                                        required
+                                                        step={60}
+                                                        value={toTimeInputValue(selectedDate)}
+                                                        onChange={(event) => handleResolutionTimeChange(event.target.value)}
+                                                        className="create-challenge-date-input h-full w-full min-w-0 border-0 bg-transparent text-xs font-black text-black outline-none"
+                                                        aria-label="Resolution time"
+                                                    />
+                                                </span>
+                                            </label>
+                                        </div>
+                                        <div className="mt-3 flex items-center gap-3 border-2 border-black bg-[#f5d547] px-3 py-2.5 shadow-[2px_2px_0_#111]">
+                                            <span className="flex h-8 w-8 shrink-0 items-center justify-center bg-black text-[#f5d547]">
+                                                <CalendarDays className="h-4 w-4" />
                                             </span>
-                                        </label>
+                                            <span className="min-w-0">
+                                                <span className="block text-[9px] font-black uppercase tracking-[0.1em] text-black/55">Your challenge resolves on or before</span>
+                                                <span className="block truncate text-sm font-black text-black">{formatDate(selectedDate)}</span>
+                                            </span>
+                                            <span className="ml-auto shrink-0 text-right text-[9px] font-bold text-black/60">
+                                                in {formatDuration(durationFromMinutes(timeUntilResolutionMinutes))}
+                                            </span>
+                                        </div>
+                                        <p className="mt-2 text-[10px] font-bold text-[#7b6a62]">
+                                            Pick any time from 15 minutes to 14 days from now.
+                                        </p>
                                     </div>
                                 )}
 

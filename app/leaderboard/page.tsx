@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { getLeaderboard, type LeaderboardPeriod, type LeaderboardSort, type LeaderboardUser } from "../lib/users-service/users";
-import { Search } from "lucide-react";
+import { getLeaderboard, type LeaderboardPeriod, type LeaderboardSort, type LeaderboardUser, type LeaderboardVerification } from "../lib/users-service/users";
+import { Filter, Search } from "lucide-react";
 
 const VerifiedBadge = ({ isModerator = false }: { isModerator?: boolean }) => (
     <svg className="h-4 w-4 shrink-0" viewBox="0 0 32 32" aria-hidden="true">
@@ -136,6 +136,7 @@ export default function LeaderboardPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [period, setPeriod] = useState<LeaderboardPeriod>("all");
+    const [verification, setVerification] = useState<LeaderboardVerification>("all");
 
     useEffect(() => {
         const timer = window.setTimeout(() => {
@@ -155,7 +156,7 @@ export default function LeaderboardPage() {
                 setIsLoading(true);
                 setError(null);
                 const apiSort: LeaderboardSort = ({ winRate: "win_rate", rekt: "lost", profit: "pnl" } as const)[sortField as "winRate" | "rekt" | "profit"] || sortField as LeaderboardSort;
-                const response = await getLeaderboard(ITEMS_PER_PAGE, offset, debouncedSearchQuery, period, apiSort, sortOrder);
+                const response = await getLeaderboard(ITEMS_PER_PAGE, offset, debouncedSearchQuery, period, apiSort, sortOrder, verification);
                 if (cancelled) return;
                 const mapped = response.users.map((user, index) => mapUserToRow(user, offset + index + 1));
                 setRows(mapped);
@@ -172,7 +173,7 @@ export default function LeaderboardPage() {
 
         loadUsers();
         return () => { cancelled = true; };
-    }, [currentPage, debouncedSearchQuery, period, sortField, sortOrder]);
+    }, [currentPage, debouncedSearchQuery, period, sortField, sortOrder, verification]);
 
     const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE);
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
@@ -261,7 +262,8 @@ export default function LeaderboardPage() {
                 </div> */}
 
                 <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="relative w-full sm:max-w-md sm:flex-1">
+                    <div className="flex w-full gap-2 sm:max-w-xl sm:flex-1">
+                      <div className="relative min-w-0 flex-1">
                         <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                         <input
                             type="text"
@@ -272,6 +274,20 @@ export default function LeaderboardPage() {
                             }}
                             className="w-full rounded-full border border-black/15 bg-white/70 py-2.5 pl-10 pr-4 text-sm text-gray-800 shadow-[2px_2px_0_rgba(0,0,0,0.16)] placeholder:text-gray-400 outline-none transition hover:shadow-[3px_3px_0_rgba(0,0,0,0.18)] focus:border-black/25 focus:bg-white focus:ring-4 focus:ring-gray-900/[0.04]"
                         />
+                      </div>
+                      <div className="relative shrink-0">
+                        <Filter className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
+                        <select
+                            aria-label="Filter leaderboard by verification"
+                            value={verification}
+                            onChange={(event) => { setVerification(event.target.value as LeaderboardVerification); setCurrentPage(1); }}
+                            className="h-full cursor-pointer appearance-none rounded-full border border-black/15 bg-white/70 py-2.5 pl-9 pr-8 text-sm font-bold text-gray-700 shadow-[2px_2px_0_rgba(0,0,0,0.16)] outline-none transition hover:bg-white focus:border-black/25"
+                        >
+                            <option value="all">All</option>
+                            <option value="x">Verified X</option>
+                            <option value="kol">Verified KOLs</option>
+                        </select>
+                      </div>
                     </div>
                     <div className="w-full sm:w-auto">
                         <div className="grid w-full grid-cols-4 rounded-lg border border-black/10 bg-white/70 p-1 shadow-sm backdrop-blur-sm sm:flex sm:w-auto" aria-label="Leaderboard period">

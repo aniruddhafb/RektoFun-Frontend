@@ -46,6 +46,7 @@ export interface User {
 
 export type LeaderboardPeriod = "1d" | "7d" | "30d" | "all";
 export type LeaderboardSort = "rank" | "win_rate" | "won" | "lost" | "pnl" | "volume";
+export type LeaderboardVerification = "all" | "x" | "kol";
 
 export type LeaderboardUser = Omit<User, "id" | "followers" | "following"> & {
   id: string;
@@ -254,7 +255,15 @@ export async function updateUser(id: number, params: UpdateUserParams): Promise<
     throw await parseError(response, `Failed to update user: ${response.statusText}`);
   }
 
-  return normalizeUser(await response.json());
+  const updated = normalizeUser(await response.json());
+  if (updated.pubkey) {
+    userCache.set(updated.pubkey.trim().toLowerCase(), {
+      user: updated,
+      expiresAt: Date.now() + USER_CACHE_TTL_MS,
+    });
+  }
+  leaderboardCache.clear();
+  return updated;
 }
 
 export async function checkUsernameExists(username: string): Promise<boolean> {
@@ -351,6 +360,7 @@ export async function getLeaderboard(
   period: LeaderboardPeriod = "all",
   sort: LeaderboardSort = "pnl",
   order: "asc" | "desc" = "desc",
+  verification: LeaderboardVerification = "all",
 ): Promise<LeaderboardResponse> {
   const queryParams = new URLSearchParams();
 
@@ -359,6 +369,7 @@ export async function getLeaderboard(
   queryParams.append("period", period);
   queryParams.append("sort", sort);
   queryParams.append("order", order);
+  queryParams.append("verification", verification);
   if (search?.trim()) queryParams.append("search", search.trim());
 
   const url = `${API_BASE_URL}/users/leaderboard?${queryParams.toString()}`;
