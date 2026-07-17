@@ -43,6 +43,12 @@ const nextConfig = {
         port: '',
         pathname: '/profile_images/**',
       },
+      {
+        protocol: 'https',
+        hostname: '**.supabase.co',
+        port: '',
+        pathname: '/storage/v1/object/public/category-images/**',
+      },
     ],
     dangerouslyAllowSVG: true,
     contentDispositionType: 'attachment',

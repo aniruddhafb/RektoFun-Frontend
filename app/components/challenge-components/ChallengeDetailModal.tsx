@@ -31,7 +31,7 @@ import {
   LineStyle,
   type UTCTimestamp,
 } from "lightweight-charts";
-import { Challenge, incrementChallengeViews } from "@/app/lib/challenges-service/challenges";
+import { Challenge, getChallengeHistoryEvents, incrementChallengeViews } from "@/app/lib/challenges-service/challenges";
 import { User as UserType } from "@/app/lib/users-service/users";
 import { getPositionsByChallenge, ParticipantUser, Position } from "@/app/lib/positions-service/positions";
 import { useChallengeDetail } from "@/app/hooks/useChallengeDetail";
@@ -52,13 +52,6 @@ interface ChallengeDetailModalProps {
 
 interface ChallengeAcceptActionProps {
   challenge: Challenge;
-  ctaState: {
-    label: string;
-    disabled: boolean;
-    className: string;
-    showCreatorHint: boolean;
-  };
-  canOpen: () => boolean;
   onOpenChange: (isOpen: boolean) => void;
 }
 
@@ -85,6 +78,7 @@ type BetActivityView = {
   bet: number;
   createdAt: string;
   isCreator: boolean;
+  type: "created" | "joined" | "cancelled" | "expired" | "target_reached" | "redeemed" | "refunded";
 };
 
 type MarketCandle = {
@@ -136,7 +130,7 @@ function formatBetPlacedAt(value: string) {
     : { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
 }
 
-function ChallengeAcceptAction({ challenge, ctaState, canOpen, onOpenChange }: ChallengeAcceptActionProps) {
+function ChallengeAcceptAction({ challenge, onOpenChange }: ChallengeAcceptActionProps) {
   const {
     isLoading,
     isBetFormOpen,
@@ -155,8 +149,7 @@ function ChallengeAcceptAction({ challenge, ctaState, canOpen, onOpenChange }: C
     teamATotalAmount,
     teamBTotalAmount,
     isTeam,
-    isExpireTimeAchieved,
-    hasJoinedChallenge,
+    shouldPresentCancelAsRefund,
     setBetInput,
     setBetError,
     setJoinSide,
@@ -183,7 +176,9 @@ function ChallengeAcceptAction({ challenge, ctaState, canOpen, onOpenChange }: C
     event.preventDefault();
     await handleJoinChallenge();
   };
-  const displayedCtaState = challengeAction || hasJoinedChallenge ? actionCtaState : ctaState;
+  // Keep the detail modal in lockstep with ChallengeCard. The card hook owns
+  // joined status, lifecycle, creator actions, and their loading states.
+  const displayedCtaState = actionCtaState;
 
   return (
     <>
@@ -195,7 +190,6 @@ function ChallengeAcceptAction({ challenge, ctaState, canOpen, onOpenChange }: C
             if (challengeAction) {
               void handleChallengeAction(event);
             } else {
-              if (!canOpen()) return;
               openBetForm(event);
             }
           }}
@@ -241,7 +235,7 @@ function ChallengeAcceptAction({ challenge, ctaState, canOpen, onOpenChange }: C
       />
       <ChallengeActionModal
         action={pendingChallengeAction}
-        isExpired={isExpireTimeAchieved}
+        isExpired={shouldPresentCancelAsRefund}
         isLoading={isLoading}
         error={actionError}
         onClose={closeChallengeActionConfirmation}
@@ -297,8 +291,6 @@ export default function ChallengeDetailModal({ challenge, creator, isOpen, onClo
     modeLabel,
     primaryTitle,
     resolutionLabel,
-    ctaState,
-    handleCtaClick,
     openProfile,
     onClose: handleClose,
   } = useChallengeDetail(challenge, resolvedCreator, isOpen && !isAcceptModalOpen && !isShareModalOpen, onClose);
@@ -413,7 +405,7 @@ export default function ChallengeDetailModal({ challenge, creator, isOpen, onClo
     if (!challenge) return [];
     const creatorId = Number(challenge.creator_id ?? challenge.creator ?? 0);
     const currentRows = participantState.key === String(challenge.id) ? participantState.rows : [];
-    const rows = currentRows.map(({ position, user }) => {
+    const rows: BetActivityView[] = currentRows.map(({ position, user }) => {
       const isCreator = position.creator === creatorId;
       const resolvedUser = user ?? (isCreator ? resolvedCreator : null);
       return {
@@ -425,6 +417,7 @@ export default function ChallengeDetailModal({ challenge, creator, isOpen, onClo
         bet: Number(position.bet || 0),
         createdAt: position.created_at,
         isCreator,
+        type: "joined" as const,
       };
     });
 
@@ -438,11 +431,56 @@ export default function ChallengeDetailModal({ challenge, creator, isOpen, onClo
         bet: Number(challenge.initial_bet || 0),
         createdAt: challenge.created_at,
         isCreator: true,
+        type: "created",
+      });
+    }
+
+    // The creator's initial position is the creation event, not a join.
+    rows.forEach((row) => {
+      if (row.isCreator && row.createdAt === challenge.created_at) row.type = "created";
+    });
+
+    const historyUsers = new Map(participants.map((participant) => [participant.id, participant]));
+    getChallengeHistoryEvents(challenge).forEach((event) => {
+      const participant = historyUsers.get(event.user_id);
+      rows.push({
+        key: `${event.type}:${event.id}`,
+        name: participant?.name || `Player ${event.user_id}`,
+        avatar: participant?.avatar || FALLBACK_AVATAR,
+        wallet: participant?.wallet || "",
+        side: participant?.side || "TEAM_A",
+        bet: event.amount,
+        createdAt: event.occurred_at,
+        isCreator: participant?.isCreator || event.user_id === creatorId,
+        type: event.type,
+      });
+    });
+
+    const status = String(challenge.status || "").toLowerCase();
+    const isUncontestedTargetReached = status === "resolved" && !hasOpponents;
+    if (isUncontestedTargetReached) {
+      rows.push({
+        key: `target-reached:${challenge.id}`, name: creatorName, avatar: creatorAvatar || FALLBACK_AVATAR,
+        wallet: creatorWalletAddress, side: "TEAM_A", bet: 0,
+        createdAt: challenge.resolved_at || challenge.created_at, isCreator: true, type: "target_reached",
+      });
+    }
+    if (status === "cancelled") {
+      rows.push({
+        key: `cancelled:${challenge.id}`, name: creatorName, avatar: creatorAvatar || FALLBACK_AVATAR,
+        wallet: creatorWalletAddress, side: "TEAM_A", bet: 0,
+        createdAt: challenge.resolved_at || challenge.expiry || challenge.created_at, isCreator: true, type: "cancelled",
+      });
+    } else if (status === "expired" || (isExpireTimeAchieved && !hasOpponents)) {
+      rows.push({
+        key: `expired:${challenge.id}`, name: creatorName, avatar: creatorAvatar || FALLBACK_AVATAR,
+        wallet: creatorWalletAddress, side: "TEAM_A", bet: 0,
+        createdAt: challenge.expiry || challenge.created_at, isCreator: true, type: "expired",
       });
     }
 
     return rows.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  }, [challenge, creatorAvatar, creatorName, creatorWalletAddress, participantState, resolvedCreator]);
+  }, [challenge, creatorAvatar, creatorName, creatorWalletAddress, hasOpponents, isExpireTimeAchieved, participantState, participants, resolvedCreator]);
 
   if (!isOpen || !challenge) return null;
 
@@ -480,8 +518,6 @@ export default function ChallengeDetailModal({ challenge, creator, isOpen, onClo
   const composerMarket = challenge.metadata?.composer?.market;
   const isSports = challenge.category?.toLowerCase() === "sports" || composerMarket === "sports" || challenge.ticker === "SPORTS";
   const isCrypto = !isSports && Boolean(challenge.ticker);
-  const cleanCtaState = { ...ctaState, label: cleanCtaLabel(ctaState.label) };
-
   return createPortal(
     <div className="fixed inset-0 z-[10010] flex items-center justify-center overflow-hidden bg-black/55 p-2 backdrop-blur-sm sm:p-4">
       <div
@@ -669,8 +705,6 @@ export default function ChallengeDetailModal({ challenge, creator, isOpen, onClo
         <footer className="flex shrink-0 items-stretch gap-2 border-t-2 border-black bg-[#f3e1d7] p-3 sm:gap-3 sm:px-5">
           <ChallengeAcceptAction
             challenge={challenge}
-            ctaState={cleanCtaState}
-            canOpen={handleCtaClick}
             onOpenChange={setIsAcceptModalOpen}
           />
           <button
@@ -686,6 +720,7 @@ export default function ChallengeDetailModal({ challenge, creator, isOpen, onClo
           challenge={challenge}
           isOpen={isShareModalOpen}
           onClose={() => setIsShareModalOpen(false)}
+          variant={lifecycle === "CANCELLED" || lifecycle === "EXPIRED" ? "promotional" : "challenge"}
         />
 
         <style jsx global>{`
@@ -1117,11 +1152,11 @@ function BetActivityList({ activity, onOpenProfile, creatorLabel }: {
     <div className="mt-4 border-t border-black/10 pt-4">
       <div className="mb-2 flex items-center justify-between gap-3">
         <div>
-          <h4 className="text-[10px] font-black uppercase tracking-[0.12em] text-[#5c4a42] sm:text-xs">Bet activity</h4>
-          <p className="mt-0.5 text-[9px] font-bold text-[#9a887f]">Who backed each side and when</p>
+          <h4 className="text-[10px] font-black uppercase tracking-[0.12em] text-[#5c4a42] sm:text-xs">Challenge history</h4>
+          <p className="mt-0.5 text-[9px] font-bold text-[#9a887f]">Joins, lifecycle changes, refunds and redemptions</p>
         </div>
         <span className="border border-black/15 bg-[#fffaf6] px-2 py-1 text-[9px] font-black text-[#75645c]">
-          {activity.length} {activity.length === 1 ? "bet" : "bets"}
+          {activity.length} {activity.length === 1 ? "event" : "events"}
         </span>
       </div>
 
@@ -1144,11 +1179,19 @@ function BetActivityList({ activity, onOpenProfile, creatorLabel }: {
                   {bet.isCreator && <span className="shrink-0 bg-[#2d1f1a] px-1.5 py-0.5 text-[7px] font-black uppercase text-white">{creatorLabel}</span>}
                 </span>
                 <span className="mt-0.5 block text-[9px] font-bold text-[#8b7355]">
-                  Backed {bet.side === "TEAM_A" ? "challenger" : "opponent"}
+                  {bet.type === "created" ? "Created the challenge"
+                    : bet.type === "joined" ? `Joined ${bet.side === "TEAM_A" ? "challenger" : "opponent"} side`
+                      : bet.type === "cancelled" ? "Cancelled the challenge"
+                        : bet.type === "expired" ? "Challenge expired"
+                          : bet.type === "target_reached" ? "Target reached before an opponent joined"
+                            : bet.type === "redeemed" ? "Redeemed winnings"
+                              : "Claimed refund"}
                 </span>
               </span>
               <span className="shrink-0 text-right">
-                <span className="block text-[11px] font-black text-emerald-700 sm:text-xs">{formatMoney(bet.bet)}</span>
+                {bet.type !== "cancelled" && bet.type !== "expired" && bet.type !== "target_reached" && (
+                  <span className="block text-[11px] font-black text-emerald-700 sm:text-xs">{formatMoney(bet.bet)}</span>
+                )}
                 <span className="mt-0.5 flex items-center justify-end gap-1 text-[8px] font-bold text-[#8b7a72] sm:text-[9px]">
                   <Clock3 className="h-2.5 w-2.5" /> {formatBetPlacedAt(bet.createdAt)}
                 </span>
@@ -1158,7 +1201,7 @@ function BetActivityList({ activity, onOpenProfile, creatorLabel }: {
         </div>
       ) : (
         <div className="border border-dashed border-black/20 bg-[#fffaf6] px-3 py-5 text-center text-[10px] font-bold text-[#8b7a72]">
-          Bet activity will appear here when players join.
+          Challenge history will appear here.
         </div>
       )}
     </div>

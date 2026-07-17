@@ -15,6 +15,7 @@ import {
 import ChallengeDetailModal from "@/app/components/challenge-components/ChallengeDetailModal";
 import {
     Challenge,
+    getChallengeCategoryImage,
     getChallengeById,
 } from "@/app/lib/challenges-service/challenges";
 import { ChallengeActivity, getActivityLabel, getActivityVerb, getChallengeActivityPage } from "@/app/lib/activity-service/activity";
@@ -137,7 +138,7 @@ function getActivityCreator(challenge: Challenge) {
         username,
         wallet,
         profileSlug: wallet || username,
-        avatar: creator?.profile_image || challenge.market?.icon || "/scribbles/btc.png",
+        avatar: creator?.profile_image || getChallengeCategoryImage(challenge),
     };
 }
 
@@ -610,7 +611,7 @@ export default function ActivityPage() {
                             const actorName = item.actor?.username || creator.username;
                             const actorAvatar = item.actor?.profile_image || creator.avatar;
                             const actorSlug = item.actor?.wallet_address || item.actor?.pubkey || creator.profileSlug;
-                            const marketIcon = challenge.market?.icon || "/scribbles/btc.png";
+                            const marketIcon = getChallengeCategoryImage(challenge);
                             const totalPool = challenge.total_pool || challenge.pool_size || challenge.initial_bet || 0;
                             const participantCount = challenge.total_challengers || challenge.participants || 0;
                             const resolutionStatus = getResolutionStatus(challenge, currentTimeMs);
@@ -639,13 +640,14 @@ export default function ActivityPage() {
                                                 alt={challenge.ticker || "Asset"}
                                                 width={56}
                                                 height={56}
+                                                unoptimized
                                                 className="h-full w-full object-cover"
                                             />
                                         </div>
 
                                         <div className="min-w-0 flex-1">
                                             <div className="mb-1 flex items-center gap-2">
-                                                <span className={`rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.08em] ${item.type === "joined" ? "bg-emerald-50 text-emerald-700" : item.type === "cancelled" ? "bg-rose-50 text-rose-700" : item.type === "expired" ? "bg-gray-100 text-gray-600" : "bg-sky-50 text-sky-700"}`}>
+                                                <span className={`rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.08em] ${item.type === "joined" || item.type === "redeemed" || item.type === "refunded" ? "bg-emerald-50 text-emerald-700" : item.type === "cancelled" ? "bg-rose-50 text-rose-700" : item.type === "expired" ? "bg-gray-100 text-gray-600" : "bg-sky-50 text-sky-700"}`}>
                                                     {getActivityLabel(item.type)}
                                                 </span>
                                                 <span className="text-[10px] font-semibold text-[#9a8274]">{formatTimeAgo(item.occurredAt)}</span>
@@ -663,7 +665,7 @@ export default function ActivityPage() {
                                                 >
                                                     {actorName}
                                                 </Link>
-                                                <span className="min-w-0 truncate">{getActivityVerb(item.type)}</span>
+                                                <span className="min-w-0 truncate">{getActivityVerb(item.type)}{item.amount != null ? ` · $${Number(item.amount).toLocaleString()}` : ""}</span>
                                                 <span className="text-[#c1aa9d]">·</span>
                                                 <span className="shrink-0 font-bold text-emerald-700">{participantCount} joined</span>
                                                 <span className="hidden text-[#c1aa9d] sm:inline">·</span>

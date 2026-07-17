@@ -5,6 +5,7 @@ import Image from "next/image";
 import { ChevronRight } from "lucide-react";
 import {
     Challenge,
+    getChallengeCategoryImage,
 } from "@/app/lib/challenges-service/challenges";
 import { ChallengeActivity, getActivityLabel, getActivityVerb, getUserChallengeActivities } from "@/app/lib/activity-service/activity";
 
@@ -191,18 +192,18 @@ export function ProfileActivity({ userId, username, avatar, onActivityClick, sea
                     >
                         <div className="flex items-center gap-3">
                             <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-[#e5d6cb] bg-[#f7eee8] shadow-sm sm:h-14 sm:w-14">
-                                <Image src={challenge.market?.icon || "/scribbles/btc.png"} alt={challenge.ticker || "Asset"} width={56} height={56} className="h-full w-full object-cover" />
+                                <Image src={getChallengeCategoryImage(challenge)} alt={challenge.ticker || "Asset"} width={56} height={56} unoptimized className="h-full w-full object-cover" />
                             </div>
                             <div className="flex-1 min-w-0">
                                 <div className="mb-1 flex items-center gap-2">
-                                    <span className={`rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.08em] ${item.type === "joined" ? "bg-emerald-50 text-emerald-700" : item.type === "cancelled" ? "bg-rose-50 text-rose-700" : item.type === "expired" ? "bg-gray-100 text-gray-600" : "bg-sky-50 text-sky-700"}`}>{getActivityLabel(item.type)}</span>
+                                    <span className={`rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.08em] ${item.type === "joined" || item.type === "redeemed" || item.type === "refunded" ? "bg-emerald-50 text-emerald-700" : item.type === "cancelled" ? "bg-rose-50 text-rose-700" : item.type === "expired" ? "bg-gray-100 text-gray-600" : "bg-sky-50 text-sky-700"}`}>{getActivityLabel(item.type)}</span>
                                     <span className="text-[10px] font-semibold text-[#9a8274]">{formatTimeAgo(item.occurredAt)}</span>
                                 </div>
                                 <h2 className="truncate text-sm font-black leading-snug text-[#17110e] sm:text-base" title={challenge.statement?.trim() || challenge.title}>{challenge.statement?.trim() || challenge.title}</h2>
                                 <div className="mt-1.5 flex min-w-0 items-center gap-1.5 text-xs text-[#8b7467]">
                                     <Image src={actorAvatar} alt="" width={20} height={20} className="h-5 w-5 shrink-0 rounded-full object-cover" />
                                     <span className="max-w-28 truncate font-bold text-[#4b382f]">{actorName}</span>
-                                    <span className="min-w-0 truncate">{getActivityVerb(item.type)}</span><span className="shrink-0 text-[#c1aa9d]">·</span>
+                                    <span className="min-w-0 truncate">{getActivityVerb(item.type)}{item.amount != null ? ` · $${Number(item.amount).toLocaleString()}` : ""}</span><span className="shrink-0 text-[#c1aa9d]">·</span>
                                     <span className="shrink-0 font-bold text-emerald-700">{participantCount} joined</span><span className="hidden text-[#c1aa9d] sm:inline">·</span>
                                     <span className="hidden shrink-0 font-semibold sm:inline">${Number(totalPool).toLocaleString()} pool</span>
                                 </div>

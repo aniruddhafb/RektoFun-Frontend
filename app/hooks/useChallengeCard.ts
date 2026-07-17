@@ -660,6 +660,14 @@ export function useChallengeCard(challenge: Challenge) {
     resolveTimestamp,
     now: currentTime,
   });
+  // The backend resolves price-feed challenges immediately when their target
+  // is hit. With no opponent, the on-chain challenge is still Open, so the
+  // creator must use the cancel instruction to recover the escrowed stake.
+  // Keep the transaction action as "cancel", but present this terminal case
+  // as a refund instead of a voluntary cancellation.
+  const isUncontestedResolved = !hasOpponents
+    && String(challenge.status || "").toUpperCase() === "RESOLVED";
+  const shouldPresentCancelAsRefund = isExpireTimeAchieved || isUncontestedResolved;
 
   React.useEffect(() => {
     if (!address || !walletProvider || !isConnected) {
@@ -782,9 +790,13 @@ export function useChallengeCard(challenge: Challenge) {
         signAllTransactions: (txs: Transaction[]) => signer.signAllTransactions(txs),
       };
       const program = getRektoProgram(walletAdapter);
-      let winningsAmount: number | null = null;
+      let actionAmount: number | null = actionToExecute === "cancel" && shouldPresentCancelAsRefund
+        ? Number(challenge.initial_bet) || 0
+        : null;
+      const chainChallenge = actionToExecute === "winnings" || actionToExecute === "refund"
+        ? await fetchChallenge(program, challengePDA)
+        : null;
       if (actionToExecute === "winnings") {
-        const chainChallenge = await fetchChallenge(program, challengePDA);
         if (!chainChallenge || chainChallenge.winningSideTotalAmount <= BigInt(0)) {
           throw new Error("Unable to calculate winnings.");
         }
@@ -802,9 +814,21 @@ export function useChallengeCard(challenge: Challenge) {
         }
         const payoutMicroUsdc = participantStake * chainChallenge.settledNetPot
           / chainChallenge.winningSideTotalAmount;
-        winningsAmount = Number(payoutMicroUsdc) / USDC_MULTIPLIER;
+        actionAmount = Number(payoutMicroUsdc) / USDC_MULTIPLIER;
+      } else if (actionToExecute === "refund") {
+        if (!chainChallenge) throw new Error("Unable to calculate refund.");
+        let participantStake = BigInt(0);
+        if (chainChallenge.creator.equals(participant)) {
+          participantStake = chainChallenge.betAmount;
+        } else {
+          const creatorIndex = chainChallenge.creatorTeam.findIndex((wallet) => wallet.equals(participant));
+          const opponentIndex = chainChallenge.opponentTeam.findIndex((wallet) => wallet.equals(participant));
+          if (creatorIndex >= 0) participantStake = chainChallenge.creatorTeamAmounts[creatorIndex] ?? BigInt(0);
+          if (opponentIndex >= 0) participantStake = chainChallenge.opponentTeamAmounts[opponentIndex] ?? BigInt(0);
+        }
+        actionAmount = Number(participantStake) / USDC_MULTIPLIER;
       }
-      await signAndSendSponsoredAction({
+      const signature = await signAndSendSponsoredAction({
         action: actionToExecute,
         participant: participant.toBase58(),
         creator: creatorPubkey.toBase58(),
@@ -818,9 +842,26 @@ export function useChallengeCard(challenge: Challenge) {
         }
         setLocallyCancelled(true);
       }
+      const recordsRefund = actionToExecute === "refund"
+        || (actionToExecute === "cancel" && shouldPresentCancelAsRefund);
+      if ((actionToExecute === "winnings" || recordsRefund) && user?.id && actionAmount !== null) {
+        try {
+          const { recordChallengeHistoryEvent } = await import("@/app/lib/challenges-service/challenges");
+          await recordChallengeHistoryEvent(challenge, {
+            id: signature,
+            type: actionToExecute === "winnings" ? "redeemed" : "refunded",
+            user_id: Number(user.id),
+            amount: actionAmount,
+            occurred_at: new Date().toISOString(),
+            signature,
+          });
+        } catch (historyError) {
+          console.error("On-chain action succeeded but history sync failed:", historyError);
+        }
+      }
       setChallengeAction(null);
-      if (actionToExecute === "winnings" && winningsAmount !== null) {
-        setClaimedWinnings(winningsAmount);
+      if (actionToExecute === "winnings" && actionAmount !== null) {
+        setClaimedWinnings(actionAmount);
       }
       setPendingChallengeAction(null);
       announceChallengeUpdated({
@@ -867,10 +908,10 @@ export function useChallengeCard(challenge: Challenge) {
 
     if (availableChallengeAction) {
       ctaLabel = availableChallengeAction === "cancel"
-        ? (isExpireTimeAchieved ? "Claim refund" : "Cancel challenge")
+        ? (shouldPresentCancelAsRefund ? "Claim refund" : "Cancel challenge")
         : availableChallengeAction === "refund" ? "Claim refund" : "Claim winnings";
       ctaDisabled = isLoading;
-      ctaClassName = availableChallengeAction === "cancel" && !isExpireTimeAchieved
+      ctaClassName = availableChallengeAction === "cancel" && !shouldPresentCancelAsRefund
         ? destructiveCtaClassName
         : activeCtaClassName;
     } else if (lifecycle === "CANCELLED") {
@@ -1021,6 +1062,7 @@ export function useChallengeCard(challenge: Challenge) {
     hasOpponents,
     isExpireTimeAchieved,
     isResolveTimeAchieved,
+    shouldPresentCancelAsRefund,
     ctaState,
     challengeAction: availableChallengeAction,
     pendingChallengeAction,

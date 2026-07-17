@@ -152,6 +152,7 @@ export function ChallengeCard({
         hasOpponents,
         isExpireTimeAchieved,
         isResolveTimeAchieved,
+        shouldPresentCancelAsRefund,
         ctaState,
         challengeAction,
         actionError,
@@ -243,6 +244,7 @@ export function ChallengeCard({
     }, [challenge.creator, challenge.creator_id, challenge.id, creatorDisplayName, creatorProfileImage, creatorWalletAddress, isTeam, shouldLoadParticipants]);
 
     const currentTeamParticipants = teamParticipants?.challengeId === challenge.id ? teamParticipants.rows : [];
+    const usePromotionalShareCard = isCancelledState || (isExpireTimeAchieved && !hasOpponents);
     const challengerProfiles = isTeam
         ? currentTeamParticipants.filter((participant) => participant.side === "TEAM_A")
         : [];
@@ -752,13 +754,13 @@ export function ChallengeCard({
             />
             <ChallengeActionModal
                 action={pendingChallengeAction}
-                isExpired={isExpireTimeAchieved}
+                isExpired={shouldPresentCancelAsRefund}
                 isLoading={isLoading}
                 error={actionError}
                 onClose={closeChallengeActionConfirmation}
                 onConfirm={() => void confirmChallengeAction()}
             />
-            <ShareChallengeModal challenge={challenge} isOpen={isShareModalOpen} onClose={() => setIsShareModalOpen(false)} />
+            <ShareChallengeModal challenge={challenge} isOpen={isShareModalOpen} onClose={() => setIsShareModalOpen(false)} variant={usePromotionalShareCard ? "promotional" : "challenge"} />
             <WinningsShareModal
                 challenge={challenge}
                 amount={claimedWinnings ?? 0}

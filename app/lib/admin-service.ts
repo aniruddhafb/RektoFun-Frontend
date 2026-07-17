@@ -21,7 +21,7 @@ export type ChallengeResolutionResult = {
 
 export async function resolveChallenge(
   challengeId: number,
-  resolution: { creator_wins?: boolean; final_price?: number },
+  resolution: { creator_wins?: boolean; final_price?: number; operation?: "resolve_all" | "resolve_db" | "settle_onchain" },
 ): Promise<ChallengeResolutionResult> {
   const response = await fetch(`/api/admin/challenges/resolve/${challengeId}`, {
     method: "POST",
@@ -31,6 +31,21 @@ export async function resolveChallenge(
   const data = await response.json().catch(() => null);
   if (!response.ok) throw new Error(data?.error || "Failed to resolve challenge");
   return data;
+}
+
+export async function withdrawChallengeFunds(
+  challengeId: number,
+  recipientWallet: string,
+  amount: number,
+) {
+  const response = await fetch(`/api/admin/challenges/withdraw/${challengeId}`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ recipient_wallet: recipientWallet, amount }),
+  });
+  const data = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(data?.error || "Failed to withdraw challenge funds");
+  return data as { success: true; signature: string; explorerUrl?: string };
 }
 
 export async function resolveDueChallenges(): Promise<ResolutionRunResult> {
