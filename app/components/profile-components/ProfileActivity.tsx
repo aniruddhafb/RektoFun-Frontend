@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
-import { ChevronRight } from "lucide-react";
+import { Ban, ChevronRight, Crown, LogIn, Plus, RotateCcw, TimerOff, Trophy, UsersRound, Wallet } from "lucide-react";
 import {
     Challenge,
     getChallengeCategoryImage,
@@ -61,20 +61,34 @@ function getResolutionStatusClass(status: string): string {
     return "border-sky-200 bg-sky-50 text-sky-700";
 }
 
+const activityAppearance = {
+    won: { Icon: Trophy, card: "bg-gradient-to-r from-amber-50/60 via-white to-white", badge: "bg-amber-100 text-amber-800" },
+    redeemed: { Icon: Crown, card: "bg-gradient-to-r from-violet-50/50 via-white to-white", badge: "bg-violet-100 text-violet-700" },
+    joined: { Icon: LogIn, card: "bg-gradient-to-r from-emerald-50/50 via-white to-white", badge: "bg-emerald-100 text-emerald-700" },
+    created: { Icon: Plus, card: "bg-gradient-to-r from-sky-50/50 via-white to-white", badge: "bg-sky-100 text-sky-700" },
+    cancelled: { Icon: Ban, card: "bg-gradient-to-r from-rose-50/50 via-white to-white", badge: "bg-rose-100 text-rose-700" },
+    expired: { Icon: TimerOff, card: "bg-gradient-to-r from-slate-50/70 via-white to-white", badge: "bg-slate-100 text-slate-600" },
+    refunded: { Icon: RotateCcw, card: "bg-gradient-to-r from-teal-50/50 via-white to-white", badge: "bg-teal-100 text-teal-700" },
+} as const;
+
 function ActivitySkeleton({ id }: { id: string }) {
     return (
-        <div key={id} className="overflow-hidden rounded-[28px] border border-[#ead7ca] bg-white/80 p-5" aria-hidden="true">
-            <div className="flex items-start gap-4">
-                <div className="h-14 w-14 flex-shrink-0 rounded-2xl bg-[#efe2d7] animate-pulse" />
+        <div key={id} className="overflow-hidden rounded-2xl border border-[#eadfd8] bg-white p-4 sm:p-5" aria-hidden="true">
+            <div className="flex items-center gap-3">
+                <div className="h-9 w-9 shrink-0 animate-pulse rounded-full bg-[#efe2d7]" />
                 <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                        <div className="h-4 w-24 rounded-full bg-[#efe2d7] animate-pulse" />
-                        <div className="h-4 w-16 rounded-full bg-[#efe2d7] animate-pulse" />
-                    </div>
-                    <div className="mt-3 h-6 w-[min(34rem,92%)] rounded-full bg-[#efe2d7] animate-pulse" />
-                    <div className="mt-2 h-4 w-[min(20rem,68%)] rounded-full bg-[#efe2d7] animate-pulse" />
+                    <div className="h-3.5 w-48 animate-pulse rounded-full bg-[#efe2d7]" />
+                    <div className="mt-2 h-3 w-24 animate-pulse rounded-full bg-[#f3e9e2]" />
                 </div>
-                <div className="h-10 w-10 flex-shrink-0 rounded-full bg-[#efe2d7] animate-pulse" />
+                <div className="h-5 w-16 animate-pulse rounded-full bg-[#efe2d7]" />
+            </div>
+            <div className="my-4 h-px bg-[#f0e7e1]" />
+            <div className="flex items-start gap-3.5">
+                <div className="h-14 w-14 shrink-0 animate-pulse rounded-xl bg-[#efe2d7]" />
+                <div className="min-w-0 flex-1 pt-1">
+                    <div className="h-5 w-[min(32rem,90%)] animate-pulse rounded-full bg-[#efe2d7]" />
+                    <div className="mt-3 h-3.5 w-60 animate-pulse rounded-full bg-[#f3e9e2]" />
+                </div>
             </div>
         </div>
     );
@@ -179,6 +193,8 @@ export function ProfileActivity({ userId, username, avatar, onActivityClick, sea
                     const totalPool = challenge.total_pool || challenge.pool_size || challenge.initial_bet || 0;
                     const actorName = item.actor?.username || username;
                     const actorAvatar = item.actor?.profile_image || avatar || "/scribbles/btc.png";
+                    const appearance = activityAppearance[item.type];
+                    const ActivityIcon = appearance.Icon;
                     return (
                     <article
                         key={item.id}
@@ -188,33 +204,44 @@ export function ProfileActivity({ userId, username, avatar, onActivityClick, sea
                         onKeyDown={(event) => {
                             if (event.key === "Enter" || event.key === " ") onActivityClick?.(challenge);
                         }}
-                        className="group cursor-pointer overflow-hidden rounded-2xl border border-[#e7d8ce] bg-white p-3 shadow-[0_2px_10px_rgba(70,45,30,0.04)] transition-all hover:-translate-y-0.5 hover:border-[#c9a58b] hover:shadow-[0_8px_24px_rgba(70,45,30,0.09)] sm:p-4"
+                        className={`group cursor-pointer overflow-hidden rounded-2xl border border-[#e8ddd6] p-4 shadow-[0_2px_12px_rgba(70,45,30,0.035)] outline-none transition-all duration-200 hover:-translate-y-0.5 hover:border-[#cfb5a4] hover:shadow-[0_10px_30px_rgba(70,45,30,0.08)] focus-visible:ring-2 focus-visible:ring-[#8b5e3c]/35 focus-visible:ring-offset-2 sm:p-5 ${appearance.card}`}
                     >
                         <div className="flex items-center gap-3">
-                            <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-[#e5d6cb] bg-[#f7eee8] shadow-sm sm:h-14 sm:w-14">
-                                <Image src={getChallengeCategoryImage(challenge)} alt={challenge.ticker || "Asset"} width={56} height={56} unoptimized className="h-full w-full object-cover" />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                                <div className="mb-1 flex items-center gap-2">
-                                    <span className={`rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.08em] ${item.type === "joined" || item.type === "redeemed" || item.type === "refunded" ? "bg-emerald-50 text-emerald-700" : item.type === "cancelled" ? "bg-rose-50 text-rose-700" : item.type === "expired" ? "bg-gray-100 text-gray-600" : "bg-sky-50 text-sky-700"}`}>{getActivityLabel(item.type)}</span>
-                                    <span className="text-[10px] font-semibold text-[#9a8274]">{formatTimeAgo(item.occurredAt)}</span>
+                            <Image src={actorAvatar} alt="" width={36} height={36} className="h-9 w-9 shrink-0 rounded-full border border-[#e8ddd6] object-cover" />
+                            <div className="min-w-0 flex-1 text-xs text-[#826e62]">
+                                <div className="flex min-w-0 items-center gap-1.5">
+                                    <span className="max-w-36 truncate font-bold text-[#352720]">{actorName}</span>
+                                    <span className="min-w-0 truncate">{getActivityVerb(item.type).toLowerCase()}</span>
+                                    {item.amount != null && <span className="shrink-0 font-bold text-[#352720]">${Number(item.amount).toLocaleString()}</span>}
                                 </div>
-                                <h2 className="truncate text-sm font-black leading-snug text-[#17110e] sm:text-base" title={challenge.statement?.trim() || challenge.title}>{challenge.statement?.trim() || challenge.title}</h2>
-                                <div className="mt-1.5 flex min-w-0 items-center gap-1.5 text-xs text-[#8b7467]">
-                                    <Image src={actorAvatar} alt="" width={20} height={20} className="h-5 w-5 shrink-0 rounded-full object-cover" />
-                                    <span className="max-w-28 truncate font-bold text-[#4b382f]">{actorName}</span>
-                                    <span className="min-w-0 truncate">{getActivityVerb(item.type)}{item.amount != null ? ` · $${Number(item.amount).toLocaleString()}` : ""}</span><span className="shrink-0 text-[#c1aa9d]">·</span>
-                                    <span className="shrink-0 font-bold text-emerald-700">{participantCount} joined</span><span className="hidden text-[#c1aa9d] sm:inline">·</span>
-                                    <span className="hidden shrink-0 font-semibold sm:inline">${Number(totalPool).toLocaleString()} pool</span>
+                                <span className="mt-0.5 block text-[11px] text-[#a08c80]">{formatTimeAgo(item.occurredAt)}</span>
+                            </div>
+                            <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.1em] ${appearance.badge}`}>
+                                <ActivityIcon className="h-3 w-3" aria-hidden="true" />
+                                {getActivityLabel(item.type)}
+                            </span>
+                        </div>
+
+                        <div className="my-3.5 h-px bg-[#f0e7e1] sm:my-4" />
+
+                        <div className="flex items-start gap-3.5">
+                            <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-[#e5d6cb] bg-[#f7eee8] sm:h-16 sm:w-16">
+                                <Image src={getChallengeCategoryImage(challenge)} alt={challenge.ticker || "Asset"} width={64} height={64} unoptimized className="h-full w-full object-cover" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                                <div className="mb-2 flex flex-wrap items-center gap-1.5">
+                                    <span className="rounded-md bg-[#f5eee9] px-2 py-1 text-[9px] font-black uppercase tracking-[0.08em] text-[#60483b]">{getModeLabel(challenge.mode)}</span>
+                                    <span className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-[10px] font-bold ${getResolutionStatusClass(resolutionStatus)}`}>
+                                        <span className="h-1.5 w-1.5 rounded-full bg-current" />{resolutionStatus}
+                                    </span>
+                                </div>
+                                <h2 className="line-clamp-2 text-sm font-black leading-snug text-[#17110e] sm:text-base" title={challenge.statement?.trim() || challenge.title}>{challenge.statement?.trim() || challenge.title}</h2>
+                                <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-semibold text-[#826e62]">
+                                    <span className="inline-flex items-center gap-1.5"><UsersRound className="h-3.5 w-3.5 text-[#a38674]" aria-hidden="true" />{participantCount} joined</span>
+                                    <span className="inline-flex items-center gap-1.5"><Wallet className="h-3.5 w-3.5 text-[#a38674]" aria-hidden="true" />${Number(totalPool).toLocaleString()} pool</span>
                                 </div>
                             </div>
-                            <div className="flex shrink-0 flex-col items-end gap-1.5">
-                                <div className="flex items-center gap-1.5">
-                                    <span className="rounded-full border border-[#dfd0c6] bg-[#f8f1ec] px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-[#60483b]">{getModeLabel(challenge.mode)}</span>
-                                    <span className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] font-bold ${getResolutionStatusClass(resolutionStatus)}`}><span className="h-1.5 w-1.5 rounded-full bg-current" />{resolutionStatus}</span>
-                                </div>
-                                <ChevronRight className="h-4 w-4 text-[#9a8274] transition-transform group-hover:translate-x-0.5" />
-                            </div>
+                            <ChevronRight className="mt-5 h-5 w-5 shrink-0 text-[#b29d91] transition-all group-hover:translate-x-0.5 group-hover:text-[#76513d]" />
                         </div>
                     </article>);
                 })}

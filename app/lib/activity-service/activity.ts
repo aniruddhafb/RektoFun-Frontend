@@ -2,7 +2,7 @@ import { Challenge } from "@/app/lib/challenges-service/challenges";
 import { Position } from "@/app/lib/positions-service/positions";
 import { User } from "@/app/lib/users-service/users";
 
-export type ChallengeActivityType = "created" | "joined" | "cancelled" | "expired" | "redeemed" | "refunded";
+export type ChallengeActivityType = "created" | "joined" | "cancelled" | "expired" | "redeemed" | "refunded" | "won";
 
 export interface ChallengeActivity {
   id: string;
@@ -29,6 +29,7 @@ export function getActivityVerb(type: ChallengeActivityType): string {
   if (type === "expired") return "had this challenge expire";
   if (type === "redeemed") return "redeemed winnings";
   if (type === "refunded") return "claimed a refund";
+  if (type === "won") return "won this challenge";
   return "created this challenge";
 }
 

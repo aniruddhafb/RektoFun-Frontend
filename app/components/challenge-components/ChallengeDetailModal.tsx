@@ -78,7 +78,7 @@ type BetActivityView = {
   bet: number;
   createdAt: string;
   isCreator: boolean;
-  type: "created" | "joined" | "cancelled" | "expired" | "target_reached" | "redeemed" | "refunded";
+  type: "created" | "joined" | "cancelled" | "expired" | "target_reached" | "redeemed" | "refunded" | "won";
 };
 
 type MarketCandle = {
@@ -457,6 +457,27 @@ export default function ChallengeDetailModal({ challenge, creator, isOpen, onClo
     });
 
     const status = String(challenge.status || "").toLowerCase();
+    const resolvedWinningSide = challenge.result === "TEAM_A" || challenge.result === "TEAM_B"
+      ? challenge.result
+      : null;
+    if (status === "resolved" && resolvedWinningSide) {
+      const winners = participants.filter((participant) => participant.side === resolvedWinningSide);
+      const recordedPool = participants.reduce((sum, participant) => sum + participant.bet, 0);
+      const winnings = recordedPool || challenge.total_pool || challenge.pool_size || challenge.initial_bet || 0;
+      winners.forEach((winner) => {
+        rows.push({
+          key: `won:${challenge.id}:${winner.id}`,
+          name: winner.name,
+          avatar: winner.avatar,
+          wallet: winner.wallet,
+          side: winner.side,
+          bet: challenge.mode === "PVP" ? winnings : 0,
+          createdAt: challenge.resolved_at || challenge.created_at,
+          isCreator: winner.isCreator,
+          type: "won",
+        });
+      });
+    }
     const isUncontestedTargetReached = status === "resolved" && !hasOpponents;
     if (isUncontestedTargetReached) {
       rows.push({
@@ -1153,7 +1174,7 @@ function BetActivityList({ activity, onOpenProfile, creatorLabel }: {
       <div className="mb-2 flex items-center justify-between gap-3">
         <div>
           <h4 className="text-[10px] font-black uppercase tracking-[0.12em] text-[#5c4a42] sm:text-xs">Challenge history</h4>
-          <p className="mt-0.5 text-[9px] font-bold text-[#9a887f]">Joins, lifecycle changes, refunds and redemptions</p>
+          <p className="mt-0.5 text-[9px] font-bold text-[#9a887f]">Joins, results, lifecycle changes, refunds and redemptions</p>
         </div>
         <span className="border border-black/15 bg-[#fffaf6] px-2 py-1 text-[9px] font-black text-[#75645c]">
           {activity.length} {activity.length === 1 ? "event" : "events"}
@@ -1168,13 +1189,14 @@ function BetActivityList({ activity, onOpenProfile, creatorLabel }: {
               type="button"
               disabled={!bet.wallet}
               onClick={() => onOpenProfile(bet.wallet)}
-              className="flex w-full items-center gap-2.5 px-2.5 py-2.5 text-left transition-colors hover:bg-[#fdf1e9] disabled:cursor-default sm:gap-3 sm:px-3"
+              className={`flex w-full items-center gap-2.5 px-2.5 py-2.5 text-left transition-colors disabled:cursor-default sm:gap-3 sm:px-3 ${bet.type === "won" ? "bg-[#fff4b8] hover:bg-[#ffed91]" : "hover:bg-[#fdf1e9]"}`}
             >
               <span className="h-8 w-8 shrink-0 overflow-hidden rounded-full border-2 border-[#d4a574] bg-[#f5d547]">
                 <Image src={bet.avatar || FALLBACK_AVATAR} alt="" width={32} height={32} className="h-full w-full object-cover" />
               </span>
               <span className="min-w-0 flex-1">
                 <span className="flex min-w-0 items-center gap-1.5">
+                  {bet.type === "won" && <Trophy className="h-3.5 w-3.5 shrink-0 text-[#a46b00]" strokeWidth={2.5} />}
                   <span className="truncate text-[11px] font-black text-[#2d1f1a] sm:text-xs">{bet.name}</span>
                   {bet.isCreator && <span className="shrink-0 bg-[#2d1f1a] px-1.5 py-0.5 text-[7px] font-black uppercase text-white">{creatorLabel}</span>}
                 </span>
@@ -1184,12 +1206,13 @@ function BetActivityList({ activity, onOpenProfile, creatorLabel }: {
                       : bet.type === "cancelled" ? "Cancelled the challenge"
                         : bet.type === "expired" ? "Challenge expired"
                           : bet.type === "target_reached" ? "Target reached before an opponent joined"
+                            : bet.type === "won" ? "Won challenge"
                             : bet.type === "redeemed" ? "Redeemed winnings"
                               : "Claimed refund"}
                 </span>
               </span>
               <span className="shrink-0 text-right">
-                {bet.type !== "cancelled" && bet.type !== "expired" && bet.type !== "target_reached" && (
+                {bet.type !== "cancelled" && bet.type !== "expired" && bet.type !== "target_reached" && !(bet.type === "won" && bet.bet <= 0) && (
                   <span className="block text-[11px] font-black text-emerald-700 sm:text-xs">{formatMoney(bet.bet)}</span>
                 )}
                 <span className="mt-0.5 flex items-center justify-end gap-1 text-[8px] font-bold text-[#8b7a72] sm:text-[9px]">
