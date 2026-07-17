@@ -28,7 +28,19 @@ function getDisplayName(user: LeaderboardUser) {
 }
 
 function formatUsdc(value?: number | null) {
-  return `$${(value ?? 0).toFixed(2)}`;
+  const amount = Number(value ?? 0);
+  if (!Number.isFinite(amount)) return "$0";
+
+  const absoluteAmount = Math.abs(amount);
+  const trimZeros = (formatted: string) =>
+    formatted.replace(/(\.\d*?[1-9])0+$|\.0+$/, "$1");
+
+  if (absoluteAmount >= 1_000) {
+    return `$${trimZeros((amount / 1_000).toFixed(1))}K`;
+  }
+
+  const maximumDecimals = absoluteAmount < 1 ? 6 : 2;
+  return `$${trimZeros(amount.toFixed(maximumDecimals))}`;
 }
 
 export function ReferralModal({ isOpen, onClose }: ReferralModalProps) {
@@ -318,7 +330,7 @@ export function ReferralModal({ isOpen, onClose }: ReferralModalProps) {
                     {history?.commissions.length ? history.commissions.map((item, index) => (
                       <div key={`${item.created_at}-${index}`} className="flex justify-between gap-3 border-t border-[#f0e3dc] py-2 text-xs">
                         <span className="font-semibold text-gray-500">{new Date(item.created_at).toLocaleString()}</span>
-                        <span className="font-black text-emerald-700">+{Number(item.amount).toFixed(2)} USDC</span>
+                        <span className="font-black text-emerald-700">+{formatUsdc(Number(item.amount))}</span>
                       </div>
                     )) : <p className="text-xs font-semibold text-gray-500">No commissions yet.</p>}
                     </div>
