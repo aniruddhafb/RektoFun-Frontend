@@ -4,7 +4,7 @@ use anchor_spl::token_interface::{self, CloseAccount, Mint, TokenAccount, TokenI
 use crate::{
     constants::*,
     error::RektoError,
-    state::{ChallengeAccount, ChallengeStatus, ChallengeType, ClaimRecord},
+    state::{ChallengeAccount, ChallengeStatus, ChallengeType, ClaimRecord, Config},
 };
 
 /// Any non-creator depositor on a Cancelled challenge claims their stake back — a PVP
@@ -72,7 +72,7 @@ pub struct ClaimRefund<'info> {
     /// status guarantees there is no collision between the two instructions.
     #[account(
         init,
-        payer = participant,
+        payer = fee_payer,
         space = 8 + ClaimRecord::INIT_SPACE,
         seeds = [CLAIM_SEED, challenge.key().as_ref(), participant.key().as_ref()],
         bump,
@@ -88,6 +88,20 @@ pub struct ClaimRefund<'info> {
     /// vault + challenge PDA rent.
     #[account(mut)]
     pub rent_payer: SystemAccount<'info>,
+
+    #[account(seeds = [CONFIG_SEED], bump = config.bump)]
+    pub config: Account<'info, Config>,
+
+    /// Pays the SOL rent for `claim_record` — either `participant` themself
+    /// (self-pay, when they have enough SOL) or `config.admin` (sponsored).
+    /// Chosen client-side based on the participant's SOL balance, same
+    /// pattern as `fee_payer` in `create_challenge`.
+    #[account(
+        mut,
+        constraint = fee_payer.key() == participant.key() || fee_payer.key() == config.admin
+            @ RektoError::Unauthorized,
+    )]
+    pub fee_payer: Signer<'info>,
 }
 
 pub(crate) fn handler(ctx: Context<ClaimRefund>) -> Result<()> {

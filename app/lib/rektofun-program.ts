@@ -202,6 +202,14 @@ function challengeAccountSpace(rosterCapacity: number): number {
 const CREATOR_COUNTER_SPACE = 8 + 32 + 8 + 1; // discriminator + creator + count + bump
 const TOKEN_ACCOUNT_SPACE = 165;              // SPL Token account size
 
+// discriminator + challenge (32) + participant (32) + amount_claimed (8) + bump (1) —
+// mirrors `ClaimRecord` in state.rs.
+const CLAIM_RECORD_SPACE = 8 + 32 + 32 + 8 + 1;
+
+// One signature (~5000 lamports) plus a safety margin, for the base network
+// fee of a single-signer transaction.
+const TX_FEE_BUFFER_LAMPORTS = 10_000;
+
 /**
  * Estimates the lamports needed to self-pay a `create_challenge` call: the
  * challenge PDA's rent + the vault ATA's rent + (creator_counter's rent, only
@@ -240,8 +248,36 @@ export async function estimateCreateChallengeRentLamports(
     usdcAtaInfo ? 0 : connection.getMinimumBalanceForRentExemption(TOKEN_ACCOUNT_SPACE),
   ]);
 
-  const TX_FEE_BUFFER_LAMPORTS = 10_000; // one signature (~5000 lamports) plus safety margin
   return challengeRent + vaultRent + counterRent + usdcAtaRent + TX_FEE_BUFFER_LAMPORTS;
+}
+
+/**
+ * Estimates the lamports needed to self-pay a `claim_winnings` or
+ * `claim_refund` call: `claim_record`'s rent + (the participant's own USDC
+ * ATA rent, only if it doesn't exist yet) + a small transaction-fee buffer.
+ */
+export async function estimateClaimFeeLamports(
+  connection: Connection,
+  participant: PublicKey
+): Promise<number> {
+  const participantUsdcAta = await getAssociatedTokenAddress(USDC_MINT, participant, false);
+  const usdcAtaInfo = await connection.getAccountInfo(participantUsdcAta);
+
+  const [claimRecordRent, usdcAtaRent] = await Promise.all([
+    connection.getMinimumBalanceForRentExemption(CLAIM_RECORD_SPACE),
+    usdcAtaInfo ? 0 : connection.getMinimumBalanceForRentExemption(TOKEN_ACCOUNT_SPACE),
+  ]);
+
+  return claimRecordRent + usdcAtaRent + TX_FEE_BUFFER_LAMPORTS;
+}
+
+/**
+ * Estimates the lamports needed to self-pay a `cancel_challenge` call.
+ * `cancel_challenge` creates no new on-chain accounts, so this is just the
+ * base transaction-fee buffer.
+ */
+export async function estimateCancelChallengeFeeLamports(): Promise<number> {
+  return TX_FEE_BUFFER_LAMPORTS;
 }
 
 // ─── Instruction Builders ─────────────────────────────────────────────────────
@@ -470,6 +506,12 @@ async function getPayoutAccountSetup(participant: PublicKey, feePayer: PublicKey
   return { participantUsdcAccount, preInstructions };
 }
 
+/**
+ * `feePayer` pays `claim_record`'s SOL rent — either `participant` themself
+ * (self-pay) or `config.admin` (sponsored), chosen by the caller based on the
+ * participant's SOL balance (see `estimateClaimFeeLamports`). `config` PDA is
+ * auto-derived by Anchor from its seeds, so it isn't passed explicitly.
+ */
 export async function buildClaimWinningsTx(
   program: Program,
   participant: PublicKey,
@@ -483,7 +525,7 @@ export async function buildClaimWinningsTx(
   return (program.methods as any).claimWinnings().accounts({
     participant, creator, challenge: challengePDA, vault, participantUsdcAccount,
     claimRecord, usdcMint: USDC_MINT, tokenProgram: TOKEN_PROGRAM_ID,
-    systemProgram: SystemProgram.programId,
+    systemProgram: SystemProgram.programId, feePayer,
   }).preInstructions(preInstructions).transaction();
 }
 
@@ -492,6 +534,8 @@ export async function buildClaimWinningsTx(
  * `rentPayer` (whichever wallet actually paid this challenge's rent at
  * creation) is auto-resolved by Anchor from the on-chain `has_one` relation
  * on `challenge`, same as in `buildCancelChallengeTx` — not passed explicitly.
+ * `feePayer` pays `claim_record`'s SOL rent — either `participant` themself
+ * (self-pay) or `config.admin` (sponsored), same as `buildClaimWinningsTx`.
  */
 export async function buildClaimRefundTx(
   program: Program,
@@ -505,7 +549,7 @@ export async function buildClaimRefundTx(
   const { participantUsdcAccount, preInstructions } = await getPayoutAccountSetup(participant, feePayer);
   return (program.methods as any).claimRefund().accounts({
     participant, creator, challenge: challengePDA, vault, participantUsdcAccount,
-    claimRecord, usdcMint: USDC_MINT, tokenProgram: TOKEN_PROGRAM_ID,
+    claimRecord, usdcMint: USDC_MINT, tokenProgram: TOKEN_PROGRAM_ID, feePayer,
     systemProgram: SystemProgram.programId,
   }).preInstructions(preInstructions).transaction();
 }
