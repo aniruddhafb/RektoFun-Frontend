@@ -31,6 +31,16 @@ export function getTokenMintAddress(token: SupportedToken) {
 }
 
 export function getSolanaRpcEndpoint() {
+  // NEXT_PUBLIC_SOLANA_RPC_URL lets ops point at a dedicated RPC provider
+  // (Helius/QuickNode/Triton/etc). The public cluster endpoints below are a
+  // fallback only — Solana Labs' public mainnet-beta RPC actively rejects
+  // production/browser dApp traffic with 403 "Access forbidden" once it
+  // recognizes the origin, so relying on it in production will break writes
+  // (sendRawTransaction/confirmTransaction) intermittently.
+  const override = process.env.NEXT_PUBLIC_SOLANA_RPC_URL?.trim();
+  if (override) {
+    return override.replace(/\/$/, "");
+  }
   return SOLANA_RPC_ENDPOINTS[SOLANA_CLUSTER];
 }
 
