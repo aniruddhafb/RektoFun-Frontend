@@ -442,8 +442,7 @@ fn test_cancel_challenge() {
         vault: vault_pda,
         creator_usdc_account: Pubkey::default(),
         usdc_mint: Pubkey::default(),
-        config: config_pda,
-        admin: admin.pubkey(),
+        rent_payer: admin.pubkey(),
         token_program: Pubkey::default(),
         system_program: system_program_id(),
     }

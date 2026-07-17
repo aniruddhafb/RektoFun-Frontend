@@ -4,7 +4,7 @@ use anchor_spl::token_interface::{self, CloseAccount, Mint, TokenAccount, TokenI
 use crate::{
     constants::*,
     error::RektoError,
-    state::{ChallengeAccount, ChallengeStatus, Config},
+    state::{ChallengeAccount, ChallengeStatus},
 };
 
 #[derive(Accounts)]
@@ -27,6 +27,7 @@ pub struct CancelChallenge<'info> {
         constraint = challenge.status == ChallengeStatus::Open @ RektoError::NotOpen,
         // Block cancellation if any opponent has joined — pot is contested at that point
         constraint = challenge.opponent_team.is_empty() @ RektoError::OpponentsJoined,
+        has_one = rent_payer @ RektoError::Unauthorized,
     )]
     pub challenge: Box<Account<'info, ChallengeAccount>>,
 
@@ -53,12 +54,11 @@ pub struct CancelChallenge<'info> {
     /// USDC mint — validated by token account constraints above
     pub usdc_mint: InterfaceAccount<'info, Mint>,
 
-    #[account(seeds = [CONFIG_SEED], bump = config.bump)]
-    pub config: Account<'info, Config>,
-
-    /// Platform wallet — receives reclaimed vault rent (it originally paid it).
-    #[account(mut, address = config.admin @ RektoError::Unauthorized)]
-    pub admin: SystemAccount<'info>,
+    /// Wallet that paid this challenge's rent at creation (`challenge.rent_payer`,
+    /// enforced via `has_one` on `challenge` above) — receives the reclaimed
+    /// vault + challenge PDA rent.
+    #[account(mut)]
+    pub rent_payer: SystemAccount<'info>,
 
     pub token_program: Interface<'info, TokenInterface>,
     pub system_program: Program<'info, System>,
@@ -106,7 +106,7 @@ pub(crate) fn handler(ctx: Context<CancelChallenge>) -> Result<()> {
             ctx.accounts.token_program.key(),
             CloseAccount {
                 account: ctx.accounts.vault.to_account_info(),
-                destination: ctx.accounts.admin.to_account_info(),
+                destination: ctx.accounts.rent_payer.to_account_info(),
                 authority: ctx.accounts.challenge.to_account_info(),
             },
             signer_seeds_nested,
@@ -128,10 +128,10 @@ pub(crate) fn handler(ctx: Context<CancelChallenge>) -> Result<()> {
         },
     );
 
-    // Reclaim the challenge PDA's rent to admin once no creator-side participants
+    // Reclaim the challenge PDA's rent to rent_payer once no creator-side participants
     // remain to claim refunds via claim_refund (which needs this account to still exist).
     if !has_creator_side_members {
-        ctx.accounts.challenge.close(ctx.accounts.admin.to_account_info())?;
+        ctx.accounts.challenge.close(ctx.accounts.rent_payer.to_account_info())?;
     }
 
     Ok(())

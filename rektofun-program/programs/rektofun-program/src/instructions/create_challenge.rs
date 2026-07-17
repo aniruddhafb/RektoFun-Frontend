@@ -70,8 +70,17 @@ pub struct CreateChallenge<'info> {
     #[account(seeds = [CONFIG_SEED], bump = config.bump)]
     pub config: Account<'info, Config>,
 
-    /// Platform wallet that sponsors all SOL rent for account creation.
-    #[account(mut, address = config.admin @ RektoError::Unauthorized)]
+    /// Pays the SOL rent for account creation — either `creator` themself
+    /// (self-pay, when they have enough SOL) or `config.admin` (sponsored).
+    /// Chosen client-side by checking the creator's SOL balance before
+    /// building this instruction. Stored as `challenge.rent_payer` so every
+    /// later close instruction refunds rent to whichever of the two actually
+    /// paid here, instead of unconditionally to admin.
+    #[account(
+        mut,
+        constraint = fee_payer.key() == creator.key() || fee_payer.key() == config.admin
+            @ RektoError::Unauthorized,
+    )]
     pub fee_payer: Signer<'info>,
 
     /// Per-creator counter — init on first challenge, increment thereafter
@@ -173,6 +182,7 @@ pub(crate) fn handler(ctx: Context<CreateChallenge>, params: CreateChallengePara
     // --- Populate challenge account ---
     let challenge = &mut ctx.accounts.challenge;
     challenge.creator = ctx.accounts.creator.key();
+    challenge.rent_payer = ctx.accounts.fee_payer.key();
     challenge.challenge_id = challenge_id;
     challenge.asset = params.asset.clone();
     challenge.bet_amount = params.bet_amount;

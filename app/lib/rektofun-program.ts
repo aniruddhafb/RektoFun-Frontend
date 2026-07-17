@@ -158,6 +158,92 @@ export function getReadonlyConnection(): Connection {
   return sharedReadonlyConnection;
 }
 
+// ─── Rent Estimation ──────────────────────────────────────────────────────────
+//
+// Mirrors `ChallengeAccount::space_for` / `effective_team_size` in
+// rektofun-program/src/state.rs + create_challenge.rs — keep in sync if
+// either changes. Used to decide, before building the transaction, whether
+// the creator has enough SOL to self-pay `create_challenge`'s rent or the
+// admin needs to sponsor it (see `fee_payer` in create_challenge.rs).
+
+const CHALLENGE_FIXED_SPACE =
+  8 +          // Anchor account discriminator
+  32 +         // creator
+  32 +         // rent_payer
+  32 +         // challenger
+  8 +          // challenger_bet_amount
+  1 +          // max_team_size
+  1 +          // winning_side
+  8 +          // winning_side_total_amount
+  8 +          // settled_net_pot
+  2 +          // winners_remaining
+  1 +          // challenge_type
+  8 +          // challenge_id
+  (4 + 10) +   // asset: 4-byte Borsh length prefix + 10-byte cap
+  8 +          // bet_amount
+  8 +          // target_price_usd_cents
+  1 +          // direction
+  8 +          // expires_at
+  8 +          // resolves_at
+  1 +          // status
+  1 +          // vault_bump
+  1;           // bump
+
+function teamRosterSpace(rosterCapacity: number): number {
+  const pubkeyVecs = 2 * (4 + rosterCapacity * 32); // creator_team + opponent_team
+  const amountVecs = 2 * (4 + rosterCapacity * 8);  // creator_team_amounts + opponent_team_amounts
+  return pubkeyVecs + amountVecs;
+}
+
+function challengeAccountSpace(rosterCapacity: number): number {
+  return CHALLENGE_FIXED_SPACE + teamRosterSpace(rosterCapacity);
+}
+
+const CREATOR_COUNTER_SPACE = 8 + 32 + 8 + 1; // discriminator + creator + count + bump
+const TOKEN_ACCOUNT_SPACE = 165;              // SPL Token account size
+
+/**
+ * Estimates the lamports needed to self-pay a `create_challenge` call: the
+ * challenge PDA's rent + the vault ATA's rent + (creator_counter's rent, only
+ * if this is the creator's first challenge) + (the creator's own USDC ATA
+ * rent, only if it doesn't exist yet) + a small transaction-fee buffer.
+ */
+export async function estimateCreateChallengeRentLamports(
+  program: Program,
+  connection: Connection,
+  creator: PublicKey,
+  args: Pick<CreateChallengeArgs, "challengeType" | "maxTeamSize">
+): Promise<number> {
+  const [configPDA] = deriveConfigPDA();
+  const config = await (program.account as any).config.fetch(configPDA);
+  const platformMaxTeamSize = Number(config.maxTeamSize);
+
+  const rosterCapacity =
+    args.challengeType !== "team"
+      ? 0
+      : args.maxTeamSize === 0 || args.maxTeamSize > platformMaxTeamSize
+        ? platformMaxTeamSize
+        : args.maxTeamSize;
+
+  const [counterPDA] = deriveCreatorCounter(creator);
+  const creatorUsdcAta = await getAssociatedTokenAddress(USDC_MINT, creator, false);
+
+  const [counterInfo, usdcAtaInfo] = await Promise.all([
+    connection.getAccountInfo(counterPDA),
+    connection.getAccountInfo(creatorUsdcAta),
+  ]);
+
+  const [challengeRent, vaultRent, counterRent, usdcAtaRent] = await Promise.all([
+    connection.getMinimumBalanceForRentExemption(challengeAccountSpace(rosterCapacity)),
+    connection.getMinimumBalanceForRentExemption(TOKEN_ACCOUNT_SPACE),
+    counterInfo ? 0 : connection.getMinimumBalanceForRentExemption(CREATOR_COUNTER_SPACE),
+    usdcAtaInfo ? 0 : connection.getMinimumBalanceForRentExemption(TOKEN_ACCOUNT_SPACE),
+  ]);
+
+  const TX_FEE_BUFFER_LAMPORTS = 10_000; // one signature (~5000 lamports) plus safety margin
+  return challengeRent + vaultRent + counterRent + usdcAtaRent + TX_FEE_BUFFER_LAMPORTS;
+}
+
 // ─── Instruction Builders ─────────────────────────────────────────────────────
 
 /**
@@ -327,8 +413,12 @@ export async function buildAcceptChallengeTx(
 
 /**
  * Build a `cancel_challenge` transaction (refunds USDC to creator).
- * The vault's reclaimed SOL rent is returned to the current Config.admin
- * (it originally paid for the vault's creation) — fetched from on-chain.
+ * The vault + challenge PDA's reclaimed SOL rent is returned to
+ * `challenge.rentPayer` — whichever wallet actually paid it at creation
+ * (the creator self-paying, or admin sponsoring). Anchor auto-resolves the
+ * `rentPayer` account via the on-chain `has_one` relation (it fetches the
+ * `challenge` account we already pass by pubkey and reads its `rentPayer`
+ * field), so it isn't passed explicitly here.
  */
 export async function buildCancelChallengeTx(
   program: Program,
@@ -336,10 +426,6 @@ export async function buildCancelChallengeTx(
   challengePDA: PublicKey
 ): Promise<Transaction> {
   const [vaultPDA] = deriveVaultPDA(challengePDA);
-  const [configPDA] = deriveConfigPDA();
-
-  const config = await (program.account as any).config.fetch(configPDA);
-  const adminPubkey = config.admin as PublicKey;
 
   // Derive the creator's USDC ATA
   const creatorUsdcAta = await getAssociatedTokenAddress(
@@ -356,8 +442,6 @@ export async function buildCancelChallengeTx(
       vault: vaultPDA,
       creatorUsdcAccount: creatorUsdcAta,
       usdcMint: USDC_MINT,
-      config: configPDA,
-      admin: adminPubkey,
       tokenProgram: TOKEN_PROGRAM_ID,
       systemProgram: SystemProgram.programId,
     })
@@ -404,6 +488,11 @@ export async function buildClaimWinningsTx(
 }
 
 
+/**
+ * `rentPayer` (whichever wallet actually paid this challenge's rent at
+ * creation) is auto-resolved by Anchor from the on-chain `has_one` relation
+ * on `challenge`, same as in `buildCancelChallengeTx` — not passed explicitly.
+ */
 export async function buildClaimRefundTx(
   program: Program,
   participant: PublicKey,
@@ -413,13 +502,11 @@ export async function buildClaimRefundTx(
 ): Promise<Transaction> {
   const [vault] = deriveVaultPDA(challengePDA);
   const [claimRecord] = deriveClaimPDA(challengePDA, participant);
-  const [config] = deriveConfigPDA();
-  const configAccount = await (program.account as any).config.fetch(config);
   const { participantUsdcAccount, preInstructions } = await getPayoutAccountSetup(participant, feePayer);
   return (program.methods as any).claimRefund().accounts({
     participant, creator, challenge: challengePDA, vault, participantUsdcAccount,
     claimRecord, usdcMint: USDC_MINT, tokenProgram: TOKEN_PROGRAM_ID,
-    systemProgram: SystemProgram.programId, config, admin: configAccount.admin,
+    systemProgram: SystemProgram.programId,
   }).preInstructions(preInstructions).transaction();
 }
 
