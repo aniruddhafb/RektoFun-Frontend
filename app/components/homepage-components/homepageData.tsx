@@ -24,84 +24,84 @@ export const heroScribbles: ScribbleItem[] = [
         src: "/scribbles/stars.png",
         alt: "Stars",
         wrapperClassName:
-            "hidden md:block absolute left-[2%] top-[3%] w-32 h-32 md:w-48 md:h-48 animate-airdrop delay-100",
+            "hidden md:block absolute left-[3%] top-[6%] size-32 xl:size-36 2xl:size-40 animate-airdrop delay-100",
         innerClassName: "w-full h-full scribble-stars",
     },
     {
         src: "/scribbles/btc.png",
         alt: "Bitcoin",
         wrapperClassName:
-            "absolute right-[3%] top-[2%] w-28 h-28 md:w-44 md:h-44 animate-airdrop delay-200",
+            "absolute right-[7%] top-[5%] size-20 md:right-[4%] md:top-[6%] md:size-28 xl:size-32 2xl:size-36 animate-airdrop delay-200",
         innerClassName: "w-full h-full scribble-btc",
     },
     {
         src: "/scribbles/dollars.png",
         alt: "Dollars",
         wrapperClassName:
-            "hidden md:block absolute left-[1%] top-[22%] w-36 h-36 md:w-52 md:h-52 animate-airdrop delay-300",
+            "hidden md:block absolute left-[2%] top-[29%] size-36 xl:size-40 2xl:size-44 animate-airdrop delay-300",
         innerClassName: "w-full h-full scribble-dollars",
     },
     {
         src: "/scribbles/sol.png",
         alt: "Solana",
         wrapperClassName:
-            "hidden md:block absolute right-[2%] top-[25%] w-32 h-32 md:w-48 md:h-48 animate-airdrop delay-400",
+            "hidden md:block absolute right-[3%] top-[30%] size-32 xl:size-36 2xl:size-40 animate-airdrop delay-400",
         innerClassName: "w-full h-full scribble-sol",
     },
     {
         src: "/scribbles/coins.png",
         alt: "Coins",
         wrapperClassName:
-            "hidden md:block absolute left-[3%] top-[48%] w-40 h-40 md:w-56 md:h-56 animate-airdrop delay-500",
+            "hidden md:block absolute left-[4%] top-[57%] size-40 xl:size-44 2xl:size-48 animate-airdrop delay-500",
         innerClassName: "w-full h-full scribble-coins",
     },
     {
         src: "/scribbles/bags.png",
         alt: "Money Bags",
         wrapperClassName:
-            "hidden md:block absolute right-[2%] top-[50%] w-36 h-36 md:w-52 md:h-52 animate-airdrop delay-600",
+            "hidden md:block absolute right-[3%] top-[58%] size-36 xl:size-40 2xl:size-44 animate-airdrop delay-600",
         innerClassName: "w-full h-full scribble-bags",
     },
     {
         src: "/scribbles/doge.png",
         alt: "Doge",
         wrapperClassName:
-            "absolute left-[6%] bottom-[8%] w-32 h-32 md:w-48 md:h-48 animate-airdrop delay-700",
+            "absolute left-[11%] bottom-[5%] size-20 md:left-[9%] md:bottom-[3%] md:size-32 xl:size-36 2xl:size-40 animate-airdrop delay-700",
         innerClassName: "w-full h-full scribble-doge",
     },
     {
         src: "/scribbles/pepe.png",
         alt: "Pepe",
         wrapperClassName:
-            "absolute right-[16%] bottom-[6%] w-32 h-32 md:w-48 md:h-48 animate-airdrop delay-800",
+            "absolute right-[22%] bottom-[6%] size-16 md:right-[16%] md:bottom-[3%] md:size-32 xl:size-36 2xl:size-40 animate-airdrop delay-800",
         innerClassName: "w-full h-full scribble-pepe",
     },
     {
         src: "/scribbles/pengu.png",
         alt: "Pengu",
         wrapperClassName:
-            "hidden md:block absolute left-[12%] top-[35%] w-28 h-28 md:w-40 md:h-40 animate-pop-in delay-300",
+            "hidden lg:block absolute left-[15%] top-[40%] size-24 xl:size-28 2xl:size-32 animate-pop-in delay-300",
         innerClassName: "w-full h-full scribble-pengu",
     },
     {
         src: "/scribbles/shiba.png",
         alt: "Shiba",
         wrapperClassName:
-            "hidden md:block absolute right-[12%] top-[38%] w-28 h-28 md:w-40 md:h-40 animate-pop-in delay-500",
+            "hidden lg:block absolute right-[14%] top-[41%] size-24 xl:size-28 2xl:size-32 animate-pop-in delay-500",
         innerClassName: "w-full h-full scribble-shiba",
     },
     {
         src: "/scribbles/trump.png",
         alt: "Trump",
         wrapperClassName:
-            "absolute left-[28%] top-[5%] w-24 h-24 md:w-36 md:h-36 animate-airdrop delay-900",
+            "absolute left-[28%] top-[6%] size-20 md:left-[27%] md:top-[8%] md:size-24 xl:size-28 2xl:size-32 animate-airdrop delay-900",
         innerClassName: "w-full h-full scribble-trump",
     },
     {
         src: "/scribbles/phantom (1).png",
         alt: "Phantom",
         wrapperClassName:
-            "hidden md:block absolute left-[40%] top-[12%] w-24 h-24 md:w-32 md:h-32 animate-pop-in delay-700",
+            "hidden lg:block absolute left-[42%] top-[14%] size-20 xl:size-24 2xl:size-28 animate-pop-in delay-700",
         innerClassName: "w-full h-full scribble-phantom",
     },
 ];

@@ -57,7 +57,7 @@ export function HeroSection() {
 
     return (
         <section
-            className="relative flex min-h-[calc(100vh-80px-64px)] items-center justify-center overflow-hidden px-3 py-8 cursor-pointer sm:px-4"
+            className="relative flex min-h-[calc(100svh-80px)] items-center justify-center overflow-hidden px-3 py-6 cursor-pointer sm:px-4 md:py-8"
             onClick={handleHeroClick}
         >
             {bubbles.map((bubble) => (
@@ -85,58 +85,45 @@ export function HeroSection() {
                 </svg>
             </div>
 
-            <div className="pointer-events-none relative z-10 mx-auto w-full max-w-4xl px-2 text-center sm:px-6">
-                {/* <div className="absolute -top-12 right-[5%] md:right-[2%]">
-                    <div className="relative w-16 h-16 md:w-20 md:h-20">
-                        <svg viewBox="0 0 80 80" className="w-full h-full rotate-12">
-                            <polygon
-                                points="40,0 45,15 60,10 52,25 65,35 50,40 55,55 40,48 25,55 30,40 15,35 28,25 20,10 35,15"
-                                fill="#e85a2d"
-                            />
-                        </svg>
-                        <span className="absolute inset-0 mb-4 flex items-center justify-center text-white text-[10px] md:text-xs font-bold rotate-12">
-                            Beta
-                        </span>
-                    </div>
-                </div> */}
+            <div className="pointer-events-none relative z-10 mx-auto w-full max-w-3xl px-2 text-center sm:px-6 xl:max-w-4xl">
 
-                {/* <div className="mx-auto mb-5 inline-flex items-center gap-2 border border-black bg-white px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-black shadow-[3px_3px_0_#111] animate-pop-in">
-                    <span className="h-2 w-2 bg-[#e85a2d]" />
-                    PvP Prediction Arena
-                </div> */}
-
-                <div className="mb-10 flex flex-wrap items-center justify-center gap-3 text-[11px] font-black uppercase tracking-[0.14em] text-black">
+                <div className="mb-7 flex flex-wrap items-center justify-center gap-3 text-[10px] font-black uppercase tracking-[0.14em] text-black md:text-[11px] xl:mb-8">
                     <span className="border border-black bg-[#a8d85b] px-3 py-2 shadow-[2px_2px_0_#111] animate-float-gentle">
                         Permissionless
                     </span>
                     <span className="border border-black bg-[#e85a2d] px-3 py-2 text-white shadow-[2px_2px_0_#111] animate-float-diagonal">
-                        PvP Battles
+                        PvP Battle
                     </span>
                     <span className="border border-black bg-[#f5d547] px-3 py-2 shadow-[2px_2px_0_#111] animate-float-updown">
                         On Solana
                     </span>
                 </div>
 
-                <h1 className="mb-4 break-words text-4xl font-black tracking-tight text-black drop-shadow-[4px_4px_0_#f5d547] animate-airdrop min-[380px]:text-5xl md:text-6xl lg:text-8xl">
-                    REKTO.FUN
-                </h1>
+                <div className="mb-4 inline-block animate-airdrop">
+                    <h1 className="relative break-words text-4xl font-black tracking-tight text-black drop-shadow-[4px_4px_0_#f5d547] min-[380px]:text-5xl md:text-6xl lg:text-7xl 2xl:text-8xl">
+                        REKTO.FUN
+                        <span className="absolute -right-4 -top-3 rotate-6 border-2 border-black bg-[#e85a2d] px-1.5 py-0.5 text-[8px] font-black leading-none tracking-[0.12em] text-white shadow-[2px_2px_0_#111] min-[380px]:-right-6 min-[380px]:text-[9px] md:-right-8 md:-top-4 md:px-2 md:py-1 md:text-[10px]">
+                            BETA
+                        </span>
+                    </h1>
+                </div>
 
-                <p className="mx-auto mb-8 max-w-xl break-words text-base font-semibold text-gray-800 min-[380px]:text-lg lg:text-xl">
+                <p className="mx-auto mb-7 max-w-xl break-words text-base font-semibold leading-snug text-gray-800 min-[380px]:text-lg lg:text-xl xl:mb-8">
                     The PvP Battleground For Predictions {"\u{1FA84}"}
                     <br />
                     Crypto & Sports 🏀
                 </p>
 
                 <Link
-                    href="/beta"
+                    href="/challenges"
                     className="pointer-events-auto inline-flex max-w-full items-center justify-center border-2 border-black bg-black px-5 py-2.5 text-xs font-black uppercase tracking-[0.08em] text-white shadow-[4px_4px_0_#e85a2d] transition-all hover:-translate-y-1 hover:shadow-[6px_6px_0_#e85a2d] active:translate-y-0 active:shadow-[2px_2px_0_#e85a2d] min-[380px]:px-7 min-[380px]:text-sm sm:px-8 sm:py-3 cursor-pointer"
                 >
-                    Join Waitlist {"\u279D"}
+                    Get Started {"\u279D"}
                 </Link>
 
             </div>
 
-            <div className="absolute bottom-12 left-1/2 -translate-x-1/2 w-32 h-14 opacity-35 blur-[0.2px] animate-float-gentle sm:bottom-16 sm:w-40 sm:h-16 sm:opacity-45 md:bottom-14 md:w-40 md:h-16 md:opacity-45 lg:bottom-16 lg:w-44 lg:h-[4.5rem] lg:opacity-60 xl:bottom-20 xl:w-48 xl:h-20 xl:opacity-100 md:blur-0">
+            <div className="absolute bottom-8 left-1/2 -translate-x-1/2 w-32 h-14 opacity-35 blur-[0.2px] animate-float-gentle sm:w-40 sm:h-16 sm:opacity-45 md:bottom-10 md:opacity-45 lg:w-44 lg:h-[4.5rem] lg:opacity-55 2xl:bottom-16 2xl:w-48 2xl:h-20 2xl:opacity-80 md:blur-0">
                 <svg viewBox="0 0 200 80" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
                     <ellipse cx="100" cy="40" rx="100" ry="40" fill="#f5d547" />
                     <path

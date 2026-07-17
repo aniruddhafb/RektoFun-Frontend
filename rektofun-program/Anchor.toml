@@ -1,4 +1,5 @@
 [toolchain]
+anchor_version = "1.0.0"
 package_manager = "yarn"
 
 [features]
@@ -6,11 +7,14 @@ resolution = true
 skip-lint = false
 
 [programs.devnet]
-rektofun_program = "4t5KYdKFmPw49yo6Bm1TV2ZDEi6k3Ns4eJLeNhgbVSzJ"
+rektofun_program = "4i89kL32hf4AzZwgqboFEVgJxAgVXxpDkyrGeJRnZtHT"
+
+[programs.mainnet]
+rektofun_program = "4i89kL32hf4AzZwgqboFEVgJxAgVXxpDkyrGeJRnZtHT"
 
 [provider]
-cluster = "devnet"
-wallet = "~/.config/solana/id.json"
+cluster = "mainnet"
+wallet = "~/.config/solana/rekto-deploy.json"
 
 [scripts]
 test = "cargo test"

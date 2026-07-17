@@ -21,6 +21,16 @@ body {
   overflow-x: hidden;
 }
 
+body, body * {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+input, textarea, [contenteditable="true"] {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
 /* Global pixel-art treatment (subtle and non-destructive to layout) */
 .pixel-shell {
   position: relative;
@@ -711,6 +721,16 @@ body {
   animation: pop-in-spring 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 
+.accept-challenge-modal.accept-challenge-modal {
+  background: #fffaf6 !important;
+  animation: none !important;
+  box-shadow: none !important;
+}
+
+.accept-challenge-modal.accept-challenge-modal * {
+  box-shadow: none !important;
+}
+
 .rekto-card-hover,
 .pixel-shell :is(.rounded-xl, .rounded-2xl, .rounded-3xl)[class*="bg-white"] {
   transition:
@@ -722,6 +742,28 @@ body {
 .pixel-shell :is(.rounded-xl, .rounded-2xl, .rounded-3xl)[class*="bg-white"]:hover {
   transform: translateY(-2px);
   box-shadow: none !important;
+}
+
+/* Profile summary uses soft cards instead of the global pixel outlines. */
+.pixel-shell .profile-header-shell.profile-header-shell,
+.pixel-shell .profile-performance-panel.profile-performance-panel,
+.pixel-shell .profile-balance-panel.profile-balance-panel {
+  border: 0 !important;
+  border-radius: 0 !important;
+}
+
+.pixel-shell .profile-header-shell.profile-header-shell {
+  border: 2px solid #111 !important;
+  border-radius: 0 !important;
+}
+
+.pixel-shell .profile-header-shell :is(div, button, a, span) {
+  border-radius: 0 !important;
+}
+
+.pixel-shell .profile-header-shell .profile-avatar,
+.pixel-shell .profile-header-shell .profile-avatar * {
+  border-radius: 9999px !important;
 }
 
 .pixel-shell .challenge-card-shell.challenge-card-shell {
@@ -738,6 +780,11 @@ body {
 
 .pixel-shell .challenge-card-shell .challenge-card-profile-tile.challenge-card-profile-tile:hover {
   box-shadow: 4px 4px 0 #111 !important;
+}
+
+.pixel-shell .challenge-card-shell .challenge-card-avatar,
+.pixel-shell .challenge-card-shell .challenge-card-avatar img {
+  border-radius: 9999px !important;
 }
 
 .pixel-shell .master-card-shell.master-card-shell {
@@ -799,6 +846,15 @@ body {
   box-shadow: none !important;
 }
 
+/* The admin user search uses its wrapper as the single visible control. */
+.pixel-shell input.admin-user-search-input {
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+
 .rekto-badge {
   display: inline-flex;
   align-items: center;
@@ -812,6 +868,47 @@ body {
   letter-spacing: 0.14em;
   text-transform: uppercase;
   box-shadow: none;
+}
+
+/* Welcome arena opts out of the site's pixelation for crisp mascot artwork. */
+.pixel-shell .welcome-arena,
+.pixel-shell .welcome-arena button {
+  border-radius: 0 !important;
+}
+
+.pixel-shell .welcome-mascot {
+  image-rendering: auto;
+}
+
+.pixel-shell .welcome-arena button:not(:disabled),
+.pixel-shell .welcome-arena a {
+  cursor: pointer !important;
+}
+
+.pixel-shell .welcome-arena button:disabled {
+  cursor: not-allowed !important;
+}
+
+@keyframes welcome-copy-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.welcome-copy {
+  animation: welcome-copy-in 280ms ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .welcome-copy,
+  .welcome-arena {
+    animation: none !important;
+  }
 }
 
 /* Hide scrollbar for filter tabs */
@@ -845,4 +942,70 @@ body {
 
 .scrollbar-thin::-webkit-scrollbar-thumb:hover {
   background-color: #e5c7b8;
+}
+
+/*
+ * Keep small screens crisp. The desktop arcade treatment uses fixed texture
+ * layers, blurred colour fields, and pixel rendering; together they make
+ * page backgrounds and type look hazy on high-density mobile displays.
+ */
+@media (max-width: 767px) {
+  .pixel-shell::before,
+  .pixel-shell::after,
+  .rekto-page::before,
+  .rekto-page::after {
+    content: none;
+    display: none;
+  }
+
+  .pixel-shell,
+  .pixel-shell * {
+    text-rendering: auto;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  .pixel-shell :is(h1, h2, h3, h4, h5, h6, p, span, label, a, li, strong, small) {
+    text-shadow: none;
+  }
+
+  .pixel-shell img,
+  .pixel-shell canvas,
+  .pixel-shell button,
+  .pixel-shell [role="button"],
+  .pixel-shell select {
+    image-rendering: auto;
+  }
+
+  .pixel-shell [class*="backdrop-blur"] {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+
+  .scribble-stars,
+  .scribble-btc,
+  .scribble-dollars,
+  .scribble-sol,
+  .scribble-coins,
+  .scribble-bags,
+  .scribble-doge,
+  .scribble-pepe,
+  .scribble-pengu,
+  .scribble-shiba,
+  .scribble-trump,
+  .scribble-usa,
+  .scribble-phantom,
+  .animate-airdrop,
+  .animate-pop-in,
+  .animate-spin-slow,
+  .animate-float-gentle,
+  .animate-float-wavy,
+  .animate-float-updown,
+  .animate-float-diagonal,
+  .animate-bounce-glow,
+  .bubble-pop,
+  .welcome-copy,
+  .rekto-modal-panel {
+    animation: none !important;
+  }
 }

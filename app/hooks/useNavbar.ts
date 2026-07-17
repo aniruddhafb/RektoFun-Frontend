@@ -4,8 +4,12 @@ import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAppKitAccount, useAppKit, useDisconnect } from '@reown/appkit/react';
 import { useUserStore } from '@/app/store/useUserStore';
-import { blockedContentError, hasBlockedContent } from '@/app/lib/content-moderation';
-import { ensureUserByWallet, updateUser, getUserByWallet, acceptReferral, User } from '@/app/lib/users-service/users';
+import { createUser, getUserByPubkey } from '@/app/lib/users-service/users';
+import { getDiceBearAvatarUrl } from '@/app/lib/profile-avatar';
+import { User } from '@/app/lib/users-service/users';
+import { useTokenBalanceStore } from '@/app/store/useTokenBalanceStore';
+import { clearPendingReferralCode, getPendingReferralCode } from '@/app/lib/referral-attribution';
+import { CHALLENGE_CREATED_EVENT } from '@/app/lib/realtime-events';
 
 export function useNavbar() {
   // AppKit hooks
@@ -14,7 +18,7 @@ export function useNavbar() {
   const { disconnect } = useDisconnect();
 
   // Store and routing
-  const { user: storeUser, setUser, updateUser: updateStoreUser, clearUser } = useUserStore();
+  const { user: storeUser, setUser, clearUser } = useUserStore();
   const pathname = usePathname();
   const router = useRouter();
 
@@ -24,25 +28,29 @@ export function useNavbar() {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
   const [fundsModalMode, setFundsModalMode] = useState<'deposit' | 'withdraw'>('deposit');
-  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isReferralModalOpen, setIsReferralModalOpen] = useState(false);
+  const [isEditProfileModalOpen, setIsEditProfileModalOpen] = useState(false);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isMobileViewport, setIsMobileViewport] = useState(false);
-
-  // Profile form state
-  const [editUsername, setEditUsername] = useState('');
-  const [editBio, setEditBio] = useState('');
-  const [editProfileIndex, setEditProfileIndex] = useState(0);
-  const [editInviteCode, setEditInviteCode] = useState('');
-  const [profileFormError, setProfileFormError] = useState<string | null>(null);
 
   // User data
   const [userProfileData, setUserProfileData] = useState<{ username: string; profileImage: string } | null>(null);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [hasInitialized, setHasInitialized] = useState(false);
+  const [initializedAddress, setInitializedAddress] = useState<string | null>(null);
+  const balanceWalletAddress = useTokenBalanceStore((state) => state.walletAddress);
+  const storedUsdcBalance = useTokenBalanceStore((state) => state.usdcBalance);
+  const storedRektoBalance = useTokenBalanceStore((state) => state.rektoBalance);
+  const loadBalances = useTokenBalanceStore((state) => state.loadBalances);
+  const clearBalances = useTokenBalanceStore((state) => state.clearBalances);
+  const usdcBalance = balanceWalletAddress === address ? storedUsdcBalance : null;
+  const rektoBalance = balanceWalletAddress === address ? storedRektoBalance : null;
 
-  // Helper: Get URL referral code
-  const getRefCodeFromUrl = () => {
-    if (typeof window === 'undefined') return '';
-    return new URLSearchParams(window.location.search).get('ref') || '';
+  const createRandomUsername = (walletAddress: string) => {
+    const adjectives = ['Lucky', 'Brave', 'Swift', 'Cosmic', 'Rekto', 'Mighty', 'Sunny', 'Wild'];
+    const nouns = ['Bull', 'Bear', 'Fox', 'Whale', 'Tiger', 'Degen', 'Otter', 'Falcon'];
+    const randomItem = (items: string[]) => items[Math.floor(Math.random() * items.length)];
+    const walletSuffix = walletAddress.slice(-6);
+    return `${randomItem(adjectives)}${randomItem(nouns)}${walletSuffix}`;
   };
 
   // Helper: Sync user state
@@ -65,7 +73,7 @@ export function useNavbar() {
     if (!isConnected || !address) return null;
 
     try {
-      const userData = await getUserByWallet(address);
+      const userData = await getUserByPubkey(address);
       applyUserToState(userData);
       return userData;
     } catch (error) {
@@ -74,80 +82,41 @@ export function useNavbar() {
     }
   };
 
-  // Generate random username
-  const generateRandomUsername = () => {
-    const gamerPartsA = ['void', 'rift', 'hex', 'nova', 'drift', 'glitch', 'crypt', 'blitz', 'shadow', 'pixel', 'frost', 'vortex', 'phantom', 'neon', 'omega'];
-    const gamerPartsB = ['reaper', 'sniper', 'raider', 'byte', 'wraith', 'core', 'slayer', 'runner', 'forge', 'venom', 'spark', 'quake', 'drone', 'spike', 'nexus'];
-    const joiners = ['', '', '_', 'x', 'z', 'q'];
 
-    const partA = gamerPartsA[Math.floor(Math.random() * gamerPartsA.length)];
-    const partB = gamerPartsB[Math.floor(Math.random() * gamerPartsB.length)];
-    const joiner = joiners[Math.floor(Math.random() * joiners.length)];
-    const uniq = `${Date.now().toString(36).slice(-3)}${Math.random().toString(36).slice(2, 4)}`;
-    const username = `${partA}${joiner}${partB}${uniq}`.slice(0, 18);
-
-    setEditUsername(username);
-    if (profileFormError) setProfileFormError(null);
-  };
-
-  // Randomize profile avatar
-  const randomizeProfile = () => {
-    const randomIndex = Math.floor(Math.random() * 31);
-    setEditProfileIndex(randomIndex);
-  };
-
-  // Handle profile form submission
-  const handleProfileSubmit = async () => {
-    if (!address) return;
-
-    // Validate content
-    if (hasBlockedContent(editUsername)) {
-      setProfileFormError(blockedContentError('Username'));
+  // Fetch tracked asset balances
+  const fetchUsdcBalance = async (force = false) => {
+    if (!address || !isConnected) {
+      clearBalances();
       return;
     }
-    if (hasBlockedContent(editBio)) {
-      setProfileFormError(blockedContentError('Bio'));
-      return;
-    }
-
-    try {
-      // Get or create existing user
-      let user = currentUser;
-      if (!user) {
-        user = await fetchUserProfile();
-      }
-      if (!user) return;
-
-      // Update profile
-      const profileIndex = editProfileIndex + 1;
-      const updatedData = {
-        username: editUsername,
-        description: editBio,
-        profile_image: `https://earningrecords.com/assets/rektofun/profiles/${profileIndex}.svg`,
-      };
-      await updateUser(user.id, updatedData);
-      updateStoreUser(updatedData);
-
-      // Handle referral code if present
-      const refCode = editInviteCode || getRefCodeFromUrl();
-      if (refCode) {
-        try {
-          await acceptReferral(address, refCode);
-        } catch (error) {
-          console.error('[Navbar] Referral failed:', error);
-        }
-      }
-
-      setIsProfileModalOpen(false);
-      await fetchUserProfile();
-    } catch (error) {
-      console.error('[Navbar] Profile update failed:', error);
-    }
+    await loadBalances(address, force);
   };
+
+  useEffect(() => {
+    fetchUsdcBalance();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [address, isConnected]);
+
+  useEffect(() => {
+    const refreshBalances = () => {
+      void fetchUsdcBalance(true);
+    };
+
+    window.addEventListener(CHALLENGE_CREATED_EVENT, refreshBalances);
+    return () => window.removeEventListener(CHALLENGE_CREATED_EVENT, refreshBalances);
+    // The event handler should always use the wallet values from this render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [address, isConnected]);
+
+  useEffect(() => {
+    if (isDepositModalOpen) void fetchUsdcBalance(true);
+    // Opening the modal is an explicit balance refresh trigger.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDepositModalOpen]);
 
   // Sync store user when it changes
   useEffect(() => {
-    if (storeUser && (!address || address === storeUser.wallet_address)) {
+    if (storeUser && (!address || address === storeUser.pubkey)) {
       setCurrentUser(storeUser);
       setUserProfileData({
         username: storeUser.username || 'User',
@@ -156,56 +125,38 @@ export function useNavbar() {
     }
   }, [storeUser, address]);
 
-  // Initialize new user on wallet connect
+  // Initialize user on wallet connect - creates the user if their pubkey is
+  // new, or fetches the existing one if it already exists
   useEffect(() => {
-    if (!isConnected || !address || hasInitialized) return;
+    if (!isConnected || !address || initializedAddress === address) return;
 
     const initUser = async () => {
       try {
-        const userData = await ensureUserByWallet(address, {
-          wallet_address: address,
-          username: `user-${address.slice(0, 8)}`,
-          login_type: 'wallet',
-        });
-
+        const userData = await getUserByPubkey(address);
         applyUserToState(userData);
-
-        // Show profile modal for new users
-        const isNewUser = userData.username === `user-${address.slice(0, 8)}`;
-        if (isNewUser) {
-          setIsProfileModalOpen(true);
-          generateRandomUsername();
-        }
+        clearPendingReferralCode();
       } catch (error) {
-        console.error('[Navbar] User initialization failed:', error);
+        console.info('[Navbar] No account found; creating a generated profile.', error);
+        try {
+          const pendingReferralCode = getPendingReferralCode();
+          const userData = await createUser({
+            pubkey: address,
+            username: createRandomUsername(address),
+            profile_image: getDiceBearAvatarUrl(),
+            referrer_code: pendingReferralCode || undefined,
+          });
+          applyUserToState(userData);
+          clearPendingReferralCode();
+        } catch (createError) {
+          console.error('[Navbar] Automatic account creation failed:', createError);
+        }
       } finally {
-        setHasInitialized(true);
+        setInitializedAddress(address);
       }
     };
 
     initUser();
-  }, [isConnected, address, hasInitialized]);
-
-  // Handle profile modal open - load user data
-  useEffect(() => {
-    if (!isProfileModalOpen || !address) return;
-
-    const initProfileModal = async () => {
-      try {
-        const user = currentUser || (await fetchUserProfile());
-        if (user) {
-          setEditUsername(user.username || '');
-          setEditBio(user.description || '');
-          setEditProfileIndex(user.profile_image ? parseInt(user.profile_image.match(/profiles\/(\d+)\.svg/)?.[1] || '1') - 1 : 0);
-        }
-      } catch (error) {
-        console.error('[Navbar] Profile modal init failed:', error);
-      }
-      setEditInviteCode(getRefCodeFromUrl());
-    };
-
-    initProfileModal();
-  }, [isProfileModalOpen, address]);
+  }, [isConnected, address, initializedAddress]);
 
   // Detect mobile viewport
   useEffect(() => {
@@ -216,26 +167,22 @@ export function useNavbar() {
     return () => mediaQuery.removeEventListener('change', syncViewport);
   }, []);
 
-  // Lock scroll when profile modal is open
   useEffect(() => {
-    if (!isProfileModalOpen) return;
-
-    const originalOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-
-    const blockEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        e.stopPropagation();
-      }
+    const openSettings = () => setIsSettingsModalOpen(true);
+    const openEditProfile = () => setIsEditProfileModalOpen(true);
+    const openDeposit = () => {
+      setFundsModalMode('deposit');
+      setIsDepositModalOpen(true);
     };
-
-    window.addEventListener('keydown', blockEscape, true);
+    window.addEventListener('rektofun:open-settings', openSettings);
+    window.addEventListener('rektofun:open-edit-profile', openEditProfile);
+    window.addEventListener('rektofun:open-deposit', openDeposit);
     return () => {
-      document.body.style.overflow = originalOverflow;
-      window.removeEventListener('keydown', blockEscape, true);
+      window.removeEventListener('rektofun:open-settings', openSettings);
+      window.removeEventListener('rektofun:open-edit-profile', openEditProfile);
+      window.removeEventListener('rektofun:open-deposit', openDeposit);
     };
-  }, [isProfileModalOpen]);
+  }, []);
 
   // Check if route is active
   const isActive = (href: string) => {
@@ -243,12 +190,13 @@ export function useNavbar() {
     return pathname === href || pathname.startsWith(`${href}/`);
   };
 
-  const profileHref = address ? `/profile/${address}` : '/settings';
+  const profileHref = address ? `/profile/${address}` : '/';
 
   // Handle mobile create challenge
   const handleMobileCreateClick = () => {
     if (pathname === '/challenges') {
       const params = new URLSearchParams(window.location.search);
+      params.delete('challengeId');
       params.set('create', '1');
       router.replace(pathname + (params.toString() ? `?${params.toString()}` : ''), { scroll: false });
     } else {
@@ -261,7 +209,7 @@ export function useNavbar() {
 
   // Handle logout
   const handleLogout = () => {
-    setHasInitialized(false);
+    setInitializedAddress(null);
     setCurrentUser(null);
     setUserProfileData(null);
     clearUser();
@@ -280,40 +228,33 @@ export function useNavbar() {
     setIsDepositModalOpen,
     fundsModalMode,
     setFundsModalMode,
-    isProfileModalOpen,
-    setIsProfileModalOpen,
+    isReferralModalOpen,
+    setIsReferralModalOpen,
+    isEditProfileModalOpen,
+    setIsEditProfileModalOpen,
+    isSettingsModalOpen,
+    setIsSettingsModalOpen,
     isMobileViewport,
-
-    // Profile form state
-    editUsername,
-    setEditUsername,
-    editBio,
-    setEditBio,
-    editProfileIndex,
-    setEditProfileIndex,
-    editInviteCode,
-    setEditInviteCode,
-    profileFormError,
-    setProfileFormError,
 
     // User data
     userProfileData,
     currentUser,
     displayAddress,
     displayUsername,
+    usdcBalance,
+    rektoBalance,
+    fetchUsdcBalance,
 
     // Connection state
     address,
     isConnected,
 
     // Handlers
-    handleProfileSubmit,
-    generateRandomUsername,
-    randomizeProfile,
     handleConnect,
     handleLogout,
     handleMobileCreateClick,
     fetchUserProfile,
+    applyUserToState,
     isActive,
     profileHref,
   };

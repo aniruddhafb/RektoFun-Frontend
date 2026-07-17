@@ -1,24 +1,55 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
-import Image from "next/image";
-import { DatePickerModal } from "./DatePickerModal";
-import { DurationPickerModal } from "./DurationPickerModal";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
-    buildCreateChallengeTx,
-    deriveChallengePDA,
-    deriveCreatorCounter,
-    getRektoProgram,
-    getReadonlyConnection,
-} from "@/app/lib/rektofun-program";
-import { createChallenge } from "@/app/lib/challenges-service/challenges";
-import { getMarkets, Market } from "@/app/lib/markets-service/market";
-import { transform } from "@/app/lib/transformation-text-ai/transform";
+    Activity,
+    ArrowLeft,
+    CalendarDays,
+    Check,
+    ChevronDown,
+    CircleDollarSign,
+    Clock3,
+    Coins,
+    Crosshair,
+    Info,
+    Loader2,
+    Lock,
+    MessageSquareText,
+    ShieldCheck,
+    Swords,
+    Trophy,
+    TrendingDown,
+    TrendingUp,
+    Eye,
+    Users,
+    Wallet,
+    X,
+    Zap,
+} from "lucide-react";
 import { useUserStore } from "@/app/store/useUserStore";
-import { blockedContentError, hasBlockedContent } from "@/app/lib/content-moderation";
 import { useBodyScrollLock } from "@/app/lib/useBodyScrollLock";
-import { useAppKit, useAppKitAccount } from "@reown/appkit/react";
-import { PublicKey, Transaction } from "@solana/web3.js";
+import { useAppKit, useAppKitAccount, useAppKitProvider } from "@reown/appkit/react";
+import {
+    CandlestickSeries,
+    ColorType,
+    createChart,
+    CrosshairMode,
+    LineSeries,
+    LineStyle,
+    type IPriceLine,
+    type ISeriesApi,
+    type UTCTimestamp,
+} from "lightweight-charts";
+import { getParentCategories, getCategoriesByParent, Category } from "@/app/lib/category-service/category";
+import { createChallenge, type Challenge } from "@/app/lib/challenges-service/challenges";
+import { Transaction } from "@solana/web3.js";
+import { getReadonlyConnection } from "@/app/lib/rektofun-program";
+import { stripUsdcQuote } from "@/app/lib/format-market-label";
+import { ChallengeCard } from "./ChallengeCard";
+import type { User } from "@/app/lib/users-service/users";
+import { announceChallengeCreated } from "@/app/lib/realtime-events";
+import { fetchUsdcBalance } from "@/app/lib/token-balances";
 
 interface CreateChallengeModalProps {
     isOpen: boolean;
@@ -27,1046 +58,1824 @@ interface CreateChallengeModalProps {
 }
 
 type TxStatus = "idle" | "building" | "signing" | "confirming" | "success" | "error";
-type CreateChallengeStep = "mode" | "category" | "details";
+type MarketType = "crypto" | "sports";
+type ChallengeFormat = "price" | "statement";
+type ChallengeMode = "pvp" | "team";
+type ChartRange = "24H" | "7D" | "30D" | "3M";
+type ComposerPanel = "topic" | "stake" | "window" | "resolution" | "players" | null;
+type MarketCandle = {
+    time: number;
+    open: number;
+    high: number;
+    low: number;
+    close: number;
+};
+type AssetPriceState = {
+    key: string;
+    asset: string;
+    currentPrice: number | null;
+    candles: MarketCandle[];
+    status: "ready" | "failed";
+};
 
-interface ValidationState {
-    suggestions: string[];
-    isValid: boolean;
-    isLoading: boolean;
-    error: string | null;
-    selectedSuggestion: string | null;
-}
+const MAX_STATEMENT_LENGTH = 220;
+const MIN_DURATION_MINUTES = 15;
+const MAX_RESOLUTION_DELAY_MINUTES = 14 * 24 * 60;
+const DEFAULT_BET_AMOUNT = 5;
+const DEFAULT_DURATION_MINUTES = 15;
+const DEFAULT_RESOLUTION_DELAY_MS = 7 * 24 * 60 * 60 * 1000;
+const DEFAULT_CHART_RANGE: ChartRange = "3M";
+const CREATE_SETTINGS_KEY = "rektofun:create-challenge-settings";
 
-interface MarketState {
-    markets: Market[];
-    childMarkets: Market[];
-    sportsEventMarkets: Market[];
-    selected: Market | null;
-    selectedChild: Market | null;
-    selectedSportsEvent: Market | null;
-}
+type SavedCreateSettings = {
+    marketType: MarketType;
+    challengeFormat: ChallengeFormat;
+    challengeMode: ChallengeMode;
+    assetCategory: string;
+    betAmount: number;
+    durationMinutes: number;
+    resolutionDelayMinutes: number;
+};
 
-export function CreateChallengeModal({
-    isOpen,
-    onClose,
-    onCreated,
-}: CreateChallengeModalProps) {
-    // Step and mode
-    const [currentStep, setCurrentStep] = useState<CreateChallengeStep>("mode");
-    const [challengeMode, setChallengeMode] = useState<"pvp" | "multi">("pvp");
+const formatDuration = (duration: { hours: number; minutes: number }) => {
+    const totalMinutes = duration.hours * 60 + duration.minutes;
+    if (totalMinutes <= 0) return "Set window";
+    const days = Math.floor(totalMinutes / 1440);
+    const hours = Math.floor((totalMinutes % 1440) / 60);
+    const minutes = totalMinutes % 60;
+    return [days ? `${days}d` : "", hours ? `${hours}h` : "", minutes ? `${minutes}m` : ""]
+        .filter(Boolean)
+        .join(" ");
+};
 
-    // Markets consolidated state
-    const [marketState, setMarketState] = useState<MarketState>({
-        markets: [],
-        childMarkets: [],
-        sportsEventMarkets: [],
-        selected: null,
-        selectedChild: null,
-        selectedSportsEvent: null,
+const formatDate = (date: Date) =>
+    date.toLocaleString("en-US", {
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
     });
 
-    // Challenge details
-    const [betAmount, setBetAmount] = useState(5);
-    const [betAmountError, setBetAmountError] = useState<string | null>(null);
-    const [predictionDirection, setPredictionDirection] = useState("Above");
-    const [predictionPrice, setPredictionPrice] = useState("66500");
-    const [selectedDate, setSelectedDate] = useState(() => new Date(Date.now() + 24 * 60 * 60 * 1000));
-    const [duration, setDuration] = useState({ hours: 4, minutes: 0 });
-    const [challengeStatement, setChallengeStatement] = useState("");
-    const [challengeStatementError, setChallengeStatementError] = useState<string | null>(null);
-    const [sportsResolutionConsent, setSportsResolutionConsent] = useState(false);
-    const [sportsResolutionConsentError, setSportsResolutionConsentError] = useState<string | null>(null);
+const toDateTimeLocalValue = (date: Date) => {
+    const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60 * 1000);
+    return localDate.toISOString().slice(0, 16);
+};
 
-    // Validation state
-    const [validation, setValidation] = useState<ValidationState>({
-        suggestions: [],
-        isValid: true,
-        isLoading: false,
-        error: null,
-        selectedSuggestion: null,
+const durationFromMinutes = (totalMinutes: number) => ({
+    hours: Math.floor(totalMinutes / 60),
+    minutes: totalMinutes % 60,
+});
+
+const getDefaultResolutionDate = (now: number) => {
+    const date = new Date(now + DEFAULT_RESOLUTION_DELAY_MS);
+    date.setHours(5, 30, 0, 0);
+    return date;
+};
+
+const getTimeUntilResolutionMinutes = (resolutionDate: Date, now: number) =>
+    Math.max(0, Math.floor((resolutionDate.getTime() - now) / (60 * 1000)));
+
+const formatPrice = (value: string) => {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed) || parsed <= 0) return "$—";
+    return new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: "USD",
+        maximumFractionDigits: parsed < 1 ? 6 : 2,
+    }).format(parsed);
+};
+
+const targetPriceInputValue = (value: number) => {
+    if (!Number.isFinite(value) || value <= 0) return "";
+    const decimals = value >= 1 ? 2 : value >= 0.01 ? 4 : 8;
+    return value.toFixed(decimals).replace(/\.?0+$/, "");
+};
+
+export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChallengeModalProps) {
+    const [marketType, setMarketType] = useState<MarketType>("crypto");
+    const [challengeFormat, setChallengeFormat] = useState<ChallengeFormat>("price");
+    const [challengeMode, setChallengeMode] = useState<ChallengeMode>("pvp");
+    const [statement, setStatement] = useState("");
+    const [betAmount, setBetAmount] = useState(DEFAULT_BET_AMOUNT);
+    const [predictionDirection, setPredictionDirection] = useState<"Above" | "Below">("Above");
+    const [predictionPrice, setPredictionPrice] = useState("");
+    const [chartRange, setChartRange] = useState<ChartRange>(DEFAULT_CHART_RANGE);
+    const [isAdvancedPickerOpen, setIsAdvancedPickerOpen] = useState(false);
+    const [assetPriceState, setAssetPriceState] = useState<AssetPriceState>({
+        key: "",
+        asset: "",
+        currentPrice: null,
+        candles: [],
+        status: "failed",
     });
+    const [composerNow] = useState(() => Date.now());
+    const [selectedDate, setSelectedDate] = useState(() => getDefaultResolutionDate(composerNow));
+    const [duration, setDuration] = useState(() => durationFromMinutes(DEFAULT_DURATION_MINUTES));
 
-    // UI state
-    const [openDropdown, setOpenDropdown] = useState<string | null>(null);
-    const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
-    const [isDurationPickerOpen, setIsDurationPickerOpen] = useState(false);
+    const [activePanel, setActivePanel] = useState<ComposerPanel>(null);
+    const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+    const [childCategories, setChildCategories] = useState<Category[]>([]);
+    const [selectedChildCategory, setSelectedChildCategory] = useState<Category | null>(null);
+    const [isLoadingCategories, setIsLoadingCategories] = useState(false);
+    const [categoryError, setCategoryError] = useState<string | null>(null);
+    const [formError, setFormError] = useState<string | null>(null);
+    const [balanceShortfall, setBalanceShortfall] = useState<number | null>(null);
+    const [rememberSettings, setRememberSettings] = useState(false);
 
-    // Transaction state
     const [txStatus, setTxStatus] = useState<TxStatus>("idle");
-    const [txError, setTxError] = useState<string | null>(null);
-    const [txSignature, setTxSignature] = useState<string | null>(null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
+    const statementRef = useRef<HTMLTextAreaElement>(null);
+    const priceRef = useRef<HTMLInputElement>(null);
+    const savedAssetCategoryRef = useRef<string | null>(null);
     const { user } = useUserStore();
     const { open } = useAppKit();
     const { address, isConnected } = useAppKitAccount();
-
-    const dropdownRefs = {
-        coin: useRef<HTMLDivElement>(null),
-        sportsEvent: useRef<HTMLDivElement>(null),
-        direction: useRef<HTMLDivElement>(null),
-    };
-
-    const isSportsSelected = marketState.selected?.symbol?.toLowerCase() === 'sports' || 
-                            marketState.selected?.name?.toLowerCase() === 'sports';
+    const { walletProvider } = useAppKitProvider("solana");
 
     useBodyScrollLock(isOpen);
 
-    // Reset on open
+    /* eslint-disable react-hooks/set-state-in-effect -- restoring an explicitly saved form snapshot when the modal opens */
     useEffect(() => {
         if (!isOpen) return;
-        setTxStatus("idle");
-        setTxError(null);
-        setTxSignature(null);
-        setChallengeStatementError(null);
-        setSportsResolutionConsentError(null);
-        setSportsResolutionConsent(false);
-    }, [isOpen]);
-
-    // Fetch markets
-    useEffect(() => {
-        if (!isOpen) return;
-        const fetchMarkets = async () => {
-            try {
-                const response = await getMarkets({ parent_id: null });
-                const fetchedMarkets = response.markets;
-                const cryptoMarket = fetchedMarkets.find(m => m.symbol?.toLowerCase() === 'crypto' || m.name?.toLowerCase() === 'crypto');
-                setMarketState(prev => ({
-                    ...prev,
-                    markets: fetchedMarkets,
-                    selected: cryptoMarket || fetchedMarkets[0] || null,
-                }));
-            } catch (error) {
-                console.error("Error fetching markets:", error);
-            }
-        };
-        fetchMarkets();
-    }, [isOpen]);
-
-    // Fetch child markets when parent changes
-    useEffect(() => {
-        if (!isOpen || !marketState.selected?.id) {
-            setMarketState(prev => ({ ...prev, childMarkets: [], selectedChild: null }));
-            return;
-        }
-        const fetchChildMarkets = async () => {
-            try {
-                const response = await getMarkets({ parent_id: marketState.selected!.id });
-                const fetchedMarkets = response.markets;
-                setMarketState(prev => ({
-                    ...prev,
-                    childMarkets: fetchedMarkets,
-                    selectedChild: fetchedMarkets[0] ?? null,
-                }));
-            } catch (error) {
-                console.error("Error fetching child markets:", error);
-                setMarketState(prev => ({ ...prev, childMarkets: [], selectedChild: null }));
-            }
-        };
-        fetchChildMarkets();
-    }, [isOpen, marketState.selected]);
-
-    // Fetch sports event markets
-    useEffect(() => {
-        if (!isOpen || !isSportsSelected || !marketState.selectedChild?.id) {
-            setMarketState(prev => ({ ...prev, sportsEventMarkets: [], selectedSportsEvent: null }));
-            return;
-        }
-        const fetchSportsEventMarkets = async () => {
-            try {
-                const response = await getMarkets({ parent_id: marketState.selectedChild!.id });
-                const fetchedMarkets = response.markets;
-                setMarketState(prev => ({
-                    ...prev,
-                    sportsEventMarkets: fetchedMarkets,
-                    selectedSportsEvent: fetchedMarkets[0] ?? null,
-                }));
-            } catch (error) {
-                console.error("Error fetching sports event markets:", error);
-                setMarketState(prev => ({ ...prev, sportsEventMarkets: [], selectedSportsEvent: null }));
-            }
-        };
-        fetchSportsEventMarkets();
-    }, [isOpen, isSportsSelected, marketState.selectedChild]);
-
-    // Click outside handler
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            const target = event.target as Node;
-            if (dropdownRefs.coin.current && !dropdownRefs.coin.current.contains(target)) {
-                setOpenDropdown(prev => prev === 'coin' ? null : prev);
-            }
-            if (dropdownRefs.sportsEvent.current && !dropdownRefs.sportsEvent.current.contains(target)) {
-                setOpenDropdown(prev => prev === 'sportsEvent' ? null : prev);
-            }
-            if (dropdownRefs.direction.current && !dropdownRefs.direction.current.contains(target)) {
-                setOpenDropdown(prev => prev === 'direction' ? null : prev);
-            }
-        };
-        document.addEventListener("mousedown", handleClickOutside);
-        return () => document.removeEventListener("mousedown", handleClickOutside);
-    }, []);
-
-    // Reset validation when market changes
-    useEffect(() => {
-        if (!isOpen || !marketState.selected) {
-            setValidation({ suggestions: [], isValid: true, isLoading: false, error: null, selectedSuggestion: null });
-            return;
-        }
-        setValidation({
-            suggestions: [],
-            isValid: !isSportsSelected,
-            isLoading: false,
-            error: null,
-            selectedSuggestion: null,
-        });
-    }, [isOpen, marketState.selected, isSportsSelected]);
-
-    const closeAllDropdowns = useCallback(() => setOpenDropdown(null), []);
-
-    const resetModalState = useCallback(() => {
-        setMarketState({
-            markets: [],
-            childMarkets: [],
-            sportsEventMarkets: [],
-            selected: null,
-            selectedChild: null,
-            selectedSportsEvent: null,
-        });
-        setOpenDropdown(null);
-        setBetAmount(5);
-        setBetAmountError(null);
-        setPredictionDirection("Above");
-        setPredictionPrice("66500");
-        setSelectedDate(new Date(Date.now() + 24 * 60 * 60 * 1000));
-        setIsDatePickerOpen(false);
-        setDuration({ hours: 4, minutes: 0 });
-        setIsDurationPickerOpen(false);
-        setCurrentStep("mode");
-        setChallengeMode("pvp");
-        setChallengeStatement("");
-        setChallengeStatementError(null);
-        setValidation({ suggestions: [], isValid: true, isLoading: false, error: null, selectedSuggestion: null });
-        setSportsResolutionConsent(false);
-        setSportsResolutionConsentError(null);
-        setTxStatus("idle");
-        setTxError(null);
-        setTxSignature(null);
-    }, []);
-
-    const handleModalClose = useCallback(() => {
-        resetModalState();
-        onClose();
-    }, [resetModalState, onClose]);
-
-    const handleValidateChallengeStatement = useCallback(async () => {
-        if (!isSportsSelected) return;
-        if (!challengeStatement.trim()) {
-            setChallengeStatementError("Please enter a challenge statement.");
-            return;
-        }
-        setChallengeStatementError(null);
-        setValidation(prev => ({ ...prev, error: null, selectedSuggestion: null, isValid: false, isLoading: true }));
         try {
-            const category = marketState.selectedChild?.symbol || marketState.selectedChild?.name || "sports";
-            const response = await transform({ category, statement: challengeStatement });
-            setValidation(prev => ({
-                ...prev,
-                suggestions: response.statements || [],
-                isValid: false,
-                error: (!response.valid || !response.statements?.length) 
-                    ? "The statement could not be validated. Please rewrite the statement properly." 
-                    : null,
-            }));
-        } catch (error) {
-            console.error("Validate transform error:", error);
-            const errMessage = error instanceof Error ? error.message : "";
-            setValidation(prev => ({
-                ...prev,
-                error: errMessage || "Unable to validate right now. Please try again.",
-                isValid: false,
-                suggestions: [],
-            }));
-        } finally {
-            setValidation(prev => ({ ...prev, isLoading: false }));
+            const rawSettings = window.localStorage.getItem(CREATE_SETTINGS_KEY);
+            if (!rawSettings) {
+                setRememberSettings(false);
+                return;
+            }
+            const saved = JSON.parse(rawSettings) as Partial<SavedCreateSettings>;
+            if (saved.marketType === "crypto" || saved.marketType === "sports") {
+                setMarketType(saved.marketType);
+                setChallengeFormat(saved.marketType === "sports" ? "statement" : saved.challengeFormat === "statement" ? "statement" : "price");
+            }
+            // Team mode is not available yet, so stale saved settings must not re-enable it.
+            setChallengeMode("pvp");
+            if (typeof saved.betAmount === "number" && Number.isFinite(saved.betAmount) && saved.betAmount > 0) setBetAmount(saved.betAmount);
+            if (typeof saved.durationMinutes === "number" && saved.durationMinutes >= MIN_DURATION_MINUTES) {
+                setDuration(durationFromMinutes(saved.durationMinutes));
+            }
+            if (typeof saved.resolutionDelayMinutes === "number" && saved.resolutionDelayMinutes >= MIN_DURATION_MINUTES) {
+                const safeDelay = Math.min(saved.resolutionDelayMinutes, MAX_RESOLUTION_DELAY_MINUTES);
+                setSelectedDate(new Date(Date.now() + safeDelay * 60 * 1000));
+            }
+            savedAssetCategoryRef.current = typeof saved.assetCategory === "string" ? saved.assetCategory : null;
+            setRememberSettings(true);
+        } catch {
+            window.localStorage.removeItem(CREATE_SETTINGS_KEY);
+            setRememberSettings(false);
         }
-    }, [isSportsSelected, challengeStatement, marketState.selectedChild]);
+    }, [isOpen]);
+    /* eslint-enable react-hooks/set-state-in-effect */
 
-    if (!isOpen) return null;
+    useEffect(() => {
+        if (!rememberSettings || !isOpen) return;
+        const settings: SavedCreateSettings = {
+            marketType,
+            challengeFormat,
+            challengeMode,
+            assetCategory: selectedChildCategory?.category ?? savedAssetCategoryRef.current ?? "",
+            betAmount,
+            durationMinutes: duration.hours * 60 + duration.minutes,
+            resolutionDelayMinutes: Math.max(MIN_DURATION_MINUTES, Math.round((selectedDate.getTime() - Date.now()) / 60000)),
+        };
+        window.localStorage.setItem(CREATE_SETTINGS_KEY, JSON.stringify(settings));
+    }, [betAmount, challengeFormat, challengeMode, duration, isOpen, marketType, rememberSettings, selectedChildCategory, selectedDate]);
 
-    const formatDate = (date: Date) => {
-        const options: Intl.DateTimeFormatOptions = { month: "long", day: "numeric", year: "numeric" };
-        const timeOptions: Intl.DateTimeFormatOptions = { hour: "numeric", minute: "2-digit", hour12: true };
-        return `${date.toLocaleDateString("en-US", options)} at ${date.toLocaleTimeString("en-US", timeOptions)}`;
+    useEffect(() => {
+        if (!isOpen) return;
+
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key !== "Escape" || isSubmitting) return;
+            if (isPreviewOpen) {
+                setIsPreviewOpen(false);
+                return;
+            }
+            if (activePanel) {
+                setActivePanel(null);
+                return;
+            }
+            setIsAdvancedPickerOpen(false);
+            onClose();
+        };
+
+        document.addEventListener("keydown", handleKeyDown);
+        return () => document.removeEventListener("keydown", handleKeyDown);
+    }, [activePanel, isOpen, isPreviewOpen, isSubmitting, onClose]);
+
+    useEffect(() => {
+        if (!isOpen) return;
+        let cancelled = false;
+        const loadCategories = async () => {
+            setIsLoadingCategories(true);
+            setCategoryError(null);
+            try {
+                const parents = await getParentCategories();
+                if (cancelled) return;
+                const currentMarket = marketType;
+                const marketParent = parents.find((category) => category.category.trim().toLowerCase() === currentMarket);
+                const children = await getCategoriesByParent(
+                    marketParent?.category ?? (currentMarket === "crypto" ? "Crypto" : "Sports"),
+                );
+                if (cancelled) return;
+                setChildCategories(children);
+                setSelectedChildCategory((current) =>
+                    current?.parent_category?.trim().toLowerCase() === currentMarket
+                        ? current
+                        : children.find((category) => category.category === savedAssetCategoryRef.current) ?? (currentMarket === "crypto"
+                            ? children.find((category) => stripUsdcQuote(category.category).trim().toUpperCase() === "BTC") ?? children[0] ?? null
+                            : children[0] ?? null),
+                );
+            } catch (error) {
+                if (cancelled) return;
+                console.error("Failed to load challenge categories:", error);
+                setCategoryError("Couldn’t load topics. Try again.");
+            } finally {
+                if (!cancelled) setIsLoadingCategories(false);
+            }
+        };
+
+        loadCategories();
+        return () => {
+            cancelled = true;
+        };
+    }, [isOpen, marketType]);
+
+    const switchMarket = (nextMarket: MarketType) => {
+        if (nextMarket === marketType) return;
+        setMarketType(nextMarket);
+        setChallengeFormat(nextMarket === "sports" ? "statement" : "price");
+        savedAssetCategoryRef.current = null;
+        setSelectedChildCategory(null);
+        setChildCategories([]);
+        setFormError(null);
+        setCategoryError(null);
+        setActivePanel("topic");
+        setIsLoadingCategories(true);
     };
 
-    const formatDuration = (dur: { hours: number; minutes: number }) => {
-        if (dur.hours === 0 && dur.minutes === 0) return "Select duration";
-        const days = Math.floor(dur.hours / 24);
-        const remainingHours = dur.hours % 24;
-        let result = "";
-        if (days > 0) result += `${days}d `;
-        if (remainingHours > 0) result += `${remainingHours}h `;
-        if (dur.minutes > 0) result += `${dur.minutes}m`;
-        return result.trim();
+    const togglePanel = (panel: Exclude<ComposerPanel, null>) => {
+        setActivePanel((current) => current === panel ? null : panel);
+        setFormError(null);
+    };
+
+    const handleDurationChange = (nextDuration: { hours: number; minutes: number }) => {
+        setDuration(nextDuration);
+    };
+
+    const handleResolutionDateChange = (nextDate: Date) => {
+        if (!Number.isFinite(nextDate.getTime())) return;
+        setSelectedDate(nextDate);
+    };
+
+    const isPriceFeed = marketType === "crypto" && challengeFormat === "price";
+    const rawTopicLabel = selectedChildCategory?.category ?? (marketType === "sports" ? "All sports" : "Choose asset");
+    const topicLabel = stripUsdcQuote(rawTopicLabel);
+    const selectedMarketPair = (selectedChildCategory?.category ?? "")
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, "")
+        .slice(0, 20);
+    const selectedAssetSymbol = (selectedChildCategory?.category ?? "")
+        .split("/", 1)[0]
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, "")
+        .slice(0, 10);
+    const assetPriceRequestKey = `${selectedMarketPair}:${chartRange}`;
+    const isAssetPriceLoading = isPriceFeed
+        && Boolean(selectedAssetSymbol)
+        && assetPriceState.key !== assetPriceRequestKey;
+    const hasAssetPriceError = isPriceFeed
+        && Boolean(selectedAssetSymbol)
+        && assetPriceState.key === assetPriceRequestKey
+        && assetPriceState.status === "failed";
+    const generatedStatement = `${stripUsdcQuote(selectedChildCategory?.category) || "Asset"} ${predictionDirection.toLowerCase()} ${formatPrice(predictionPrice)}`;
+    const totalDurationMinutes = duration.hours * 60 + duration.minutes;
+    const timeUntilResolutionMinutes = getTimeUntilResolutionMinutes(selectedDate, composerNow);
+    const minResolutionDate = new Date(composerNow + MIN_DURATION_MINUTES * 60 * 1000);
+    const maxResolutionDate = new Date(composerNow + MAX_RESOLUTION_DELAY_MINUTES * 60 * 1000);
+
+    useEffect(() => {
+        if (!isOpen || !isPriceFeed || !selectedAssetSymbol || !selectedMarketPair) return;
+        let cancelled = false;
+
+        fetch(`/api/market-chart?pair=${encodeURIComponent(selectedChildCategory?.category ?? "")}&range=${chartRange}`)
+            .then(async (response) => {
+                if (!response.ok) throw new Error("Asset price unavailable");
+                return response.json() as Promise<{ candles: MarketCandle[] }>;
+            })
+            .then((data) => {
+                const currentPrice = Number(data.candles.at(-1)?.close);
+                if (!Number.isFinite(currentPrice) || currentPrice <= 0) {
+                    throw new Error("Invalid asset price");
+                }
+                if (cancelled) return;
+
+                setPredictionPrice((currentTarget) => {
+                    const parsedTarget = Number(currentTarget);
+                    return Number.isFinite(parsedTarget) && parsedTarget > 0
+                        ? currentTarget
+                        : targetPriceInputValue(currentPrice * 1.1);
+                });
+                setAssetPriceState({
+                    key: assetPriceRequestKey,
+                    asset: selectedAssetSymbol,
+                    currentPrice,
+                    candles: data.candles,
+                    status: "ready",
+                });
+            })
+            .catch((error) => {
+                if (cancelled) return;
+                console.error(`Failed to load ${selectedAssetSymbol} price:`, error);
+                setAssetPriceState({
+                    key: assetPriceRequestKey,
+                    asset: selectedAssetSymbol,
+                    currentPrice: null,
+                    candles: [],
+                    status: "failed",
+                });
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [assetPriceRequestKey, chartRange, isOpen, isPriceFeed, selectedAssetSymbol, selectedMarketPair, selectedChildCategory?.category]);
+
+    const validateForm = ({ requireProfile = true }: { requireProfile?: boolean } = {}) => {
+        if (marketType === "crypto" && !selectedChildCategory) {
+            setActivePanel("topic");
+            return "Choose a crypto asset.";
+        }
+        if (!isPriceFeed && statement.trim().length < 8) {
+            window.setTimeout(() => statementRef.current?.focus(), 0);
+            return "Write a clear challenge statement.";
+        }
+        if (isPriceFeed && (!Number.isFinite(Number(predictionPrice)) || Number(predictionPrice) <= 0)) {
+            window.setTimeout(() => priceRef.current?.focus(), 0);
+            return "Enter a valid target price.";
+        }
+        if (!Number.isFinite(betAmount) || betAmount < 1) {
+            setActivePanel("stake");
+            return "Minimum stake is 1 USDC.";
+        }
+        if (selectedDate.getTime() < minResolutionDate.getTime() || selectedDate.getTime() > maxResolutionDate.getTime()) {
+            setActivePanel("resolution");
+            return "Resolution must be between 15 minutes and 14 days from now.";
+        }
+        if (totalDurationMinutes < MIN_DURATION_MINUTES || totalDurationMinutes > timeUntilResolutionMinutes) {
+            setActivePanel("window");
+            return "Join window must be at least 15 minutes and cannot extend beyond the resolution time.";
+        }
+        if (requireProfile && !user?.id) return "Finish your profile before creating a challenge.";
+        return null;
+    };
+
+    const handleOpenPreview = () => {
+        const validationError = validateForm({ requireProfile: false });
+        if (validationError) {
+            setFormError(validationError);
+            return;
+        }
+
+        setActivePanel(null);
+        setFormError(null);
+        setIsPreviewOpen(true);
+    };
+
+    const getStatusLabel = () => {
+        if (txStatus === "building") return "Preparing challenge";
+        if (txStatus === "signing") return "Confirm in wallet";
+        if (txStatus === "confirming") return "Publishing challenge";
+        return null;
     };
 
     const handleCreateChallenge = async () => {
-        if (!isConnected) {
-            open();
+        const validationError = validateForm();
+        if (validationError) {
+            setFormError(validationError);
             return;
-        }
-        if (!address) {
-            setTxError("Wallet address not found.");
-            return;
-        }
-        if (betAmount < 5) {
-            setBetAmountError("Min bet should be $5");
-            setTxError("Bet amount must be at least $5.");
-            return;
-        }
-        if (isSportsSelected) {
-            if (!challengeStatement.trim()) {
-                setChallengeStatementError("Please enter a challenge statement.");
-                setTxError("Please enter a challenge statement.");
-                return;
-            }
-            if (!validation.selectedSuggestion) {
-                setTxError("Please validate and select one suggested statement before creating the challenge.");
-                return;
-            }
-            setChallengeStatementError(null);
-            if (!sportsResolutionConsent) {
-                setSportsResolutionConsentError("Please check this box to continue.");
-                setTxError("Please check the box to confirm the sports challenge resolution terms.");
-                return;
-            }
-            setSportsResolutionConsentError(null);
-            if (hasBlockedContent(challengeStatement)) {
-                setTxError(blockedContentError("Challenge statement"));
-                return;
-            }
-        } else {
-            if (!predictionPrice || Number(predictionPrice) <= 0) {
-                setTxError("Please enter a valid prediction price.");
-                return;
-            }
-        }
-        if (duration.hours === 0 && duration.minutes === 0) {
-            setTxError("Please select a challenge expiry duration.");
-            return;
-        }
-        if (!isSportsSelected && selectedDate.getTime() <= Date.now()) {
-            setTxError("Challenge end date must be in the future.");
-            return;
-        }
-        if (!isSportsSelected) {
-            const expiryTimeMs = Date.now() + (duration.hours * 60 + duration.minutes) * 60 * 1000;
-            if (selectedDate.getTime() < expiryTimeMs) {
-                setTxError("Challenge end date cannot be earlier than challenge expiry time.");
-                return;
-            }
         }
 
+        if (!address || !isConnected) {
+            onClose();
+            window.setTimeout(() => void open({ view: "Connect" }), 50);
+            return;
+        }
+        if (!walletProvider) {
+            setFormError("Wallet isn’t ready. Reconnect and try again.");
+            return;
+        }
+
+        setIsSubmitting(true);
         setTxStatus("building");
-        setTxError(null);
-        setTxSignature(null);
+        setFormError(null);
+        setBalanceShortfall(null);
 
         try {
-            const creatorPubkey = new PublicKey(address);
-            const wallet = {
-                publicKey: creatorPubkey,
-                signTransaction: async (tx: Transaction) => {
-                    const signedTx = await (window as any).solana?.signTransaction(tx);
-                    return signedTx || tx;
-                },
-                signAllTransactions: async (txs: Transaction[]) => {
-                    return await Promise.all(txs.map(tx => (window as any).solana?.signTransaction(tx) || tx));
-                }
-            };
-            
-            const program = getRektoProgram(wallet);
-            const connection = getReadonlyConnection();
+            const usdcBalance = await fetchUsdcBalance(address);
+            if (usdcBalance < betAmount) {
+                setBalanceShortfall(Math.max(betAmount - usdcBalance, 0));
+                setFormError(
+                    usdcBalance <= 0
+                        ? "You don’t have enough USDC to create this challenge."
+                        : `Your balance is ${usdcBalance.toLocaleString(undefined, { maximumFractionDigits: 6 })} USDC, but this challenge requires ${betAmount.toLocaleString()} USDC.`,
+                );
+                setTxStatus("idle");
+                setIsPreviewOpen(false);
+                return;
+            }
+
+            // Transaction timestamps must be calculated at submission time, not at render time.
+            // eslint-disable-next-line react-hooks/purity
             const nowSec = Math.floor(Date.now() / 1000);
             const expiresAt = nowSec + duration.hours * 3600 + duration.minutes * 60;
-            const resolvesAt = isSportsSelected ? expiresAt : Math.floor(selectedDate.getTime() / 1000);
-            const targetPriceUsdCents = Math.round(Number(predictionPrice) * 100);
+            const resolvesAt = Math.max(Math.floor(selectedDate.getTime() / 1000), expiresAt);
+            const topic = selectedChildCategory?.category?.trim() || (marketType === "sports" ? "SPORTS" : "CRYPTO");
+            // The program's asset label is capped at 10 characters. Store the
+            // base ticker there, while preserving the complete pair in
+            // `tradingPair`/`trading_pair` for charts and price settlement.
+            const ticker = topic.split("/", 1)[0].replace(/[^a-zA-Z0-9]/g, "").slice(0, 10).toUpperCase()
+                || marketType.toUpperCase();
+            const onchainAsset = ticker;
+            const targetPrice = isPriceFeed ? Number(predictionPrice) : 0;
+            const challengeStatement = isPriceFeed ? generatedStatement : statement.trim();
 
-            const tx = await buildCreateChallengeTx(program, creatorPubkey, {
-                asset: marketState.selectedChild?.symbol || "",
-                betAmountUsdc: betAmount,
-                targetPriceUsdCents,
-                directionAbove: predictionDirection === "Above",
-                expiresAt,
-                resolvesAt,
+            const response = await fetch("/api/challenges/create", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    userWallet: address,
+                    asset: onchainAsset,
+                    betAmountUsdc: betAmount,
+                    targetPriceUsdCents: Math.floor(targetPrice * 100),
+                    directionAbove: isPriceFeed ? predictionDirection === "Above" : true,
+                    expiresAt,
+                    resolvesAt,
+                    challengeType: challengeMode,
+                    maxTeamSize: 20,
+                    statement: challengeStatement,
+                    ticker,
+                    tradingPair: topic,
+                    target: targetPrice,
+                    resolutionMethod: isPriceFeed ? "PRICE_FEED" : "COMMUNITY",
+                    resolutionDate: new Date(resolvesAt * 1000).toISOString().split("T")[0],
+                }),
             });
 
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error || "Failed to create challenge");
+
             setTxStatus("signing");
-            
-            const signedTx = await wallet.signTransaction(tx);
-            const signature = await connection.sendRawTransaction(signedTx.serialize());
-            
-            setTxSignature(signature);
+            const transaction = Transaction.from(Buffer.from(data.serializedTx, "base64"));
+            const signedTransaction = await (walletProvider as {
+                signTransaction: (transaction: Transaction) => Promise<Transaction>;
+            }).signTransaction(transaction);
+
             setTxStatus("confirming");
+            const connection = getReadonlyConnection();
+            const signature = await connection.sendRawTransaction(signedTransaction.serialize(), {
+                skipPreflight: false,
+                preflightCommitment: "confirmed",
+            });
+            await connection.confirmTransaction(
+                {
+                    signature,
+                    blockhash: data.blockhash,
+                    lastValidBlockHeight: data.lastValidBlockHeight,
+                },
+                "confirmed",
+            );
 
-            const [counterPDA] = deriveCreatorCounter(creatorPubkey);
-            let challengeId = 0;
-            try {
-                const counter = await (program.account as any).creatorCounter.fetch(counterPDA);
-                challengeId = Number(counter.count) - 1;
-            } catch {
-                challengeId = 0;
-            }
-
-            const [challengePDA] = deriveChallengePDA(creatorPubkey, challengeId);
-
-            try {
-                const selectedCategory = isSportsSelected
-                    ? (marketState.selectedSportsEvent?.name || marketState.selectedSportsEvent?.symbol || "")
-                    : (marketState.selectedChild?.name || "");
-                const selectedTicker = isSportsSelected
-                    ? (marketState.selectedSportsEvent?.symbol || marketState.selectedSportsEvent?.name || "")
-                    : (marketState.selectedChild?.symbol || "");
-                const selectedAssetName = isSportsSelected
-                    ? (marketState.selectedSportsEvent?.description || marketState.selectedSportsEvent?.name || marketState.selectedSportsEvent?.symbol || "")
-                    : (marketState.selectedChild?.description || "");
-
-                await createChallenge({
-                    title: isSportsSelected ? challengeStatement : `${marketState.selectedChild?.symbol} ${predictionDirection} $${predictionPrice}`,
-                    description: isSportsSelected
-                        ? challengeStatement
-                        : `Bet ${betAmount} USDC that ${marketState.selectedChild?.symbol} will be ${predictionDirection.toLowerCase()} $${predictionPrice} by ${selectedDate.toISOString()}`,
-                    category: selectedCategory,
-                    event_type: "binary",
-                    ticker: selectedTicker,
-                    asset_name: selectedAssetName,
-                    created_by: user?.id || "",
-                    mode: challengeMode,
-                    initial_bet: betAmount,
-                    min_accept_bet: betAmount,
-                    target_price: isSportsSelected ? undefined : Number(predictionPrice),
-                    bet_unit: 1,
-                    resolution_source: isSportsSelected ? "manual" : "price_feed",
-                    expire_time: new Date(expiresAt * 1000).toISOString(),
-                    resolve_time: new Date(resolvesAt * 1000).toISOString(),
-                    metadata: {
-                        onchain: {
-                            challenge_pda: challengePDA.toBase58(),
-                            challenge_id: challengeId,
-                            creator_wallet: creatorPubkey.toBase58(),
-                            program_id: "4t5KYdKFmPw49yo6Bm1TV2ZDEi6k3Ns4eJLeNhgbVSzJ",
-                            cluster: "devnet",
-                            tx_signature: signature,
-                        },
+            await createChallenge({
+                statement: challengeStatement,
+                ticker,
+                trading_pair: topic,
+                target: targetPrice,
+                initial_bet: betAmount,
+                pool_size: betAmount,
+                resolution_source: isPriceFeed ? "PRICE_FEED" : "COMMUNITY",
+                metadata: {
+                    onchain: {
+                        challenge_pda: data.challengePDA,
+                        creator_wallet: data.creator,
+                        on_chain_challenge_id: data.challengeId,
                     },
-                });
-            } catch (apiErr) {
-                console.warn("Backend API error (non-fatal):", apiErr);
+                    composer: {
+                        market: marketType,
+                        format: isPriceFeed ? "price" : "statement",
+                        topic,
+                        category_image: selectedChildCategory?.image_url || "",
+                        resolves_at: new Date(resolvesAt * 1000).toISOString(),
+                    },
+                },
+                creator: user!.id,
+                resolution_method: isPriceFeed ? "PRICE_FEED" : "COMMUNITY",
+                participants: 1,
+                status: "OPEN",
+                mode: challengeMode === "pvp" ? "PVP" : "TEAM",
+                result: "TEAM_A",
+                direction: predictionDirection === "Above" ? "UP" : "DOWN",
+                expiry: new Date(expiresAt * 1000).toISOString(),
+                resolution_date: new Date(resolvesAt * 1000).toISOString().split("T")[0],
+                final_price: 0,
+                category: marketType === "crypto" ? "Crypto" : "Sports",
+            });
+
+            setTxStatus("idle");
+            if (!rememberSettings) {
+                setMarketType("crypto");
+                setChallengeFormat("price");
+                setChallengeMode("pvp");
+                setBetAmount(DEFAULT_BET_AMOUNT);
+                setSelectedChildCategory(null);
+                const nextResolutionDate = getDefaultResolutionDate(composerNow);
+                setSelectedDate(nextResolutionDate);
+                setDuration(durationFromMinutes(DEFAULT_DURATION_MINUTES));
             }
-
-            setTxStatus("success");
+            setStatement("");
+            setPredictionPrice("");
+            setChartRange(DEFAULT_CHART_RANGE);
+            setIsAdvancedPickerOpen(false);
+            setActivePanel(null);
+            setIsPreviewOpen(false);
+            announceChallengeCreated();
             onCreated();
-        } catch (err: unknown) {
-            console.error("Create challenge error:", err);
-            const errorMessage = err instanceof Error ? err.message : "";
-            const msg = errorMessage.includes("User rejected") ? "Transaction cancelled by user." : errorMessage || "Transaction failed. Please try again.";
-            setTxError(msg);
+        } catch (error) {
+            console.error("Error creating challenge:", error);
             setTxStatus("error");
+            setFormError(error instanceof Error ? error.message : "Something went wrong. Try again.");
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
-    const isLoading = txStatus === "building" || txStatus === "signing" || txStatus === "confirming";
-    const hasChallengeStatement = challengeStatement.trim().length > 0;
-    const isSportsSelectionComplete = Boolean(validation.selectedSuggestion);
-    const stepOrder: CreateChallengeStep[] = ["mode", "category", "details"];
-    const currentStepIndex = stepOrder.indexOf(currentStep);
-    const isModeStep = currentStep === "mode";
-    const isCategoryStep = currentStep === "category";
-    const isDetailsStep = currentStep === "details";
-    const stepTitle = isModeStep ? "Choose challenge mode" : isCategoryStep ? "Pick a category" : "Set the terms";
-    const stepSubtitle = isModeStep
-        ? "Start with how players can join your challenge."
-        : isCategoryStep
-            ? "Choose the market and asset or event."
-            : "Add the bet, prediction, timing, and review the payout.";
-
-    const goToNextStep = () => {
-        const nextStep = stepOrder[Math.min(currentStepIndex + 1, stepOrder.length - 1)];
-        setCurrentStep(nextStep);
-        closeAllDropdowns();
+    const handleDeposit = () => {
+        onClose();
+        window.setTimeout(() => {
+            window.dispatchEvent(new Event("rektofun:open-deposit"));
+        }, 0);
     };
 
-    const goToPreviousStep = () => {
-        const previousStep = stepOrder[Math.max(currentStepIndex - 1, 0)];
-        setCurrentStep(previousStep);
-        closeAllDropdowns();
-    };
+    if (!isOpen) return null;
 
-    const getButtonLabel = () => {
-        if (!isConnected) return "Connect Wallet to Create";
-        switch (txStatus) {
-            case "building": return "Building Transaction...";
-            case "signing": return "Waiting for Signature...";
-            case "confirming": return "Confirming on-chain...";
-            case "success": return "Challenge Created! 🎉";
-            default: return "Create Challenge";
-        }
-    };
+    const statusLabel = getStatusLabel();
 
-    const getButtonStyle = () => {
-        if (!isConnected) return "rekto-button cursor-pointer w-full py-3 sm:py-4 bg-gray-900 hover:bg-gray-700 text-white font-black text-base sm:text-lg transition-colors";
-        if (isLoading || (isSportsSelected && (!validation.isValid || !isSportsSelectionComplete))) return "cursor-pointer w-full py-3 sm:py-4 border-2 border-black bg-gray-400 text-white font-black text-base sm:text-lg cursor-not-allowed shadow-[3px_3px_0_#111]";
-        if (txStatus === "success") return "cursor-pointer w-full py-3 sm:py-4 border-2 border-black bg-green-500 text-white font-black text-base sm:text-lg cursor-not-allowed shadow-[1px_1px_0_#111]";
-        if (txStatus === "error") return "cursor-pointer w-full py-3 sm:py-4 border-2 border-black bg-red-500 hover:bg-red-600 text-white font-black text-base sm:text-lg transition-colors shadow-[1px_1px_0_#111]";
-        return "rekto-button cursor-pointer w-full py-3 sm:py-4 bg-gray-900 hover:bg-gray-700 text-white font-black text-base sm:text-lg transition-colors";
-    };
+    return createPortal(
+        <div className="create-challenge-overlay fixed inset-0 z-[250] flex items-end justify-center p-0 sm:items-center sm:p-5">
+            <button
+                type="button"
+                className="absolute inset-0 h-full w-full cursor-default bg-black/45 backdrop-blur-[2px]"
+                onClick={() => {
+                    if (isSubmitting) return;
+                    setIsPreviewOpen(false);
+                    setIsAdvancedPickerOpen(false);
+                    setActivePanel(null);
+                    onClose();
+                }}
+                aria-label="Close create challenge"
+            />
 
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
-            <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={handleModalClose} />
-            <div className="rekto-modal-panel relative w-full max-w-md md:max-w-2xl max-h-[94vh] sm:max-h-[90vh] overflow-hidden flex flex-col">
-                <div className="bg-[#f3e1d7] px-4 sm:px-6 pt-4 sm:pt-6 pb-3 sm:pb-4 border-b-2 border-black">
-                    <div className="flex items-center justify-between">
-                        <div className="w-8" />
-                        <h2 className="text-lg sm:text-xl md:text-2xl font-black text-gray-900 text-center drop-shadow-[2px_2px_0_#f5d547]">Create Challenge</h2>
-                        <button onClick={handleModalClose} className="w-8 h-8 flex items-center justify-center border-2 border-black bg-white shadow-[2px_2px_0_#111] hover:bg-[#f5d54 la7] transition-colors">
-                            <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                        </button>
-                    </div>
-                    <p className="text-center text-gray-600 text-xs sm:text-sm mt-2">Create a challenge in a few quick choices.</p>
-                </div>
-
-                <div className="px-4 sm:px-6 py-3 sm:py-4 space-y-4 overflow-y-auto">
-                    <div className="space-y-3">
-                        <div className="flex items-center gap-2">
-                            {stepOrder.map((step, index) => (
-                                <button
-                                    key={step}
-                                    type="button"
-                                    onClick={() => setCurrentStep(step)}
-                                    className={`h-2 flex-1 rounded-full transition-colors ${index <= currentStepIndex ? "bg-gray-900" : "bg-[#e8d5c8]"}`}
-                                    aria-label={`Go to step ${index + 1}`}
-                                />
-                            ))}
+            <section
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="create-challenge-title"
+                className="create-challenge-modal relative flex h-[100dvh] max-h-[100dvh] w-full max-w-2xl flex-col overflow-hidden border-2 border-black bg-[#fffaf6] sm:h-auto sm:max-h-[92vh]"
+            >
+                <header className="flex shrink-0 items-center justify-between border-b-2 border-black px-3 py-2.5 sm:px-5 sm:py-3.5">
+                    <div className="flex items-center gap-2.5">
+                        <div className="flex h-8 w-8 items-center justify-center border-2 border-black bg-[#f5d547] sm:h-9 sm:w-9">
+                            <Zap className="h-4.5 w-4.5 fill-black" />
                         </div>
                         <div>
-                            <p className="text-xs font-bold uppercase tracking-wide text-gray-500">Step {currentStepIndex + 1} of {stepOrder.length}</p>
-                            <h3 className="text-xl font-black text-gray-900">{stepTitle}</h3>
-                            <p className="text-sm text-gray-600">{stepSubtitle}</p>
+                            <h2 id="create-challenge-title" className="text-base font-black tracking-tight text-[#17120f] sm:text-lg">
+                                Create challenge
+                            </h2>
+                            <p className="text-[11px] font-bold text-[#7a6961]">Make your call.</p>
                         </div>
                     </div>
+                    <button
+                        type="button"
+                        onClick={() => {
+                            if (isSubmitting) return;
+                            setIsPreviewOpen(false);
+                            setIsAdvancedPickerOpen(false);
+                            setActivePanel(null);
+                            onClose();
+                        }}
+                        disabled={isSubmitting}
+                        aria-label="Close create challenge"
+                        className="flex h-8 w-8 cursor-pointer items-center justify-center border-2 border-black bg-white text-black transition-colors hover:bg-[#f5d547] disabled:cursor-not-allowed disabled:opacity-50 sm:h-9 sm:w-9"
+                    >
+                        <X className="h-4 w-4" />
+                    </button>
+                </header>
 
-                    {isCategoryStep && (
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700">Challenge Market</label>
-                        <div className="flex items-center gap-2 p-1 bg-[#faf0eb] border border-[#e8d5c8] rounded-xl">
-                            {marketState.markets.length === 0 ? (
-                                <div className="flex-1 py-2 px-4 text-sm text-gray-500 text-center">Loading markets...</div>
-                            ) : (
-                                marketState.markets.map((m: Market) => (
+                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+                    <div className="border-b border-black/15 px-3 py-2.5 sm:px-5 sm:py-3">
+                        <div className="grid grid-cols-1 gap-2 min-[430px]:flex min-[430px]:flex-wrap min-[430px]:items-center">
+                            <div className="grid w-full grid-cols-2 border-2 border-black bg-[#f3e1d7] p-0.5 min-[430px]:inline-flex min-[430px]:w-auto" aria-label="Challenge market">
+                                <button
+                                    type="button"
+                                    onClick={() => switchMarket("crypto")}
+                                    className={`inline-flex h-8 items-center justify-center gap-1.5 px-3 text-xs font-black transition-colors ${marketType === "crypto" ? "bg-black text-white" : "text-[#594b44] hover:bg-white/70"}`}
+                                    aria-pressed={marketType === "crypto"}
+                                >
+                                    <Coins className="h-3.5 w-3.5" /> Crypto
+                                </button>
+                                <span
+                                    className="group relative h-8"
+                                    tabIndex={0}
+                                    aria-label="Sports, coming soon"
+                                >
                                     <button
-                                        key={m.id}
-                                        onClick={() => setMarketState(prev => ({ ...prev, selected: m }))}
-                                        className={`flex-1 py-2 px-4 rounded-lg text-sm font-semibold transition-colors ${marketState.selected?.id === m.id
-                                            ? "bg-gray-900 text-white"
-                                            : "bg-transparent text-gray-600 hover:bg-[#f3e1d7]"
-                                            }`}
+                                        type="button"
+                                        disabled
+                                        aria-describedby="sports-coming-soon"
+                                        className="inline-flex h-full w-full cursor-not-allowed items-center justify-center gap-1.5 px-3 text-xs font-black text-[#594b44] opacity-45"
                                     >
-                                        {m.symbol || m.name}
+                                        <Lock className="h-3 w-3" aria-hidden="true" />
+                                        <Trophy className="h-3.5 w-3.5" /> Sports
                                     </button>
-                                ))
-                            )}
-                        </div>
-                    </div>
-                    )}
-
-                    {isModeStep && (
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700">Challenge Mode</label>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <button
-                                onClick={() => setChallengeMode("pvp")}
-                                className={`min-h-28 rounded-xl border px-4 py-4 text-left transition-colors ${challengeMode === "pvp"
-                                    ? "border-gray-900 bg-gray-900 text-white shadow-[3px_3px_0_#f5d547]"
-                                    : "border-[#e8d5c8] bg-[#faf0eb] text-gray-700 hover:border-[#d4b8a8]"
-                                    }`}
-                            >
-                                <span className="block text-base font-black">PVP</span>
-                                <span className={`mt-1 block text-sm ${challengeMode === "pvp" ? "text-white/80" : "text-gray-500"}`}>One opponent accepts your exact bet.</span>
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setChallengeMode("multi")}
-                                className={`min-h-28 rounded-xl border px-4 py-4 text-left transition-colors ${challengeMode === "multi"
-                                    ? "border-gray-900 bg-gray-900 text-white shadow-[3px_3px_0_#f5d547]"
-                                    : "border-[#e8d5c8] bg-[#faf0eb] text-gray-700 hover:border-[#d4b8a8]"
-                                    }`}
-                            >
-                                <span className="block text-base font-black">Multi</span>
-                                <span className={`mt-1 block text-sm ${challengeMode === "multi" ? "text-white/80" : "text-gray-500"}`}>Multiple players can join the same challenge.</span>
-                            </button>
-                        </div>
-                        <p className="text-xs text-gray-500">You can change this before moving forward.</p>
-                    </div>
-                    )}
-
-                    {isCategoryStep && (
-                    <div className="space-y-2">
-                        {isSportsSelected ? (
-                            <label className="text-sm font-medium text-gray-700">Select Sport Event</label>
-                        ) : <label className="text-sm font-medium text-gray-700">Select Token</label>}
-                        <div className="relative" ref={dropdownRefs.coin}>
-                            <button 
-                                onClick={() => setOpenDropdown(prev => prev === 'coin' ? null : 'coin')} 
-                                className="w-full flex items-center justify-between px-4 py-3 bg-[#faf0eb] border border-[#e8d5c8] rounded-xl hover:border-[#d4b8a8] transition-colors"
-                            >
-                                <div className="flex items-center gap-3">
-                                    <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
-                                        {marketState.selectedChild?.image ? (
-                                            <Image src={marketState.selectedChild.image} alt={marketState.selectedChild.symbol || marketState.selectedChild.name} width={24} height={24} className="w-6 h-6 object-contain" />
-                                        ) : (
-                                            <span className="text-xs font-bold text-white">
-                                                {marketState.selectedChild?.symbol?.slice(0, 2) || "?"}
-                                            </span>
-                                        )}
-                                    </div>
-                                    <span className="font-semibold text-gray-900">{marketState.selectedChild?.symbol || "Select Token"}</span>
-                                </div>
-                                <svg className={`w-5 h-5 text-gray-500 transition-transform ${openDropdown === 'coin' ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                </svg>
-                            </button>
-                            {openDropdown === 'coin' && (
-                                <div className="absolute top-full left-0 right-0 mt-1 bg-[#faf0eb] border border-[#e8d5c8] rounded-xl shadow-lg z-10 overflow-hidden">
-                                    {marketState.childMarkets.length === 0 ? (
-                                        <div className="px-4 py-3 text-sm text-gray-500">Loading tokens...</div>
-                                    ) : (
-                                        marketState.childMarkets.map((childMarket: Market) => (
-                                            <button 
-                                                key={childMarket.id} 
-                                                onClick={() => { 
-                                                    setMarketState(prev => ({ ...prev, selectedChild: childMarket })); 
-                                                    setOpenDropdown(null); 
-                                                }} 
-                                                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#f3e1d7] transition-colors"
-                                            >
-                                                <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
-                                                    {childMarket.image ? (
-                                                        <Image src={childMarket.image} alt={childMarket.symbol || childMarket.name} width={24} height={24} className="w-6 h-6 object-contain" />
-                                                    ) : (
-                                                        <span className="text-xs font-bold text-white">
-                                                            {childMarket.symbol?.slice(0, 2) || "?"}
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                <span className="font-medium text-gray-900">{childMarket.symbol}</span>
-                                            </button>
-                                        ))
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                        {isSportsSelected && (
-                            <div className="space-y-2 pt-2">
-                                <label className="text-sm font-medium text-gray-700">Select Market</label>
-                                <div className="relative" ref={dropdownRefs.sportsEvent}>
-                                    <button 
-                                        onClick={() => setOpenDropdown(prev => prev === 'sportsEvent' ? null : 'sportsEvent')} 
-                                        className="w-full flex items-center justify-between px-4 py-3 bg-[#faf0eb] border border-[#e8d5c8] rounded-xl hover:border-[#d4b8a8] transition-colors"
+                                    <span
+                                        id="sports-coming-soon"
+                                        role="tooltip"
+                                        className="pointer-events-none absolute left-1/2 top-full z-20 mt-2 -translate-x-1/2 whitespace-nowrap border border-black bg-black px-2 py-1 text-[9px] font-black uppercase tracking-[0.08em] text-white opacity-0 shadow-[2px_2px_0_#e85a2d] transition-opacity group-hover:opacity-100 group-focus:opacity-100"
                                     >
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
-                                                {marketState.selectedSportsEvent?.image ? (
-                                                    <Image src={marketState.selectedSportsEvent.image} alt={marketState.selectedSportsEvent.symbol || marketState.selectedSportsEvent.name} width={24} height={24} className="w-6 h-6 object-contain" />
-                                                ) : (
-                                                    <span className="text-xs font-bold text-white">
-                                                        {marketState.selectedSportsEvent?.symbol?.slice(0, 2) || "?"}
-                                                    </span>
-                                                )}
-                                            </div>
-                                            <span className="font-semibold text-gray-900">{marketState.selectedSportsEvent?.symbol || marketState.selectedSportsEvent?.name || "Select Market"}</span>
-                                        </div>
-                                        <svg className={`w-5 h-5 text-gray-500 transition-transform ${openDropdown === 'sportsEvent' ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                        </svg>
-                                    </button>
-                                    {openDropdown === 'sportsEvent' && (
-                                        <div className="absolute top-full left-0 right-0 mt-1 bg-[#faf0eb] border border-[#e8d5c8] rounded-xl shadow-lg z-10 overflow-hidden">
-                                            {marketState.sportsEventMarkets.length === 0 ? (
-                                                <div className="px-4 py-3 text-sm text-gray-500">Loading markets...</div>
-                                            ) : (
-                                                marketState.sportsEventMarkets.map((market: Market) => (
-                                                    <button 
-                                                        key={market.id} 
-                                                        onClick={() => { 
-                                                            setMarketState(prev => ({ ...prev, selectedSportsEvent: market })); 
-                                                            setOpenDropdown(null); 
-                                                        }} 
-                                                        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#f3e1d7] transition-colors"
-                                                    >
-                                                        <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
-                                                            {market.image ? (
-                                                                <Image src={market.image} alt={market.symbol || market.name} width={24} height={24} className="w-6 h-6 object-contain" />
-                                                            ) : (
-                                                                <span className="text-xs font-bold text-white">
-                                                                    {market.symbol?.slice(0, 2) || "?"}
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                        <span className="font-medium text-gray-900">{market.symbol || market.name}</span>
-                                                    </button>
-                                                ))
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                    )}
-
-                    {isDetailsStep && (
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700">Bet Amount</label>
-                        <div className="flex items-center gap-2">
-                            <button
-                                onClick={() => {
-                                    const newVal = Math.max(5, betAmount - 1);
-                                    setBetAmount(newVal);
-                                    setBetAmountError(newVal < 5 ? "Min bet should be $5" : null);
-                                }}
-                                className="w-10 h-10 flex items-center justify-center bg-[#faf0eb] border border-[#e8d5c8] rounded-xl hover:bg-[#f3e1d7] transition-colors text-gray-700 font-bold text-lg"
-                            >
-                                -
-                            </button>
-                            <div className="relative flex-1">
-                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 text-sm font-bold">$</span>
-                                <input
-                                    type="number"
-                                    value={betAmount}
-                                    onChange={(e) => {
-                                        const val = Number(e.target.value);
-                                        setBetAmount(val);
-                                        setBetAmountError(val < 5 ? "Min bet should be $5" : null);
-                                    }}
-                                    step="1"
-                                    min="5"
-                                    className="w-full pl-8 pr-4 py-3 bg-[#faf0eb] border border-[#e8d5c8] rounded-xl text-lg font-semibold text-gray-900 focus:outline-none focus:border-[#d4b8a8]"
-                                />
-                            </div>
-                            <button
-                                onClick={() => {
-                                    const newVal = betAmount + 1;
-                                    setBetAmount(newVal);
-                                    setBetAmountError(null);
-                                }}
-                                className="w-10 h-10 flex items-center justify-center bg-[#faf0eb] border border-[#e8d5c8] rounded-xl hover:bg-[#f3e1d7] transition-colors text-gray-700 font-bold text-lg"
-                            >
-                                +
-                            </button>
-                        </div>
-                        {betAmountError && <p className="text-red-500 text-sm mt-1">{betAmountError}</p>}
-                    </div>
-                    )}
-
-                    {isDetailsStep && isSportsSelected && (
-                        <div className="space-y-3">
-                            <div className="flex items-center gap-2">
-                                <label className="text-sm font-medium text-gray-700">Challenge Statement</label>
-                                <span className="relative group/info">
-                                    <svg className="w-4 h-4 text-gray-400 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    </svg>
-                                    <span className="absolute left-0 bottom-full mb-2 px-3 py-2 text-xs text-white bg-gray-800 rounded-lg opacity-0 group-hover/info:opacity-100 transition-opacity pointer-events-none z-20 w-max max-w-[260px]">
-                                        This is the statement on which you are taking a bet, it can be any prediction or outcome conviction related to the selected sport.
+                                        Coming soon
                                     </span>
                                 </span>
                             </div>
-                            <div className="relative">
-                                <input
-                                    required
-                                    type="text"
-                                    value={challengeStatement}
-                                    onChange={(e) => {
-                                        setChallengeStatement(e.target.value);
-                                        setValidation(prev => ({ ...prev, suggestions: [], selectedSuggestion: null, isValid: false }));
-                                        if (challengeStatementError) setChallengeStatementError(null);
-                                        if (txError) setTxError(null);
-                                    }}
-                                    placeholder={
-                                        marketState.selectedChild?.symbol?.toLowerCase() === 'cricket'
-                                            ? "e.g. rohit sharma will hit a six in todays MI vs RCB IPL match"
-                                            : marketState.selectedChild?.symbol?.toLowerCase() === 'football'
-                                                ? "e.g. real madrid will win fifa 2026"
-                                                : "Enter your challenge statement..."
-                                    }
-                                    disabled={Boolean(validation.selectedSuggestion)}
-                                    className={`w-full border border-[#e8d5c8] rounded-xl text-base sm:text-lg text-gray-900 placeholder:text-gray-400 placeholder:text-xs sm:placeholder:text-sm ${validation.selectedSuggestion ? "bg-gray-100 cursor-not-allowed px-3 sm:px-4 py-3 pr-16 sm:pr-20" : "bg-[#faf0eb] focus:outline-none focus:border-[#d4b8a8] px-3 sm:px-4 py-3"}`}
-                                />
-                                {validation.selectedSuggestion && (
+
+                            {marketType === "crypto" && (
+                                <div className="grid w-full grid-cols-2 border border-black/20 bg-white p-0.5 min-[430px]:inline-flex min-[430px]:w-auto" aria-label="Challenge format">
                                     <button
                                         type="button"
                                         onClick={() => {
-                                            setChallengeStatement("");
-                                            setValidation(prev => ({ ...prev, selectedSuggestion: null, suggestions: [], isValid: false, error: null }));
-                                            setChallengeStatementError(null);
-                                            if (txError) setTxError(null);
+                                            setChallengeFormat("price");
+                                            setFormError(null);
                                         }}
-                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-blue-700 hover:text-blue-800 underline"
+                                        className={`inline-flex h-8 items-center justify-center gap-1.5 px-2.5 text-[11px] font-black transition-colors ${challengeFormat === "price" ? "bg-[#e85a2d] text-white" : "text-[#6d5d55] hover:bg-[#f3e1d7]"}`}
+                                        aria-pressed={challengeFormat === "price"}
                                     >
-                                        Reset
+                                        <Activity className="h-3.5 w-3.5" /> Price
                                     </button>
-                                )}
-                            </div>
-                            {hasChallengeStatement && !validation.selectedSuggestion && (
-                                <div className="space-y-3">
-                                    <button
-                                        type="button"
-                                        className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-full font-semibold text-sm transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
-                                        onClick={handleValidateChallengeStatement}
-                                        disabled={validation.isLoading}
+                                    <span
+                                        className="group relative h-8"
+                                        tabIndex={0}
+                                        aria-label="Statement, coming soon"
                                     >
-                                        {validation.isLoading && (
-                                            <svg className="animate-spin w-4 h-4 text-white" fill="none" viewBox="0 0 24 24">
-                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                                            </svg>
-                                        )}
-                                        <span>{validation.isLoading ? "Validating statement..." : "Validate Statement"}</span>
-                                    </button>
+                                        <button
+                                            type="button"
+                                            disabled
+                                            aria-describedby="statement-coming-soon"
+                                            className="inline-flex h-full w-full cursor-not-allowed items-center justify-center gap-1.5 px-2.5 text-[11px] font-black text-[#6d5d55] opacity-45"
+                                        >
+                                            <Lock className="h-3 w-3" aria-hidden="true" />
+                                            <MessageSquareText className="h-3.5 w-3.5" /> Statement
+                                        </button>
+                                        <span
+                                            id="statement-coming-soon"
+                                            role="tooltip"
+                                            className="pointer-events-none absolute left-1/2 top-full z-20 mt-2 -translate-x-1/2 whitespace-nowrap border border-black bg-black px-2 py-1 text-[9px] font-black uppercase tracking-[0.08em] text-white opacity-0 shadow-[2px_2px_0_#e85a2d] transition-opacity group-hover:opacity-100 group-focus:opacity-100"
+                                        >
+                                            Coming soon
+                                        </span>
+                                    </span>
+                                </div>
+                            )}
 
-                                    {validation.suggestions.length > 0 && (
-                                        <div className="rounded-2xl border border-[#e8d5c8] bg-white p-4 space-y-3">
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-sm font-semibold text-gray-800">Suggested Valid Statements</span>
-                                                <span className="text-xs text-gray-500">Pick one to use</span>
-                                            </div>
-                                            <div className="space-y-2">
-                                                {validation.suggestions.map((suggestion: string, index: number) => (
+                            <span className="ml-auto hidden items-center gap-1 text-[10px] font-bold uppercase tracking-[0.08em] text-[#8b7a72] sm:inline-flex">
+                                {isPriceFeed ? <><Activity className="h-3 w-3" /> Auto resolved</> : <><ShieldCheck className="h-3 w-3" /> Community resolved</>}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div className="px-3 pb-3 pt-3 sm:px-5 sm:pb-5 sm:pt-5">
+                        <div className="min-w-0">
+                            <div className="flex min-w-0 items-center gap-3">
+                                <div className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-black bg-[#f5d547] text-sm font-black text-black">
+                                    <span>{(user?.username || "Y").charAt(0).toUpperCase()}</span>
+                                    {(user?.profile_image || user?.twitter_profile_image) && (
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        <img
+                                            src={user.profile_image || user.twitter_profile_image || ""}
+                                            alt={`${user.username || "User"} profile`}
+                                            className="absolute inset-0 h-full w-full object-cover"
+                                            onError={(event) => { event.currentTarget.style.display = "none"; }}
+                                        />
+                                    )}
+                                </div>
+                                <div className="min-w-0">
+                                    <div className="flex min-w-0 items-center gap-1.5">
+                                        <span className="truncate text-sm font-black text-[#17120f]">{user?.username || "You"}</span>
+                                        {(user?.user_type === "moderator" || user?.twitter_username) && (
+                                            <VerifiedBadge
+                                                isModerator={user.user_type === "moderator"}
+                                                twitterUsername={user.twitter_username}
+                                            />
+                                        )}
+                                    </div>
+                                    <p className="mt-0.5 text-[11px] font-semibold text-[#8b7a72]">challenges everyone</p>
+                                </div>
+                            </div>
+
+                            <div className="mt-3 min-w-0 pl-0 sm:pl-[52px]">
+
+                                {isPriceFeed ? (
+                                    <div className="min-h-28 py-1 sm:min-h-32 sm:py-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => setActivePanel("topic")}
+                                            className="mb-3 inline-flex items-center gap-1.5 border border-black/20 bg-[#f3e1d7] px-2 py-1 text-[11px] font-black text-[#594b44] hover:border-black"
+                                        >
+                                            <Coins className="h-3 w-3" /> {rawTopicLabel}
+                                        </button>
+                                        <div className="grid min-w-0 grid-cols-1 items-center gap-2 text-lg font-black leading-tight text-[#17120f] min-[430px]:flex min-[430px]:flex-wrap min-[430px]:gap-x-2 min-[430px]:gap-y-3 sm:text-2xl">
+                                            <span className="min-w-0 truncate">{topicLabel || "This asset"}</span>
+                                            <div className="grid w-full grid-cols-2 border-2 border-black bg-white p-0.5 min-[430px]:inline-flex min-[430px]:w-auto">
+                                                {(["Above", "Below"] as const).map((direction) => (
                                                     <button
-                                                        key={`${suggestion}-${index}`}
+                                                        key={direction}
                                                         type="button"
-                                                        className="cursor-pointer w-full text-left px-4 py-3 bg-[#fff9f5] border border-[#ead8cc] rounded-xl hover:bg-[#f7e8de] transition-colors text-sm text-gray-900"
                                                         onClick={() => {
-                                                            setChallengeStatement(suggestion);
-                                                            setValidation(prev => ({ ...prev, selectedSuggestion: suggestion, isValid: true, error: null }));
+                                                            setPredictionDirection(direction);
+                                                            if (assetPriceState.asset === selectedAssetSymbol && assetPriceState.currentPrice) {
+                                                                const targetPrice = assetPriceState.currentPrice * (direction === "Above" ? 1.1 : 0.9);
+                                                                setPredictionPrice(targetPriceInputValue(targetPrice));
+                                                            }
                                                         }}
+                                                        className={`px-2.5 py-1.5 text-sm font-black ${predictionDirection === direction ? direction === "Above" ? "bg-emerald-600 text-white" : "bg-[#e85a2d] text-white" : "text-[#77675f]"}`}
                                                     >
-                                                        {suggestion}
+                                                        {direction.toLowerCase()}
                                                     </button>
                                                 ))}
                                             </div>
+                                            <label className="relative inline-flex w-full min-w-0 max-w-none flex-1 items-center border-b-2 border-black min-[430px]:min-w-32 min-[430px]:max-w-48">
+                                                <span className="text-[#8b7a72]">$</span>
+                                                <input
+                                                    ref={priceRef}
+                                                    type="number"
+                                                    inputMode="decimal"
+                                                    min="0"
+                                                    step="any"
+                                                    value={predictionPrice}
+                                                    disabled={isAssetPriceLoading}
+                                                    onChange={(event) => {
+                                                        setPredictionPrice(event.target.value);
+                                                        setFormError(null);
+                                                    }}
+                                                    className="create-challenge-composer-input min-w-0 flex-1 border-0 bg-transparent px-1 py-1 text-xl font-black text-black outline-none placeholder:text-[#b7a9a2] disabled:cursor-not-allowed disabled:opacity-60 sm:text-2xl"
+                                                    placeholder={isAssetPriceLoading ? "loading" : "target"}
+                                                    aria-label="Target price"
+                                                    aria-busy={isAssetPriceLoading}
+                                                />
+                                                {isAssetPriceLoading && <Loader2 className="h-4 w-4 shrink-0 animate-spin text-[#8b7a72]" />}
+                                                {hasAssetPriceError && <span className="shrink-0 text-xs font-black text-[#e85a2d]" title="Price unavailable">!</span>}
+                                             </label>
+                                         </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                if (!selectedAssetSymbol) {
+                                                    setActivePanel("topic");
+                                                    return;
+                                                }
+                                                setIsAdvancedPickerOpen((current) => !current);
+                                            }}
+                                            aria-expanded={isAdvancedPickerOpen}
+                                            className={`mt-3 flex w-full items-center justify-between gap-3 border px-3 py-2 text-left transition-colors ${isAdvancedPickerOpen ? "border-black bg-[#f5d547] text-black" : "border-black/15 bg-[#f8ede7] text-[#594b44] hover:border-black"}`}
+                                        >
+                                            <span className="flex min-w-0 items-center gap-2">
+                                                <Activity className="h-3.5 w-3.5 shrink-0" />
+                                                <span>
+                                                    <span className="block text-[10px] font-black uppercase tracking-[0.1em]">Advanced mode</span>
+                                                    <span className="mt-0.5 block text-[9px] font-bold opacity-65">
+                                                        {selectedAssetSymbol ? "Analyze candles and place a visual target" : "Choose an asset to open the chart"}
+                                                    </span>
+                                                </span>
+                                            </span>
+                                            <ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${isAdvancedPickerOpen ? "rotate-180" : ""}`} />
+                                        </button>
+                                        {isAdvancedPickerOpen && selectedAssetSymbol && (
+                                            <div className="mt-4">
+                                                {isAssetPriceLoading ? (
+                                                    <div className="flex h-44 items-center justify-center border-2 border-black/15 bg-[#f8ede7] text-[#8b7a72]">
+                                                        <Loader2 className="h-5 w-5 animate-spin" />
+                                                        <span className="ml-2 text-xs font-black">Loading market chart</span>
+                                                    </div>
+                                                ) : assetPriceState.status === "ready" && assetPriceState.currentPrice ? (
+                                                    <TargetPricePicker
+                                                        asset={selectedAssetSymbol}
+                                                        candles={assetPriceState.candles}
+                                                        currentPrice={assetPriceState.currentPrice}
+                                                        targetPrice={Number(predictionPrice)}
+                                                        direction={predictionDirection}
+                                                        range={chartRange}
+                                                        onRangeChange={setChartRange}
+                                                        onTargetChange={(nextTarget) => {
+                                                            setPredictionPrice(targetPriceInputValue(nextTarget));
+                                                            setPredictionDirection(nextTarget >= assetPriceState.currentPrice! ? "Above" : "Below");
+                                                            setFormError(null);
+                                                        }}
+                                                    />
+                                                ) : null}
+                                            </div>
+                                        )}
+                                         <p className="mt-4 inline-flex items-center gap-1.5 text-xs font-bold text-[#7c6b63]">
+                                             <CalendarDays className="h-3.5 w-3.5 text-[#e85a2d]" /> by {formatDate(selectedDate)}
+                                         </p>
+                                    </div>
+                                ) : (
+                                    <div>
+                                        <textarea
+                                            ref={statementRef}
+                                            value={statement}
+                                            onChange={(event) => {
+                                                setStatement(event.target.value);
+                                                setFormError(null);
+                                            }}
+                                            maxLength={MAX_STATEMENT_LENGTH}
+                                            rows={5}
+                                            autoFocus
+                                            placeholder={marketType === "sports" ? "India wins the next match..." : "ETH flips BTC this cycle..."}
+                                            className="create-challenge-composer-input min-h-28 w-full resize-none border-0 bg-transparent p-0 text-base font-bold leading-relaxed text-[#17120f] outline-none placeholder:font-semibold placeholder:text-[#a99991] sm:min-h-32 sm:text-xl"
+                                            aria-label="Challenge statement"
+                                        />
+                                        <div className="flex justify-end text-[10px] font-bold text-[#9a8981]">
+                                            {statement.length}/{MAX_STATEMENT_LENGTH}
                                         </div>
-                                    )}
-                                </div>
-                            )}
-                            {validation.isValid && isSportsSelectionComplete && !validation.isLoading && (
-                                <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 text-sm text-green-700">
-                                    Your statement has been validated. Use Reset to edit again or proceed to create the challenge.
-                                </div>
-                            )}
-                            {validation.error && (
-                                <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
-                                    {validation.error}
-                                </div>
-                            )}
-                            {challengeStatementError && <p className="text-red-500 text-sm mt-1">{challengeStatementError}</p>}
-                        </div>
-                    )}
+                                    </div>
+                                )}
 
-                    {isDetailsStep && !isSportsSelected && (
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium text-gray-700">Predict Price Movement</label>
-                            <div className="flex flex-col min-[380px]:flex-row gap-2">
-                                <div className="relative flex-1" ref={dropdownRefs.direction}>
-                                    <button 
-                                        onClick={() => setOpenDropdown(prev => prev === 'direction' ? null : 'direction')} 
-                                        className="w-full flex items-center justify-between px-3 sm:px-4 py-3 bg-[#faf0eb] border border-[#e8d5c8] rounded-xl hover:border-[#d4b8a8] transition-colors"
-                                    >
-                                        <span className="font-semibold text-sm sm:text-base text-gray-900 truncate pr-2">{marketState.selectedChild?.name} {predictionDirection}</span>
-                                        <svg className={`w-5 h-5 text-gray-500 transition-transform ${openDropdown === 'direction' ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                        </svg>
-                                    </button>
-                                    {openDropdown === 'direction' && (
-                                        <div className="absolute top-full left-0 right-0 mt-1 bg-[#faf0eb] border border-[#e8d5c8] rounded-xl shadow-lg z-10 overflow-hidden">
-                                            {["Above", "Below"].map((dir) => (
-                                                <button 
-                                                    key={dir} 
-                                                    onClick={() => { 
-                                                        setPredictionDirection(dir); 
-                                                        setOpenDropdown(null); 
-                                                    }} 
-                                                    className="w-full px-4 py-3 text-left hover:bg-[#f3e1d7] transition-colors font-medium text-gray-900"
+                                <div className="mt-3 border-t-2 border-black/15 pt-3" aria-label="Challenge setup options">
+                                    <div className="mb-2 flex items-center justify-between gap-3">
+                                        <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#302722]">Challenge setup</p>
+                                        <p className="text-[9px] font-bold text-[#8b7a72]">Tap an option to edit</p>
+                                    </div>
+                                    <div className="grid grid-cols-6 gap-2">
+                                        <ComposerButton
+                                            icon={marketType === "crypto" ? Coins : Trophy}
+                                            caption="Asset"
+                                            label={topicLabel}
+                                            isActive={activePanel === "topic"}
+                                            onClick={() => togglePanel("topic")}
+                                            layoutClassName="col-span-2"
+                                        />
+                                        <ComposerButton
+                                            icon={CircleDollarSign}
+                                            caption="Stake"
+                                            label={`${betAmount || 0} USDC`}
+                                            isActive={activePanel === "stake"}
+                                            onClick={() => togglePanel("stake")}
+                                            layoutClassName="col-span-2"
+                                        />
+                                        <ComposerButton
+                                            icon={Clock3}
+                                            caption="Window"
+                                            label={formatDuration(duration)}
+                                            isActive={activePanel === "window"}
+                                            onClick={() => togglePanel("window")}
+                                            layoutClassName="col-span-2"
+                                        />
+                                        <ComposerButton
+                                            icon={CalendarDays}
+                                            caption="Resolves by"
+                                            label={formatDate(selectedDate)}
+                                            isActive={activePanel === "resolution"}
+                                            onClick={() => togglePanel("resolution")}
+                                            layoutClassName="col-span-3"
+                                        />
+                                        <ComposerButton
+                                            icon={challengeMode === "pvp" ? Swords : Users}
+                                            caption="Mode"
+                                            label={challengeMode === "pvp" ? "1 vs 1" : "Teams"}
+                                            isActive={activePanel === "players"}
+                                            onClick={() => togglePanel("players")}
+                                            layoutClassName="col-span-3"
+                                        />
+                                    </div>
+                                    <label className="mt-2.5 inline-flex cursor-pointer items-center gap-2 text-[10px] font-bold text-[#6d5d55] hover:text-[#302722]">
+                                        <input
+                                            type="checkbox"
+                                            checked={rememberSettings}
+                                            onChange={(event) => {
+                                                const shouldRemember = event.target.checked;
+                                                setRememberSettings(shouldRemember);
+                                                if (!shouldRemember) {
+                                                    window.localStorage.removeItem(CREATE_SETTINGS_KEY);
+                                                }
+                                            }}
+                                            className="h-3.5 w-3.5 cursor-pointer accent-[#11895a]"
+                                        />
+                                        Remember these settings for my next challenge
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        {activePanel && (
+                            <div className="mt-3 border-2 border-black bg-[#f8ede7] p-3 sm:mt-4 sm:p-4">
+                                {activePanel === "topic" && (
+                                    <div>
+                                        <PanelHeading>{marketType === "crypto" ? "Asset" : "Sport"}</PanelHeading>
+                                        {isLoadingCategories ? (
+                                            <div className="flex h-16 items-center justify-center text-[#7b6a62]">
+                                                <Loader2 className="h-5 w-5 animate-spin" />
+                                            </div>
+                                        ) : childCategories.length > 0 ? (
+                                            <div className="flex max-h-36 flex-wrap gap-2 overflow-y-auto">
+                                                {childCategories.map((category) => {
+                                                    const isSelected = selectedChildCategory?.id === category.id;
+                                                    return (
+                                                        <button
+                                                            key={category.id}
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setSelectedChildCategory(category);
+                                                                if (marketType === "crypto" && category.id !== selectedChildCategory?.id) {
+                                                                    setPredictionPrice("");
+                                                                    setPredictionDirection("Above");
+                                                                }
+                                                                setFormError(null);
+                                                                setActivePanel(null);
+                                                            }}
+                                                            className={`inline-flex max-w-full items-center gap-1.5 break-words border-2 px-3 py-2 text-left text-xs font-black transition-all ${isSelected ? "border-black bg-[#f5d547] text-black shadow-[2px_2px_0_#111]" : "border-black/20 bg-white text-[#594b44] hover:border-black"}`}
+                                                        >
+                                                            {isSelected && <Check className="h-3.5 w-3.5" />}
+                                                            {stripUsdcQuote(category.category)}
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        ) : (
+                                            <p className="py-3 text-xs font-bold text-[#7b6a62]">
+                                                {marketType === "sports" ? "Your statement can cover any sport." : categoryError || "No assets available."}
+                                            </p>
+                                        )}
+                                    </div>
+                                )}
+
+                                {activePanel === "stake" && (
+                                    <div>
+                                        <PanelHeading>Stake</PanelHeading>
+                                        <div className="grid grid-cols-4 items-center gap-2">
+                                            {[1, 5, 10, 25].map((amount) => (
+                                                <button
+                                                    key={amount}
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setBetAmount(amount);
+                                                        setFormError(null);
+                                                        setBalanceShortfall(null);
+                                                    }}
+                                                    className={`h-10 min-w-0 border-2 px-1 text-xs font-black sm:px-3 ${betAmount === amount ? "border-black bg-[#f5d547] shadow-[2px_2px_0_#111]" : "border-black/20 bg-white hover:border-black"}`}
                                                 >
-                                                    {marketState.selectedChild?.name} {dir}
+                                                    ${amount}
+                                                </button>
+                                            ))}
+                                            <label className="relative col-span-4 min-w-0 sm:col-span-4">
+                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-black text-[#75645c]">$</span>
+                                                <input
+                                                    type="number"
+                                                    min="1"
+                                                    step="1"
+                                                    value={betAmount}
+                                                    onChange={(event) => {
+                                                        setBetAmount(Number(event.target.value));
+                                                        setFormError(null);
+                                                        setBalanceShortfall(null);
+                                                    }}
+                                                    className="h-11 w-full border-2 border-black bg-white pl-7 pr-14 text-base font-black outline-none sm:h-10 sm:text-sm"
+                                                    aria-label="Custom stake"
+                                                />
+                                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-[#8b7a72]">USDC</span>
+                                            </label>
+                                        </div>
+                                        {/* <p className="mt-3 text-[11px] font-bold text-[#77675f]">
+                                            {challengeMode === "pvp"
+                                                ? `${estimatedPvpPool.toFixed(2)} USDC pot · ${estimatedPayout.toFixed(2)} to winner`
+                                                : `Pool starts at ${Number.isFinite(betAmount) ? betAmount : 0} USDC`}
+                                        </p> */}
+                                    </div>
+                                )}
+
+                                {activePanel === "window" && (
+                                    <div>
+                                        <PanelHeading info="The challenge expires in the selected window time, no participant can join and you will get refunded.">
+                                            Join window
+                                        </PanelHeading>
+                                        <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
+                                            {[
+                                                { label: "15m", minutes: 15 },
+                                                { label: "1h", minutes: 60 },
+                                                { label: "4h", minutes: 240 },
+                                                { label: "1d", minutes: 1440 },
+                                                { label: "3d", minutes: 4320 },
+                                                { label: "7d", minutes: 10080 },
+                                            ].map((option) => (
+                                                <button
+                                                    key={option.minutes}
+                                                    type="button"
+                                                    onClick={() => handleDurationChange(durationFromMinutes(option.minutes))}
+                                                    className={`h-9 min-w-0 border-2 px-2 text-xs font-black sm:min-w-12 sm:px-3 ${totalDurationMinutes === option.minutes ? "border-black bg-[#f5d547] shadow-[2px_2px_0_#111]" : "border-black/20 bg-white hover:border-black"}`}
+                                                >
+                                                    {option.label}
                                                 </button>
                                             ))}
                                         </div>
-                                    )}
-                                </div>
-                                <div className="relative w-full min-[380px]:w-32">
-                                    <span className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 text-gray-500 text-base sm:text-lg">$</span>
-                                    <input 
-                                        type="number" 
-                                        value={predictionPrice} 
-                                        onChange={(e) => setPredictionPrice(e.target.value)} 
-                                        className="w-full pl-7 sm:pl-8 pr-3 sm:pr-4 py-3 bg-[#faf0eb] border border-[#e8d5c8] rounded-xl text-base sm:text-lg font-semibold text-gray-900 focus:outline-none focus:border-[#d4b8a8]" 
-                                        placeholder="66500" 
-                                    />
-                                </div>
+                                    </div>
+                                )}
+
+                                {activePanel === "resolution" && (
+                                    <div>
+                                        <PanelHeading info="The challenge will resolve on or before the selected time.">
+                                            Resolves by
+                                        </PanelHeading>
+                                        <label className="block">
+                                            <span className="sr-only">Resolution date and time</span>
+                                            <span className="flex items-center gap-2 border-2 border-black/20 bg-white px-3 focus-within:border-black">
+                                                <CalendarDays className="h-4 w-4 shrink-0 text-[#e85a2d]" />
+                                                <input
+                                                    type="datetime-local"
+                                                    required
+                                                    step={60}
+                                                    value={toDateTimeLocalValue(selectedDate)}
+                                                    min={toDateTimeLocalValue(minResolutionDate)}
+                                                    max={toDateTimeLocalValue(maxResolutionDate)}
+                                                    onChange={(event) => handleResolutionDateChange(new Date(event.target.value))}
+                                                    className="create-challenge-date-input h-12 w-full min-w-0 flex-1 border-0 bg-transparent text-base font-black text-black outline-none sm:h-11 sm:text-xs"
+                                                />
+                                            </span>
+                                        </label>
+                                    </div>
+                                )}
+
+                                {activePanel === "players" && (
+                                    <div>
+                                        <PanelHeading>Select mode</PanelHeading>
+                                        <div className="grid grid-cols-1 gap-2 min-[380px]:grid-cols-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setChallengeMode("pvp");
+                                                    setActivePanel(null);
+                                                }}
+                                                className={`flex items-center gap-3 border-2 p-3 text-left ${challengeMode === "pvp" ? "border-black bg-black text-white shadow-[3px_3px_0_#f5d547]" : "border-black/20 bg-white text-black hover:border-black"}`}
+                                            >
+                                                <Swords className="h-5 w-5 shrink-0" />
+                                                <span>
+                                                    <span className="block text-xs font-black">1 vs 1</span>
+                                                    <span className={`text-[10px] font-bold ${challengeMode === "pvp" ? "text-white/65" : "text-[#8b7a72]"}`}>PvP Mode</span>
+                                                </span>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                disabled
+                                                aria-label="Team mode coming soon"
+                                                className="flex cursor-not-allowed items-center gap-3 border-2 border-black/10 bg-black/5 p-3 text-left text-black/40"
+                                            >
+                                                <Users className="h-5 w-5 shrink-0" />
+                                                <span className="min-w-0 flex-1">
+                                                    <span className="block text-xs font-black">Team</span>
+                                                    <span className="text-[10px] font-bold">Coming soon</span>
+                                                </span>
+                                                <Lock className="h-4 w-4 shrink-0" aria-hidden="true" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
-                        </div>
-                    )}
+                        )}
 
-                    {isDetailsStep && (
-                    <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                            <label className="text-sm font-medium text-gray-700">Challenge Expires In</label>
-                            <span className="relative group/info">
-                                <svg className="w-4 h-4 text-gray-400 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                                <span className="absolute left-0 bottom-full mb-2 px-3 py-2 text-xs text-white bg-gray-800 rounded-lg opacity-0 group-hover/info:opacity-100 transition-opacity pointer-events-none z-20 w-max max-w-[200px]">
-                                    Your challenge will expire in the selected time. If not accepted, your bet amount will be refunded.
-                                </span>
-                            </span>
-                        </div>
-                        <button onClick={() => setIsDurationPickerOpen(true)} className="w-full flex items-center justify-between px-3 sm:px-4 py-3 bg-[#faf0eb] border border-[#e8d5c8] rounded-xl hover:border-[#d4b8a8] transition-colors">
-                            <span className="font-medium text-sm sm:text-base text-gray-900 pr-2 break-words">{formatDuration(duration)}</span>
-                            <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                            </svg>
-                        </button>
-                    </div>
-                    )}
-
-                    {isDetailsStep && (!isSportsSelected ? (
-                        <div className="space-y-2">
-                            <div className="flex items-center gap-2">
-                                <label className="text-sm font-medium text-gray-700">Challenge End Date</label>
-                                <span className="relative group/info">
-                                    <svg className="w-4 h-4 text-gray-400 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    </svg>
-                                    <span className="absolute left-0 bottom-full mb-2 px-3 py-2 text-xs text-white bg-gray-800 rounded-lg opacity-0 group-hover/info:opacity-100 transition-opacity pointer-events-none z-20 w-max max-w-[200px]">
-                                        The challenges will get resolved on this exact selected date and time OR when the price event is triggered whichever comes first.
-                                    </span>
-                                </span>
+                        {formError && (
+                            <div role="alert" className="mt-3 flex items-start gap-2 border border-red-300 bg-red-50 px-3 py-2 text-xs font-bold text-red-700">
+                                <span className="mt-1 h-1.5 w-1.5 shrink-0 bg-red-600" />
+                                {formError}
                             </div>
-                            <button onClick={() => setIsDatePickerOpen(true)} className="w-full flex items-center justify-between px-3 sm:px-4 py-3 bg-[#faf0eb] border border-[#e8d5c8] rounded-xl hover:border-[#d4b8a8] transition-colors gap-2">
-                                <span className="font-medium text-sm sm:text-base text-gray-900 break-words text-left">{formatDate(selectedDate)}</span>
-                                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                </svg>
-                            </button>
-                        </div>
-                    ) : (
-                        <div className="space-y-1">
-                            <label className="flex items-start gap-2 p-3 bg-[#faf0eb] border border-[#e8d5c8] rounded-xl cursor-pointer">
-                                <input
-                                    type="checkbox"
-                                    checked={sportsResolutionConsent}
-                                    onChange={(e) => {
-                                        setSportsResolutionConsent(e.target.checked);
-                                        if (e.target.checked) setSportsResolutionConsentError(null);
-                                        if (txError) setTxError(null);
-                                    }}
-                                    className="mt-0.5 h-4 w-4 rounded border-[#d4b8a8] text-gray-900 focus:ring-gray-700"
-                                />
-                                <span className="text-xs font-medium text-gray-700">
-                                    Challenge will end after the selected sport event is completed and will be resolved by the community based on the outcome of the challenge statement posted by you.
-                                </span>
-                            </label>
-                            {sportsResolutionConsentError && <p className="text-red-500 text-sm mt-1">{sportsResolutionConsentError}</p>}
-                        </div>
-                    ))}
-
-                    {isDetailsStep && (
-                    <div className="text-center py-2 px-1 sm:px-2">
-                        {isSportsSelected ? (
-                            <p className="text-sm sm:text-base text-gray-700 break-words">
-                                You win <span className="font-bold text-gray-900">${(betAmount * 2 * 0.975).toFixed(4)}</span> if your statement is correct
-                            </p>
-                        ) : (
-                            <p className="text-sm sm:text-base text-gray-700 break-words">
-                                You win <span className="font-bold text-gray-900">${(betAmount * 2 * 0.975).toFixed(4)}</span> if {marketState.selectedChild?.symbol} closes {predictionDirection.toLowerCase()} ${Number(predictionPrice).toLocaleString()} in {formatDuration(duration)}
-                            </p>
                         )}
-                        <p className="text-xs text-gray-500 mt-1">6% platform fee applies</p>
-                    </div>
-                    )}
-
-                    {isDetailsStep && txStatus === "error" && txError && (
-                        <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
-                            ⚠️ {txError}
-                        </div>
-                    )}
-
-                    {isDetailsStep && txStatus === "success" && txSignature && (
-                        <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 text-sm text-green-700">
-                            <p className="font-semibold">✅ Challenge created on-chain!</p>
-                            <a
-                                href={`https://explorer.solana.com/tx/${txSignature}?cluster=devnet`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-green-600 underline break-all text-xs mt-1 block"
-                            >
-                                View on Solana Explorer ↗
-                            </a>
-                        </div>
-                    )}
-
-                    {isDetailsStep && isLoading && (
-                        <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-sm text-blue-700 flex items-center gap-2">
-                            <svg className="animate-spin w-4 h-4 text-blue-500 flex-shrink-0" fill="none" viewBox="0 0 24 24">
-                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                            </svg>
-                            <span>
-                                {txStatus === "building" && "Building transaction..."}
-                                {txStatus === "signing" && "Please approve in your wallet..."}
-                                {txStatus === "confirming" && "Confirming on Solana devnet..."}
-                            </span>
-                        </div>
-                    )}
-
-                    <div className="flex flex-col sm:flex-row gap-3 pt-1">
-                        {!isModeStep && (
-                            <button
-                                type="button"
-                                onClick={goToPreviousStep}
-                                disabled={isLoading}
-                                className="w-full sm:w-32 py-3 border-2 border-black bg-white text-gray-900 font-black text-base shadow-[2px_2px_0_#111] hover:bg-[#f3e1d7] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-                            >
-                                Back
-                            </button>
-                        )}
-                        {!isDetailsStep ? (
-                            <button
-                                type="button"
-                                onClick={goToNextStep}
-                                disabled={!marketState.selected && isCategoryStep}
-                                className="rekto-button cursor-pointer w-full py-3 sm:py-4 bg-gray-900 hover:bg-gray-700 text-white font-black text-base sm:text-lg transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
-                            >
-                                Continue
-                            </button>
-                        ) : (
-                            <button
-                                onClick={handleCreateChallenge}
-                                disabled={isLoading || txStatus === "success" || (isSportsSelected && (!validation.isValid || !isSportsSelectionComplete))}
-                                className={getButtonStyle()}
-                            >
-                                {getButtonLabel()}
-                            </button>
+                        {balanceShortfall !== null && (
+                            <div className="mt-3 flex flex-col gap-3 border-2 border-black bg-amber-50 px-3 py-3 sm:flex-row sm:items-center">
+                                <CircleDollarSign className="h-5 w-5 shrink-0 text-amber-700" />
+                                <div className="min-w-0 flex-1">
+                                    <p className="text-sm font-black text-amber-950">Deposit USDC to continue</p>
+                                    <p className="text-xs font-medium text-amber-800">
+                                        Add at least {balanceShortfall.toLocaleString(undefined, { maximumFractionDigits: 6 })} USDC, then create the challenge again.
+                                    </p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={handleDeposit}
+                                    className="inline-flex shrink-0 cursor-pointer items-center justify-center gap-1.5 border-2 border-black bg-black px-3 py-2 text-xs font-black text-white transition hover:bg-[#27211e] hover:shadow-[2px_2px_0_#e85a2d]"
+                                >
+                                    <CircleDollarSign className="h-4 w-4" />
+                                    Deposit funds
+                                </button>
+                            </div>
                         )}
                     </div>
                 </div>
+
+                <footer className="flex shrink-0 items-center gap-3 border-t-2 border-black bg-[#f3e1d7] px-3 py-2.5 sm:px-5 sm:py-3">
+                    <div className="hidden min-w-0 flex-1 sm:block">
+                        <p className="truncate text-xs font-black text-[#17120f]">
+                            {marketType === "crypto" ? "Crypto" : "Sports"} · {isPriceFeed ? "Price" : "Statement"} · {challengeMode === "pvp" ? "1 vs 1" : "Teams"}
+                        </p>
+                        <p className="mt-0.5 text-[10px] font-bold text-[#7b6a62]">
+                            {betAmount || 0} USDC · closes in {formatDuration(duration)}
+                        </p>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={handleOpenPreview}
+                        disabled={isSubmitting}
+                        className="inline-flex h-11 shrink-0 cursor-pointer items-center justify-center gap-1.5 border-2 border-black bg-white px-3 text-xs font-black text-black transition-colors hover:bg-[#f5d547] disabled:cursor-not-allowed disabled:opacity-60 sm:px-4"
+                    >
+                        <Eye className="h-4 w-4" />
+                        <span>Preview</span>
+                    </button>
+                    <button
+                        type="button"
+                        onClick={handleCreateChallenge}
+                        disabled={isSubmitting || txStatus === "success"}
+                        className="rekto-button ml-auto inline-flex h-11 min-w-0 flex-1 cursor-pointer items-center justify-center gap-2 border-2 border-black bg-black px-3 text-sm font-black text-white transition-all hover:-translate-y-0.5 hover:bg-[#27211e] hover:shadow-[3px_3px_0_#e85a2d] disabled:cursor-not-allowed disabled:opacity-60 sm:flex-none sm:px-5 sm:min-w-44"
+                    >
+                        {isSubmitting ? (
+                            <><Loader2 className="h-4 w-4 animate-spin" /> {statusLabel}</>
+                        ) : !isConnected ? (
+                            <><Wallet className="h-4 w-4" /> Connect & create</>
+                        ) : (
+                            <><Zap className="h-4 w-4 fill-white" /> Create challenge</>
+                        )}
+                    </button>
+                </footer>
+
+                {isPreviewOpen && (
+                    <div className="absolute inset-0 z-30 flex min-h-0 flex-col bg-[#fffaf6]">
+                        <header className="flex shrink-0 items-center justify-between border-b-2 border-black px-3 py-2.5 sm:px-5 sm:py-3.5">
+                            <div className="flex items-center gap-2.5">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsPreviewOpen(false)}
+                                    className="flex h-8 w-8 cursor-pointer items-center justify-center border-2 border-black bg-white transition-colors hover:bg-[#f5d547] sm:h-9 sm:w-9"
+                                    aria-label="Back to editor"
+                                >
+                                    <ArrowLeft className="h-4 w-4" />
+                                </button>
+                                <div>
+                                    <h2 className="text-base font-black text-[#17120f] sm:text-lg">Challenge preview</h2>
+                                    <p className="text-[11px] font-bold text-[#7a6961]">This is how your call will appear.</p>
+                                </div>
+                            </div>
+                            <span className="border border-black/20 bg-[#f5d547] px-2 py-1 text-[9px] font-black uppercase tracking-[0.1em]">Preview</span>
+                        </header>
+
+                        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 sm:p-5">
+                            <ChallengePreview
+                                user={user}
+                                marketType={marketType}
+                                isPriceFeed={isPriceFeed}
+                                challengeMode={challengeMode}
+                                pairTag={rawTopicLabel}
+                                categoryImage={selectedChildCategory?.image_url}
+                                title={isPriceFeed ? generatedStatement : statement.trim()}
+                                betAmount={betAmount}
+                                duration={duration}
+                                resolutionDate={selectedDate}
+                            />
+                        </div>
+
+                        <footer className="flex shrink-0 gap-2 border-t-2 border-black bg-[#f3e1d7] px-3 py-2.5 sm:gap-3 sm:px-5 sm:py-3">
+                            <button
+                                type="button"
+                                onClick={() => setIsPreviewOpen(false)}
+                                disabled={isSubmitting}
+                                className="inline-flex h-11 min-w-24 cursor-pointer items-center justify-center gap-2 border-2 border-black bg-white px-3 text-xs font-black text-black hover:bg-[#f5d547] disabled:opacity-60"
+                            >
+                                <ArrowLeft className="h-4 w-4" /> Edit
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleCreateChallenge}
+                                disabled={isSubmitting}
+                                className="rekto-button inline-flex h-11 min-w-0 flex-1 cursor-pointer items-center justify-center gap-2 border-2 border-black bg-black px-3 text-sm font-black text-white hover:bg-[#27211e] disabled:cursor-not-allowed disabled:opacity-60 sm:flex-none sm:px-5 sm:min-w-48"
+                            >
+                                {isSubmitting ? (
+                                    <><Loader2 className="h-4 w-4 animate-spin" /> {statusLabel}</>
+                                ) : !isConnected ? (
+                                    <><Wallet className="h-4 w-4" /> Connect & create</>
+                                ) : (
+                                    <><Zap className="h-4 w-4 fill-white" /> Create challenge</>
+                                )}
+                            </button>
+                        </footer>
+                    </div>
+                )}
+            </section>
+
+            <style jsx global>{`
+                .pixel-shell .create-challenge-modal .create-challenge-composer-input,
+                .pixel-shell .create-challenge-modal .create-challenge-date-input {
+                    border: 0 !important;
+                    border-radius: 0 !important;
+                    background: transparent !important;
+                    box-shadow: none !important;
+                }
+
+                .pixel-shell .create-challenge-modal .create-challenge-composer-input:focus,
+                .pixel-shell .create-challenge-modal .create-challenge-date-input:focus {
+                    border: 0 !important;
+                    box-shadow: none !important;
+                }
+
+                .create-challenge-modal {
+                    min-width: 0;
+                }
+
+                .create-challenge-date-input::-webkit-date-and-time-value {
+                    min-width: 0;
+                    text-align: left;
+                }
+
+                @media (max-width: 639px) {
+                    .create-challenge-modal {
+                        max-height: calc(100vh - 1.5rem);
+                    }
+
+                    @supports (height: 100dvh) {
+                        .create-challenge-modal {
+                            max-height: calc(100dvh - 1.5rem);
+                        }
+                    }
+                }
+
+                @media (min-width: 380px) and (max-width: 639px) {
+                    .create-challenge-modal {
+                        max-height: calc(100vh - 2rem);
+                    }
+
+                    @supports (height: 100dvh) {
+                        .create-challenge-modal {
+                            max-height: calc(100dvh - 2rem);
+                        }
+                    }
+                }
+            `}</style>
+
+        </div>,
+        document.body,
+    );
+}
+
+function ComposerButton({
+    icon: Icon,
+    caption,
+    label,
+    isActive,
+    onClick,
+    layoutClassName,
+}: {
+    icon: typeof Coins;
+    caption: string;
+    label: string;
+    isActive: boolean;
+    onClick: () => void;
+    layoutClassName?: string;
+}) {
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            aria-pressed={isActive}
+            title={`${caption}: ${label}`}
+            className={`group relative inline-flex min-h-16 min-w-0 items-center gap-2 border-2 px-2.5 py-2 text-left transition-all ${layoutClassName ?? ""} ${isActive
+                ? "border-black bg-[#f5d547] text-black shadow-[3px_3px_0_#111]"
+                : "border-black/30 bg-[#fffaf7] text-[#302722] hover:border-black hover:bg-[#fff5c2]"
+                }`}
+        >
+            <span className={`flex h-7 w-7 shrink-0 items-center justify-center border ${isActive ? "border-black bg-black text-[#f5d547]" : "border-black/20 bg-white text-[#e85a2d] group-hover:border-black"}`}>
+                <Icon className="h-4 w-4" strokeWidth={2.4} />
+            </span>
+            <span className="min-w-0 flex-1">
+                <span className="block whitespace-nowrap text-[9px] font-black uppercase leading-none tracking-[0.08em] text-[#75655d]">
+                    {caption}
+                </span>
+                <span className="mt-1.5 block break-words text-[11px] font-black leading-tight text-[#17120f]">
+                    {label}
+                </span>
+            </span>
+            {isActive ? <span className="absolute right-1 top-1 h-1.5 w-1.5 bg-black" aria-hidden="true" /> : null}
+        </button>
+    );
+}
+
+function TargetPricePicker({
+    asset,
+    candles,
+    currentPrice,
+    targetPrice,
+    direction,
+    range,
+    onRangeChange,
+    onTargetChange,
+}: {
+    asset: string;
+    candles: MarketCandle[];
+    currentPrice: number;
+    targetPrice: number;
+    direction: "Above" | "Below";
+    range: ChartRange;
+    onRangeChange: (range: ChartRange) => void;
+    onTargetChange: (target: number) => void;
+}) {
+    const chartContainerRef = useRef<HTMLDivElement>(null);
+    const chartApiRef = useRef<ReturnType<typeof createChart> | null>(null);
+    const candleSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
+    const targetLineRef = useRef<IPriceLine | null>(null);
+    const onTargetChangeRef = useRef(onTargetChange);
+    const [interactionMode, setInteractionMode] = useState<"analyze" | "target">("analyze");
+    const selectedTarget = Number.isFinite(targetPrice) && targetPrice > 0 ? targetPrice : currentPrice;
+    const targetChange = currentPrice > 0 ? ((selectedTarget - currentPrice) / currentPrice) * 100 : 0;
+    const targetStateRef = useRef({ price: selectedTarget, direction });
+    const bounds = getTargetPriceBounds(candles, currentPrice);
+
+    useEffect(() => {
+        onTargetChangeRef.current = onTargetChange;
+    }, [onTargetChange]);
+
+    useEffect(() => {
+        targetStateRef.current = { price: selectedTarget, direction };
+        targetLineRef.current?.applyOptions({
+            price: selectedTarget,
+            title: `${direction.toUpperCase()} TARGET`,
+        });
+    }, [direction, selectedTarget]);
+
+    useEffect(() => {
+        const container = chartContainerRef.current;
+        const priceBounds = getTargetPriceBounds(candles, currentPrice);
+        if (!container || !priceBounds) return;
+
+        const validCandles = candles
+            .filter((candle) => [candle.time, candle.open, candle.high, candle.low, candle.close].every(Number.isFinite))
+            .map((candle) => ({
+                time: Math.floor(candle.time / 1000) as UTCTimestamp,
+                open: candle.open,
+                high: candle.high,
+                low: candle.low,
+                close: candle.close,
+            }));
+        if (validCandles.length < 2) return;
+
+        const chartApi = createChart(container, {
+            autoSize: true,
+            layout: {
+                background: { type: ColorType.Solid, color: "#163f31" },
+                textColor: "rgba(255,255,255,.58)",
+                fontFamily: "inherit",
+                attributionLogo: true,
+            },
+            grid: {
+                vertLines: { color: "rgba(255,255,255,.07)" },
+                horzLines: { color: "rgba(255,255,255,.09)" },
+            },
+            crosshair: {
+                mode: CrosshairMode.Normal,
+                vertLine: { color: "rgba(255,255,255,.35)", labelBackgroundColor: "#246044" },
+                horzLine: { color: "rgba(255,255,255,.35)", labelBackgroundColor: "#246044" },
+            },
+            rightPriceScale: {
+                borderColor: "rgba(255,255,255,.15)",
+            },
+            timeScale: {
+                borderColor: "rgba(255,255,255,.15)",
+                timeVisible: true,
+                secondsVisible: false,
+                rightOffset: 1,
+                barSpacing: 12,
+                minBarSpacing: 1,
+            },
+            handleScroll: true,
+            handleScale: true,
+            localization: {
+                priceFormatter: (price: number) => formatPrice(String(price)),
+            },
+        });
+        chartApiRef.current = chartApi;
+        const candleSeries = chartApi.addSeries(CandlestickSeries, {
+            upColor: "#34d399",
+            downColor: "#fb7185",
+            borderUpColor: "#a7f3d0",
+            borderDownColor: "#fecdd3",
+            wickUpColor: "#6ee7b7",
+            wickDownColor: "#fda4af",
+            priceLineVisible: false,
+            lastValueVisible: false,
+        });
+        candleSeries.setData(validCandles);
+
+        const rangeSeries = chartApi.addSeries(LineSeries, {
+            color: "rgba(0,0,0,0)",
+            lineVisible: false,
+            crosshairMarkerVisible: false,
+            priceLineVisible: false,
+            lastValueVisible: false,
+        });
+        rangeSeries.setData([
+            { time: validCandles[0].time, value: priceBounds.minPrice },
+            { time: validCandles.at(-1)!.time, value: priceBounds.maxPrice },
+        ]);
+
+        candleSeries.createPriceLine({
+            price: currentPrice,
+            color: "rgba(255,255,255,.48)",
+            lineWidth: 1,
+            lineStyle: LineStyle.Dashed,
+            axisLabelVisible: true,
+            title: "CURRENT",
+        });
+        const initialTarget = targetStateRef.current;
+        targetLineRef.current = candleSeries.createPriceLine({
+            price: initialTarget.price,
+            color: "#f5d547",
+            lineWidth: 2,
+            lineStyle: LineStyle.Dashed,
+            axisLabelVisible: true,
+            title: `${initialTarget.direction.toUpperCase()} TARGET`,
+        });
+        candleSeriesRef.current = candleSeries;
+        chartApi.timeScale().fitContent();
+
+        return () => {
+            chartApiRef.current = null;
+            candleSeriesRef.current = null;
+            targetLineRef.current = null;
+            chartApi.remove();
+        };
+    }, [candles, currentPrice]);
+
+    const selectTargetFromPointer = (clientY: number) => {
+        const container = chartContainerRef.current;
+        const candleSeries = candleSeriesRef.current;
+        if (!container || !candleSeries || !bounds) return;
+        const coordinate = clientY - container.getBoundingClientRect().top;
+        const price = candleSeries.coordinateToPrice(coordinate);
+        if (typeof price !== "number" || !Number.isFinite(price)) return;
+        onTargetChangeRef.current(Math.max(bounds.minPrice, Math.min(bounds.maxPrice, price)));
+    };
+
+    const handleTargetPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+        event.currentTarget.setPointerCapture(event.pointerId);
+        selectTargetFromPointer(event.clientY);
+    };
+
+    const handleTargetPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+        if (event.currentTarget.hasPointerCapture(event.pointerId)) selectTargetFromPointer(event.clientY);
+    };
+
+    const zoomChart = (factor: number) => {
+        const timeScale = chartApiRef.current?.timeScale();
+        const visibleRange = timeScale?.getVisibleLogicalRange();
+        if (!timeScale || !visibleRange) return;
+        const center = (visibleRange.from + visibleRange.to) / 2;
+        const halfRange = ((visibleRange.to - visibleRange.from) * factor) / 2;
+        timeScale.setVisibleLogicalRange({ from: center - halfRange, to: center + halfRange });
+    };
+
+    const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+        if (!bounds || !["ArrowUp", "ArrowDown"].includes(event.key)) return;
+        event.preventDefault();
+        const change = currentPrice * 0.01 * (event.key === "ArrowUp" ? 1 : -1);
+        onTargetChange(Math.max(bounds.minPrice, Math.min(bounds.maxPrice, selectedTarget + change)));
+    };
+
+    if (!bounds) return null;
+
+    return (
+        <section className="overflow-hidden border-2 border-black bg-[#163f31] text-white">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/15 px-3 py-2.5 sm:px-4">
+                <div className="flex items-center gap-2">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center border border-white/20 bg-white/10">
+                        <Crosshair className="h-4 w-4" />
+                    </span>
+                    <div>
+                        <p className="text-[9px] font-black uppercase tracking-[0.12em] text-white/55">
+                            {interactionMode === "analyze" ? "Analyze the market" : "Pick your target"}
+                        </p>
+                        <p className="text-xs font-black sm:text-sm">
+                            {interactionMode === "analyze" ? "Pan, zoom and inspect the candles" : "Click or drag to move the target"}
+                        </p>
+                    </div>
+                </div>
+                <div className="text-right">
+                    <p className="text-[9px] font-black uppercase tracking-[0.1em] text-white/50">Current {asset}</p>
+                    <p className="text-sm font-black">{formatPrice(String(currentPrice))}</p>
+                </div>
             </div>
 
-            <DatePickerModal isOpen={isDatePickerOpen} onClose={() => setIsDatePickerOpen(false)} selectedDate={selectedDate} onSelectDate={setSelectedDate} />
-            <DurationPickerModal isOpen={isDurationPickerOpen} onClose={() => setIsDurationPickerOpen(false)} selectedDuration={duration} onSelectDuration={setDuration} />
+            <div className="grid gap-2 border-b border-white/15 bg-black/10 px-3 py-2 min-[460px]:grid-cols-2 sm:px-4">
+                <div className="flex min-w-0 items-center gap-2">
+                    <span className="hidden text-[9px] font-black uppercase tracking-[0.1em] text-white/50 min-[430px]:inline">Range</span>
+                    <div className="grid min-w-0 flex-1 grid-cols-4 border border-white/20 bg-black/15 p-0.5" aria-label="Market chart range">
+                        {(["24H", "7D", "30D", "3M"] as const).map((option) => (
+                            <button
+                                key={option}
+                                type="button"
+                                onClick={() => onRangeChange(option)}
+                                aria-pressed={range === option}
+                                className={`h-8 min-w-0 px-1 text-[9px] font-black transition-colors ${range === option ? "bg-white text-[#163f31]" : "text-white/60 hover:bg-white/10 hover:text-white"}`}
+                            >
+                                {option}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+                <div className="grid min-w-0 grid-cols-2 border border-white/20 bg-black/15 p-0.5" aria-label="Chart interaction mode">
+                    {(["analyze", "target"] as const).map((mode) => (
+                        <button
+                            key={mode}
+                            type="button"
+                            onClick={() => setInteractionMode(mode)}
+                            aria-pressed={interactionMode === mode}
+                            className={`inline-flex h-8 min-w-0 items-center justify-center gap-1 px-1 text-[9px] font-black uppercase transition-colors ${interactionMode === mode ? mode === "target" ? "bg-[#f5d547] text-black" : "bg-white text-[#163f31]" : "text-white/60 hover:bg-white/10 hover:text-white"}`}
+                        >
+                            {mode === "analyze" ? <Activity className="h-3 w-3" /> : <Crosshair className="h-3 w-3" />}
+                            {mode === "analyze" ? "Analyze" : "Set target"}
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            <div className="grid grid-cols-4 border-b border-white/15 bg-black/10 p-1.5">
+                {[-10, -5, 5, 10].map((percentage) => {
+                    const isActive = Math.abs(targetChange - percentage) < 0.15;
+                    const isUp = percentage > 0;
+                    return (
+                        <button
+                            key={percentage}
+                            type="button"
+                            onClick={() => onTargetChange(currentPrice * (1 + percentage / 100))}
+                            className={`flex h-8 items-center justify-center gap-1 text-[10px] font-black transition-colors ${isActive ? "bg-[#f5d547] text-black" : "text-white/65 hover:bg-white/10 hover:text-white"}`}
+                            aria-label={`Set target ${Math.abs(percentage)} percent ${isUp ? "above" : "below"} current price`}
+                        >
+                            {isUp ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                            {percentage > 0 ? "+" : ""}{percentage}%
+                        </button>
+                    );
+                })}
+            </div>
+
+            <div className="relative h-48 min-w-0 select-none min-[400px]:h-52 sm:h-56">
+                <div ref={chartContainerRef} className="h-full w-full" />
+                {interactionMode === "analyze" && (
+                    <div className="absolute bottom-2 right-2 z-20 flex border border-white/20 bg-[#163f31]/90 p-0.5 shadow-sm sm:bottom-auto sm:right-14 sm:top-2" aria-label="Chart zoom controls">
+                        <button
+                            type="button"
+                            onClick={() => zoomChart(1.35)}
+                            className="flex h-7 w-7 cursor-pointer items-center justify-center text-sm font-black text-white/70 hover:bg-white/10 hover:text-white"
+                            aria-label="Zoom out"
+                            title="Zoom out"
+                        >
+                            −
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => zoomChart(0.72)}
+                            className="flex h-7 w-7 cursor-pointer items-center justify-center border-x border-white/15 text-sm font-black text-white/70 hover:bg-white/10 hover:text-white"
+                            aria-label="Zoom in"
+                            title="Zoom in"
+                        >
+                            +
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => chartApiRef.current?.timeScale().fitContent()}
+                            className="flex h-7 cursor-pointer items-center justify-center px-2 text-[8px] font-black uppercase text-white/70 hover:bg-white/10 hover:text-white"
+                            aria-label="Fit all candles"
+                            title="Fit all candles"
+                        >
+                            Fit
+                        </button>
+                    </div>
+                )}
+                {interactionMode === "target" && (
+                    <div
+                        role="slider"
+                        tabIndex={0}
+                        aria-label={`${asset} target price`}
+                        aria-valuemin={bounds.minPrice}
+                        aria-valuemax={bounds.maxPrice}
+                        aria-valuenow={selectedTarget}
+                        aria-valuetext={`${direction} ${formatPrice(String(selectedTarget))}`}
+                        onPointerDown={handleTargetPointerDown}
+                        onPointerMove={handleTargetPointerMove}
+                        onPointerUp={(event) => {
+                            if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+                                event.currentTarget.releasePointerCapture(event.pointerId);
+                            }
+                        }}
+                        onKeyDown={handleKeyDown}
+                        className="absolute inset-0 z-20 touch-none cursor-ns-resize outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#f5d547]"
+                    />
+                )}
+                <span
+                    className="pointer-events-none absolute left-2 top-2 z-10 max-w-[70%] border border-black bg-[#f5d547] px-2 py-1 text-[9px] font-black text-black shadow-[2px_2px_0_#111]"
+                >
+                    {direction} {formatPrice(String(selectedTarget))} · {targetChange >= 0 ? "+" : ""}{targetChange.toFixed(1)}%
+                </span>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-1.5 border-t border-white/15 px-3 py-2 text-[8px] font-bold text-white/50 sm:px-4 sm:text-[9px]">
+                <span className="min-w-0">
+                    <a href="https://www.tradingview.com/" target="_blank" rel="noopener noreferrer" className="pointer-events-auto text-white/65 hover:text-white">Charts by TradingView</a>
+                    {` · ${range}`}
+                </span>
+                <span>{interactionMode === "analyze" ? "Wheel/pinch to zoom" : "↑↓ keys adjust by 1%"}</span>
+            </div>
+        </section>
+    );
+}
+
+function getTargetPriceBounds(candles: MarketCandle[], currentPrice: number) {
+    const validCandles = candles.filter((candle) => Number.isFinite(candle.close) && candle.close > 0);
+    if (validCandles.length < 2 || !Number.isFinite(currentPrice) || currentPrice <= 0) return null;
+
+    const lows = validCandles.map((candle) => Number.isFinite(candle.low) && candle.low > 0 ? candle.low : candle.close);
+    const highs = validCandles.map((candle) => Number.isFinite(candle.high) && candle.high > 0 ? candle.high : candle.close);
+    const observedMin = Math.min(...lows);
+    const observedMax = Math.max(...highs);
+    const baseSpread = Math.max(observedMax - observedMin, currentPrice * 0.08);
+    let minPrice = Math.max(0, Math.min(observedMin - baseSpread * 0.15, currentPrice * 0.75));
+    let maxPrice = Math.max(observedMax + baseSpread * 0.15, currentPrice * 1.25);
+    const padding = Math.max((maxPrice - minPrice) * 0.04, currentPrice * 0.005);
+    minPrice = Math.max(0, minPrice - padding);
+    maxPrice += padding;
+
+    return { minPrice, maxPrice };
+}
+
+function VerifiedBadge({
+    isModerator,
+    twitterUsername,
+}: {
+    isModerator: boolean;
+    twitterUsername: string | null;
+}) {
+    const label = isModerator ? "Verified creator" : `Verified on X as @${twitterUsername}`;
+
+    return (
+        <span className="inline-flex shrink-0" title={label} aria-label={label}>
+            <svg className="h-4 w-4" viewBox="0 0 32 32" aria-hidden="true">
+                <path
+                    fill={isModerator ? "#F5B800" : "#378FDB"}
+                    d="M16 1.5l2.8 2.2 3.5-1 1.6 3.2 3.6.5.1 3.7 3 2-1.4 3.4 1.4 3.4-3 2-.1 3.7-3.6.5-1.6 3.2-3.5-1L16 30.5l-2.8-2.2-3.5 1-1.6-3.2-3.6-.5-.1-3.7-3-2 1.4-3.4-1.4-3.4 3-2 .1-3.7 3.6-.5 1.6-3.2 3.5 1L16 1.5Z"
+                />
+                <path
+                    d="m9.4 16.2 4.2 4.2 9-9"
+                    fill="none"
+                    stroke="white"
+                    strokeWidth="3.4"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                />
+            </svg>
+        </span>
+    );
+}
+
+function ChallengePreview({
+    user,
+    marketType,
+    isPriceFeed,
+    challengeMode,
+    pairTag,
+    categoryImage,
+    title,
+    betAmount,
+    duration,
+    resolutionDate,
+}: {
+    user: User | null;
+    marketType: MarketType;
+    isPriceFeed: boolean;
+    challengeMode: ChallengeMode;
+    pairTag: string;
+    categoryImage?: string;
+    title: string;
+    betAmount: number;
+    duration: { hours: number; minutes: number };
+    resolutionDate: Date;
+}) {
+    const now = new Date();
+    const expiryDate = new Date(now.getTime() + (duration.hours * 60 + duration.minutes) * 60 * 1000);
+    const username = user?.username || "You";
+    const profileImage = user?.profile_image || "/scribbles/btc.png";
+    const creatorId = user?.id ?? -1;
+    const pair = pairTag.trim();
+    const ticker = pair.split("/", 1)[0].toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10) || marketType.toUpperCase();
+    const safeBetAmount = Number.isFinite(betAmount) ? betAmount : 0;
+
+    const previewChallenge: Challenge = {
+        id: -1,
+        views: 0,
+        title,
+        statement: title,
+        ticker,
+        trading_pair: pair,
+        target: 0,
+        initial_bet: safeBetAmount,
+        pool_size: safeBetAmount,
+        total_pool: safeBetAmount,
+        category_image: categoryImage || null,
+        resolution_source: isPriceFeed ? "PRICE_FEED" : "COMMUNITY",
+        metadata: {
+            composer: {
+                market: marketType,
+                format: isPriceFeed ? "price" : "statement",
+                topic: pair,
+                category_image: categoryImage || "",
+                resolves_at: resolutionDate.toISOString(),
+            },
+        },
+        creator: creatorId as Challenge["creator"],
+        creator_id: creatorId,
+        creator_details: user,
+        resolution_method: isPriceFeed ? "PRICE_FEED" : "COMMUNITY",
+        participants: 1,
+        total_challengers: 1,
+        total_opponents: 0,
+        status: "OPEN",
+        mode: challengeMode === "pvp" ? "PVP" : "TEAM",
+        result: "TEAM_A",
+        direction: "UP",
+        expiry: expiryDate.toISOString(),
+        expire_time: expiryDate.toISOString(),
+        resolution_date: resolutionDate.toISOString().split("T")[0],
+        resolve_time: resolutionDate.toISOString(),
+        resolved_at: "",
+        final_price: 0,
+        category: marketType === "crypto" ? "Crypto" : "Sports",
+        created_at: now.toISOString(),
+        bet_info: {
+            highest_bet: {
+                TEAM_A: {
+                    id: creatorId,
+                    username,
+                    profile_image: profileImage,
+                    pubkey: user?.pubkey || user?.wallet_address || "",
+                    bet: safeBetAmount,
+                    twitter_username: user?.twitter_username ?? null,
+                    user_type: user?.user_type ?? "user",
+                },
+            },
+            team_count: {
+                TEAM_A: {
+                    total_bets: 1,
+                    total_amount: safeBetAmount,
+                },
+            },
+        },
+        market: {
+            name: pair,
+            icon: "",
+            image: "",
+            parent_market_id: "",
+            parent_id: "",
+        },
+    };
+
+    return (
+        <div className="mx-auto w-full max-w-[392px]">
+            <p className="mb-2 text-center text-[10px] font-black uppercase tracking-[0.12em] text-[#8b7a72]">Challenge preview</p>
+            <div inert className="pointer-events-none select-none" aria-label="Challenge card preview">
+                <ChallengeCard challenge={previewChallenge} showPin={false} />
+            </div>
+            <div className="mt-3 border-2 border-black bg-[#f5d547] px-3 py-2.5 text-[10px] font-bold leading-relaxed text-[#17120f] shadow-[2px_2px_0_#111]">
+                <span className="font-black uppercase">Important:</span>{" "}
+                You can cancel the challenge and receive a refund only before the join window closes. Once someone accepts the challenge, it can no longer be cancelled.
+            </div>
         </div>
+    );
+}
+
+function PanelHeading({ children, info }: { children: React.ReactNode; info?: string }) {
+    return (
+        <h3 className="mb-3 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-[#75645c]">
+            <span>{children}</span>
+            {info && (
+                <span
+                    className="group relative inline-flex shrink-0 cursor-help animate-pulse"
+                    tabIndex={0}
+                    aria-label={info}
+                >
+                    <Info className="h-3.5 w-3.5" aria-hidden="true" />
+                    <span
+                        role="tooltip"
+                        className="pointer-events-none absolute left-0 top-full z-30 mt-2 w-64 max-w-[calc(100vw-4rem)] border border-black bg-black px-2.5 py-2 text-[10px] font-bold normal-case leading-relaxed tracking-normal text-white opacity-0 shadow-[2px_2px_0_#e85a2d] transition-opacity group-hover:opacity-100 group-focus:opacity-100"
+                    >
+                        {info}
+                    </span>
+                </span>
+            )}
+        </h3>
     );
 }

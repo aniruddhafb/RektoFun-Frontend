@@ -8,19 +8,21 @@ export const metadata: Metadata = {
         index: true,
         follow: true,
     },
+    alternates: { canonical: "/privacy" },
     openGraph: {
         title: "Privacy Policy | RektoFun",
         description: "Read our Privacy Policy and learn how we protect your data.",
         url: "https://rekto.fun/privacy",
         images: [
             {
-                url: "/logos/BG.png",
-                width: 1200,
-                height: 630,
+                url: "/logos/social_share.png",
+                width: 1731,
+                height: 909,
                 alt: "RektoFun Privacy Policy",
             },
         ],
     },
+    twitter: { card: "summary_large_image", images: ["/logos/social_share.png"] },
 };
 
 export default function PrivacyPage() {
@@ -34,7 +36,7 @@ export default function PrivacyPage() {
 
                 <div className="prose prose-lg max-w-none text-gray-700">
                     <p className="text-lg mb-6">
-                        Last updated: April 2026
+                        Last updated: 14 July 2026
                     </p>
 
                     <section className="mb-8">
@@ -45,7 +47,7 @@ export default function PrivacyPage() {
                             We collect information that you provide directly to us, including:
                         </p>
                         <ul className="list-disc pl-6 mb-4 space-y-2">
-                            <li>Account information (wallet address, email when provided)</li>
+                            <li>Account information (wallet address, twitter handle when provided)</li>
                             <li>Transaction data related to challenges and predictions</li>
                             <li>Communication preferences and support requests</li>
                             <li>Usage data and analytics to improve our service</li>
@@ -151,7 +153,7 @@ export default function PrivacyPage() {
                         </h2>
                         <p className="mb-4">
                             If you have any questions about this Privacy Policy, please contact us
-                            through our Twitter or email support at rektofun@gmail.com
+                            through our twitter or discord ticket support system.
                         </p>
                     </section>
                 </div>

@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { ReactNode } from "react";
+import { ReactNode, useRef, useState } from "react";
+import { LayoutDashboard, Music, Pause } from "lucide-react";
 import favicon from "../../../public/logos/1.png";
 import Image from "next/image";
 
@@ -9,6 +10,9 @@ type NavbarProfileDropdownProps = {
     displayAddress: string;
     displayUsername: string;
     displayProfileImage: string | null;
+    isXVerified: boolean;
+    isModerator: boolean;
+    isAdmin: boolean;
     usdcBalance: number | null;
     isOpen: boolean;
     onClose: () => void;
@@ -18,6 +22,9 @@ type NavbarProfileDropdownProps = {
     onLogout: () => void;
     onOpenDeposit: () => void;
     onOpenWithdraw: () => void;
+    onOpenReferral: () => void;
+    onOpenEditProfile: () => void;
+    onOpenSettings: () => void;
     profileHref: string;
     isMobileViewport: boolean;
 };
@@ -59,7 +66,7 @@ function MenuAction(props: MenuActionProps) {
         <button
             type="button"
             onClick={props.onClick}
-            className={`w-full text-left bg-transparent border-0 ${className}`}
+            className={`w-full text-left bg-transparent border-0 !shadow-none ${className}`}
         >
             {content}
         </button>
@@ -70,6 +77,9 @@ export function NavbarProfileDropdown({
     displayAddress,
     displayUsername,
     displayProfileImage,
+    isXVerified,
+    isModerator,
+    isAdmin,
     usdcBalance,
     isOpen,
     onClose,
@@ -79,12 +89,32 @@ export function NavbarProfileDropdown({
     onLogout,
     onOpenDeposit,
     onOpenWithdraw,
+    onOpenReferral,
+    onOpenEditProfile,
+    onOpenSettings,
     profileHref,
     isMobileViewport,
 }: NavbarProfileDropdownProps) {
+    const audioRef = useRef<HTMLAudioElement>(null);
+    const [isMusicPlaying, setIsMusicPlaying] = useState(false);
     const balanceDisplay = usdcBalance !== null
         ? `$${usdcBalance.toFixed(2)}`
         : '...';
+    const toggleMusic = async () => {
+        const audio = audioRef.current;
+        if (!audio) return;
+
+        if (audio.paused) {
+            try {
+                await audio.play();
+            } catch {
+                setIsMusicPlaying(false);
+            }
+        } else {
+            audio.pause();
+        }
+    };
+
     return (
         <div
             className="relative"
@@ -95,7 +125,7 @@ export function NavbarProfileDropdown({
             <button
                 type="button"
                 onClick={isMobileViewport ? onToggle : undefined}
-                className="flex items-center gap-2 border-2 border-black bg-white px-[4px] py-[2px] pr-3 shadow-[2px_2px_0_#111] transition-all hover:-translate-y-0.5 hover:bg-[#fffaf6] cursor-pointer"
+                className="flex items-center gap-1 border-2 border-black bg-white px-[3px] py-[2px] shadow-[2px_2px_0_#111] transition-all hover:-translate-y-0.5 hover:bg-[#fffaf6] cursor-pointer min-[380px]:gap-2 min-[380px]:pr-2 sm:pr-3"
             >
                 {displayProfileImage ? (
                     <Image
@@ -114,9 +144,9 @@ export function NavbarProfileDropdown({
                         className="rounded-full object-cover flex-shrink-0"
                     />
                 )}
-                <span className="hidden sm:block text-sm font-medium text-gray-700 max-w-[100px] m-1 truncate">
+                {/* <span className="hidden sm:block text-sm font-medium text-gray-700 max-w-[100px] m-1 truncate">
                     {displayUsername}
-                </span>
+                </span> */}
                 <svg
                     className="w-4 h-4 text-gray-500"
                     fill="none"
@@ -133,13 +163,13 @@ export function NavbarProfileDropdown({
             </button>
 
             {isOpen && (
-                <div className="absolute right-0 top-full pt-2 w-72 z-50">
+                <div className="absolute right-0 top-full z-50 w-[min(18rem,calc(100vw-1rem))] pt-2">
                     <div className="bg-white border-2 border-black overflow-hidden">
                         <div className="p-4 bg-[#fffaf6] border-b-2 border-black">
                             <Link
                                 href={profileHref}
                                 onClick={onClose}
-                                className="flex items-center gap-3"
+                                className="group flex items-center gap-3"
                             >
                                 {displayProfileImage ? (
                                     <Image
@@ -159,11 +189,26 @@ export function NavbarProfileDropdown({
                                     />
                                 )}
                                 <div className="min-w-0">
-                                    <p className="font-black text-gray-900 truncate">
-                                        {displayUsername}
-                                    </p>
+                                    <div className="flex min-w-0 items-center gap-1.5">
+                                        <p className="truncate font-black text-gray-900">
+                                            {displayUsername}
+                                        </p>
+                                        {(isModerator || isXVerified) && (
+                                            <svg className="h-4 w-4 shrink-0" viewBox="0 0 32 32" role="img" aria-label={isModerator ? "Moderator" : "Verified on X"}>
+                                                <path
+                                                    fill={isModerator ? "#F5B800" : "#378FDB"}
+                                                    d="M16 1.5l2.8 2.2 3.5-1 1.6 3.2 3.6.5.1 3.7 3 2-1.4 3.4 1.4 3.4-3 2-.1 3.7-3.6.5-1.6 3.2-3.5-1L16 30.5l-2.8-2.2-3.5 1-1.6-3.2-3.6-.5-.1-3.7-3-2 1.4-3.4-1.4-3.4 3-2 .1-3.7 3.6-.5 1.6-3.2 3.5 1L16 1.5Z"
+                                                />
+                                                <path d="m9.4 16.2 4.2 4.2 9-9" fill="none" stroke="white" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
+                                            </svg>
+                                        )}
+                                    </div>
                                     <p className="text-xs text-gray-500 font-mono truncate">
                                         {displayAddress}
+                                    </p>
+                                    <p className="mt-1 flex items-center gap-1 text-[10px] font-black uppercase tracking-[0.08em] text-[#e85a2d] transition-colors group-hover:text-black">
+                                        View profile
+                                        <span aria-hidden="true">↗</span>
                                     </p>
                                 </div>
                             </Link>
@@ -230,8 +275,10 @@ export function NavbarProfileDropdown({
                             </div>
 
                             <MenuAction
-                                href="/referral"
-                                onClick={onClose}
+                                onClick={() => {
+                                    onClose();
+                                    onOpenReferral();
+                                }}
                                 icon={
                                     <svg
                                         className="w-5 h-5 text-gray-500"
@@ -252,8 +299,25 @@ export function NavbarProfileDropdown({
                             </MenuAction>
 
                             <MenuAction
-                                href="/settings"
-                                onClick={onClose}
+                                onClick={() => {
+                                    onClose();
+                                    onOpenEditProfile();
+                                }}
+                                icon={
+                                    <svg className="h-5 w-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536M9 11l6.586-6.586a2 2 0 112.828 2.828L11.828 13.828A4 4 0 019 15H7v-2a4 4 0 012-2z" />
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5h5M5 5v14h14v-5" />
+                                    </svg>
+                                }
+                            >
+                                Edit profile
+                            </MenuAction>
+
+                            <MenuAction
+                                onClick={() => {
+                                    onClose();
+                                    onOpenSettings();
+                                }}
                                 icon={
                                     <svg
                                         className="w-5 h-5 text-gray-500"
@@ -278,6 +342,22 @@ export function NavbarProfileDropdown({
                             >
                                 Settings
                             </MenuAction>
+
+                            <MenuAction
+                                onClick={toggleMusic}
+                                icon={isMusicPlaying
+                                    ? <Pause className="h-5 w-5 text-gray-500" fill="currentColor" />
+                                    : <Music className="h-5 w-5 text-gray-500" />
+                                }
+                            >
+                                {isMusicPlaying ? "Pause music" : "Play music"}
+                            </MenuAction>
+
+                            {isAdmin && (
+                                <MenuAction href="/admin" onClick={onClose} icon={<LayoutDashboard className="h-5 w-5 text-gray-500" />}>
+                                    Admin panel
+                                </MenuAction>
+                            )}
 
                             <div className="my-2 border-t-2 border-black" />
 
@@ -400,6 +480,22 @@ export function NavbarProfileDropdown({
                                             <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.248.195.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z" />
                                         </svg>
                                     </a>
+                                    <a
+                                        href="https://t.me/rektofun"
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        onClick={onClose}
+                                        className="w-8 h-8 border-2 border-black bg-gray-100 flex items-center justify-center text-gray-600 hover:bg-[#229ED9] hover:text-white transition-colors cursor-pointer"
+                                        aria-label="Telegram"
+                                    >
+                                        <svg
+                                            className="w-4 h-4"
+                                            fill="currentColor"
+                                            viewBox="0 0 24 24"
+                                        >
+                                            <path d="M9.78 15.54 9.4 20.9c.54 0 .78-.23 1.06-.51l2.55-2.44 5.28 3.87c.97.53 1.65.25 1.91-.89l3.46-16.2.01-.01c.31-1.43-.52-1.99-1.46-1.64L1.86 10.87c-1.39.54-1.37 1.32-.24 1.67l5.2 1.62L18.9 6.6c.57-.38 1.09-.17.66.21L9.78 15.54z" />
+                                        </svg>
+                                    </a>
                                 </div>
                             </div>
 
@@ -431,6 +527,15 @@ export function NavbarProfileDropdown({
                     </div>
                 </div>
             )}
+            <audio
+                ref={audioRef}
+                src="/music.mp3"
+                loop
+                preload="none"
+                onPlay={() => setIsMusicPlaying(true)}
+                onPause={() => setIsMusicPlaying(false)}
+                onEnded={() => setIsMusicPlaying(false)}
+            />
         </div>
     );
 }

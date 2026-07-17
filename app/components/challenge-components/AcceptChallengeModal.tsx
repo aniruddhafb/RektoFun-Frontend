@@ -1,7 +1,20 @@
 "use client";
 
 import React from "react";
+import { createPortal } from "react-dom";
+import {
+    Clock3,
+    Check,
+    CircleAlert,
+    CircleDollarSign,
+    ExternalLink,
+    LoaderCircle,
+    ShieldCheck,
+    Swords,
+    X,
+} from "lucide-react";
 import { useBodyScrollLock } from "@/app/lib/useBodyScrollLock";
+import { getSolscanClusterQuery } from "@/app/lib/solana-config";
 
 interface AcceptChallengeModalProps {
     isOpen: boolean;
@@ -15,16 +28,21 @@ interface AcceptChallengeModalProps {
     escrowAddress?: string;
     resolveCountdown: string;
     resolveLabel: string;
-    resolutionSource?: string;
-    isPoolMode: boolean;
-    joinSide: "challenger" | "opponent";
+    joinCountdown: string;
+    joinLabel: string;
+    currentPoolAmount: number;
+    selectedSidePoolAmount: number;
+    isTeam: boolean;
+    requiresCreatorStakeMatch: boolean;
+    joinSide: "TEAM_A" | "TEAM_B";
     onClose: () => void;
     onSubmit: (event: React.SubmitEvent<HTMLFormElement>) => void;
     onBetInputChange: (value: string) => void;
-    onJoinSideChange: (side: "challenger" | "opponent") => void;
+    onJoinSideChange: (side: "TEAM_A" | "TEAM_B") => void;
 }
 
 const PRESET_AMOUNTS = [5, 10, 25, 50, 100];
+const GENERIC_ACCEPT_ERROR = "Something went wrong. Please try again.";
 
 export function AcceptChallengeModal({
     isOpen,
@@ -38,8 +56,12 @@ export function AcceptChallengeModal({
     escrowAddress,
     resolveCountdown,
     resolveLabel,
-    resolutionSource,
-    isPoolMode,
+    joinCountdown,
+    joinLabel,
+    currentPoolAmount,
+    selectedSidePoolAmount,
+    isTeam,
+    requiresCreatorStakeMatch,
     joinSide,
     onClose,
     onSubmit,
@@ -48,17 +70,35 @@ export function AcceptChallengeModal({
 }: AcceptChallengeModalProps) {
     useBodyScrollLock(isOpen);
 
-    if (!isOpen) return null;
-    const isPriceFeedResolution = String(resolutionSource ?? "").toLowerCase() === "price_feed";
-
     const parsedBet = Number(betInput);
-    const isValidNumber = Number.isFinite(parsedBet) && parsedBet > 0;
-    const amountForDisplay = isValidNumber ? parsedBet.toFixed(2) : "0.00";
+    const hasKnownBalance = typeof usdcBalance === "number" && Number.isFinite(usdcBalance);
+    const requiredStake = Number.isFinite(parsedBet) && parsedBet > 0
+        ? Math.max(parsedBet, minAcceptBet ?? 0)
+        : (minAcceptBet ?? 0);
+    const balanceShortfall = hasKnownBalance
+        ? Math.max(requiredStake - (usdcBalance as number), 0)
+        : 0;
+    const hasLowBalance = balanceShortfall > 0;
+    const formattedBalance =
+        typeof usdcBalance === "number" && Number.isFinite(usdcBalance)
+            ? usdcBalance.toLocaleString(undefined, { maximumFractionDigits: 2 })
+            : "0";
+    const validStake = Number.isFinite(parsedBet) && parsedBet > 0 ? parsedBet : 0;
+    const potentialPayout = validStake > 0
+        ? (validStake / Math.max(selectedSidePoolAmount + validStake, validStake))
+            * Math.max(currentPoolAmount + validStake, validStake)
+        : 0;
+    const potentialProfit = Math.max(potentialPayout - validStake, 0);
+    const formatAmount = (amount: number) => amount.toLocaleString(undefined, {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 2,
+    });
+
     const liveValidationError = React.useMemo(() => {
-        if (!betInput.trim()) return "Please enter a valid bet amount.";
+        if (!betInput.trim()) return "Enter a bet amount.";
 
         if (!Number.isFinite(parsedBet) || parsedBet <= 0) {
-            return "Please enter a valid bet amount.";
+            return "Enter a valid bet amount.";
         }
 
         if (
@@ -66,31 +106,42 @@ export function AcceptChallengeModal({
             Number.isFinite(usdcBalance) &&
             parsedBet > usdcBalance
         ) {
-            return "Not enough balance.";
+            return "Your balance is too low for this amount.";
         }
 
         if (typeof minAcceptBet === "number" && parsedBet < minAcceptBet) {
-            return `Bet amount must be at least ${minAcceptBet} ${betCurrency}.`;
+            return isTeam
+                ? `The opponent side must first match the creator's stake. Bet at least ${minAcceptBet} ${betCurrency}.`
+                : `Your bet must match or exceed the challenger's ${minAcceptBet} ${betCurrency} stake.`;
         }
 
         if (typeof maxAcceptBet === "number" && parsedBet > maxAcceptBet) {
-            return `Bet amount must be at most ${maxAcceptBet} ${betCurrency}.`;
+            return `Maximum bet is ${maxAcceptBet} ${betCurrency}.`;
         }
 
         return "";
-    }, [betInput, betCurrency, maxAcceptBet, minAcceptBet, parsedBet, usdcBalance]);
+    }, [betInput, betCurrency, isTeam, maxAcceptBet, minAcceptBet, parsedBet, usdcBalance]);
 
-    const handlePresetClick = (value: number) => {
-        onBetInputChange(String(value));
-    };
+    const handleClose = React.useCallback(() => {
+        if (!isLoading) onClose();
+    }, [isLoading, onClose]);
+
+    React.useEffect(() => {
+        if (!isOpen) return;
+        const closeOnEscape = (event: KeyboardEvent) => {
+            if (event.key === "Escape") handleClose();
+        };
+        window.addEventListener("keydown", closeOnEscape);
+        return () => window.removeEventListener("keydown", closeOnEscape);
+    }, [handleClose, isOpen]);
 
     const handleMaxClick = () => {
         if (typeof usdcBalance === "number" && Number.isFinite(usdcBalance) && usdcBalance > 0) {
-            const cappedByChallengeMax =
+            const cappedAmount =
                 typeof maxAcceptBet === "number" && Number.isFinite(maxAcceptBet)
                     ? Math.min(usdcBalance, maxAcceptBet)
                     : usdcBalance;
-            onBetInputChange(String(cappedByChallengeMax));
+            onBetInputChange(String(cappedAmount));
             return;
         }
 
@@ -104,168 +155,184 @@ export function AcceptChallengeModal({
         }
     };
 
+    const handleDeposit = () => {
+        onClose();
+        window.setTimeout(() => {
+            window.dispatchEvent(new Event("rektofun:open-deposit"));
+        }, 0);
+    };
+
+    const isPresetDisabled = (amount: number) => {
+        if (typeof minAcceptBet === "number" && amount < minAcceptBet) return true;
+        if (typeof maxAcceptBet === "number" && amount > maxAcceptBet) return true;
+        return typeof usdcBalance === "number" && Number.isFinite(usdcBalance) && amount > usdcBalance;
+    };
+
     const escrowAddressDisplay = React.useMemo(() => {
-        if (!escrowAddress) return "Not available";
+        if (!escrowAddress) return null;
         if (escrowAddress.length <= 14) return escrowAddress;
         return `${escrowAddress.slice(0, 6)}...${escrowAddress.slice(-6)}`;
     }, [escrowAddress]);
     const escrowHref = React.useMemo(() => {
         if (!escrowAddress) return null;
-        return `https://solscan.io/account/${encodeURIComponent(escrowAddress)}?cluster=devnet`;
+        return `https://solscan.io/account/${encodeURIComponent(escrowAddress)}${getSolscanClusterQuery()}`;
     }, [escrowAddress]);
 
-    return (
-        <div
-            onClick={onClose}
-            className="fixed inset-0 z-[120] flex items-center justify-center bg-black/50 p-2 backdrop-blur-sm md:p-4"
-        >
-            <div
-                onClick={(e) => e.stopPropagation()}
-                className="rekto-modal-panel w-full max-w-3xl max-h-[92vh] overflow-y-auto rounded-3xl border border-[#e8d5c8] bg-[#f8ede7] shadow-2xl"
+    if (!isOpen) return null;
+
+    // Never expose wallet, RPC, API, or program errors in the UI. Input
+    // validation remains specific because it is safe and actionable.
+    const displayedError = liveValidationError || (betError ? GENERIC_ACCEPT_ERROR : "");
+    const submitLabel = isLoading
+        ? "Accepting challenge"
+        : liveValidationError
+            ? "Accept challenge"
+            : `Accept for ${parsedBet.toLocaleString()} ${betCurrency}`;
+
+    return createPortal(
+        <div className="fixed inset-0 z-[10020] flex items-center justify-center p-3 min-[380px]:p-4 sm:p-5">
+            <button
+                type="button"
+                onClick={handleClose}
+                className="absolute inset-0 cursor-pointer bg-black/45 backdrop-blur-[2px]"
+                aria-label="Close accept challenge dialog"
+            />
+
+            <section
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="accept-challenge-title"
+                className="accept-challenge-modal rekto-modal-panel relative z-10 flex max-h-[calc(100dvh-1.5rem)] w-full max-w-lg flex-col overflow-hidden border-2 border-black bg-[#fffaf6] min-[380px]:max-h-[calc(100dvh-2rem)] sm:max-h-[90vh]"
             >
-                <div className="relative overflow-hidden bg-gradient-to-r from-[#f6efe9] via-[#f8ede7] to-[#f4ebe3] px-4 py-4 md:px-8 md:py-5">
-                    <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(255,255,255,0.8),transparent_45%)]" />
-                    <div className="relative flex items-start justify-between gap-3">
-                        <div className="flex flex-1 flex-col items-start gap-3 sm:flex-row sm:items-center sm:gap-4 md:gap-6">
-                            <div className="h-[88px] w-[88px] shrink-0 overflow-hidden rounded-2xl bg-[#efe5dc] ring-1 ring-[#e8d9cd] sm:h-[120px] sm:w-[120px] md:h-[150px] md:w-[150px]">
-                                <video
-                                    src="/animations/Sword%20Battle.webm"
-                                    autoPlay
-                                    loop
-                                    muted
-                                    playsInline
-                                    className="h-full w-full object-cover"
-                                />
-                            </div>
-                            <div>
-                                <h3 className="mt-2 text-2xl font-black leading-tight text-[#171411] sm:mt-3 sm:text-3xl">Counter This Challenge</h3>
-                                <p className="mt-1.5 text-sm text-[#6f6a63] sm:mt-2">Confirm your bet to join this prediction battle.</p>
-                                {isPoolMode ? (
-                                    <div className="mt-3 space-y-2 sm:mt-4">
-                                        <p className="text-xs font-semibold uppercase tracking-wide text-[#6f6a63]">
-                                            Which side do you want to join?
-                                        </p>
-                                        <div className="inline-flex rounded-xl border border-[#d7ebe1] bg-[#f5fcf8] p-1">
-                                            <button
-                                                type="button"
-                                                onClick={() => onJoinSideChange("challenger")}
-                                                className={`cursor-pointer rounded-lg px-3 py-1.5 text-sm font-semibold transition ${joinSide === "challenger"
-                                                    ? "bg-emerald-600 text-white"
-                                                    : "text-[#2a8f66] hover:bg-emerald-100"
-                                                    }`}
-                                            >
-                                                Challenger
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => onJoinSideChange("opponent")}
-                                                className={`cursor-pointer rounded-lg px-3 py-1.5 text-sm font-semibold transition ${joinSide === "opponent"
-                                                    ? "bg-emerald-600 text-white"
-                                                    : "text-[#2a8f66] hover:bg-emerald-100"
-                                                    }`}
-                                            >
-                                                Opponent
-                                            </button>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div className="mt-3 space-y-2 sm:mt-4">
-                                        <p className="text-xs font-semibold uppercase tracking-wide text-[#6f6a63]">
-                                            You are joining as an
-                                        </p>
-                                        <div className="inline-flex rounded-xl border border-[#d7ebe1] bg-[#f5fcf8] p-1">
-                                            <button
-                                                type="button"
-                                                onClick={() => onJoinSideChange("opponent")}
-                                                className={`cursor-pointer rounded-lg px-3 py-1.5 text-sm font-semibold transition ${joinSide === "opponent"
-                                                    ? "bg-emerald-600 text-white"
-                                                    : "text-[#2a8f66] hover:bg-emerald-100"
-                                                    }`}
-                                            >
-                                                Opponent
-                                            </button>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            disabled={isLoading}
-                            className="group h-9 w-9 shrink-0 cursor-pointer rounded-full border-2 border-black bg-white text-base font-black text-[#6f6a63] shadow-[2px_2px_0_#111] transition-all hover:-translate-y-0.5 hover:border-black hover:bg-[#fffaf7] hover:text-[#2d1f1a] hover:shadow-[2px_2px_0_#111] disabled:cursor-not-allowed disabled:opacity-60 sm:h-10 sm:w-10 sm:text-lg"
-                            aria-label="Close"
-                        >
-                            <span className="leading-none">×</span>
-                        </button>
+                <header className="flex shrink-0 items-center gap-2.5 border-b-2 border-black px-3 py-2.5 sm:px-5 sm:py-3.5">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center border-2 border-black bg-[#f5d547] text-black sm:h-9 sm:w-9">
+                        <Swords className="h-4 w-4 sm:h-4.5 sm:w-4.5" strokeWidth={2.5} />
                     </div>
 
-                    <div className="mt-5 grid gap-3 rounded-2xl border border-[#e4d6cc] bg-white/75 p-3 md:grid-cols-2 md:p-4">
-                        <div className="flex items-center gap-3">
-                            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-50 text-lg">⏱️</div>
-                            <div>
-                                <p className="text-xs font-medium text-gray-900">
-                                    {isPriceFeedResolution ? "Challenge resolves in" : "Challenge resolves on"}
-                                </p>
-                                <p className="text-2xl font-bold text-[#1f1b16]">
-                                    {isPriceFeedResolution ? resolveCountdown : "Match day"}
-                                </p>
-                                <p className="text-xs text-gray-900">
-                                    {isPriceFeedResolution ? resolveLabel : "community resolves this after match ends"}
-                                </p>
+                    <div className="min-w-0 flex-1">
+                        <h2 id="accept-challenge-title" className="text-base font-black tracking-tight text-[#17120f] sm:text-lg">
+                            Accept challenge
+                        </h2>
+                        <p className="text-[11px] font-bold text-[#7a6961]">
+                            Pick a side. Back your call.
+                        </p>
+                    </div>
+
+                    <button
+                        type="button"
+                        onClick={handleClose}
+                        disabled={isLoading}
+                        className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center border-2 border-black bg-white text-black transition-colors hover:bg-[#f5d547] disabled:cursor-not-allowed disabled:opacity-50 sm:h-9 sm:w-9"
+                        aria-label="Close"
+                    >
+                        <X className="h-4.5 w-4.5" strokeWidth={2.5} />
+                    </button>
+                </header>
+
+                <form onSubmit={onSubmit} className="min-h-0 overflow-y-auto overscroll-contain bg-[#fffaf6] px-3 py-3 sm:px-4 sm:py-4">
+                    <div className="grid grid-cols-2 divide-x-2 divide-black overflow-hidden border-2 border-black bg-[#f3e1d7]">
+                        <div className="min-w-0 px-3 py-2" title={joinLabel || undefined}>
+                            <div className="flex items-center gap-1 text-[9px] font-black uppercase tracking-[0.1em] text-[#b45309]">
+                                <Clock3 className="h-3 w-3" />
+                                Joins close
                             </div>
+                            <p className="mt-0.5 truncate text-sm font-black leading-tight text-[#17120f]">
+                                {joinCountdown || "Closing soon"}
+                            </p>
                         </div>
-                        <div className="flex items-center gap-3 border-t border-[#eee2d8] pt-3 md:border-l md:border-t-0 md:pl-4 md:pt-0">
-                            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-50 text-lg">💵</div>
-                            <div>
-                                <p className="text-xs font-medium text-gray-900">Min bet</p>
-                                <p className="text-2xl font-bold text-[#1f1b16]">${(minAcceptBet ?? 0)}</p>
-                                <p className="text-xs text-gray-900">You can bet ${(minAcceptBet ?? 0)} or more</p>
-                            </div>
+                        <div className="min-w-0 px-3 py-2" title={resolveLabel || undefined}>
+                            <p className="text-[9px] font-black uppercase tracking-[0.1em] text-[#8a776b]">Resolves in</p>
+                            <p className="mt-0.5 truncate text-sm font-black leading-tight text-[#201a16]">
+                                {resolveCountdown || "Resolution pending"}
+                            </p>
                         </div>
                     </div>
-                </div>
 
-                <form onSubmit={onSubmit} className="space-y-4 px-4 py-4 md:px-8 md:py-5">
-                    <div>
-                        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#6f6a63]">Your bet amount</p>
-                        <div className="grid overflow-hidden rounded-2xl border border-[#d4c1b5] bg-white md:grid-cols-[220px_1fr]">
-                            <div className="flex items-center gap-3 border-b border-[#eee2d8] bg-[#f9f3ee] px-4 py-4 md:border-b-0 md:border-r">
-                                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-50 text-base">💲</div>
-                                <p className="text-lg font-semibold text-[#2d1f1a]">{betCurrency}</p>
+                    <div className="mt-4">
+                        <p className="mb-2 text-[10px] font-black uppercase tracking-[0.12em] text-[#302722]">Your side</p>
+                        {isTeam ? (
+                            <div className="grid grid-cols-2 gap-2 border-2 border-black bg-[#f3e1d7] p-1.5">
+                                <button
+                                    type="button"
+                                    onClick={() => onJoinSideChange("TEAM_A")}
+                                    aria-pressed={joinSide === "TEAM_A"}
+                                    className={`flex cursor-pointer items-center justify-center gap-1.5 border-2 px-3 py-2.5 text-sm font-black transition ${joinSide === "TEAM_A"
+                                        ? "border-black bg-black text-white shadow-[3px_3px_0_#f5d547]"
+                                        : "border-transparent bg-white text-[#6f6158] hover:border-black hover:text-black"
+                                        }`}
+                                >
+                                    {joinSide === "TEAM_A" ? <Check className="h-4 w-4" strokeWidth={3} /> : null}
+                                    Creator side
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => onJoinSideChange("TEAM_B")}
+                                    aria-pressed={joinSide === "TEAM_B"}
+                                    className={`flex cursor-pointer items-center justify-center gap-1.5 border-2 px-3 py-2.5 text-sm font-black transition ${joinSide === "TEAM_B"
+                                        ? "border-black bg-black text-white shadow-[3px_3px_0_#e85a2d]"
+                                        : "border-transparent bg-white text-[#6f6158] hover:border-black hover:text-black"
+                                        }`}
+                                >
+                                    {joinSide === "TEAM_B" ? <Check className="h-4 w-4" strokeWidth={3} /> : null}
+                                    Opponent side
+                                </button>
                             </div>
-                            <div className="flex items-center justify-between px-4 py-3">
-                                <input
-                                    id="accept-challenge-bet-amount"
-                                    type="number"
-                                    min={minAcceptBet ?? 0}
-                                    max={maxAcceptBet}
-                                    step="any"
-                                    value={betInput}
-                                    onChange={(e) => onBetInputChange(e.target.value)}
-                                    className="w-1/2 bg-transparent text-3xl font-black text-[#1f1b16] outline-none sm:text-4xl"
-                                    placeholder="0"
-                                />
-                                {/* fetch the balance  */}
-                                <div className="text-right">
-                                    <p className="text-xs font-semibold uppercase text-[#9d958d]">Balance</p>
-                                    <p className="text-2xl font-semibold text-[#53473f]">${usdcBalance}</p>
-                                </div>
+                        ) : (
+                            <div className="flex items-center justify-between border-2 border-black bg-[#f3e1d7] px-3.5 py-2.5">
+                                <span className="text-sm font-semibold text-[#53635b]">Joining as</span>
+                                <span className="border border-black bg-black px-3 py-1 text-xs font-black text-white shadow-[2px_2px_0_#e85a2d]">Opponent</span>
                             </div>
+                        )}
+                    </div>
+
+                    <div className="mt-4">
+                        <div className="mb-2 flex items-center justify-between gap-3">
+                            <label htmlFor="accept-challenge-bet-amount" className="text-[10px] font-black uppercase tracking-[0.12em] text-[#302722]">
+                                Your stake
+                            </label>
+                            <p className="text-xs font-semibold text-[#786a61]">
+                                Min {minAcceptBet ?? 0} · Balance <span className="text-[#302722]">{formattedBalance} {betCurrency}</span>
+                            </p>
                         </div>
 
-                        <div className="mt-3 grid grid-cols-3 gap-2 md:grid-cols-6">
+                        {isTeam && !requiresCreatorStakeMatch ? (
+                            <p className="mb-2 text-[10px] font-bold text-emerald-700">
+                                The opponent side has covered the creator stake. New bets can start from 1 {betCurrency}.
+                            </p>
+                        ) : null}
+
+                        <div className="flex items-center border-2 border-black bg-white px-4 transition focus-within:shadow-[3px_3px_0_#f5d547]">
+                            <input
+                                id="accept-challenge-bet-amount"
+                                type="number"
+                                min={minAcceptBet ?? 0}
+                                max={maxAcceptBet}
+                                step="any"
+                                value={betInput}
+                                onChange={(event) => onBetInputChange(event.target.value)}
+                                className="min-w-0 flex-1 bg-transparent py-3.5 text-3xl font-black text-[#201a16] outline-none placeholder:text-[#c4b7af] sm:text-4xl"
+                                placeholder="0"
+                                aria-describedby={displayedError ? "accept-challenge-error" : undefined}
+                                aria-invalid={Boolean(displayedError)}
+                                autoFocus
+                            />
+                            <span className="ml-3 text-sm font-black text-[#665950]">{betCurrency}</span>
+                        </div>
+
+                        <div className="mt-2.5 grid grid-cols-6 gap-1.5 sm:gap-2">
                             {PRESET_AMOUNTS.map((amount) => {
                                 const isActive = parsedBet === amount;
+                                const isDisabled = isPresetDisabled(amount);
                                 return (
                                     <button
                                         key={amount}
                                         type="button"
-                                        onClick={() => handlePresetClick(amount)}
-                                        className={`rounded-xl border px-3 py-2 text-sm font-semibold transition ${isActive
-                                            ? "border-emerald-500 bg-emerald-50 text-emerald-700"
-                                            : "border-[#e6d7cc] bg-white text-[#53473f] hover:border-[#ccb6a8]"
-                                            }`}
+                                        onClick={() => onBetInputChange(String(amount))}
+                                        disabled={isDisabled}
+                                        className={`cursor-pointer border-2 px-1 py-2 text-xs font-black transition sm:text-sm ${isActive
+                                            ? "border-black bg-[#f5d547] text-black shadow-[2px_2px_0_#111]"
+                                            : "border-black/20 bg-white text-[#5d5048] hover:border-black"
+                                            } disabled:cursor-not-allowed disabled:bg-[#f4efec] disabled:text-[#b5a8a0]`}
                                     >
                                         {amount}
                                     </button>
@@ -274,70 +341,91 @@ export function AcceptChallengeModal({
                             <button
                                 type="button"
                                 onClick={handleMaxClick}
-                                className="rounded-xl border border-[#e6d7cc] bg-white px-3 py-2 text-sm font-semibold text-[#53473f] transition hover:border-[#ccb6a8]"
+                                className="cursor-pointer border-2 border-black/20 bg-white px-1 py-2 text-xs font-black text-[#5d5048] transition hover:border-black sm:text-sm"
                             >
-                                MAX
+                                Max
                             </button>
                         </div>
-                        <p className="mt-1 text-[11px] text-[#7b746d]">
-                            Available balance: {typeof usdcBalance === "number" && Number.isFinite(usdcBalance) ? usdcBalance.toFixed(2) : "0.00"} {betCurrency}
-                        </p>
 
-                        {liveValidationError || betError ? (
-                            <p className="mt-2 text-xs text-red-600">{liveValidationError || betError}</p>
+                        {validStake > 0 && !liveValidationError ? (
+                            <div className="mt-3 flex items-center justify-between gap-4 border-2 border-black bg-[#fff5bd] px-3 py-3 shadow-[2px_2px_0_#111] sm:px-4">
+                                <div className="min-w-0">
+                                    <p className="text-[11px] font-black uppercase tracking-[0.09em] text-[#8a6500]">If your side wins</p>
+                                    <p className="mt-0.5 text-xs font-semibold text-[#6f6259]">
+                                        +{formatAmount(potentialProfit)} {betCurrency} potential profit
+                                    </p>
+                                </div>
+                                <div className="shrink-0 text-right">
+                                    <p className="text-2xl font-black leading-none text-[#08764b]">
+                                        {formatAmount(potentialPayout)} <span className="text-xs">{betCurrency}</span>
+                                    </p>
+                                    <p className="mt-1 text-[10px] font-semibold text-[#807268]">estimated payout · before fees</p>
+                                </div>
+                            </div>
+                        ) : null}
+
+                        {displayedError ? (
+                            <p id="accept-challenge-error" className="mt-2 text-xs font-semibold text-red-600" role="alert">
+                                {displayedError}
+                            </p>
+                        ) : null}
+
+                        {hasLowBalance ? (
+                            <div className="mt-3 flex flex-col gap-3 border-2 border-black bg-amber-50 px-3.5 py-3 sm:flex-row sm:items-center">
+                                <CircleAlert className="h-5 w-5 shrink-0 text-amber-700" />
+                                <div className="min-w-0 flex-1">
+                                    <p className="text-sm font-black text-amber-950">More USDC needed</p>
+                                    <p className="text-xs font-medium text-amber-800">
+                                        Deposit at least {balanceShortfall.toLocaleString(undefined, { maximumFractionDigits: 6 })} more {betCurrency} to join with this stake.
+                                    </p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={handleDeposit}
+                                    className="inline-flex shrink-0 cursor-pointer items-center justify-center gap-1.5 border-2 border-black bg-black px-3 py-2 text-xs font-black text-white transition hover:bg-[#27211e] hover:shadow-[2px_2px_0_#e85a2d]"
+                                >
+                                    <CircleDollarSign className="h-4 w-4" />
+                                    Deposit USDC
+                                </button>
+                            </div>
                         ) : null}
                     </div>
 
-                    {/* info section  */}
-                    <div className="grid gap-2 sm:grid-cols-2">
-                        {/* contract section  */}
-                        <div className="grid rounded-xl border border-[#e7ddd5] bg-white p-2.5">
-                            <div className="flex items-center gap-2 md:pr-3">
-                                <div className="min-w-0">
-                                    <p className="truncate text-sm font-bold text-[#1f1b16]">
-                                        Your funds are secure <span className="text-emerald-600">🔒</span>
-                                    </p>
-                                    <p className="truncate text-xs text-[#66615b]">
-                                        Bet stays in escrow until challenge resolution.
-                                    </p>
-                                    <p className="text-[11px] text-[#7b746d]">Escrow Contract</p>
-                                    <div className="mt-0.5 flex items-center gap-1">
-                                        {escrowHref ? (
-                                            <a
-                                                href={escrowHref}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="text-sm font-bold text-emerald-700 underline-offset-2 hover:underline"
-                                            >
-                                                {escrowAddressDisplay} ↗
-                                            </a>
-                                        ) : (
-                                            <p className="text-sm font-bold text-emerald-700">{escrowAddressDisplay} ↗</p>
-                                        )}
-                                    </div>
-                                </div>
+                    {escrowHref && escrowAddressDisplay ? (
+                        <div className="group relative mt-3 flex justify-end focus-within:z-10">
+                            <a
+                                href={escrowHref}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex cursor-pointer items-center gap-1.5 border border-black/30 bg-white px-2.5 py-1.5 text-[10px] font-black uppercase tracking-[0.06em] text-[#6b5e56] transition hover:border-black hover:text-black focus:outline-none focus:ring-2 focus:ring-[#f5d547]"
+                                aria-describedby="accept-escrow-tooltip"
+                            >
+                                <ShieldCheck className="h-3.5 w-3.5" strokeWidth={2.2} />
+                                View escrow
+                                <ExternalLink className="h-3 w-3" />
+                            </a>
+                            <div
+                                id="accept-escrow-tooltip"
+                                role="tooltip"
+                                className="pointer-events-none absolute bottom-full right-0 z-20 mb-2 w-64 border border-black bg-black px-3 py-2 text-xs font-bold leading-relaxed text-white opacity-0 shadow-[2px_2px_0_#e85a2d] transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+                            >
+                                Your funds stay locked in escrow until resolution{resolveLabel ? ` on ${resolveLabel}` : ""}.
+                                <span className="absolute right-5 top-full border-4 border-transparent border-t-[#201a16]" />
                             </div>
                         </div>
-
-                        {/* winner section  */}
-                        <div className="flex items-center gap-2 rounded-xl border border-[#d9ece3] bg-[#eff8f3] px-2.5 py-2">
-                            <div className="min-w-0">
-                                <p className="text-sm font-bold text-[#2d2a26]">Prize is distributed after challenge gets resolved 🏆</p>
-                                <p className=" text-xs text-[#67615b]">Fair play guaranteed. Back your prediction with confidence.</p>
-                            </div>
-                        </div>
-                    </div>
+                    ) : null}
 
                     <button
                         type="submit"
                         disabled={isLoading || Boolean(liveValidationError)}
-                        className="rekto-button cursor-pointer w-full rounded-2xl bg-[#11895a] px-5 py-3.5 text-lg font-black text-white shadow-lg transition hover:bg-[#0f7b50] disabled:cursor-not-allowed disabled:opacity-70"
+                        className="rekto-button mt-5 flex h-12 w-full cursor-pointer items-center justify-center gap-2 border-2 border-black bg-black px-5 text-sm font-black text-white transition-all hover:-translate-y-0.5 hover:bg-[#27211e] hover:shadow-[3px_3px_0_#e85a2d] disabled:cursor-not-allowed disabled:translate-y-0 disabled:opacity-50 sm:text-base"
                     >
-                        {isLoading ? "PROCESSING..." : "ACCEPT & PROCEED"}
+                        {isLoading ? <LoaderCircle className="h-5 w-5 animate-spin" /> : null}
+                        {submitLabel}
                     </button>
-
                 </form>
-            </div>
-        </div>
+            </section>
+        </div>,
+        document.body,
     );
 }

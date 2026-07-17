@@ -1,49 +1,48 @@
-
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import "./globals.css";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 import { Analytics } from "@vercel/analytics/next";
 import ReownProvider from "./providers/reown-provider";
+import { ReferralAttributionCapture } from "./components/ReferralAttributionCapture";
 
 import { WelcomeTutorialModal } from "./components/homepage-components";
-import { PageMarginWrapper } from "./components/PageMarginWrapper";
 
 export const metadata: Metadata = {
   title: {
-    default: "RektoFun | The First PvP Battleground For Predictions",
-    template: " | RektoFun",
+    default: "The PvP Battleground For Predictions On Solana | RektoFun",
+    template: "%s | RektoFun",
   },
-  description: "The first PvP battleground for predictions. Create permissionless prediciton challenges around crypto & sports. Compete other traders, and win rewards. Prediction Markets 2.0",
-  keywords: ["prediction markets", " PvP trading", " crypto predictions", " price prediction", "permissionless prediction markets", " solana meme projects", " pump fun alternative", " prediction markets on solana", "pvp battleground for predictions", " Solana", " Bitcoin", " Ethereum"],
+  description: "Explore RektoFun, a Solana challenge market where users create permissionless crypto and sports challenges, compete, and win rewards.",
+  applicationName: "RektoFun",
+  keywords: ["RektoFun", "prediction markets", "challenge markets", "Solana dapps", "prediction markets on Solana", "trending prediction markets", "crypto predictions", "sports predictions", "PvP predictions"],
   authors: [{ name: "RektoFun" }],
   creator: "RektoFun",
   publisher: "RektoFun",
   metadataBase: new URL("https://rekto.fun"),
-  alternates: {
-    canonical: "/",
-  },
+  category: "finance",
   openGraph: {
     type: "website",
     locale: "en_US",
     url: "https://rekto.fun",
     siteName: "RektoFun",
-    title: "RektoFun | The First PvP Battleground For Predictions",
-    description: "The first PvP battleground for predictions. Compete, battle, and win rewards.",
+    title: "The PvP Battleground For Predictions On Solana | RektoFun",
+    description: "Create and join permissionless crypto and sports challenge markets on Solana.",
     images: [
       {
-        url: "/logos/BG.png",
-        width: 1200,
-        height: 630,
-        alt: "RektoFun - PvP Prediction Markets",
+        url: "/logos/social_share.png",
+        width: 1731,
+        height: 909,
+        alt: "RektoFun prediction and challenge markets on Solana",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "RektoFun | The First PvP Battleground For Predictions",
-    description: "The first PvP battleground for predictions. Compete, battle, and win rewards.",
-    images: ["/logos/BG.png"],
+    title: "The PvP Battleground For Predictions On Solana | RektoFun",
+    description: "Create and join permissionless crypto and sports challenge markets on Solana.",
+    images: ["/logos/social_share.png"],
     creator: "@rekto_fun",
   },
   robots: {
@@ -58,14 +57,11 @@ export const metadata: Metadata = {
     },
   },
   icons: {
-    icon: "/fav.png",
-    shortcut: "/fav.png",
-    apple: "/fav.png",
+    icon: "/fav_old.png",
+    shortcut: "/fav_old.png",
+    apple: "/fav_old.png",
   },
   manifest: "/manifest.json",
-  verification: {
-    google: "your-google-verification-code",
-  },
 };
 
 export default function RootLayout({
@@ -82,23 +78,22 @@ export default function RootLayout({
           href="https://fonts.cdnfonts.com/css/craftwork-grotesk"
           rel="stylesheet"
         />
-        <link rel="icon" type="image/png" href="/fav.png" />
-        <link rel="shortcut icon" type="image/png" href="/fav.png" />
-        <link rel="apple-touch-icon" href="/fav.png" />
+        <link rel="icon" type="image/png" href="/fav_old.png" />
+        <link rel="shortcut icon" type="image/png" href="/fav_old.png" />
+        <link rel="apple-touch-icon" href="/fav_old.png" />
         <meta name="theme-color" content="#f3e1d7" />
         <meta name="msapplication-TileColor" content="#f3e1d7" />
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
       </head>
-
       <body className="min-h-full flex flex-col">
         <ReownProvider>
-          <div className="pixel-shell min-h-full flex flex-col">
+          <div className="pixel-shell min-h-screen flex flex-col">
+            <Suspense fallback={null}>
+              <ReferralAttributionCapture />
+            </Suspense>
             <WelcomeTutorialModal />
             <Navbar />
-
-            <PageMarginWrapper>
-              <main className="flex-1">{children}</main>
-            </PageMarginWrapper>
+            <main className="flex-1 mt-12 md:mt-8">{children}</main>
             <Footer />
           </div>
         </ReownProvider>

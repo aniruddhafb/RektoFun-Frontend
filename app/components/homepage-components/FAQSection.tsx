@@ -27,7 +27,7 @@ const faqData = [
 ];
 
 export function FAQSection() {
-    const [openIndex, setOpenIndex] = useState<number | null>(null);
+    const [openIndex, setOpenIndex] = useState<number | null>(0);
 
     return (
         <section className="relative overflow-hidden px-4 py-16 sm:px-6 sm:py-20 lg:px-8 xl:px-12">

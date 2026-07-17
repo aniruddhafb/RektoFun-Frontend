@@ -1,175 +1,283 @@
-export interface Challenge {
-  id: string;
-  title: string;
-  description: string;
-  category: string;
-  event_type: string;
+import { User } from '../users-service/users';
+
+type ChallengeCreator = number & User;
+
+export interface CreateChallengeParams {
+  statement: string;
   ticker: string;
-  created_by: string;
-  mode: string;
+  trading_pair: string;
+  target: number;
   initial_bet: number;
-  min_accept_bet: number;
-  max_accept_bet: number;
-  min_bet: number;
-  bet_unit: number;
-  total_pool: number;
-  status: 'open' | 'locked' | 'resolved' | 'cancelled';
-  resolution_status: string;
-  resolution_mode: string;
+  pool_size: number;
   resolution_source: string;
-  resolution_config: Record<string, unknown>;
-  expire_time: string;
-  resolve_time: string;
-  resolved_at: string | null;
-  result: Record<string, unknown>;
-  metadata: Record<string, unknown>;
-  created_at: string;
-  updated_at: string;
+  metadata: Record<string, Record<string, unknown>>;
+  creator: number;
+  resolution_method: 'PRICE_FEED' | string;
+  participants: number;
+  status: 'OPEN' | string;
+  mode: 'PVP' | string;
+  result: 'TEAM_A' | string;
+  direction: 'UP' | string;
+  expiry: string;
+  resolution_date: string;
+  final_price: number;
+  category?: string;
 }
 
-export interface ChallengeListItem {
-  id: string;
+export interface ChallengeAvailability {
+  allowed: boolean;
+  reason?: string | null;
+  available_at?: string | null;
+  conflicting_challenge_ids: number[];
+}
+
+export interface HighestBetEntry {
+  id: number;
+  username: string;
+  profile_image: string;
+  pubkey: string;
+  bet: number;
+  twitter_username?: string | null;
+  user_type?: "user" | "moderator";
+}
+
+export interface HighestBets {
+  TEAM_A?: HighestBetEntry;
+  TEAM_B?: HighestBetEntry;
+}
+
+export interface TeamCountEntry {
+  total_bets: number;
+  total_amount: number;
+}
+
+export interface TeamCount {
+  TEAM_A?: TeamCountEntry;
+  TEAM_B?: TeamCountEntry;
+}
+
+export interface BetInfo {
+  highest_bet?: HighestBets;
+  team_count?: TeamCount;
+}
+
+export interface Challenge {
+  id: number;
+  views: number;
   title: string;
-  mode: string;
-  resolution_source?: string | null;
+  statement: string;
+  ticker: string;
+  trading_pair: string;
+  target: number;
   initial_bet: number;
-  target_price?: number;
-  min_accept_bet?: number;
-  max_accept_bet?: number;
-  min_bet?: number;
+  pool_size: number;
   total_pool: number;
-  status: 'open' | 'locked' | 'resolved' | 'cancelled';
+  resolution_source: string;
   resolution_status?: string;
-  expire_time: string;
-  resolve_time: string;
-  resolved_at: string | null;
-  result: Record<string, unknown>;
-  created_at: string;
+  metadata: Record<string, Record<string, unknown>>;
+  creator: ChallengeCreator;
+  creator_id?: number;
+  creator_details?: User | null;
+  resolution_method: 'PRICE_FEED' | string;
+  participants: number;
   total_challengers: number;
   total_opponents: number;
+  status: 'OPEN' | 'PENDING_RESOLUTION' | 'EXPIRED' | 'RESOLVED' | 'CANCELLED' | string;
+  mode: 'PVP' | 'TEAM' | string;
+  result: 'TEAM_A' | string;
+  direction: 'UP' | 'DOWN' | string;
+  expiry: string;
+  expire_time: string;
+  resolution_date: string;
+  resolve_time: string;
+  resolved_at: string;
+  final_price: number;
+  category?: string;
+  category_image?: string | null;
+  created_at: string;
+  bet_info?: BetInfo | null;
   market: {
     name: string;
-    image: string;
     icon: string;
-    description?: string | null;
-    parent_id: string | null;
+    image: string;
+    parent_market_id: string;
+    parent_id: string;
   };
-  creator: {
-    username: string;
-    profile_image: string;
-    wallet_address: string;
-  };
-  opponent_info?: {
-    username: string;
-    profile_image: string;
-    wallet_address: string;
-  } | null;
 }
 
-export interface ChallengesResponse {
-  challenges: ChallengeListItem[];
+export interface ChallengeHistoryEvent {
+  id: string;
+  type: "redeemed" | "refunded";
+  user_id: number;
+  amount: number;
+  occurred_at: string;
+  signature?: string;
+}
+
+export function getChallengeHistoryEvents(challenge: Challenge): ChallengeHistoryEvent[] {
+  const value = challenge.metadata?.activity_events;
+  if (!Array.isArray(value)) return [];
+  return value.filter((event): event is ChallengeHistoryEvent => (
+    Boolean(event)
+    && typeof event === "object"
+    && (event.type === "redeemed" || event.type === "refunded")
+    && typeof event.user_id === "number"
+    && typeof event.amount === "number"
+    && typeof event.occurred_at === "string"
+  ));
+}
+
+export function getChallengeCategoryImage(challenge: Challenge): string {
+  const composer = challenge.metadata?.composer;
+  const metadataImage = typeof composer?.category_image === "string"
+    ? composer.category_image
+    : typeof composer?.image_url === "string"
+      ? composer.image_url
+      : "";
+
+  return challenge.category_image
+    || metadataImage
+    || challenge.market?.image
+    || challenge.market?.icon
+    || "/scribbles/btc.png";
+}
+
+export interface GetChallengesResponse {
+  challenges: Challenge[];
+  total: number;
   count: number;
+  has_more: boolean;
 }
 
 export interface GetChallengesParams {
-  status?: 'open' | 'locked' | 'resolved' | 'cancelled';
-  category?: string;
-  ticker?: string;
-  created_by?: string;
-  search?: string;
-  sort?: 'latest' | 'expiring_soon';
   limit?: number;
   offset?: number;
+  created_by?: number | string;
+  search?: string;
+  sort?: string;
+  resolution_source?: string;
+  open_first?: boolean;
+  status?: string;
+  expiring_soon?: boolean;
+  joinable?: boolean;
+  include_total?: boolean;
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
-const DEFAULT_TIMEOUT_MS = 10000;
-const DEFAULT_RETRIES = 2;
-
-interface RequestOptions {
-  signal?: AbortSignal;
-  timeoutMs?: number;
-  retries?: number;
-  cacheKey?: string;
-  cacheTtlMs?: number;
+export interface GetChallengesOptions {
   bypassCache?: boolean;
 }
 
-interface CacheEntry<T> {
-  data: T;
-  expiresAt: number;
-}
+const API_BASE_URL = "/api/backend";
+const challengeListRequests = new Map<string, Promise<GetChallengesResponse>>();
 
-const requestCache = new Map<string, CacheEntry<unknown>>();
+export async function createChallenge(params: CreateChallengeParams): Promise<Challenge> {
+  const response = await fetch(`${API_BASE_URL}/challenges`, {
+    method: 'POST',
+    headers: {
+      'accept': 'application/json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(params),
+  });
 
-function shouldRetryStatus(status: number): boolean {
-  return status === 408 || status === 429 || status >= 500;
-}
+  console.log("response", response);
 
-function wait(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-async function fetchJsonWithRetry<T>(url: string, init: RequestInit, options: RequestOptions = {}): Promise<T> {
-  const retries = options.retries ?? DEFAULT_RETRIES;
-  const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
-
-  for (let attempt = 0; attempt <= retries; attempt++) {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), timeoutMs);
-    let abortListener: (() => void) | undefined;
-
-    if (options.signal) {
-      abortListener = () => controller.abort();
-      options.signal.addEventListener('abort', abortListener, { once: true });
-    }
-
-    try {
-      const response = await fetch(url, {
-        ...init,
-        signal: controller.signal,
-      });
-
-      if (!response.ok) {
-        if (attempt < retries && shouldRetryStatus(response.status)) {
-          await wait(250 * (attempt + 1));
-          continue;
-        }
-        throw new Error(`Request failed (${response.status}): ${response.statusText}`);
-      }
-
-      return response.json() as Promise<T>;
-    } catch (error) {
-      const isAborted = error instanceof DOMException && error.name === 'AbortError';
-      const parentAborted = !!options.signal?.aborted;
-
-      if (parentAborted) {
-        throw error;
-      }
-
-      if (attempt < retries && isAborted) {
-        await wait(250 * (attempt + 1));
-        continue;
-      }
-
-      if (attempt < retries) {
-        await wait(250 * (attempt + 1));
-        continue;
-      }
-
-      throw error;
-    } finally {
-      clearTimeout(timeout);
-      if (options.signal && abortListener) {
-        options.signal.removeEventListener('abort', abortListener);
-      }
-    }
+  if (!response.ok) {
+    const data = await response.json().catch(() => null);
+    const detail = data?.detail;
+    throw new Error(
+      (typeof detail === "object" ? detail?.reason : detail)
+      || `Failed to create challenge: ${response.statusText}`
+    );
   }
 
-  throw new Error('Request failed after retries');
+  return response.json();
 }
 
-export async function getChallengeById(id: string): Promise<Challenge> {
+export async function checkChallengeAvailability(
+  params: CreateChallengeParams
+): Promise<ChallengeAvailability> {
+  const response = await fetch(`${API_BASE_URL}/challenges/availability`, {
+    method: "POST",
+    headers: { accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify(params),
+  });
+  if (!response.ok) throw new Error("Could not check whether this challenge is available.");
+  return response.json();
+}
+
+export async function getChallenges(
+  params?: GetChallengesParams,
+  _options?: GetChallengesOptions
+): Promise<GetChallengesResponse> {
+  void _options;
+  const queryParams = new URLSearchParams();
+  
+  if (params?.limit !== undefined) {
+    queryParams.append('limit', params.limit.toString());
+  }
+  
+  if (params?.offset !== undefined) {
+    queryParams.append('offset', params.offset.toString());
+  }
+
+  if (params?.created_by !== undefined) {
+    queryParams.append('created_by', params.created_by.toString());
+  }
+
+  if (params?.search) {
+    queryParams.append('search', params.search);
+  }
+
+  if (params?.resolution_source) {
+    queryParams.append('resolution_source', params.resolution_source);
+  }
+
+  if (params?.open_first !== undefined) {
+    queryParams.append('open_first', params.open_first.toString());
+  }
+
+  if (params?.status) {
+    queryParams.append('status', params.status);
+  }
+
+  if (params?.expiring_soon !== undefined) {
+    queryParams.append('expiring_soon', params.expiring_soon.toString());
+  }
+
+  if (params?.joinable !== undefined) {
+    queryParams.append('joinable', params.joinable.toString());
+  }
+
+  if (params?.include_total !== undefined) {
+    queryParams.append('include_total', params.include_total.toString());
+  }
+  
+  const queryString = queryParams.toString();
+  const url = `${API_BASE_URL}/challenges${queryString ? `?${queryString}` : ''}`;
+  
+  const pending = challengeListRequests.get(url);
+  if (pending) return pending;
+
+  const request = fetch(url, {
+    method: 'GET',
+    headers: { 'accept': 'application/json' },
+  }).then(async (response) => {
+    if (!response.ok) throw new Error(`Failed to fetch challenges: ${response.statusText}`);
+    const data = await response.json();
+    return {
+      challenges: data.challenges || [],
+      total: data.total || 0,
+      count: data.count ?? data.total ?? 0,
+      has_more: data.has_more ?? false,
+    };
+  }).finally(() => challengeListRequests.delete(url));
+
+  challengeListRequests.set(url, request);
+  return request;
+}
+
+export async function getChallengeById(id: number): Promise<Challenge> {
   const response = await fetch(`${API_BASE_URL}/challenges/${id}`, {
     method: 'GET',
     headers: {
@@ -184,299 +292,60 @@ export async function getChallengeById(id: string): Promise<Challenge> {
   return response.json();
 }
 
-export async function getChallenges(
-  params: GetChallengesParams = {},
-  requestOptions: RequestOptions = {},
-): Promise<ChallengesResponse> {
-  const searchParams = new URLSearchParams();
-
-  if (params.status) {
-    searchParams.set('status', params.status);
-  }
-  if (params.category) {
-    searchParams.set('category', params.category);
-  }
-  if (params.ticker) {
-    searchParams.set('ticker', params.ticker);
-  }
-  if (params.created_by) {
-    searchParams.set('created_by', params.created_by);
-  }
-  if (params.search) {
-    searchParams.set('search', params.search);
-  }
-  if (params.sort) {
-    searchParams.set('sort', params.sort);
-  }
-  if (params.limit !== undefined) {
-    searchParams.set('limit', String(params.limit));
-  }
-  if (params.offset !== undefined) {
-    searchParams.set('offset', String(params.offset));
-  }
-
-  const queryString = searchParams.toString();
-  const url = `${API_BASE_URL}/challenges${queryString ? `?${queryString}` : ''}`;
-  const cacheKey = requestOptions.cacheKey ?? url;
-  const cacheTtlMs = requestOptions.cacheTtlMs ?? 20000;
-  const now = Date.now();
-
-  if (!requestOptions.bypassCache) {
-    const cached = requestCache.get(cacheKey);
-    if (cached && cached.expiresAt > now) {
-      return cached.data as ChallengesResponse;
-    }
-  }
-
-  const response = await fetchJsonWithRetry<ChallengesResponse>(url, {
-    method: 'GET',
+export async function incrementChallengeViews(id: number): Promise<number> {
+  const response = await fetch(`${API_BASE_URL}/challenges/${id}/view`, {
+    method: 'POST',
     headers: {
       'accept': 'application/json',
     },
-  }, requestOptions);
-
-  requestCache.set(cacheKey, {
-    data: response,
-    expiresAt: now + cacheTtlMs,
   });
 
-  return response;
+  if (!response.ok) {
+    throw new Error(`Failed to record challenge view: ${response.statusText}`);
+  }
+
+  const data: { views: number } = await response.json();
+  return data.views;
 }
 
-export interface CreateChallengeParams {
-  title: string;
-  description: string;
-  category: string;
-  event_type: string;
-  ticker: string;
-  asset_name: string;
-  created_by: string;
-  mode: string;
-  initial_bet: number;
-  target_price?: number;
-  min_accept_bet?: number;
-  max_accept_bet?: number;
-  min_bet?: number;
-  bet_unit: number;
-  expire_time: string;
-  resolve_time: string;
-  resolution_source: string;
-  resolution_config?: Record<string, unknown>;
-  result?: Record<string, unknown>;
-  metadata?: Record<string, unknown>;
-}
-
-export interface CreateChallengeResponse {
-  status: string;
-}
-
-export interface CreateChallengeSideParams {
-  challenge_id: string;
-  side_key: string;
-  display_name: string;
-  total_amount: number;
-}
-
-export interface CreateChallengeSideResponse {
-  status: string;
-}
-
-export interface ChallengeSide {
-  id: string;
-  challenge_id: string;
-  side_key: string;
-  display_name: string;
-  total_amount: number;
-  created_at: string;
-}
-
-export interface ChallengeSidesResponse {
-  sides: ChallengeSide[];
-  count: number;
-}
-
-export interface GetChallengeSidesParams {
-  limit?: number;
-  offset?: number;
-}
-
-export interface JoinChallengeParams {
-  challenge_id: string;
-  user_id: string;
-  side: string;
-  bet_amount: number;
-}
-
-export interface JoinChallengeResponse {
-  status: string;
-}
-
-export async function createChallenge(params: CreateChallengeParams): Promise<CreateChallengeResponse> {
-  const response = await fetch(`${API_BASE_URL}/challenges`, {
-    method: 'POST',
+export async function updateChallengeMetadata(
+  challengeId: number,
+  metadata: Record<string, unknown>
+): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/challenges/${challengeId}`, {
+    method: 'PATCH',
     headers: {
       'accept': 'application/json',
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify(params),
+    body: JSON.stringify({ metadata }),
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to create challenge: ${response.statusText}`);
+    throw new Error(`Failed to update challenge metadata: ${response.statusText}`);
   }
-
-  const json = await response.json();
-  requestCache.clear();
-  return json;
 }
 
-export async function joinChallenge(params: JoinChallengeParams): Promise<JoinChallengeResponse> {
-  const response = await fetch(`${API_BASE_URL}/challenges/join`, {
-    method: 'POST',
-    headers: {
-      'accept': 'application/json',
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(params),
+export async function recordChallengeHistoryEvent(
+  challenge: Challenge,
+  event: ChallengeHistoryEvent,
+  status?: Challenge["status"],
+): Promise<void> {
+  const existing = getChallengeHistoryEvents(challenge);
+  const metadata = { ...(challenge.metadata || {}), activity_events: [...existing.filter((item) => item.id !== event.id), event] };
+  const response = await fetch(`${API_BASE_URL}/challenges/${challenge.id}`, {
+    method: "PATCH",
+    headers: { accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify({ metadata, ...(status ? { status } : {}) }),
   });
-
-  if (!response.ok) {
-    throw new Error(`Failed to join challenge: ${response.statusText}`);
-  }
-
-  const json = await response.json();
-  requestCache.clear();
-  return json;
+  if (!response.ok) throw new Error(`Failed to record challenge history: ${response.statusText}`);
 }
 
-export async function getChallengeSides(params: GetChallengeSidesParams = {}): Promise<ChallengeSidesResponse> {
-  const searchParams = new URLSearchParams();
-
-  if (params.limit !== undefined) {
-    searchParams.set('limit', String(params.limit));
-  }
-  if (params.offset !== undefined) {
-    searchParams.set('offset', String(params.offset));
-  }
-
-  const queryString = searchParams.toString();
-  const url = `${API_BASE_URL}/challenge-sides${queryString ? `?${queryString}` : ''}`;
-
-  const response = await fetch(url, {
-    method: 'GET',
-    headers: {
-      'accept': 'application/json',
-    },
+export async function updateChallengeStatus(challengeId: number, status: Challenge["status"]): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/challenges/${challengeId}`, {
+    method: 'PATCH',
+    headers: { 'accept': 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status }),
   });
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch challenge sides: ${response.statusText}`);
-  }
-
-  return response.json();
+  if (!response.ok) throw new Error(`Failed to update challenge status: ${response.statusText}`);
 }
-
-export interface CreatePositionParams {
-  challenge_id: string;
-  side_id: string;
-  user_id: string;
-  amount: number;
-}
-
-export interface CreatePositionResponse {
-  status: string;
-}
-
-export async function createPosition(params: CreatePositionParams): Promise<CreatePositionResponse> {
-  const response = await fetch(`${API_BASE_URL}/positions`, {
-    method: 'POST',
-    headers: {
-      'accept': 'application/json',
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(params),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to create position: ${response.statusText}`);
-  }
-
-  return response.json();
-}
-
-export async function createChallengeSide(params: CreateChallengeSideParams): Promise<CreateChallengeSideResponse> {
-  const response = await fetch(`${API_BASE_URL}/challenge-sides`, {
-    method: 'POST',
-    headers: {
-      'accept': 'application/json',
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(params),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to create challenge side: ${response.statusText}`);
-  }
-
-  return response.json();
-}
-
-export interface Position {
-  id: string;
-  challenge_id: string;
-  side_id: string;
-  user_id: string;
-  amount: number;
-  created_at: string;
-}
-
-export interface PositionsResponse {
-  positions: Position[];
-  count: number;
-}
-
-export interface GetPositionsParams {
-  challenge_id?: string;
-  side_id?: string;
-  user_id?: string;
-  limit?: number;
-  offset?: number;
-}
-
-export async function getPositions(params: GetPositionsParams = {}): Promise<PositionsResponse> {
-  const searchParams = new URLSearchParams();
-
-  if (params.challenge_id) {
-    searchParams.set('challenge_id', params.challenge_id);
-  }
-  if (params.side_id) {
-    searchParams.set('side_id', params.side_id);
-  }
-  if (params.user_id) {
-    searchParams.set('user_id', params.user_id);
-  }
-  if (params.limit !== undefined) {
-    searchParams.set('limit', String(params.limit));
-  }
-  if (params.offset !== undefined) {
-    searchParams.set('offset', String(params.offset));
-  }
-
-  const queryString = searchParams.toString();
-  const url = `${API_BASE_URL}/positions${queryString ? `?${queryString}` : ''}`;
-
-  const response = await fetch(url, {
-    method: 'GET',
-    headers: {
-      'accept': 'application/json',
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch positions: ${response.statusText}`);
-  }
-
-  return response.json();
-}
-
-

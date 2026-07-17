@@ -8,19 +8,21 @@ export const metadata: Metadata = {
         index: true,
         follow: true,
     },
+    alternates: { canonical: "/terms" },
     openGraph: {
         title: "Terms of Service | RektoFun",
         description: "Read our Terms of Service and user agreement.",
         url: "https://rekto.fun/terms",
         images: [
             {
-                url: "/logos/BG.png",
-                width: 1200,
-                height: 630,
+                url: "/logos/social_share.png",
+                width: 1731,
+                height: 909,
                 alt: "RektoFun Terms of Service",
             },
         ],
     },
+    twitter: { card: "summary_large_image", images: ["/logos/social_share.png"] },
 };
 
 export default function TermsPage() {
@@ -34,7 +36,7 @@ export default function TermsPage() {
 
                 <div className="prose prose-lg max-w-none text-gray-700">
                     <p className="text-lg mb-6">
-                        Last updated: April 2026
+                        Last updated: 14 July 2026
                     </p>
 
                     <section className="mb-8">
@@ -113,7 +115,7 @@ export default function TermsPage() {
                         </h2>
                         <p className="mb-4">
                             If you have any questions about these Terms of Service, please contact us
-                            through our twitter or email support at rektofun@gmail.com
+                            through our twitter or discord ticket support system.
                         </p>
                     </section>
                 </div>

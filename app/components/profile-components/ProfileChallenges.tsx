@@ -1,36 +1,75 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import { ChallengeCard } from "@/app/components/challenge-components/ChallengeCard";
-import { ChallengeListItem } from "@/app/lib/challenges-service/challenges";
+import { Challenge } from "@/app/lib/challenges-service/challenges";
 
 interface ProfileChallengesProps {
-    challenges: ChallengeListItem[];
+    challenges: Challenge[];
     loading?: boolean;
-    onChallengeClick: (challenge: ChallengeListItem) => void;
-    onToggleBookmark?: (challengeId: string) => void;
-    isBookmarked?: (challengeId: string) => boolean;
+    onChallengeClick: (challenge: Challenge) => void;
+    onCreateChallenge?: () => void;
+    hasMore?: boolean;
+    loadingMore?: boolean;
+    onLoadMore?: () => void;
 }
 
 export function ProfileChallenges({
     challenges,
     loading,
     onChallengeClick,
-    onToggleBookmark,
-    isBookmarked,
+    onCreateChallenge,
+    hasMore = false,
+    loadingMore = false,
+    onLoadMore,
 }: ProfileChallengesProps) {
+    const loadMoreRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const target = loadMoreRef.current;
+        if (!target || !hasMore || loadingMore) return;
+        const observer = new IntersectionObserver(([entry]) => {
+            if (entry.isIntersecting) onLoadMore?.();
+        }, { rootMargin: "300px" });
+        observer.observe(target);
+        return () => observer.disconnect();
+    }, [hasMore, loadingMore, onLoadMore]);
+
+    const skeletons = (count: number) => Array.from({ length: count }, (_, index) => (
+        <div key={index} className="h-[300px] border-2 border-black bg-white/70 p-5 animate-pulse" aria-hidden="true">
+            <div className="h-6 w-3/4 rounded bg-gray-200" />
+            <div className="mt-3 h-4 w-1/2 rounded bg-gray-200" />
+            <div className="mt-8 h-4 w-full rounded bg-gray-200" />
+            <div className="mt-2 h-4 w-5/6 rounded bg-gray-200" />
+            <div className="mt-10 h-10 w-full rounded-xl bg-gray-200" />
+        </div>
+    ));
+
     if (loading) {
         return (
-            <div className="mt-6 p-4 bg-white/70 rounded-xl border border-[#d4a574]/30 text-center text-[#8b7355]">
-                Loading challenges...
-            </div>
+            <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">{skeletons(6)}</div>
         );
     }
 
     if (!challenges.length) {
         return (
-            <div className="bg-[#f8ede7] rounded-2xl p-6 border border-[#e8d5c8] text-[#5c4a42] mt-4">
-                No challenges found for this user yet.
+            <div className="mx-auto mt-8 max-w-2xl px-6 py-10 text-center sm:py-12">
+                <div className="mx-auto flex h-14 w-14 items-center justify-center border border-black/15 bg-[#f5d547] shadow-[3px_3px_0_#111]">
+                    <svg className="h-7 w-7 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6l4 2m5-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </div>
+                <h2 className="mt-6 text-xl font-black text-gray-950 sm:text-2xl">No challenges found</h2>
+                {onCreateChallenge && (
+                    <button
+                        type="button"
+                        onClick={onCreateChallenge}
+                        className="mt-7 inline-flex cursor-pointer items-center justify-center border-2 border-black bg-white/70 px-6 py-3 text-sm font-black uppercase tracking-[0.08em] text-gray-800 shadow-[4px_4px_0_#e85a2d] transition-colors hover:bg-white focus:outline-none focus-visible:ring-4 focus-visible:ring-[#e85a2d]/25"
+                    >
+                        <span className="mr-2 text-lg leading-none">+</span>
+                        Create a challenge
+                    </button>
+                )}
             </div>
         );
     }
@@ -42,10 +81,11 @@ export function ProfileChallenges({
                     key={challenge.id}
                     challenge={challenge}
                     onClick={onChallengeClick}
-                    onToggleBookmark={onToggleBookmark}
-                    isBookmarked={isBookmarked?.(challenge.id)}
+                    showPin={false}
                 />
             ))}
+            {loadingMore && skeletons(9)}
+            {hasMore && <div ref={loadMoreRef} className="col-span-full h-1" aria-hidden="true" />}
         </div>
     );
 }

@@ -2,14 +2,20 @@
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  env: {
+    NEXT_PUBLIC_SOLANA_CLUSTER: process.env.NEXT_PUBLIC_SOLANA_CLUSTER,
+  },
 
   async rewrites() {
-    return [
-      {
-        source: '/api/:path*',
-        destination: 'https://api.rekto.fun/:path*',
-      },
-    ];
+    return {
+      // fallback: checked AFTER all pages, public files, AND dynamic routes.
+      fallback: [
+        {
+          source: '/api/:path*',
+          destination: 'https://api.rekto.fun/api/:path*',
+        },
+      ],
+    };
   },
   images: {
     remotePatterns: [
@@ -24,6 +30,24 @@ const nextConfig = {
         hostname: 'cryptologos.cc',
         port: '',
         pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'api.dicebear.com',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'pbs.twimg.com',
+        port: '',
+        pathname: '/profile_images/**',
+      },
+      {
+        protocol: 'https',
+        hostname: '**.supabase.co',
+        port: '',
+        pathname: '/storage/v1/object/public/category-images/**',
       },
     ],
     dangerouslyAllowSVG: true,

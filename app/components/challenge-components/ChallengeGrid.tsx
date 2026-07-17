@@ -3,23 +3,38 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAppKitAccount } from '@reown/appkit/react';
 import { ChallengeCard } from "./ChallengeCard";
-import { getChallenges } from "../../lib/challenges-service/challenges";
-import { ChallengeListItem } from '../../lib/challenges-service/challenges';
+import { getChallenges, Challenge } from "../../lib/challenges-service/challenges";
+import { getPositions } from "../../lib/positions-service/positions";
+import { useUserStore } from "@/app/store/useUserStore";
+import { CHALLENGE_CREATED_EVENT, CHALLENGE_UPDATED_EVENT } from "@/app/lib/realtime-events";
 
 interface ChallengeGridProps {
-    onRekt: (challenge: ChallengeListItem) => void;
-    onClick: (challenge: ChallengeListItem) => void;
+    onRekt: (challenge: Challenge) => void;
+    onClick: (challenge: Challenge) => void;
     onToggleBookmark: (challengeId: string) => void;
     isBookmarked: (challengeId: string) => boolean;
     onOpenModal: () => void;
-    onChallengesLoaded?: (challenges: ChallengeListItem[]) => void;
+    onChallengesLoaded?: (challenges: Challenge[]) => void;
     refreshKey?: number;
+    onRefreshComplete?: () => void;
     activeFilter: string;
-    activeAsset: string;
     searchQuery: string;
+    resolutionSource?: string;
 }
 
-const PAGE_SIZE = 6;
+const INITIAL_PAGE_SIZE = 6;
+const NEXT_PAGE_SIZE = 6;
+const STATUS_PRIORITY: Record<string, number> = {
+    OPEN: 0,
+    PENDING_RESOLUTION: 1,
+    RESOLVED: 2,
+    EXPIRED: 3,
+    CANCELLED: 4,
+};
+
+const compareChallengeStatus = (a: Challenge, b: Challenge) =>
+    (STATUS_PRIORITY[a.status.trim().toUpperCase()] ?? 5)
+    - (STATUS_PRIORITY[b.status.trim().toUpperCase()] ?? 5);
 
 export function ChallengeGrid({
     onRekt,
@@ -29,14 +44,20 @@ export function ChallengeGrid({
     onOpenModal,
     onChallengesLoaded,
     refreshKey = 0,
+    onRefreshComplete,
     activeFilter,
-    activeAsset,
     searchQuery,
+    resolutionSource,
 }: ChallengeGridProps) {
     const { address } = useAppKitAccount();
+    const { user } = useUserStore();
+    const userId = user?.id;
+    const filterUserId = activeFilter === "My Bets" || activeFilter === "Created By Me"
+        ? userId
+        : undefined;
     const ownerAddress = address || '';
 
-    const [challenges, setChallenges] = useState<ChallengeListItem[]>([]);
+    const [challenges, setChallenges] = useState<Challenge[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [loadError, setLoadError] = useState<string | null>(null);
     const [retryNonce, setRetryNonce] = useState(0);
@@ -44,9 +65,11 @@ export function ChallengeGrid({
     const [hasMore, setHasMore] = useState(true);
     const [isLoadingMore, setIsLoadingMore] = useState(false);
     const loadMoreRef = useRef<HTMLDivElement | null>(null);
+    const requestIdRef = useRef(0);
 
     const fetchChallenges = useCallback(async (currentOffset: number, append: boolean) => {
         if (append && isLoadingMore) return;
+        const requestId = ++requestIdRef.current;
 
         if (!append) {
             setIsLoading(true);
@@ -57,65 +80,143 @@ export function ChallengeGrid({
 
         try {
             const isPinnedFilter = activeFilter === "Pinned";
-            const requestLimit = isPinnedFilter ? 100 : PAGE_SIZE;
-            const requestOffset = isPinnedFilter ? 0 : currentOffset;
+            const isMyBetsFilter = activeFilter === "My Bets";
+            const isCreatedByMeFilter = activeFilter === "Created By Me";
+            const isExpiringSoonFilter = activeFilter === "Expiring Soon";
+            const isOpenFilter = activeFilter === "Open";
+            const statusFilter = activeFilter === "Completed"
+                ? "RESOLVED"
+                : activeFilter === "Cancelled"
+                    ? "CANCELLED"
+                    : undefined;
+            const needsCompleteList = isPinnedFilter || isMyBetsFilter || isCreatedByMeFilter;
 
-            const response = await getChallenges({
-                limit: requestLimit,
-                offset: requestOffset,
-                category: activeAsset !== "All Markets" ? activeAsset : undefined,
-                search: searchQuery.trim() || undefined,
-                sort: activeFilter === "Expiring Soon" ? "expiring_soon" : "latest",
-                created_by: activeFilter === "Created By Me" ? ownerAddress || undefined : undefined,
-            });
+            if ((isMyBetsFilter || isCreatedByMeFilter) && filterUserId == null) {
+                setChallenges([]);
+                setHasMore(false);
+                setOffset(0);
+                return;
+            }
+
+            const requestLimit = needsCompleteList ? 100 : append ? NEXT_PAGE_SIZE : INITIAL_PAGE_SIZE;
+            const requestOffset = needsCompleteList ? 0 : currentOffset;
+
+            const [response, positionsResponse] = await Promise.all([
+                getChallenges({
+                    limit: requestLimit,
+                    offset: requestOffset,
+                    search: searchQuery.trim() || undefined,
+                    resolution_source: resolutionSource,
+                    open_first: activeFilter !== "Latest",
+                    status: statusFilter,
+                    expiring_soon: isExpiringSoonFilter || undefined,
+                    joinable: isOpenFilter || undefined,
+                    include_total: false,
+                }),
+                isMyBetsFilter ? getPositions({ limit: 100, offset: 0 }) : Promise.resolve(null),
+            ]);
 
             let nextChunk = response.challenges ?? [];
 
+            if (resolutionSource) {
+                const normalizedSource = resolutionSource.trim().toUpperCase().replace(/[\s-]+/g, "_");
+                nextChunk = nextChunk.filter((challenge) =>
+                    String(challenge.resolution_source ?? "").trim().toUpperCase().replace(/[\s-]+/g, "_") === normalizedSource
+                );
+            }
+
             if (isPinnedFilter) {
-                nextChunk = nextChunk.filter((challenge) => isBookmarked(challenge.id));
+                nextChunk = nextChunk.filter((challenge) => isBookmarked(challenge.id.toString()));
             } else {
                 nextChunk = [...nextChunk].sort((a, b) => {
-                    const aBookmarked = isBookmarked(a.id);
-                    const bBookmarked = isBookmarked(b.id);
+                    const statusOrder = compareChallengeStatus(a, b);
+                    if (statusOrder !== 0) return statusOrder;
+                    const aBookmarked = isBookmarked(a.id.toString());
+                    const bBookmarked = isBookmarked(b.id.toString());
                     if (aBookmarked === bBookmarked) return 0;
                     return aBookmarked ? -1 : 1;
                 });
             }
 
-            if (activeFilter === "My Bets" && ownerAddress) {
-                nextChunk = nextChunk.filter((challenge) => {
-                    const creatorWallet = challenge.creator?.wallet_address?.toLowerCase();
-                    const opponentWallet = challenge.opponent_info?.wallet_address?.toLowerCase();
-                    const currentUser = ownerAddress.toLowerCase();
-                    return creatorWallet === currentUser || opponentWallet === currentUser;
+            if (isMyBetsFilter) {
+                const joinedChallengeIds = new Set(
+                    (positionsResponse?.positions ?? [])
+                        .filter((position) => position.creator === filterUserId)
+                        .map((position) => position.challenge_id),
+                );
+                nextChunk = nextChunk.filter((challenge) => joinedChallengeIds.has(challenge.id));
+            }
+
+            if (isCreatedByMeFilter) {
+                nextChunk = nextChunk.filter((challenge) => challenge.creator === filterUserId);
+            }
+
+            // Keep a client-side search pass for APIs that do not support search yet.
+            if (searchQuery.trim()) {
+                const query = searchQuery.toLowerCase();
+                nextChunk = nextChunk.filter((challenge) =>
+                    [
+                        challenge.statement,
+                        challenge.title,
+                        challenge.ticker,
+                        challenge.trading_pair,
+                        challenge.category,
+                    ].some((value) => String(value ?? "").toLowerCase().includes(query))
+                );
+            }
+
+            // Apply sort filter client-side
+            if (activeFilter === "Expiring Soon") {
+                nextChunk = [...nextChunk].sort((a, b) => {
+                    return new Date(a.expiry).getTime() - new Date(b.expiry).getTime();
+                });
+            } else if (activeFilter === "Latest") {
+                nextChunk = [...nextChunk].sort((a, b) => {
+                    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
                 });
             }
 
+            if (requestId !== requestIdRef.current) return;
             setChallenges((prev) => (append ? [...prev, ...nextChunk] : nextChunk));
-            setHasMore(!isPinnedFilter && nextChunk.length === PAGE_SIZE);
-            setOffset(isPinnedFilter ? nextChunk.length : currentOffset + nextChunk.length);
+            setHasMore(!needsCompleteList && response.has_more);
+            setOffset(needsCompleteList ? nextChunk.length : currentOffset + response.challenges.length);
         } catch (error) {
+            if (requestId !== requestIdRef.current) return;
             console.error('Failed to fetch challenges:', error);
             if (!append) {
                 setChallenges([]);
             }
             setLoadError('Could not load challenges. Please try again.');
         } finally {
+            if (requestId !== requestIdRef.current) return;
             if (!append) {
                 setIsLoading(false);
+                onRefreshComplete?.();
             } else {
                 setIsLoadingMore(false);
             }
         }
-    }, [activeAsset, activeFilter, isBookmarked, ownerAddress, searchQuery, isLoadingMore]);
+    }, [activeFilter, filterUserId, isBookmarked, onRefreshComplete, searchQuery, isLoadingMore, resolutionSource]);
 
+    /* eslint-disable react-hooks/set-state-in-effect -- reset pagination before fetching a newly selected challenge view */
     useEffect(() => {
         setIsLoadingMore(false);
         setChallenges([]);
         setOffset(0);
         setHasMore(true);
         fetchChallenges(0, false);
-    }, [refreshKey, retryNonce, activeAsset, activeFilter, searchQuery]);
+    }, [refreshKey, retryNonce, activeFilter, searchQuery, resolutionSource, filterUserId]);
+    /* eslint-enable react-hooks/set-state-in-effect */
+
+    useEffect(() => {
+        const refreshChallenges = () => setRetryNonce((nonce) => nonce + 1);
+        window.addEventListener(CHALLENGE_CREATED_EVENT, refreshChallenges);
+        window.addEventListener(CHALLENGE_UPDATED_EVENT, refreshChallenges);
+        return () => {
+            window.removeEventListener(CHALLENGE_CREATED_EVENT, refreshChallenges);
+            window.removeEventListener(CHALLENGE_UPDATED_EVENT, refreshChallenges);
+        };
+    }, []);
 
     useEffect(() => {
         if (!hasMore || isLoading || isLoadingMore) return;
@@ -147,13 +248,6 @@ export function ChallengeGrid({
     if (isLoading) {
         return (
             <div className="max-w-7xl mx-auto px-6 lg:px-8 pb-16">
-                {/* <div className="rounded-2xl border border-white/50 bg-white/60 px-6 py-6 mb-6">
-                    <p className="text-sm text-gray-500">Loading challenges</p>
-                    <p className="text-base font-medium text-gray-900 mt-1">{LOADING_MESSAGES[loadingMessageIndex]}</p>
-                    <div className="mt-4 h-1.5 w-full overflow-hidden rounded-full bg-gray-200">
-                        <div className="h-full w-1/2 animate-pulse rounded-full bg-gray-700/70" />
-                    </div>
-                </div> */}
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
                     {Array.from({ length: 6 }).map((_, index) => (
                         <div
@@ -197,16 +291,33 @@ export function ChallengeGrid({
     }
 
     if (challenges.length === 0) {
+        const isFilteredView = activeFilter !== "Latest" || searchQuery.trim().length > 0;
+
         return (
-            <div className="max-w-7xl mx-auto px-6 lg:px-8 pb-16">
-                <div className="mx-auto max-w-xl border-2 border-black bg-white p-8 text-center shadow-[5px_5px_0_#111] animate-pop-in">
-                    <p className="text-gray-800 text-lg font-black mb-4">No challenges found yet.</p>
-                    <button
-                        onClick={onOpenModal}
-                        className="cursor-pointer inline-flex items-center justify-center border-2 border-black bg-black px-6 py-3 text-sm font-black uppercase tracking-[0.08em] text-white shadow-[4px_4px_0_#e85a2d] transition-all hover:-translate-y-1 hover:shadow-[6px_6px_0_#e85a2d]"
-                    >
-                        Be the first to create one!
-                    </button>
+            <div className="mx-auto w-full max-w-7xl px-4 pb-16 sm:px-6 lg:px-8">
+                <div className="mx-auto max-w-2xl text-center">
+                    <div className="px-6 py-10 sm:px-12 sm:py-12">
+                        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-black/15 bg-[#f5d547] shadow-[3px_3px_0_#111]">
+                            <svg className="h-7 w-7 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6l4 2m5-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        </div>
+                        <h2 className="mt-6 text-xl font-black text-gray-950 sm:text-2xl">
+                            No challenges found
+                        </h2>
+                        <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-gray-500 sm:text-base">
+                            {isFilteredView
+                                ? "Try another filter or search term, or start a new challenge of your own."
+                                : "The arena is quiet for now. Start a challenge and be the first one on the board."}
+                        </p>
+                        <button
+                            onClick={onOpenModal}
+                            className="mt-7 inline-flex cursor-pointer items-center justify-center rounded-xl border border-black bg-black px-6 py-3 text-sm font-black uppercase tracking-[0.08em] text-white shadow-[4px_4px_0_#e85a2d] transition-colors hover:bg-gray-800 focus:outline-none focus-visible:ring-4 focus-visible:ring-[#e85a2d]/25"
+                        >
+                            <span className="mr-2 text-lg leading-none">+</span>
+                            Create a challenge
+                        </button>
+                    </div>
                 </div>
             </div>
         );
@@ -222,12 +333,12 @@ export function ChallengeGrid({
                         onRekt={onRekt}
                         onClick={onClick}
                         onToggleBookmark={onToggleBookmark}
-                        isBookmarked={isBookmarked(challenge.id)}
+                        isBookmarked={isBookmarked(challenge.id.toString())}
                         ownerAddress={ownerAddress}
                     />
                 ))}
                 {isLoadingMore &&
-                    Array.from({ length: PAGE_SIZE }).map((_, index) => (
+                    Array.from({ length: NEXT_PAGE_SIZE }).map((_, index) => (
                         <div
                             key={`loading-more-skeleton-${index}`}
                             className="h-[300px] border-2 border-black bg-white/70 p-5 animate-pulse"

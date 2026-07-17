@@ -2,11 +2,11 @@
 
 import React, { useState } from "react";
 import Image from "next/image";
-import { ChallengeListItem } from "@/app/lib/challenges-service/challenges";
+import { Challenge } from "@/app/lib/challenges-service/challenges";
 
 interface ProfileChallengeCardProps {
-    challenge: ChallengeListItem;
-    onClick?: (challenge: ChallengeListItem) => void;
+    challenge: Challenge;
+    onClick?: (challenge: Challenge) => void;
 }
 
 function parseDateValue(value: string | number | null | undefined): number {
@@ -45,7 +45,7 @@ function formatTimeLeft(expiresAt: number): string {
     return `${minutes}m left`;
 }
 
-function getStatusLabel(status: ChallengeListItem["status"]): { label: string; color: string; bg: string } {
+function getStatusLabel(status: Challenge["status"]): { label: string; color: string; bg: string } {
     switch (status) {
         case "open":
             return { label: "Open", color: "text-emerald-700", bg: "bg-emerald-100" };
@@ -60,7 +60,7 @@ function getStatusLabel(status: ChallengeListItem["status"]): { label: string; c
     }
 }
 
-function getChallengeTypeLabel(challenge: ChallengeListItem): string {
+function getChallengeTypeLabel(challenge: Challenge): string {
     switch (challenge.mode) {
         case "pvp":
             return "Head to Head";
@@ -71,7 +71,7 @@ function getChallengeTypeLabel(challenge: ChallengeListItem): string {
     }
 }
 
-function getConviction(challenge: ChallengeListItem): number {
+function getConviction(challenge: Challenge): number {
     if (challenge.total_pool <= 0) return 0;
 
     const ratio = Math.min((challenge.initial_bet / Math.max(challenge.total_pool, 1)) * 100, 100);
