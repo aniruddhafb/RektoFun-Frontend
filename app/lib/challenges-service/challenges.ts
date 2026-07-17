@@ -105,6 +105,28 @@ export interface Challenge {
   };
 }
 
+export interface ChallengeHistoryEvent {
+  id: string;
+  type: "redeemed" | "refunded";
+  user_id: number;
+  amount: number;
+  occurred_at: string;
+  signature?: string;
+}
+
+export function getChallengeHistoryEvents(challenge: Challenge): ChallengeHistoryEvent[] {
+  const value = challenge.metadata?.activity_events;
+  if (!Array.isArray(value)) return [];
+  return value.filter((event): event is ChallengeHistoryEvent => (
+    Boolean(event)
+    && typeof event === "object"
+    && (event.type === "redeemed" || event.type === "refunded")
+    && typeof event.user_id === "number"
+    && typeof event.amount === "number"
+    && typeof event.occurred_at === "string"
+  ));
+}
+
 export function getChallengeCategoryImage(challenge: Challenge): string {
   const composer = challenge.metadata?.composer;
   const metadataImage = typeof composer?.category_image === "string"
@@ -302,6 +324,21 @@ export async function updateChallengeMetadata(
   if (!response.ok) {
     throw new Error(`Failed to update challenge metadata: ${response.statusText}`);
   }
+}
+
+export async function recordChallengeHistoryEvent(
+  challenge: Challenge,
+  event: ChallengeHistoryEvent,
+  status?: Challenge["status"],
+): Promise<void> {
+  const existing = getChallengeHistoryEvents(challenge);
+  const metadata = { ...(challenge.metadata || {}), activity_events: [...existing.filter((item) => item.id !== event.id), event] };
+  const response = await fetch(`${API_BASE_URL}/challenges/${challenge.id}`, {
+    method: "PATCH",
+    headers: { accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify({ metadata, ...(status ? { status } : {}) }),
+  });
+  if (!response.ok) throw new Error(`Failed to record challenge history: ${response.statusText}`);
 }
 
 export async function updateChallengeStatus(challengeId: number, status: Challenge["status"]): Promise<void> {

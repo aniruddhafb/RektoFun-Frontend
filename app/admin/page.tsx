@@ -38,6 +38,7 @@ import {
 import {
   getAdminReferrals,
   resolveChallenge,
+  withdrawChallengeFunds,
   updateRedemptionStatus,
   updateUserRole,
   uploadCategoryImage,
@@ -295,27 +296,34 @@ export default function AdminPage() {
     }
   };
 
-  const resolveOne = async (challenge: Challenge) => {
+  const resolveOne = async (
+    challenge: Challenge,
+    operation: "resolve_all" | "resolve_db" | "settle_onchain" = "resolve_all",
+  ) => {
     if (!hasOpponent(challenge)) {
       setError("This challenge cannot be resolved because no opponent joined.");
       return;
     }
     const priceFeed = isPriceFeed(challenge);
     const winner = manualWinners[challenge.id];
-    if (!priceFeed && !winner) {
+    if (!priceFeed && !winner && operation !== "settle_onchain") {
       setError("Select the winning side before resolving a manual challenge.");
       return;
     }
-    if (!window.confirm(`Resolve only challenge #${challenge.id}? This may trigger an on-chain payout.`)) return;
+    const actionLabel = operation === "resolve_db" ? "resolve in the database only"
+      : operation === "settle_onchain" ? "settle on-chain only"
+      : "resolve in the database and settle on-chain";
+    if (!window.confirm(`Challenge #${challenge.id}: ${actionLabel}?`)) return;
 
     setBusyId(challenge.id);
     setError("");
     setNotice("");
     try {
       const manualPrice = Number(manualPrices[challenge.id]);
-      const result = await resolveChallenge(challenge.id, priceFeed ? {} : {
-        creator_wins: winner === "creator",
+      const result = await resolveChallenge(challenge.id, priceFeed ? { operation } : {
+        ...(winner ? { creator_wins: winner === "creator" } : {}),
         ...(Number.isFinite(manualPrice) && manualPrice > 0 ? { final_price: manualPrice } : {}),
+        operation,
       });
       setNotice(
         result.settlement_succeeded
@@ -325,6 +333,31 @@ export default function AdminPage() {
       await loadSection("resolution", true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Challenge resolution failed.");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const emergencyWithdraw = async (challenge: Challenge) => {
+    const recipient = window.prompt("Recipient wallet address for the emergency USDC withdrawal:");
+    if (!recipient) return;
+    const amountText = window.prompt("Amount in USDC (for example 1.25):");
+    if (!amountText) return;
+    const amount = Math.round(Number(amountText) * 1_000_000);
+    if (!Number.isSafeInteger(amount) || amount <= 0) {
+      setError("Enter a valid positive USDC amount.");
+      return;
+    }
+    if (!window.confirm(`Emergency-withdraw ${amountText} USDC from challenge #${challenge.id} to ${recipient}? This bypasses normal payouts.`)) return;
+    setBusyId(challenge.id);
+    setError("");
+    setNotice("");
+    try {
+      const result = await withdrawChallengeFunds(challenge.id, recipient.trim(), amount);
+      setNotice(`Emergency withdrawal submitted. Transaction: ${result.signature}`);
+      await loadSection("resolution", true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Emergency withdrawal failed.");
     } finally {
       setBusyId(null);
     }
@@ -794,14 +827,20 @@ export default function AdminPage() {
                             )}
                           </td>
                           <td className="px-4 py-3">
-                            <button
-                              onClick={() => void resolveOne(challenge)}
-                              disabled={!canResolve || !opponentJoined || busyId === challenge.id || (section.key === "manual" && !manualWinners[challenge.id])}
-                              title={!opponentJoined ? "Cannot resolve until an opponent joins" : !canResolve ? "This challenge is not awaiting resolution" : undefined}
-                              className="cursor-pointer border-2 border-black bg-[#a8d85b] px-3 py-2 text-sm font-black shadow-[2px_2px_0_#111] disabled:cursor-not-allowed disabled:opacity-40"
-                            >
-                              {busyId === challenge.id ? "Resolving…" : !opponentJoined ? "No opponent" : canResolve ? "Resolve" : challenge.status}
-                            </button>
+                            <div className="flex min-w-[190px] flex-col gap-2">
+                              <button
+                                onClick={() => void resolveOne(challenge, "resolve_all")}
+                                disabled={!canResolve || !opponentJoined || busyId === challenge.id || (section.key === "manual" && challenge.status === "OPEN" && !manualWinners[challenge.id])}
+                                className="cursor-pointer border-2 border-black bg-[#a8d85b] px-3 py-2 text-sm font-black shadow-[2px_2px_0_#111] disabled:cursor-not-allowed disabled:opacity-40"
+                              >
+                                {busyId === challenge.id ? "Working…" : "Resolve DB + chain"}
+                              </button>
+                              <div className="flex gap-2">
+                                <button onClick={() => void resolveOne(challenge, "resolve_db")} disabled={challenge.status !== "OPEN" || !opponentJoined || busyId === challenge.id || (section.key === "manual" && !manualWinners[challenge.id])} className="flex-1 cursor-pointer border-2 border-black bg-white px-2 py-1 text-xs font-black disabled:cursor-not-allowed disabled:opacity-40">DB only</button>
+                                <button onClick={() => void resolveOne(challenge, "settle_onchain")} disabled={challenge.status !== "RESOLVED" || !opponentJoined || busyId === challenge.id} className="flex-1 cursor-pointer border-2 border-black bg-[#f5d547] px-2 py-1 text-xs font-black disabled:cursor-not-allowed disabled:opacity-40">Chain only</button>
+                              </div>
+                              <button onClick={() => void emergencyWithdraw(challenge)} disabled={busyId === challenge.id || !challenge.metadata?.onchain?.challenge_pda} className="cursor-pointer border-2 border-black bg-[#ff8c79] px-2 py-1 text-xs font-black disabled:cursor-not-allowed disabled:opacity-40">Emergency withdraw</button>
+                            </div>
                           </td>
                         </tr>
                         );
