@@ -4,7 +4,7 @@ use anchor_spl::token_interface::{self, CloseAccount, Mint, TokenAccount, TokenI
 use crate::{
     constants::*,
     error::RektoError,
-    state::{ChallengeAccount, ChallengeStatus, ChallengeType, ClaimRecord, WinningSide},
+    state::{ChallengeAccount, ChallengeStatus, ChallengeType, ClaimRecord, Config, WinningSide},
 };
 
 /// TEAM mode only: a winner on the winning side calls this to pull their proportional
@@ -58,7 +58,7 @@ pub struct ClaimWinnings<'info> {
     /// Seeds: [b"claim", challenge.key(), participant.key()]
     #[account(
         init,
-        payer = participant,
+        payer = fee_payer,
         space = 8 + ClaimRecord::INIT_SPACE,
         seeds = [CLAIM_SEED, challenge.key().as_ref(), participant.key().as_ref()],
         bump,
@@ -67,6 +67,20 @@ pub struct ClaimWinnings<'info> {
 
     /// USDC mint
     pub usdc_mint: InterfaceAccount<'info, Mint>,
+
+    #[account(seeds = [CONFIG_SEED], bump = config.bump)]
+    pub config: Account<'info, Config>,
+
+    /// Pays the SOL rent for `claim_record` — either `participant` themself
+    /// (self-pay, when they have enough SOL) or `config.admin` (sponsored).
+    /// Chosen client-side based on the participant's SOL balance, same
+    /// pattern as `fee_payer` in `create_challenge`.
+    #[account(
+        mut,
+        constraint = fee_payer.key() == participant.key() || fee_payer.key() == config.admin
+            @ RektoError::Unauthorized,
+    )]
+    pub fee_payer: Signer<'info>,
 
     /// Wallet that paid this challenge's rent at creation (`challenge.rent_payer`,
     /// enforced via `has_one` on `challenge` above) — receives the reclaimed

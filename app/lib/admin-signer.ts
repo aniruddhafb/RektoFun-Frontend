@@ -31,6 +31,8 @@ import {
   buildClaimRefundTx,
   buildClaimWinningsTx,
   estimateCreateChallengeRentLamports,
+  estimateClaimFeeLamports,
+  estimateCancelChallengeFeeLamports,
   CreateChallengeArgs,
   deriveChallengePDA,
   deriveCreatorCounter,
@@ -64,6 +66,27 @@ export async function buildAdminSignedChallengeActionTx(args: {
   };
   const program = getRektoProgram(adminWalletAdapter);
 
+  // For cancel/refund/winnings, self-pay when the caller's own SOL balance
+  // covers it — same balance-check-then-fallback pattern as create_challenge.
+  // "accept" always stays admin-sponsored (unchanged) since it's out of scope
+  // here. `feePayer` decides both which key funds this call's on-chain rent
+  // (claim_record for refund/winnings) and which key covers the network fee.
+  let feePayerPubkey = adminPubkey;
+  if (args.action === "cancel") {
+    const [required, balance] = await Promise.all([
+      estimateCancelChallengeFeeLamports(),
+      connection.getBalance(args.participant),
+    ]);
+    if (balance >= required) feePayerPubkey = args.participant;
+  } else if (args.action === "refund" || args.action === "winnings") {
+    const [required, balance] = await Promise.all([
+      estimateClaimFeeLamports(connection, args.participant),
+      connection.getBalance(args.participant),
+    ]);
+    if (balance >= required) feePayerPubkey = args.participant;
+  }
+  const selfPay = args.action !== "accept" && feePayerPubkey.equals(args.participant);
+
   const tx = args.action === "accept"
     ? await buildAcceptChallengeTx(
       program,
@@ -77,18 +100,25 @@ export async function buildAdminSignedChallengeActionTx(args: {
     : args.action === "cancel"
       ? await buildCancelChallengeTx(program, args.participant, args.challengePDA)
       : args.action === "refund"
-        ? await buildClaimRefundTx(program, args.participant, args.creator, args.challengePDA, adminPubkey)
-        : await buildClaimWinningsTx(program, args.participant, args.creator, args.challengePDA, adminPubkey);
+        ? await buildClaimRefundTx(program, args.participant, args.creator, args.challengePDA, feePayerPubkey)
+        : await buildClaimWinningsTx(program, args.participant, args.creator, args.challengePDA, feePayerPubkey);
 
   const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
-  tx.feePayer = adminPubkey;
+  tx.feePayer = feePayerPubkey;
   tx.recentBlockhash = blockhash;
-  tx.partialSign(adminKeypair);
+
+  // Only the sponsored path needs a server-side signature — in the self-pay
+  // path feePayer === participant, so their own wallet signature (collected
+  // client-side, as always) is the only one required.
+  if (!selfPay) {
+    tx.partialSign(adminKeypair);
+  }
 
   return {
     serializedTx: tx.serialize({ requireAllSignatures: false }).toString("base64"),
     blockhash,
     lastValidBlockHeight,
+    rentSponsored: !selfPay,
   };
 }
 

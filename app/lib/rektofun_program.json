@@ -686,6 +686,35 @@
           "relations": [
             "challenge"
           ]
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "fee_payer",
+          "docs": [
+            "Pays the SOL rent for `claim_record` — either `participant` themself",
+            "(self-pay, when they have enough SOL) or `config.admin` (sponsored).",
+            "Chosen client-side based on the participant's SOL balance, same",
+            "pattern as `fee_payer` in `create_challenge`."
+          ],
+          "writable": true,
+          "signer": true
         }
       ],
       "args": []
@@ -817,6 +846,35 @@
           "docs": [
             "USDC mint"
           ]
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "fee_payer",
+          "docs": [
+            "Pays the SOL rent for `claim_record` — either `participant` themself",
+            "(self-pay, when they have enough SOL) or `config.admin` (sponsored).",
+            "Chosen client-side based on the participant's SOL balance, same",
+            "pattern as `fee_payer` in `create_challenge`."
+          ],
+          "writable": true,
+          "signer": true
         },
         {
           "name": "rent_payer",
