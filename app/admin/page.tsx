@@ -7,6 +7,8 @@ import { useRouter } from "next/navigation";
 import { useAppKitAccount } from "@reown/appkit/react";
 import {
   Activity,
+  BadgeCheck,
+  CircleDollarSign,
   ArrowDownUp,
   ChevronDown,
   Copy,
@@ -46,7 +48,22 @@ import {
   type AdminReferralUser,
 } from "@/app/lib/admin-service";
 
-type Tab = "stats" | "funds" | "status" | "resolution" | "users" | "categories" | "referrals";
+type Tab = "stats" | "funds" | "status" | "challenges" | "resolution" | "users" | "categories" | "referrals";
+type ChallengeAudit = {
+  id: number;
+  chainStatus: string;
+  payoutKind: "automatic" | "individual" | "refund";
+  creatorPaid: boolean | null;
+  recipients: Array<{ wallet: string; claimed: boolean }>;
+  paidCount: number | null;
+  totalRecipients: number | null;
+  complete: boolean;
+  lockedUsdc: number;
+  lockedSol: number;
+  contractAddress: string | null;
+  note: string;
+};
+type ContractBalances = { escrowUsdc: number; programSol: number };
 type TrackedWallet = {
   label: string;
   address: string;
@@ -76,6 +93,15 @@ const date = (value: string) =>
   new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(
     new Date(value),
   );
+const challengeExpiryTime = (challenge: Challenge) => {
+  const value = challenge.expiry || challenge.expire_time;
+  const timestamp = value ? new Date(value).getTime() : Number.NaN;
+  return Number.isFinite(timestamp) ? timestamp : null;
+};
+const isPastChallengeExpiry = (challenge: Challenge, now = Date.now()) => {
+  const expiry = challengeExpiryTime(challenge);
+  return expiry !== null && expiry <= now;
+};
 
 export default function AdminPage() {
   const router = useRouter();
@@ -92,6 +118,10 @@ export default function AdminPage() {
   const [fundsCluster, setFundsCluster] = useState<"devnet" | "mainnet">("devnet");
   const [healthCheckedAt, setHealthCheckedAt] = useState("");
   const [resolutionChallenges, setResolutionChallenges] = useState<Challenge[]>([]);
+  const [auditedChallenges, setAuditedChallenges] = useState<Challenge[]>([]);
+  const [challengeAudits, setChallengeAudits] = useState<Record<number, ChallengeAudit>>({});
+  const [contractBalances, setContractBalances] = useState<ContractBalances>({ escrowUsdc: 0, programSol: 0 });
+  const [auditCheckedAt, setAuditCheckedAt] = useState("");
   const [manualWinners, setManualWinners] = useState<Record<number, "creator" | "opponent">>({});
   const [manualPrices, setManualPrices] = useState<Record<number, string>>({});
   const [priceFeedFilter, setPriceFeedFilter] = useState<PriceFeedFilter>("due");
@@ -108,6 +138,7 @@ export default function AdminPage() {
     stats: false,
     funds: false,
     status: false,
+    challenges: false,
     resolution: false,
     users: false,
     categories: false,
@@ -120,6 +151,7 @@ export default function AdminPage() {
   const [parentCategory, setParentCategory] = useState("");
   const [categoryImage, setCategoryImage] = useState<File | null>(null);
   const [categoryPage, setCategoryPage] = useState(1);
+  const [challengePage, setChallengePage] = useState(1);
   const [userSort, setUserSort] = useState<UserSort>("followers");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [userPage, setUserPage] = useState(1);
@@ -167,6 +199,38 @@ export default function AdminPage() {
               0,
             ),
           });
+        } else if (section === "challenges") {
+          const challengeData = await getChallenges(
+            { limit: 1000, offset: 0 },
+            { bypassCache: true },
+          );
+          const now = Date.now();
+          const terminal = challengeData.challenges.filter((challenge) =>
+            ["EXPIRED", "CANCELLED", "RESOLVED"].includes(String(challenge.status).toUpperCase())
+            || isPastChallengeExpiry(challenge, now),
+          );
+          const response = await fetch("/api/admin/challenges/audit", {
+            method: "POST",
+            cache: "no-store",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              challenges: challengeData.challenges.map((challenge) => ({
+                id: challenge.id,
+                status: challenge.status,
+                mode: challenge.mode,
+                result: challenge.result,
+                challengePda: typeof challenge.metadata?.onchain?.challenge_pda === "string"
+                  ? challenge.metadata.onchain.challenge_pda : undefined,
+              })),
+            }),
+          });
+          const auditData = await response.json();
+          if (!response.ok) throw new Error(auditData.error || "Could not audit challenges.");
+          setAuditedChallenges(terminal);
+          setChallengePage(1);
+          setChallengeAudits(Object.fromEntries((auditData.rows || []).map((row: ChallengeAudit) => [row.id, row])));
+          setContractBalances(auditData.balances || { escrowUsdc: 0, programSol: 0 });
+          setAuditCheckedAt(auditData.checkedAt || "");
         } else if (section === "resolution") {
           const challengeData = await getChallenges(
             { limit: 1000, offset: 0 },
@@ -276,6 +340,21 @@ export default function AdminPage() {
         return status === priceFeedFilter || resolutionStatus === priceFeedFilter;
       });
   const manualChallenges = dueChallenges.filter((challenge) => !isPriceFeed(challenge));
+  const terminalChallengesByLockedFunds = [...auditedChallenges].sort(
+    (a, b) =>
+      ((challengeAudits[b.id]?.lockedUsdc || 0) + (challengeAudits[b.id]?.lockedSol || 0))
+      - ((challengeAudits[a.id]?.lockedUsdc || 0) + (challengeAudits[a.id]?.lockedSol || 0)),
+  );
+  const terminalContractsWithFunds = terminalChallengesByLockedFunds.filter((challenge) => {
+    const audit = challengeAudits[challenge.id];
+    return Boolean(audit?.contractAddress) && ((audit?.lockedUsdc || 0) > 0 || (audit?.lockedSol || 0) > 0);
+  });
+  const lockedTerminalCount = terminalContractsWithFunds.length;
+  const challengePages = Math.max(1, Math.ceil(terminalChallengesByLockedFunds.length / 10));
+  const challengePageRows = terminalChallengesByLockedFunds.slice(
+    (challengePage - 1) * 10,
+    challengePage * 10,
+  );
 
   const changeRole = async (user: User) => {
     const next = user.user_type === "moderator" ? "user" : "moderator";
@@ -478,6 +557,7 @@ export default function AdminPage() {
     { id: "stats", label: "Stats" },
     { id: "funds", label: "Funds" },
     { id: "status", label: "System status" },
+    { id: "challenges", label: "Challenges" },
     { id: "resolution", label: "Resolution" },
     { id: "users", label: "Users" },
     { id: "categories", label: "Categories" },
@@ -705,6 +785,202 @@ export default function AdminPage() {
           </section>
         )}
 
+        {tab === "challenges" && (
+          <section className="space-y-5">
+            <div className="flex flex-col gap-4 border-2 border-black bg-[#fffaf6] p-5 shadow-[4px_4px_0_#111] lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <h2 className="flex items-center gap-2 text-2xl font-black">
+                  <Swords className="h-6 w-6" /> Challenge payouts
+                </h2>
+                <p className="mt-1 text-sm font-semibold text-black/55">
+                  Refund and winnings status verified against on-chain claim records.
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-2 sm:min-w-[360px]">
+                <div className="border-2 border-black bg-[#f5d547] px-4 py-3">
+                  <p className="text-[10px] font-black uppercase tracking-[.13em] text-black/55">Escrow USDC</p>
+                  <p className="mt-1 text-xl font-black">{loading ? "—" : contractBalances.escrowUsdc.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
+                </div>
+                <div className="border-2 border-black bg-[#a8d85b] px-4 py-3">
+                  <p className="text-[10px] font-black uppercase tracking-[.13em] text-black/55">Program SOL</p>
+                  <p className="mt-1 text-xl font-black">{loading ? "—" : contractBalances.programSol.toLocaleString(undefined, { maximumFractionDigits: 3 })}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-3 text-xs font-bold text-black/50">
+              <div className="flex flex-wrap items-center gap-2">
+                <p>{auditedChallenges.length} past-expiry, cancelled or resolved challenges</p>
+                {lockedTerminalCount > 0 && (
+                  <span className="border-2 border-black bg-[#ff8c79] px-2 py-1 font-black text-black">
+                    {lockedTerminalCount} still holding funds
+                  </span>
+                )}
+              </div>
+              <p>{auditCheckedAt ? `Chain checked ${new Date(auditCheckedAt).toLocaleString()}` : "Checking chain…"}</p>
+            </div>
+
+            <div className="overflow-hidden border-2 border-black bg-[#fffaf6] shadow-[5px_5px_0_#111]">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[980px] text-left">
+                  <thead className="border-b-2 border-black bg-black text-white">
+                    <tr>
+                      {["Challenge", "Lifecycle", "Mode", "Creator", "Funds locked", "Payout progress", "On-chain status"].map((heading) => (
+                        <th key={heading} className="px-4 py-3 text-[11px] font-black uppercase tracking-[.08em]">{heading}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y-2 divide-black/10">
+                    {challengePageRows.map((challenge) => {
+                      const audit = challengeAudits[challenge.id];
+                      const status = String(challenge.status).toUpperCase();
+                      const expiredByTime = isPastChallengeExpiry(challenge);
+                      const isResolved = status === "RESOLVED";
+                      const creator = challenge.creator_details || (typeof challenge.creator === "object" ? challenge.creator : null);
+                      const payoutLabel = !audit
+                        ? "Not verified"
+                        : audit.payoutKind === "automatic"
+                          ? "Winner paid"
+                          : audit.totalRecipients === null
+                            ? audit.complete ? "Distribution complete" : "Pending"
+                            : `${audit.paidCount || 0} of ${audit.totalRecipients || 0} claimed`;
+                      return (
+                        <tr key={challenge.id} className="align-top transition-colors hover:bg-white">
+                          <td className="max-w-[300px] px-4 py-4">
+                            <p className="truncate font-black" title={challenge.statement || challenge.title}>
+                              {challenge.statement || challenge.title || `Challenge #${challenge.id}`}
+                            </p>
+                            <p className="mt-1 text-xs font-bold text-black/40">
+                              #{challenge.id} · {challenge.trading_pair || challenge.ticker || "General"}
+                            </p>
+                          </td>
+                          <td className="px-4 py-4">
+                            <span className={`inline-flex border-2 border-black px-2 py-1 text-[10px] font-black uppercase ${
+                              isResolved ? "bg-[#a8d85b]" : status === "CANCELLED" ? "bg-[#ffb59f]" : "bg-[#f5d547]"
+                            }`}>
+                              {status}
+                            </span>
+                            {expiredByTime && status !== "EXPIRED" && (
+                              <span className="mt-1.5 block w-fit border border-black bg-[#f5d547] px-1.5 py-0.5 text-[9px] font-black uppercase">
+                                Time expired
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-4">
+                            <p className="font-black">{String(challenge.mode).toUpperCase()}</p>
+                            <p className="mt-1 text-xs font-bold text-black/45">
+                              {isResolved ? `${challenge.result === "TEAM_A" ? "Creator side" : "Opponent side"} won` : "Refund flow"}
+                            </p>
+                          </td>
+                          <td className="px-4 py-4">
+                            <p className="font-black">{creator?.username || "Unknown"}</p>
+                            <p className="mt-1 font-mono text-xs font-bold text-black/45">{shortWallet(creator?.pubkey)}</p>
+                            {!isResolved && audit?.creatorPaid !== null && (
+                              <span className={`mt-2 inline-flex items-center gap-1 text-[11px] font-black ${audit?.creatorPaid ? "text-emerald-700" : "text-[#b44324]"}`}>
+                                {audit?.creatorPaid ? <BadgeCheck className="h-3.5 w-3.5" /> : <CircleDollarSign className="h-3.5 w-3.5" />}
+                                {audit?.creatorPaid ? "Creator refunded" : "Creator refund pending"}
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-4">
+                            <span className={`inline-flex items-center gap-1.5 border-2 border-black px-2.5 py-1.5 text-sm font-black ${
+                              (audit?.lockedUsdc || 0) > 0 ? "bg-[#ff8c79]" : "bg-white text-black/45"
+                            }`}>
+                              <CircleDollarSign className="h-4 w-4" />
+                              {(audit?.lockedUsdc || 0).toLocaleString(undefined, { maximumFractionDigits: 6 })} USDC
+                            </span>
+                            <p className="mt-1 text-[10px] font-black text-black/50">
+                              {(audit?.lockedSol || 0).toLocaleString(undefined, { maximumFractionDigits: 6 })} SOL in challenge PDA
+                            </p>
+                            {((audit?.lockedUsdc || 0) > 0 || (audit?.lockedSol || 0) > 0) && (
+                              <p className="mt-1.5 text-[10px] font-black uppercase tracking-wide text-[#a6381d]">Still in contract</p>
+                            )}
+                          </td>
+                          <td className="px-4 py-4">
+                            <div className="flex items-center gap-2">
+                              <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${audit?.complete ? "bg-emerald-600" : "bg-amber-500"}`} />
+                              <span className="font-black">{payoutLabel}</span>
+                            </div>
+                            <p className="mt-1 max-w-[300px] text-xs font-semibold leading-relaxed text-black/50">{audit?.note || "On-chain audit unavailable."}</p>
+                            {audit?.recipients?.length > 0 && (
+                              <div className="mt-2 flex flex-wrap gap-1">
+                                {audit.recipients.map((recipient) => (
+                                  <span
+                                    key={recipient.wallet}
+                                    title={recipient.wallet}
+                                    className={`border px-1.5 py-0.5 font-mono text-[9px] font-bold ${recipient.claimed ? "border-emerald-600/30 bg-emerald-50 text-emerald-700" : "border-amber-600/30 bg-amber-50 text-amber-800"}`}
+                                  >
+                                    {shortWallet(recipient.wallet)} · {recipient.claimed ? "paid" : "pending"}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-4 py-4">
+                            <p className="font-black">{audit?.chainStatus || "Unknown"}</p>
+                            <p className="mt-1 text-xs font-bold text-black/45">
+                              Pool {Number(challenge.total_pool || challenge.pool_size || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })} USDC
+                            </p>
+                            {audit?.contractAddress && (
+                              <a
+                                href={`https://solscan.io/account/${audit.contractAddress}${fundsCluster === "devnet" ? "?cluster=devnet" : ""}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                title={audit.contractAddress}
+                                className="mt-2 inline-flex max-w-[180px] items-center gap-1 font-mono text-[10px] font-black text-blue-700 underline underline-offset-2"
+                              >
+                                <span className="truncate">{audit.contractAddress}</span>
+                                <ExternalLink className="h-3 w-3 shrink-0" />
+                              </a>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    {!loading && auditedChallenges.length === 0 && (
+                      <tr>
+                        <td colSpan={7} className="p-12 text-center">
+                          <BadgeCheck className="mx-auto mb-3 h-8 w-8 text-black/25" />
+                          <p className="font-black">No completed challenge lifecycles yet.</p>
+                          <p className="mt-1 text-sm font-semibold text-black/45">Past-expiry, cancelled and resolved challenges will appear here.</p>
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              {terminalChallengesByLockedFunds.length > 0 && (
+                <div className="flex flex-col gap-3 border-t-2 border-black bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-xs font-bold text-black/50">
+                    Showing {(challengePage - 1) * 10 + 1}–{Math.min(challengePage * 10, terminalChallengesByLockedFunds.length)} of {terminalChallengesByLockedFunds.length}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setChallengePage((page) => Math.max(1, page - 1))}
+                      disabled={challengePage === 1}
+                      className="cursor-pointer border-2 border-black bg-white px-3 py-1.5 text-xs font-black disabled:cursor-not-allowed disabled:opacity-35"
+                    >
+                      Previous
+                    </button>
+                    <span className="min-w-20 text-center text-xs font-black">
+                      Page {challengePage} of {challengePages}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setChallengePage((page) => Math.min(challengePages, page + 1))}
+                      disabled={challengePage === challengePages}
+                      className="cursor-pointer border-2 border-black bg-[#f5d547] px-3 py-1.5 text-xs font-black disabled:cursor-not-allowed disabled:opacity-35"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+
         {tab === "resolution" && (
           <div className="space-y-6">
             <section className="grid gap-4 sm:grid-cols-3">
@@ -780,6 +1056,8 @@ export default function AdminPage() {
                     <tbody className="divide-y-2 divide-black/10">
                       {section.rows.map((challenge) => {
                         const opponentJoined = hasOpponent(challenge);
+                        const contractAddress = typeof challenge.metadata?.onchain?.challenge_pda === "string"
+                          ? challenge.metadata.onchain.challenge_pda : "";
                         const canResolve = (challenge.status === "OPEN" || challenge.status === "RESOLVED")
                           && Boolean(challenge.resolution_date)
                           && challenge.resolution_date.slice(0, 10) <= today;
@@ -790,6 +1068,18 @@ export default function AdminPage() {
                               {challenge.statement || challenge.title || `Challenge #${challenge.id}`}
                             </p>
                             <p className="text-xs font-bold text-black/40">#{challenge.id}</p>
+                            {contractAddress && (
+                              <a
+                                href={`https://solscan.io/account/${contractAddress}${fundsCluster === "devnet" ? "?cluster=devnet" : ""}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                title={contractAddress}
+                                className="mt-1 inline-flex max-w-[220px] items-center gap-1 font-mono text-[10px] font-black text-blue-700 underline underline-offset-2"
+                              >
+                                <span className="truncate">{contractAddress}</span>
+                                <ExternalLink className="h-3 w-3 shrink-0" />
+                              </a>
+                            )}
                           </td>
                           <td className="px-4 py-3 font-black">{challenge.trading_pair || challenge.ticker || "—"}</td>
                           <td className="px-4 py-3 font-bold">{challenge.mode}</td>

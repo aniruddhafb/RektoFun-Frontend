@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useAppKit, useAppKitAccount } from "@reown/appkit/react";
-import { Check, Copy, Crown, History, Loader2, Medal, Sparkles, Trophy, Users, X } from "lucide-react";
+import { BadgeCheck, Check, ChevronLeft, ChevronRight, Copy, Crown, History, Loader2, Medal, Sparkles, Trophy, Users, X } from "lucide-react";
 import { getLeaderboard, getReferralHistory, getUserByWallet, requestReferralRedemption, type LeaderboardUser, type ReferralHistory, type User } from "@/app/lib/users-service/users";
 import { useBodyScrollLock } from "@/app/lib/useBodyScrollLock";
 
@@ -17,9 +18,12 @@ type LeaderboardRow = {
   name: string;
   walletAddress: string;
   referrals: number;
+  profileImage: string;
+  isVerified: boolean;
 };
 
-const TOP_REFERRERS_LIMIT = 10;
+const LEADERBOARD_PAGE_SIZE = 10;
+const TOP_REFERRERS_FETCH_LIMIT = 100;
 
 function getDisplayName(user: LeaderboardUser) {
   if (user.username) return user.username;
@@ -50,6 +54,7 @@ export function ReferralModal({ isOpen, onClose }: ReferralModalProps) {
   const [user, setUser] = useState<User | null>(null);
   const [leaderboardRows, setLeaderboardRows] = useState<LeaderboardRow[]>([]);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [leaderboardPage, setLeaderboardPage] = useState(1);
   const [isLoadingUser, setIsLoadingUser] = useState(false);
   const [isLoadingLeaderboard, setIsLoadingLeaderboard] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -100,17 +105,20 @@ export function ReferralModal({ isOpen, onClose }: ReferralModalProps) {
 
     try {
       setIsLoadingLeaderboard(true);
-      const response = await getLeaderboard(TOP_REFERRERS_LIMIT, 0);
+      const response = await getLeaderboard(TOP_REFERRERS_FETCH_LIMIT, 0);
       const rows = response.users
         .map((leaderboardUser) => ({
           id: leaderboardUser.id,
           name: getDisplayName(leaderboardUser),
           walletAddress: leaderboardUser.wallet_address || leaderboardUser.pubkey,
           referrals: leaderboardUser.referrals?.length ?? 0,
+          profileImage: leaderboardUser.profile_image || leaderboardUser.twitter_profile_image || "/scribbles/pepe.png",
+          isVerified: leaderboardUser.user_type === "moderator" || Boolean(leaderboardUser.twitter_username),
         }))
         .sort((a, b) => b.referrals - a.referrals);
 
       setLeaderboardRows(rows);
+      setLeaderboardPage(1);
     } catch (loadError) {
       console.error("[ReferralModal] Failed to load referral leaderboard:", loadError);
       setLeaderboardRows([]);
@@ -156,12 +164,19 @@ export function ReferralModal({ isOpen, onClose }: ReferralModalProps) {
     const timer = window.setTimeout(() => {
       setCopied(false);
       setShowLeaderboard(false);
+      setLeaderboardPage(1);
     }, 0);
 
     return () => window.clearTimeout(timer);
   }, [isOpen]);
 
   if (!isOpen) return null;
+
+  const leaderboardPages = Math.max(1, Math.ceil(leaderboardRows.length / LEADERBOARD_PAGE_SIZE));
+  const leaderboardPageRows = leaderboardRows.slice(
+    (leaderboardPage - 1) * LEADERBOARD_PAGE_SIZE,
+    leaderboardPage * LEADERBOARD_PAGE_SIZE,
+  );
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(referralLink);
@@ -385,8 +400,11 @@ export function ReferralModal({ isOpen, onClose }: ReferralModalProps) {
               ) : leaderboardRows.length === 0 ? (
                 <div className="px-4 py-6 text-center text-sm font-bold text-gray-500">No referrals yet.</div>
               ) : (
-                <div className="referral-leaderboard-scrollbar max-h-64 overflow-y-auto divide-y divide-[#ead7cc]">
-                  {leaderboardRows.map((row, index) => (
+                <>
+                <div className="divide-y divide-[#ead7cc]">
+                  {leaderboardPageRows.map((row, index) => {
+                    const rank = (leaderboardPage - 1) * LEADERBOARD_PAGE_SIZE + index + 1;
+                    return (
                     <Link
                       key={row.id}
                       href={row.walletAddress ? `/profile/${row.walletAddress}` : "#"}
@@ -394,18 +412,56 @@ export function ReferralModal({ isOpen, onClose }: ReferralModalProps) {
                       className="flex items-center justify-between gap-3 px-4 py-3 transition hover:bg-[#fffaf7] focus:bg-[#fffaf7] focus:outline-none"
                     >
                       <div className="flex min-w-0 items-center gap-3">
-                        <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-black ${index === 0 ? "bg-[#f5d547] text-gray-950 shadow-sm" : index === 1 ? "bg-slate-200 text-slate-700" : index === 2 ? "bg-orange-100 text-orange-700" : "border border-[#ead7cc] bg-[#fff8f4] text-gray-700"}`}>
-                          {index < 3 ? <Medal className="h-4 w-4" /> : index + 1}
+                        <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-black ${rank === 1 ? "bg-[#f5d547] text-gray-950 shadow-sm" : rank === 2 ? "bg-slate-200 text-slate-700" : rank === 3 ? "bg-orange-100 text-orange-700" : "border border-[#ead7cc] bg-[#fff8f4] text-gray-700"}`}>
+                          {rank <= 3 ? <Medal className="h-4 w-4" /> : rank}
                         </span>
-                        <span className="truncate text-sm font-black text-gray-900 underline-offset-4 hover:underline">{row.name}</span>
+                        <Image
+                          src={row.profileImage}
+                          alt=""
+                          width={32}
+                          height={32}
+                          unoptimized
+                          className="h-8 w-8 shrink-0 rounded-full border border-[#ead7cc] bg-[#fff8f4] object-cover"
+                        />
+                        <span className="flex min-w-0 items-center gap-1">
+                          <span className="truncate text-sm font-black text-gray-900 underline-offset-4 hover:underline">{row.name}</span>
+                          {row.isVerified && <BadgeCheck className="h-4 w-4 shrink-0 fill-blue-500 text-white" aria-label="Verified" />}
+                        </span>
                       </div>
                       <div className="flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-black text-emerald-700">
                         <Users className="h-3.5 w-3.5" />
                         {row.referrals}
                       </div>
                     </Link>
-                  ))}
+                    );
+                  })}
                 </div>
+                {leaderboardPages > 1 && (
+                  <div className="flex items-center justify-center gap-2 border-t border-[#ead7cc] bg-[#fffaf7] px-3 py-2.5">
+                    <button
+                      type="button"
+                      onClick={() => setLeaderboardPage((page) => Math.max(1, page - 1))}
+                      disabled={leaderboardPage === 1}
+                      aria-label="Previous leaderboard page"
+                      className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-[#d7c5ba] bg-white text-gray-700 transition hover:border-black hover:bg-[#f5d547] disabled:cursor-not-allowed disabled:opacity-35"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </button>
+                    <span className="min-w-12 text-center text-[11px] font-black text-[#7c6a60]">
+                      {leaderboardPage}/{leaderboardPages}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setLeaderboardPage((page) => Math.min(leaderboardPages, page + 1))}
+                      disabled={leaderboardPage === leaderboardPages}
+                      aria-label="Next leaderboard page"
+                      className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-[#d7c5ba] bg-white text-gray-700 transition hover:border-black hover:bg-[#f5d547] disabled:cursor-not-allowed disabled:opacity-35"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </button>
+                  </div>
+                )}
+                </>
               )}
             </div>
           )}

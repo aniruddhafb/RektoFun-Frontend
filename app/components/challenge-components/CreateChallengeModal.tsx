@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import Image from "next/image";
 import {
     Activity,
     ArrowLeft,
@@ -154,6 +155,9 @@ const targetPriceInputValue = (value: number) => {
     const decimals = value >= 1 ? 2 : value >= 0.01 ? 4 : 8;
     return value.toFixed(decimals).replace(/\.?0+$/, "");
 };
+
+const getCategoryImage = (category: Category | null | undefined) =>
+    category?.image_url || category?.metadata?.image_url || "";
 
 export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChallengeModalProps) {
     const [marketType, setMarketType] = useState<MarketType>("crypto");
@@ -377,6 +381,7 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
     const isPriceFeed = marketType === "crypto" && challengeFormat === "price";
     const rawTopicLabel = selectedChildCategory?.category ?? (marketType === "sports" ? "All sports" : "Choose asset");
     const topicLabel = stripUsdcQuote(rawTopicLabel);
+    const selectedCategoryImage = getCategoryImage(selectedChildCategory);
     const selectedMarketPair = (selectedChildCategory?.category ?? "")
         .toUpperCase()
         .replace(/[^A-Z0-9]/g, "")
@@ -841,7 +846,19 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
                                             <Coins className="h-3 w-3" /> {rawTopicLabel}
                                         </button>
                                         <div className="grid min-w-0 grid-cols-1 items-center gap-2 text-lg font-black leading-tight text-[#17120f] min-[430px]:flex min-[430px]:flex-wrap min-[430px]:gap-x-2 min-[430px]:gap-y-3 sm:text-2xl">
-                                            <span className="min-w-0 truncate">{topicLabel || "This asset"}</span>
+                                            <span className="inline-flex min-w-0 items-center gap-2">
+                                                {selectedCategoryImage && (
+                                                    <Image
+                                                        src={selectedCategoryImage}
+                                                        alt=""
+                                                        width={28}
+                                                        height={28}
+                                                        unoptimized
+                                                        className="h-6 w-6 shrink-0 object-contain sm:h-7 sm:w-7"
+                                                    />
+                                                )}
+                                                <span className="min-w-0 truncate">{topicLabel || "This asset"}</span>
+                                            </span>
                                             <div className="grid w-full grid-cols-2 border-2 border-black bg-white p-0.5 min-[430px]:inline-flex min-[430px]:w-auto">
                                                 {(["Above", "Below"] as const).map((direction) => (
                                                     <button
@@ -965,6 +982,7 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
                                     <div className="grid grid-cols-6 gap-2">
                                         <ComposerButton
                                             icon={marketType === "crypto" ? Coins : Trophy}
+                                            imageSrc={selectedCategoryImage}
                                             caption="Asset"
                                             label={topicLabel}
                                             isActive={activePanel === "topic"}
@@ -1036,6 +1054,7 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
                                             <div className="flex max-h-36 flex-wrap gap-2 overflow-y-auto">
                                                 {childCategories.map((category) => {
                                                     const isSelected = selectedChildCategory?.id === category.id;
+                                                    const categoryImage = getCategoryImage(category);
                                                     return (
                                                         <button
                                                             key={category.id}
@@ -1052,6 +1071,16 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
                                                             className={`inline-flex max-w-full items-center gap-1.5 break-words border-2 px-3 py-2 text-left text-xs font-black transition-all ${isSelected ? "border-black bg-[#f5d547] text-black shadow-[2px_2px_0_#111]" : "border-black/20 bg-white text-[#594b44] hover:border-black"}`}
                                                         >
                                                             {isSelected && <Check className="h-3.5 w-3.5" />}
+                                                            {categoryImage && (
+                                                                <Image
+                                                                    src={categoryImage}
+                                                                    alt=""
+                                                                    width={20}
+                                                                    height={20}
+                                                                    unoptimized
+                                                                    className="h-5 w-5 shrink-0 object-contain"
+                                                                />
+                                                            )}
                                                             {stripUsdcQuote(category.category)}
                                                         </button>
                                                     );
@@ -1458,6 +1487,7 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
 
 function ComposerButton({
     icon: Icon,
+    imageSrc,
     caption,
     label,
     isActive,
@@ -1465,6 +1495,7 @@ function ComposerButton({
     layoutClassName,
 }: {
     icon: typeof Coins;
+    imageSrc?: string;
     caption: string;
     label: string;
     isActive: boolean;
@@ -1483,7 +1514,18 @@ function ComposerButton({
                 }`}
         >
             <span className={`flex h-7 w-7 shrink-0 items-center justify-center border ${isActive ? "border-black bg-black text-[#f5d547]" : "border-black/20 bg-white text-[#e85a2d] group-hover:border-black"}`}>
-                <Icon className="h-4 w-4" strokeWidth={2.4} />
+                {imageSrc ? (
+                    <Image
+                        src={imageSrc}
+                        alt=""
+                        width={20}
+                        height={20}
+                        unoptimized
+                        className="h-5 w-5 object-contain"
+                    />
+                ) : (
+                    <Icon className="h-4 w-4" strokeWidth={2.4} />
+                )}
             </span>
             <span className="min-w-0 flex-1">
                 <span className="block whitespace-nowrap text-[9px] font-black uppercase leading-none tracking-[0.08em] text-[#75655d]">
