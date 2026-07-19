@@ -39,6 +39,7 @@ import {
 } from "@/app/lib/category-service/category";
 import {
   getAdminReferrals,
+  getReferralBalances,
   resolveChallenge,
   withdrawChallengeFunds,
   updateRedemptionStatus,
@@ -48,7 +49,8 @@ import {
   type AdminReferralUser,
 } from "@/app/lib/admin-service";
 
-type Tab = "stats" | "funds" | "status" | "challenges" | "resolution" | "users" | "categories" | "referrals";
+type Tab = "stats" | "challenges" | "resolution" | "users" | "categories" | "referrals";
+type ReferralView = "current" | "active";
 type ChallengeAudit = {
   id: number;
   chainStatus: string;
@@ -79,7 +81,7 @@ type ServiceHealth = {
   details?: Record<string, string | boolean | number | null>;
 };
 type UserSort = "verified" | "followers" | "role";
-type PriceFeedFilter = "due" | "resolved" | "completed" | "cancelled" | "expired";
+type PriceFeedFilter = "current" | "resolved";
 const CATEGORY_PAGE_SIZE = 10;
 const shortWallet = (wallet?: string | null) =>
   wallet ? `${wallet.slice(0, 5)}…${wallet.slice(-4)}` : "—";
@@ -124,7 +126,7 @@ export default function AdminPage() {
   const [auditCheckedAt, setAuditCheckedAt] = useState("");
   const [manualWinners, setManualWinners] = useState<Record<number, "creator" | "opponent">>({});
   const [manualPrices, setManualPrices] = useState<Record<number, string>>({});
-  const [priceFeedFilter, setPriceFeedFilter] = useState<PriceFeedFilter>("due");
+  const [priceFeedFilter, setPriceFeedFilter] = useState<PriceFeedFilter>("current");
   const [stats, setStats] = useState({
     users: 0,
     challenges: 0,
@@ -136,8 +138,6 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [loaded, setLoaded] = useState<Record<Tab, boolean>>({
     stats: false,
-    funds: false,
-    status: false,
     challenges: false,
     resolution: false,
     users: false,
@@ -158,6 +158,8 @@ export default function AdminPage() {
   const [userTotal, setUserTotal] = useState(0);
   const [referralPage, setReferralPage] = useState(1);
   const [expandedReferrer, setExpandedReferrer] = useState<number | null>(null);
+  const [referralView, setReferralView] = useState<ReferralView>("current");
+  const [referralBalancesLoading, setReferralBalancesLoading] = useState(false);
 
   useEffect(() => {
     if (!allowed) router.replace("/");
@@ -170,24 +172,21 @@ export default function AdminPage() {
       setLoading(true);
       setError("");
       try {
-        if (section === "funds") {
-          const response = await fetch("/api/admin/funds", { cache: "no-store" });
-          const data = await response.json();
-          if (!response.ok) throw new Error(data.error || "Could not load wallet funds.");
-          setTrackedWallets(data.wallets || []);
-          setFundsCheckedAt(data.checkedAt || "");
-          setFundsCluster(data.cluster === "mainnet" ? "mainnet" : "devnet");
-        } else if (section === "status") {
-          const response = await fetch("/api/admin/status", { cache: "no-store" });
-          const data = await response.json();
-          if (!response.ok) throw new Error(data.error || "Could not check services.");
-          setServiceHealth(data.services || []);
-          setHealthCheckedAt(data.checkedAt || "");
-        } else if (section === "stats") {
-          const [userData, challengeData] = await Promise.all([
+        if (section === "stats") {
+          const [userData, challengeData, fundsResponse, statusResponse] = await Promise.all([
             getUsers({ limit: 1, offset: 0 }),
             getChallenges({ limit: 1000, offset: 0 }, { bypassCache: true }),
+            fetch("/api/admin/funds", { cache: "no-store" }),
+            fetch("/api/admin/status", { cache: "no-store" }),
           ]);
+          const [fundsData, statusData] = await Promise.all([fundsResponse.json(), statusResponse.json()]);
+          if (!fundsResponse.ok) throw new Error(fundsData.error || "Could not load wallet funds.");
+          if (!statusResponse.ok) throw new Error(statusData.error || "Could not check services.");
+          setTrackedWallets(fundsData.wallets || []);
+          setFundsCheckedAt(fundsData.checkedAt || "");
+          setFundsCluster(fundsData.cluster === "mainnet" ? "mainnet" : "devnet");
+          setServiceHealth(statusData.services || []);
+          setHealthCheckedAt(statusData.checkedAt || "");
           const challenges = challengeData.challenges;
           setStats({
             users: userData.total,
@@ -237,6 +236,24 @@ export default function AdminPage() {
             { bypassCache: true },
           );
           setResolutionChallenges(challengeData.challenges);
+          const auditResponse = await fetch("/api/admin/challenges/audit", {
+            method: "POST",
+            cache: "no-store",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              challenges: challengeData.challenges.map((challenge) => ({
+                id: challenge.id,
+                status: challenge.status,
+                mode: challenge.mode,
+                result: challenge.result,
+                challengePda: typeof challenge.metadata?.onchain?.challenge_pda === "string"
+                  ? challenge.metadata.onchain.challenge_pda : undefined,
+              })),
+            }),
+          });
+          const auditData = await auditResponse.json();
+          if (!auditResponse.ok) throw new Error(auditData.error || "Could not verify on-chain resolution status.");
+          setChallengeAudits(Object.fromEntries((auditData.rows || []).map((row: ChallengeAudit) => [row.id, row])));
         } else if (section === "users") {
           const data = await getUsers({
             limit: 10,
@@ -251,6 +268,22 @@ export default function AdminPage() {
           const data = await getAdminReferrals();
           setReferralUsers(data.users);
           setRedemptions(data.redemptions);
+          const referredWallets = [...new Set(data.users.flatMap((user) => user.referrals || []))];
+          setReferralBalancesLoading(referredWallets.length > 0);
+          void (async () => {
+            try {
+              for (let offset = 0; offset < referredWallets.length; offset += 20) {
+                const balances = await getReferralBalances(referredWallets.slice(offset, offset + 20));
+                setReferralUsers((current) => current.map((user) =>
+                  balances[user.pubkey] ? { ...user, balances: balances[user.pubkey] } : user,
+                ));
+              }
+            } catch (balanceError) {
+              console.error("Could not hydrate referral balances:", balanceError);
+            } finally {
+              setReferralBalancesLoading(false);
+            }
+          })();
         }
         setLoaded((current) => ({ ...current, [section]: true }));
       } catch (err) {
@@ -298,11 +331,18 @@ export default function AdminPage() {
     (item) => item.status.toLowerCase() === "pending",
   );
   const referralLeaderboard = useMemo(
-    () =>
-      [...referralUsers].sort(
-        (a, b) => (b.referrals?.length || 0) - (a.referrals?.length || 0),
-      ),
-    [referralUsers],
+    () => {
+      const activeCount = (user: AdminReferralUser) => (user.referrals || []).reduce((count, wallet) => {
+        const balances = referralUserByWallet.get(wallet)?.balances;
+        return count + (balances && (balances.sol > 0 || balances.usdc > 0 || balances.rekto > 0) ? 1 : 0);
+      }, 0);
+      return [...referralUsers].sort((a, b) =>
+        referralView === "active"
+          ? activeCount(b) - activeCount(a) || (b.referrals?.length || 0) - (a.referrals?.length || 0)
+          : (b.referrals?.length || 0) - (a.referrals?.length || 0),
+      );
+    },
+    [referralUsers, referralUserByWallet, referralView],
   );
   const referralPageRows = referralLeaderboard.slice(
     (referralPage - 1) * 10,
@@ -316,30 +356,37 @@ export default function AdminPage() {
     categoryPage * CATEGORY_PAGE_SIZE,
   );
   const today = new Date().toISOString().slice(0, 10);
-  const dueChallenges = resolutionChallenges
-    .filter(
-      (challenge) =>
-        (challenge.status === "OPEN" || challenge.status === "RESOLVED")
-        && Boolean(challenge.resolution_date)
-        && challenge.resolution_date.slice(0, 10) <= today,
-    )
-    .sort((a, b) => a.resolution_date.localeCompare(b.resolution_date));
   const isPriceFeed = (challenge: Challenge) =>
     String(challenge.resolution_method || challenge.resolution_source || "").toUpperCase() === "PRICE_FEED";
   const hasOpponent = (challenge: Challenge) =>
     Number(challenge.bet_info?.team_count?.TEAM_B?.total_bets ?? 0) > 0
     || Number(challenge.total_opponents ?? 0) > 0
-    || Boolean(challenge.bet_info?.highest_bet?.TEAM_B);
-  const priceFeedChallenges = dueChallenges.filter(isPriceFeed);
-  const allPriceFeedChallenges = resolutionChallenges.filter(isPriceFeed);
-  const filteredPriceFeedChallenges = priceFeedFilter === "due"
+    || Number(challenge.total_challengers ?? 0) > 0
+    || Number(challenge.participants ?? 0) > 1
+    || Boolean(challenge.bet_info?.highest_bet?.TEAM_B)
+    || Boolean(challenge.metadata?.onchain?.challenger_wallet);
+  const resolutionCandidates = resolutionChallenges.filter((challenge) => {
+    const status = String(challenge.status || "").toUpperCase();
+    return hasOpponent(challenge) && ["OPEN", "RESOLVED"].includes(status);
+  });
+  const actionableResolutionChallenges = resolutionCandidates.filter((challenge) => {
+    const status = String(challenge.status || "").toUpperCase();
+    const chainStatus = String(challengeAudits[challenge.id]?.chainStatus || "").toLowerCase();
+    const fullyResolved = status === "RESOLVED" && (chainStatus === "settled" || chainStatus === "closed");
+    return !fullyResolved;
+  });
+  const currentChallenges = [...actionableResolutionChallenges]
+    .sort((a, b) => String(a.resolution_date || "").localeCompare(String(b.resolution_date || "")));
+  const priceFeedChallenges = currentChallenges.filter(isPriceFeed);
+  const allPriceFeedChallenges = resolutionCandidates.filter(isPriceFeed);
+  const filteredPriceFeedChallenges = priceFeedFilter === "current"
     ? priceFeedChallenges
     : allPriceFeedChallenges.filter((challenge) => {
         const status = String(challenge.status || "").toLowerCase();
         const resolutionStatus = String(challenge.resolution_status || "").toLowerCase();
         return status === priceFeedFilter || resolutionStatus === priceFeedFilter;
       });
-  const manualChallenges = dueChallenges.filter((challenge) => !isPriceFeed(challenge));
+  const manualChallenges = currentChallenges.filter((challenge) => !isPriceFeed(challenge));
   const terminalChallengesByLockedFunds = [...auditedChallenges].sort(
     (a, b) =>
       ((challengeAudits[b.id]?.lockedUsdc || 0) + (challengeAudits[b.id]?.lockedSol || 0))
@@ -434,7 +481,7 @@ export default function AdminPage() {
     try {
       const result = await withdrawChallengeFunds(challenge.id, recipient.trim(), amount);
       setNotice(`Emergency withdrawal submitted. Transaction: ${result.signature}`);
-      await loadSection("resolution", true);
+      await loadSection("challenges", true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Emergency withdrawal failed.");
     } finally {
@@ -554,9 +601,7 @@ export default function AdminPage() {
       />
     );
   const tabs: Array<{ id: Tab; label: string }> = [
-    { id: "stats", label: "Stats" },
-    { id: "funds", label: "Funds" },
-    { id: "status", label: "System status" },
+    { id: "stats", label: "Overview" },
     { id: "challenges", label: "Challenges" },
     { id: "resolution", label: "Resolution" },
     { id: "users", label: "Users" },
@@ -614,7 +659,7 @@ export default function AdminPage() {
         )}
 
         {tab === "stats" && (
-          <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <section className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {[
               {
                 label: "Total users",
@@ -657,8 +702,8 @@ export default function AdminPage() {
           </section>
         )}
 
-        {tab === "funds" && (
-          <section className="space-y-5">
+        {tab === "stats" && (
+          <section className="mb-6 space-y-5">
             <div className="flex flex-col gap-2 border-2 border-black bg-[#fffaf6] p-5 shadow-[4px_4px_0_#111] sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h2 className="flex items-center gap-2 text-2xl font-black">
@@ -729,7 +774,7 @@ export default function AdminPage() {
           </section>
         )}
 
-        {tab === "status" && (
+        {tab === "stats" && (
           <section className="space-y-5">
             <div className="flex flex-col gap-2 border-2 border-black bg-[#fffaf6] p-5 shadow-[4px_4px_0_#111] sm:flex-row sm:items-center sm:justify-between">
               <div>
@@ -825,7 +870,7 @@ export default function AdminPage() {
                 <table className="w-full min-w-[980px] text-left">
                   <thead className="border-b-2 border-black bg-black text-white">
                     <tr>
-                      {["Challenge", "Lifecycle", "Mode", "Creator", "Funds locked", "Payout progress", "On-chain status"].map((heading) => (
+                      {["Challenge", "Lifecycle", "Mode", "Creator", "Funds locked", "Payout progress", "On-chain status", "Action"].map((heading) => (
                         <th key={heading} className="px-4 py-3 text-[11px] font-black uppercase tracking-[.08em]">{heading}</th>
                       ))}
                     </tr>
@@ -934,12 +979,26 @@ export default function AdminPage() {
                               </a>
                             )}
                           </td>
+                          <td className="px-4 py-4">
+                            {(audit?.lockedUsdc || 0) > 0 ? (
+                              <button
+                                type="button"
+                                onClick={() => void emergencyWithdraw(challenge)}
+                                disabled={busyId === challenge.id || !audit?.contractAddress}
+                                className="cursor-pointer border-2 border-black bg-[#ff8c79] px-3 py-2 text-xs font-black shadow-[2px_2px_0_#111] disabled:cursor-not-allowed disabled:opacity-40"
+                              >
+                                {busyId === challenge.id ? "Working…" : "Emergency withdraw"}
+                              </button>
+                            ) : (
+                              <span className="text-xs font-bold text-black/35">No locked USDC</span>
+                            )}
+                          </td>
                         </tr>
                       );
                     })}
                     {!loading && auditedChallenges.length === 0 && (
                       <tr>
-                        <td colSpan={7} className="p-12 text-center">
+                        <td colSpan={8} className="p-12 text-center">
                           <BadgeCheck className="mx-auto mb-3 h-8 w-8 text-black/25" />
                           <p className="font-black">No completed challenge lifecycles yet.</p>
                           <p className="mt-1 text-sm font-semibold text-black/45">Past-expiry, cancelled and resolved challenges will appear here.</p>
@@ -985,7 +1044,7 @@ export default function AdminPage() {
           <div className="space-y-6">
             <section className="grid gap-4 sm:grid-cols-3">
               {[
-                { label: "Due now", value: dueChallenges.length, color: "bg-[#f5d547]" },
+                { label: "Open / ongoing", value: currentChallenges.length, color: "bg-[#f5d547]" },
                 { label: "Price feed", value: priceFeedChallenges.length, color: "bg-[#ff8c79]" },
                 { label: "Manual", value: manualChallenges.length, color: "bg-[#a8d85b]" },
               ].map((item) => (
@@ -1023,8 +1082,8 @@ export default function AdminPage() {
                   <p className="text-sm font-semibold text-black/50">{section.description}</p>
                   {section.key === "price" && (
                     <div className="mt-4 flex flex-wrap gap-2">
-                      {(["due", "resolved", "completed", "cancelled", "expired"] as PriceFeedFilter[]).map((filter) => {
-                        const count = filter === "due"
+                      {(["current", "resolved"] as PriceFeedFilter[]).map((filter) => {
+                        const count = filter === "current"
                           ? priceFeedChallenges.length
                           : allPriceFeedChallenges.filter((challenge) =>
                               String(challenge.status || "").toLowerCase() === filter
@@ -1037,7 +1096,7 @@ export default function AdminPage() {
                             onClick={() => setPriceFeedFilter(filter)}
                             className={`cursor-pointer border-2 border-black px-3 py-1.5 text-xs font-black uppercase shadow-[2px_2px_0_#111] ${priceFeedFilter === filter ? "bg-black text-white" : "bg-white text-black"}`}
                           >
-                            {filter === "due" ? "Due now" : filter} ({count})
+                            {filter === "current" ? "Open / ongoing" : filter} ({count})
                           </button>
                         );
                       })}
@@ -1061,6 +1120,10 @@ export default function AdminPage() {
                         const canResolve = (challenge.status === "OPEN" || challenge.status === "RESOLVED")
                           && Boolean(challenge.resolution_date)
                           && challenge.resolution_date.slice(0, 10) <= today;
+                        const databaseResolved = String(challenge.status).toUpperCase() === "RESOLVED";
+                        const onchainStatus = String(challengeAudits[challenge.id]?.chainStatus || "").toLowerCase();
+                        const onchainResolved = onchainStatus === "settled" || onchainStatus === "closed";
+                        const fullyResolved = databaseResolved && onchainResolved;
                         return (
                         <tr key={challenge.id} className="hover:bg-white">
                           <td className="max-w-[260px] px-4 py-3">
@@ -1084,7 +1147,7 @@ export default function AdminPage() {
                           <td className="px-4 py-3 font-black">{challenge.trading_pair || challenge.ticker || "—"}</td>
                           <td className="px-4 py-3 font-bold">{challenge.mode}</td>
                           <td className="px-4 py-3 font-bold">{challenge.direction || "—"} {challenge.target ? money(challenge.target) : "—"}</td>
-                          <td className="px-4 py-3 font-bold">{date(challenge.resolution_date)}</td>
+                          <td className="px-4 py-3 font-bold">{challenge.resolution_date ? date(challenge.resolution_date) : "—"}</td>
                           <td className="px-4 py-3">
                             <span className={`border-2 border-black px-2 py-1 text-xs font-black ${challenge.status === "OPEN" ? "bg-[#ff8c79]" : "bg-[#a8d85b]"}`}>{challenge.status}</span>
                           </td>
@@ -1118,25 +1181,43 @@ export default function AdminPage() {
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex min-w-[190px] flex-col gap-2">
-                              <button
-                                onClick={() => void resolveOne(challenge, "resolve_all")}
-                                disabled={!canResolve || !opponentJoined || busyId === challenge.id || (section.key === "manual" && challenge.status === "OPEN" && !manualWinners[challenge.id])}
-                                className="cursor-pointer border-2 border-black bg-[#a8d85b] px-3 py-2 text-sm font-black shadow-[2px_2px_0_#111] disabled:cursor-not-allowed disabled:opacity-40"
-                              >
-                                {busyId === challenge.id ? "Working…" : "Resolve DB + chain"}
-                              </button>
-                              <div className="flex gap-2">
-                                <button onClick={() => void resolveOne(challenge, "resolve_db")} disabled={challenge.status !== "OPEN" || !opponentJoined || busyId === challenge.id || (section.key === "manual" && !manualWinners[challenge.id])} className="flex-1 cursor-pointer border-2 border-black bg-white px-2 py-1 text-xs font-black disabled:cursor-not-allowed disabled:opacity-40">DB only</button>
-                                <button onClick={() => void resolveOne(challenge, "settle_onchain")} disabled={challenge.status !== "RESOLVED" || !opponentJoined || busyId === challenge.id} className="flex-1 cursor-pointer border-2 border-black bg-[#f5d547] px-2 py-1 text-xs font-black disabled:cursor-not-allowed disabled:opacity-40">Chain only</button>
-                              </div>
-                              <button onClick={() => void emergencyWithdraw(challenge)} disabled={busyId === challenge.id || !challenge.metadata?.onchain?.challenge_pda} className="cursor-pointer border-2 border-black bg-[#ff8c79] px-2 py-1 text-xs font-black disabled:cursor-not-allowed disabled:opacity-40">Emergency withdraw</button>
+                              {fullyResolved ? (
+                                <div className="flex items-center justify-center gap-2 border-2 border-black bg-[#a8d85b] px-3 py-2 text-sm font-black">
+                                  <BadgeCheck className="h-4 w-4" /> Fully resolved
+                                </div>
+                              ) : databaseResolved ? (
+                                <button
+                                  onClick={() => void resolveOne(challenge, "settle_onchain")}
+                                  disabled={!canResolve || !opponentJoined || busyId === challenge.id}
+                                  className="cursor-pointer border-2 border-black bg-[#f5d547] px-3 py-2 text-sm font-black shadow-[2px_2px_0_#111] disabled:cursor-not-allowed disabled:opacity-40"
+                                >
+                                  {busyId === challenge.id ? "Working…" : "Settle on-chain"}
+                                </button>
+                              ) : (
+                                <>
+                                  <button
+                                    onClick={() => void resolveOne(challenge, "resolve_all")}
+                                    disabled={!canResolve || !opponentJoined || busyId === challenge.id || (section.key === "manual" && !manualWinners[challenge.id])}
+                                    className="cursor-pointer border-2 border-black bg-[#a8d85b] px-3 py-2 text-sm font-black shadow-[2px_2px_0_#111] disabled:cursor-not-allowed disabled:opacity-40"
+                                  >
+                                    {busyId === challenge.id ? "Working…" : "Resolve DB + chain"}
+                                  </button>
+                                  <button
+                                    onClick={() => void resolveOne(challenge, "resolve_db")}
+                                    disabled={!canResolve || !opponentJoined || busyId === challenge.id || (section.key === "manual" && !manualWinners[challenge.id])}
+                                    className="cursor-pointer border-2 border-black bg-white px-2 py-1 text-xs font-black disabled:cursor-not-allowed disabled:opacity-40"
+                                  >
+                                    Resolve DB only
+                                  </button>
+                                </>
+                              )}
                             </div>
                           </td>
                         </tr>
                         );
                       })}
                       {!section.rows.length && (
-                        <tr><td colSpan={8} className="p-10 text-center font-bold text-black/45">{section.key === "price" && priceFeedFilter !== "due" ? `No ${priceFeedFilter} price-feed challenges.` : "No due challenges in this section."}</td></tr>
+                        <tr><td colSpan={8} className="p-10 text-center font-bold text-black/45">{section.key === "price" && priceFeedFilter === "resolved" ? "No resolved price-feed challenges." : "No open or ongoing challenges with an opponent in this section."}</td></tr>
                       )}
                     </tbody>
                   </table>
@@ -1597,11 +1678,37 @@ export default function AdminPage() {
               </div>
             </section>
             <section className="border-2 border-black bg-[#fffaf6] shadow-[5px_5px_0_#111]">
-              <div className="border-b-2 border-black p-5">
-                <h2 className="text-xl font-black">Referral leaderboard</h2>
-                <p className="text-sm font-semibold text-black/50">
-                  Ranked by total successful referrals
-                </p>
+              <div className="flex flex-col gap-4 border-b-2 border-black p-5 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="text-xl font-black">Referral leaderboard</h2>
+                  <p className="text-sm font-semibold text-black/50">
+                    {referralView === "active" ? "Ranked by referred wallets with funds" : "Ranked by total successful referrals"}
+                  </p>
+                  {referralBalancesLoading && (
+                    <p className="mt-1 flex items-center gap-1.5 text-xs font-bold text-black/45">
+                      <RefreshCw className="h-3 w-3 animate-spin" /> Loading live balances in the background…
+                    </p>
+                  )}
+                </div>
+                <div className="inline-flex w-fit border-2 border-black bg-white p-1" role="group" aria-label="Referral ranking view">
+                  {([
+                    ["current", "Current"],
+                    ["active", "Active referrals"],
+                  ] as const).map(([value, label]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => {
+                        setReferralView(value);
+                        setReferralPage(1);
+                        setExpandedReferrer(null);
+                      }}
+                      className={`cursor-pointer px-3 py-2 text-xs font-black uppercase ${referralView === value ? "bg-black text-white" : "hover:bg-[#f5d547]"}`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
               </div>
               <div className="divide-y-2 divide-black/10">
                 {referralPageRows.map((user, index) => {
@@ -1609,7 +1716,15 @@ export default function AdminPage() {
                   const isExpanded = expandedReferrer === user.id;
                   const referrals = (user.referrals || [])
                     .map((wallet) => referralUserByWallet.get(wallet))
-                    .filter((item): item is AdminReferralUser => Boolean(item));
+                    .filter((item): item is AdminReferralUser => Boolean(item))
+                    .sort((a, b) => {
+                      if (referralView !== "active") return 0;
+                      const funded = (item: AdminReferralUser) => Number(Boolean(item.balances && (item.balances.sol > 0 || item.balances.usdc > 0 || item.balances.rekto > 0)));
+                      return funded(b) - funded(a);
+                    });
+                  const activeReferrals = referrals.filter((item) =>
+                    item.balances && (item.balances.sol > 0 || item.balances.usdc > 0 || item.balances.rekto > 0),
+                  ).length;
                   return (
                     <div key={user.id}>
                       <div className="grid grid-cols-[44px_1fr_auto] items-center gap-3 p-4 hover:bg-[#f5d547]/15">
@@ -1640,10 +1755,10 @@ export default function AdminPage() {
                         >
                           <span>
                             <strong className="block text-lg leading-none">
-                              {user.referrals?.length || 0}
+                              {referralView === "active" ? activeReferrals : user.referrals?.length || 0}
                             </strong>
                             <small className="text-[9px] font-black uppercase">
-                              referrals
+                              {referralView === "active" ? "active" : "referrals"}
                             </small>
                           </span>
                           <ChevronDown
@@ -1655,24 +1770,31 @@ export default function AdminPage() {
                         <div className="border-t-2 border-black/10 bg-[#f7efe9] px-4 py-3 sm:pl-16">
                           {referrals.length ? (
                             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                              {referrals.map((referred) => (
+                              {referrals.map((referred) => {
+                                const balances = referred.balances || { sol: 0, usdc: 0, rekto: 0 };
+                                const isActive = balances.sol > 0 || balances.usdc > 0 || balances.rekto > 0;
+                                return (
                                 <Link
                                   key={referred.id}
                                   href={`/profile/${referred.pubkey}`}
                                   target="_blank"
-                                  className="flex items-center justify-between border-2 border-black bg-white px-3 py-2 hover:bg-[#f5d547]"
+                                  className={`flex items-center justify-between gap-3 border-2 border-black px-3 py-2 ${isActive ? "bg-[#a8d85b] shadow-[2px_2px_0_#111]" : "bg-white hover:bg-[#f5d547]"}`}
                                 >
                                   <span>
-                                    <strong className="block text-sm">
+                                    <strong className="flex items-center gap-1.5 text-sm">
                                       {referred.username || "Unnamed"}
+                                      {isActive && <span className="border border-black bg-white px-1.5 py-0.5 text-[8px] font-black uppercase">Active</span>}
                                     </strong>
                                     <small className="font-mono text-black/45">
                                       {shortWallet(referred.pubkey)}
                                     </small>
+                                    <small className="mt-1 block text-[9px] font-black">
+                                      {balances.usdc.toLocaleString(undefined, { maximumFractionDigits: 2 })} USDC · {balances.sol.toLocaleString(undefined, { maximumFractionDigits: 4 })} SOL · {balances.rekto.toLocaleString(undefined, { maximumFractionDigits: 2 })} REKTO
+                                    </small>
                                   </span>
                                   <ExternalLink className="h-3.5 w-3.5" />
                                 </Link>
-                              ))}
+                              )})}
                             </div>
                           ) : (
                             <p className="text-sm font-bold text-black/45">

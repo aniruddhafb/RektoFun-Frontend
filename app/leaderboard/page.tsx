@@ -44,6 +44,7 @@ type LeaderboardRow = {
     twitterUsername: string | null;
     userType: "user" | "moderator";
     avatar: string;
+    createdChallenges: number;
     winRate: number;
     winRateLabel: string;
     won: number;
@@ -52,7 +53,7 @@ type LeaderboardRow = {
     volume: string;
 };
 
-type SortField = "rank" | "winRate" | "won" | "rekt" | "profit" | "volume";
+type SortField = "rank" | "createdChallenges" | "winRate" | "won" | "rekt" | "profit" | "volume";
 type SortOrder = "desc" | "asc";
 
 const ITEMS_PER_PAGE = 10;
@@ -79,6 +80,7 @@ function mapUserToRow(user: LeaderboardUser, rank: number): LeaderboardRow {
         twitterUsername: user.twitter_username,
         userType: user.user_type,
         avatar: user.profile_image || "/scribbles/pepe.png",
+        createdChallenges: user.created_challenges || 0,
         winRate,
         winRateLabel,
         won,
@@ -128,7 +130,7 @@ export default function LeaderboardPage() {
     const router = useRouter();
     const [searchQuery, setSearchQuery] = useState("");
     const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
-    const [sortField, setSortField] = useState<SortField>("profit");
+    const [sortField, setSortField] = useState<SortField>("createdChallenges");
     const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
     const [currentPage, setCurrentPage] = useState(1);
     const [rows, setRows] = useState<LeaderboardRow[]>([]);
@@ -155,7 +157,7 @@ export default function LeaderboardPage() {
             try {
                 setIsLoading(true);
                 setError(null);
-                const apiSort: LeaderboardSort = ({ winRate: "win_rate", rekt: "lost", profit: "pnl" } as const)[sortField as "winRate" | "rekt" | "profit"] || sortField as LeaderboardSort;
+                const apiSort: LeaderboardSort = ({ createdChallenges: "created_challenges", winRate: "win_rate", rekt: "lost", profit: "pnl" } as const)[sortField as "createdChallenges" | "winRate" | "rekt" | "profit"] || sortField as LeaderboardSort;
                 const response = await getLeaderboard(ITEMS_PER_PAGE, offset, debouncedSearchQuery, period, apiSort, sortOrder, verification);
                 if (cancelled) return;
                 const mapped = response.users.map((user, index) => mapUserToRow(user, offset + index + 1));
@@ -306,7 +308,7 @@ export default function LeaderboardPage() {
                     <div className="flex flex-col gap-1 border-b border-black/10 bg-white/80 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                             <h2 className="text-lg font-black text-gray-900">User Rankings</h2>
-                            <p className="text-sm font-medium text-gray-500">Realized performance · {periods.find((item) => item.value === period)?.label}</p>
+                            <p className="text-sm font-medium text-gray-500">Ranked by challenges created · {periods.find((item) => item.value === period)?.label}</p>
                         </div>
                         <div className="text-sm font-semibold text-gray-600">
                             Page {Math.min(currentPage, Math.max(totalPages, 1))} of {Math.max(totalPages, 1)}
@@ -319,8 +321,8 @@ export default function LeaderboardPage() {
                                     Rank <SortIndicator active={sortField === "rank"} order={sortOrder} />
                                 </div>
                                 <div className="col-span-3">User</div>
-                                <div onClick={() => handleSort("winRate")} className="col-span-2 flex cursor-pointer items-center gap-1 bg-transparent p-0 text-left font-black text-gray-500 transition hover:text-gray-900">
-                                    Win Rate <SortIndicator active={sortField === "winRate"} order={sortOrder} />
+                                <div onClick={() => handleSort("createdChallenges")} className="col-span-2 flex cursor-pointer items-center gap-1 bg-transparent p-0 text-left font-black text-gray-500 transition hover:text-gray-900">
+                                    Created <SortIndicator active={sortField === "createdChallenges"} order={sortOrder} />
                                 </div>
                                 <div onClick={() => handleSort("won")} className="col-span-1 flex cursor-pointer items-center gap-1 bg-transparent p-0 text-left font-black text-gray-500 transition hover:text-gray-900">
                                     Won <SortIndicator active={sortField === "won"} order={sortOrder} />
@@ -380,7 +382,7 @@ export default function LeaderboardPage() {
                                         </div>
 
                                         <div className="col-span-2 flex items-center gap-1">
-                                            <span className="rounded-full bg-emerald-50 px-2 py-1 text-xs font-black text-emerald-700">{user.winRateLabel}</span>
+                                            <span className="rounded-full bg-sky-50 px-2 py-1 text-xs font-black text-sky-700">{user.createdChallenges}</span>
                                         </div>
 
                                         <div className="col-span-1 flex items-center gap-1">

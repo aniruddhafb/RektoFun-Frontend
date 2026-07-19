@@ -3,26 +3,32 @@
 import React from "react";
 import { ChevronDown, Search, TrendingUp } from "lucide-react";
 
-type TabType = "challenges" | "activity";
+export type ProfileTabType = "challenges" | "past" | "redeem" | "activity";
 
 interface ProfileTabsProps {
-    activeTab: TabType;
-    onTabChange: (tab: TabType) => void;
+    activeTab: ProfileTabType;
+    onTabChange: (tab: ProfileTabType) => void;
+    isOwnProfile?: boolean;
     searchQuery: string;
     onSearchChange: (query: string) => void;
     sortOrder: "latest" | "oldest";
     onSortChange: (order: "latest" | "oldest") => void;
 }
 
-export function ProfileTabs({ activeTab, onTabChange, searchQuery, onSearchChange, sortOrder, onSortChange }: ProfileTabsProps) {
-    const tabs: { id: TabType; label: string }[] = [
+export function ProfileTabs({ activeTab, onTabChange, searchQuery, onSearchChange, sortOrder, onSortChange, isOwnProfile = false }: ProfileTabsProps) {
+    const tabs: { id: ProfileTabType; label: string }[] = [
         { id: "challenges", label: "Challenges" },
+        { id: "past", label: "Past Wins" },
+        ...(isOwnProfile ? [{ id: "redeem" as const, label: "Redeem" }] : []),
         { id: "activity", label: "Activity" },
     ];
 
     return (
         <div className="mt-8 flex flex-col gap-3 border-b border-gray-300/50 pb-3 lg:flex-row lg:items-center lg:justify-between">
-            <div className="grid h-11 w-full grid-cols-2 border-2 border-black bg-white/60 p-1 shadow-[3px_3px_0_rgba(0,0,0,0.14)] sm:w-[250px]">
+            <div
+                className="grid h-11 w-full border-2 border-black bg-white/60 p-1 shadow-[3px_3px_0_rgba(0,0,0,0.14)] sm:w-auto"
+                style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}
+            >
                 {tabs.map((tab) => (
                     <button
                         key={tab.id}

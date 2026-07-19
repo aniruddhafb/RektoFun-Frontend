@@ -45,7 +45,7 @@ export interface User {
 }
 
 export type LeaderboardPeriod = "1d" | "7d" | "30d" | "all";
-export type LeaderboardSort = "rank" | "win_rate" | "won" | "lost" | "pnl" | "volume";
+export type LeaderboardSort = "rank" | "created_challenges" | "win_rate" | "won" | "lost" | "pnl" | "volume";
 export type LeaderboardVerification = "all" | "x" | "kol";
 
 export type LeaderboardUser = Omit<User, "id" | "followers" | "following"> & {
@@ -53,6 +53,7 @@ export type LeaderboardUser = Omit<User, "id" | "followers" | "following"> & {
   followers: string[];
   following: string[];
   rank: number;
+  created_challenges: number;
   won: number;
   lost: number;
   win_rate: number;
@@ -389,11 +390,11 @@ export async function getLeaderboard(
 
     const data = await response.json();
     const users = (data.users || []).map((rawUser: BackendUser & {
-      rank: number; won: number; lost: number; win_rate: number; pnl: number; volume: number;
+      rank: number; created_challenges: number; won: number; lost: number; win_rate: number; pnl: number; volume: number;
     }) => ({ ...normalizeUser(rawUser), ...rawUser }));
 
     const result: LeaderboardResponse = {
-      users: users.map((user: User & { rank: number; won: number; lost: number; win_rate: number; pnl: number; volume: number }) => ({
+      users: users.map((user: User & { rank: number; created_challenges: number; won: number; lost: number; win_rate: number; pnl: number; volume: number }) => ({
         ...user,
         id: String(user.id),
         followers: (user.followers || []).map(String),

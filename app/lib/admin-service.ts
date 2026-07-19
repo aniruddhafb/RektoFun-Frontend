@@ -1,7 +1,8 @@
 const API_BASE_URL = "/api/admin/backend";
 const headers = { accept: "application/json", "Content-Type": "application/json" };
 
-export type AdminReferralUser = { id: number; username: string | null; pubkey: string; referral_code: string | null; referred_by: string | null; referrals: string[]; earnings: number };
+export type ReferralWalletBalances = { sol: number; usdc: number; rekto: number };
+export type AdminReferralUser = { id: number; username: string | null; pubkey: string; referral_code: string | null; referred_by: string | null; referrals: string[]; earnings: number; balances?: ReferralWalletBalances };
 export type AdminRedemption = { id: number; user_id: number; username: string | null; wallet_address: string | null; amount: number; status: string; requested_at: string };
 export type ResolutionRunResult = {
   status: string;
@@ -68,6 +69,16 @@ export async function getAdminReferrals(): Promise<{ users: AdminReferralUser[];
   const response = await fetch(`${API_BASE_URL}/referrals`, { headers });
   if (!response.ok) throw new Error((await response.json().catch(() => null))?.detail || "Failed to load referrals");
   return response.json();
+}
+
+export async function getReferralBalances(wallets: string[]): Promise<Record<string, ReferralWalletBalances>> {
+  if (!wallets.length) return {};
+  const response = await fetch("/api/admin/referral-balances", {
+    method: "POST", headers,
+    body: JSON.stringify({ wallets }),
+  });
+  if (!response.ok) throw new Error("Failed to load referral wallet balances");
+  return (await response.json()).balances as Record<string, ReferralWalletBalances>;
 }
 
 export async function updateRedemptionStatus(redemptionId: number, status: "pending" | "paid" | "rejected") {

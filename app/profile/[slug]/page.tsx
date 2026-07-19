@@ -10,6 +10,9 @@ import {
     ProfileTabs,
     ProfileChallenges,
     ProfileActivity,
+    ProfilePastChallenges,
+    type ProfileChallengeResult,
+    type ProfileTabType,
 } from "@/app/components/profile-components";
 import { LoadingPage } from "@/app/components/LoadingPage";
 import { followUser, getUserProfile, unfollowUser, UserProfile } from "@/app/lib/users-service/users";
@@ -17,17 +20,17 @@ import { useUserStore } from "@/app/store/useUserStore";
 import { useTokenBalanceStore } from "@/app/store/useTokenBalanceStore";
 import {
     Challenge,
+    getChallengeHistoryEvents,
     getChallengeById,
     getChallenges,
 } from "@/app/lib/challenges-service/challenges";
 import { fetchRektoBalance, fetchUsdcBalance } from "@/app/lib/token-balances";
+import { getPositions, type Position } from "@/app/lib/positions-service/positions";
 import {
     CHALLENGE_CREATED_EVENT,
     CHALLENGE_UPDATED_EVENT,
     type ChallengeUpdatedDetail,
 } from "@/app/lib/realtime-events";
-
-type TabType = "challenges" | "activity";
 
 export default function ProfilePage() {
     const params = useParams();
@@ -37,11 +40,11 @@ export default function ProfilePage() {
     const storedRektoBalance = useTokenBalanceStore((state) => state.rektoBalance);
     const storedUsdcBalance = useTokenBalanceStore((state) => state.usdcBalance);
     const storedBalancesLoading = useTokenBalanceStore((state) => state.isLoading);
-    
+
     const slug = params.slug as string;
     const walletFromSlug = decodeURIComponent(slug || "");
 
-    const [activeTab, setActiveTab] = useState<TabType>("challenges");
+    const [activeTab, setActiveTab] = useState<ProfileTabType>("challenges");
     const [profileSearchQuery, setProfileSearchQuery] = useState("");
     const [profileSortOrder, setProfileSortOrder] = useState<"latest" | "oldest">("latest");
     const [selectedChallenge, setSelectedChallenge] = useState<Challenge | null>(null);
@@ -56,6 +59,9 @@ export default function ProfilePage() {
     const [challengesLoading, setChallengesLoading] = useState(false);
     const [challengesLoadingMore, setChallengesLoadingMore] = useState(false);
     const [hasMoreChallenges, setHasMoreChallenges] = useState(true);
+    const [pastChallenges, setPastChallenges] = useState<ProfileChallengeResult[]>([]);
+    const [redeemChallenges, setRedeemChallenges] = useState<Challenge[]>([]);
+    const [historyLoading, setHistoryLoading] = useState(false);
     const [isFollowActionLoading, setIsFollowActionLoading] = useState(false);
     const [rektoBalance, setRektoBalance] = useState(0);
     const [isRektoBalanceLoading, setIsRektoBalanceLoading] = useState(true);
@@ -78,7 +84,7 @@ export default function ProfilePage() {
     useEffect(() => {
         async function fetchUser() {
             if (!walletFromSlug) return;
-            
+
             try {
                 setLoading(true);
                 const userData = await getUserProfile(walletFromSlug);
@@ -148,6 +154,63 @@ export default function ProfilePage() {
         }
 
         fetchUserChallenges();
+    }, [user?.id, challengeRefreshKey]);
+
+    useEffect(() => {
+        let cancelled = false;
+        async function fetchChallengeHistory() {
+            if (!user?.id) return;
+            try {
+                setHistoryLoading(true);
+                const [created, positionPage] = await Promise.all([
+                    getChallenges({ created_by: user.id, limit: 1000, offset: 0 }),
+                    getPositions({ creator: user.id, limit: 1000, offset: 0 }),
+                ]);
+                const positionsByChallenge = new Map<number, Position>();
+                for (const position of positionPage.positions || []) {
+                    if (!positionsByChallenge.has(position.challenge_id)) positionsByChallenge.set(position.challenge_id, position);
+                }
+                const createdIds = new Set((created.challenges || []).map((challenge) => challenge.id));
+                const joinedIds = [...positionsByChallenge.keys()].filter((id) => !createdIds.has(id));
+                const joined = await Promise.all(joinedIds.map((id) => getChallengeById(id).catch(() => null)));
+                const all = [...(created.challenges || []), ...joined.filter((item): item is Challenge => Boolean(item))];
+
+                const completed = all
+                    .filter((challenge) => challenge.status === "RESOLVED" && ["TEAM_A", "TEAM_B"].includes(challenge.result))
+                    .map((challenge): ProfileChallengeResult => {
+                        const side = createdIds.has(challenge.id)
+                            ? "TEAM_A"
+                            : positionsByChallenge.get(challenge.id)?.side;
+                        return { challenge, outcome: side === challenge.result ? "WON" : "LOST" };
+                    });
+                const redeemable = all.filter((challenge) => {
+                    const alreadyClaimed = getChallengeHistoryEvents(challenge)
+                        .some((event) => event.user_id === user.id);
+                    if (alreadyClaimed) return false;
+                    const isCreator = createdIds.has(challenge.id);
+                    const side = isCreator ? "TEAM_A" : positionsByChallenge.get(challenge.id)?.side;
+                    const winningTeamClaim = challenge.status === "RESOLVED"
+                        && challenge.mode === "TEAM"
+                        && side === challenge.result;
+                    const participantRefund = challenge.status === "CANCELLED" && !isCreator && Boolean(side);
+                    return winningTeamClaim || participantRefund;
+                });
+                if (!cancelled) {
+                    setPastChallenges(completed);
+                    setRedeemChallenges(redeemable);
+                }
+            } catch (historyError) {
+                console.error("Failed to fetch challenge history:", historyError);
+                if (!cancelled) {
+                    setPastChallenges([]);
+                    setRedeemChallenges([]);
+                }
+            } finally {
+                if (!cancelled) setHistoryLoading(false);
+            }
+        }
+        void fetchChallengeHistory();
+        return () => { cancelled = true; };
     }, [user?.id, challengeRefreshKey]);
 
     const loadMoreChallenges = useCallback(async () => {
@@ -356,6 +419,7 @@ export default function ProfilePage() {
                             onSearchChange={setProfileSearchQuery}
                             sortOrder={profileSortOrder}
                             onSortChange={setProfileSortOrder}
+                            isOwnProfile={isOwnProfile}
                         />
 
                         {activeTab === "challenges" && (
@@ -382,6 +446,35 @@ export default function ProfilePage() {
                                 searchQuery={profileSearchQuery}
                                 sortOrder={profileSortOrder}
                             />
+                        )}
+
+                        {activeTab === "past" && (
+                            <ProfilePastChallenges
+                                entries={pastChallenges
+                                    .filter(({ challenge }) => !profileSearchQuery.trim() || (challenge.statement || challenge.title || "").toLowerCase().includes(profileSearchQuery.trim().toLowerCase()))
+                                    .sort((a, b) => (profileSortOrder === "latest" ? -1 : 1) * (new Date(a.challenge.resolved_at || a.challenge.created_at).getTime() - new Date(b.challenge.resolved_at || b.challenge.created_at).getTime()))}
+                                loading={historyLoading}
+                                onChallengeClick={handleChallengeClick}
+                            />
+                        )}
+
+                        {activeTab === "redeem" && isOwnProfile && (
+                            <section className="mt-6">
+                                {historyLoading ? (
+                                    <div className="py-10 text-center font-bold text-gray-500">Checking for pending funds…</div>
+                                ) : redeemChallenges.length ? (
+                                    <ProfileChallenges
+                                        challenges={redeemChallenges}
+                                        onChallengeClick={handleChallengeClick}
+                                    />
+                                ) : (
+                                    <div className="border-2 border-dashed border-black/25 bg-white/60 px-6 py-10 text-center">
+                                        <div className="text-3xl" aria-hidden="true">💰</div>
+                                        <h3 className="mt-3 text-lg font-black text-gray-950">No pending funds right now</h3>
+                                        <p className="mt-1 text-sm font-semibold text-gray-600">All your pending winnings and refunds will appear here when they are ready to redeem.</p>
+                                    </div>
+                                )}
+                            </section>
                         )}
                     </>
                 )}
