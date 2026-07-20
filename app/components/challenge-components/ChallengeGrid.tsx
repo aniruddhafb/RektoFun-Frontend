@@ -36,6 +36,44 @@ const compareChallengeStatus = (a: Challenge, b: Challenge) =>
     (STATUS_PRIORITY[a.status.trim().toUpperCase()] ?? 5)
     - (STATUS_PRIORITY[b.status.trim().toUpperCase()] ?? 5);
 
+function ChallengeCardSkeleton({ keyPrefix, index }: { keyPrefix: string; index: number }) {
+    return (
+        <div
+            key={`${keyPrefix}-${index}`}
+            className="h-[419px] animate-pulse rounded-xl border border-gray-200 bg-[#fffaf6] p-3 sm:h-[435px] sm:p-4"
+            aria-hidden="true"
+        >
+            <div className="flex items-start justify-between gap-3">
+                <div className="flex flex-1 items-center gap-3">
+                    <div className="h-10 w-10 shrink-0 rounded-full bg-gray-200 sm:h-11 sm:w-11" />
+                    <div className="flex-1 space-y-2">
+                        <div className="h-4 w-4/5 rounded bg-gray-200" />
+                        <div className="h-3 w-2/5 rounded bg-gray-200" />
+                    </div>
+                </div>
+                <div className="h-10 w-10 border-2 border-gray-200 bg-white" />
+            </div>
+            <div className="my-3 border-t border-gray-200" />
+            <div className="mx-auto h-6 w-24 bg-gray-200" />
+            <div className="mt-4 flex items-center justify-center gap-2 sm:gap-4">
+                <div className="h-[132px] w-[98px] rounded-xl bg-gray-200 sm:h-[140px] sm:w-[120px]" />
+                <div className="flex w-12 flex-col items-center gap-3">
+                    <div className="h-10 w-10 rounded-full bg-gray-200 sm:h-12 sm:w-12" />
+                    <div className="h-4 w-12 rounded bg-gray-200" />
+                </div>
+                <div className="h-[132px] w-[98px] rounded-xl bg-gray-200 sm:h-[140px] sm:w-[120px]" />
+            </div>
+            <div className="mt-5 h-10 w-full rounded-lg bg-gray-200" />
+            <div className="mx-auto mt-2 h-3 w-2/5 rounded bg-gray-200" />
+            <div className="my-2 border-t border-gray-200" />
+            <div className="flex items-center justify-between">
+                <div className="h-4 w-1/3 rounded bg-gray-200" />
+                <div className="h-7 w-20 rounded bg-gray-200" />
+            </div>
+        </div>
+    );
+}
+
 export function ChallengeGrid({
     onRekt,
     onClick,
@@ -107,7 +145,7 @@ export function ChallengeGrid({
                     offset: requestOffset,
                     search: searchQuery.trim() || undefined,
                     resolution_source: resolutionSource,
-                    open_first: activeFilter !== "Latest",
+                    open_first: true,
                     status: statusFilter,
                     expiring_soon: isExpiringSoonFilter || undefined,
                     joinable: isOpenFilter || undefined,
@@ -117,6 +155,11 @@ export function ChallengeGrid({
             ]);
 
             let nextChunk = response.challenges ?? [];
+            if (activeFilter !== "Cancelled") {
+                nextChunk = nextChunk.filter(
+                    (challenge) => challenge.status.trim().toUpperCase() !== "CANCELLED",
+                );
+            }
 
             if (resolutionSource) {
                 const normalizedSource = resolutionSource.trim().toUpperCase().replace(/[\s-]+/g, "_");
@@ -172,6 +215,8 @@ export function ChallengeGrid({
                 });
             } else if (activeFilter === "Latest") {
                 nextChunk = [...nextChunk].sort((a, b) => {
+                    const statusOrder = compareChallengeStatus(a, b);
+                    if (statusOrder !== 0) return statusOrder;
                     return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
                 });
             }
@@ -250,16 +295,7 @@ export function ChallengeGrid({
             <div className="max-w-7xl mx-auto px-6 lg:px-8 pb-16">
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
                     {Array.from({ length: 6 }).map((_, index) => (
-                        <div
-                            key={index}
-                            className="h-[300px] border-2 border-black bg-white/70 p-5 animate-pulse"
-                        >
-                            <div className="h-6 w-3/4 rounded bg-gray-200" />
-                            <div className="mt-3 h-4 w-1/2 rounded bg-gray-200" />
-                            <div className="mt-8 h-4 w-full rounded bg-gray-200" />
-                            <div className="mt-2 h-4 w-5/6 rounded bg-gray-200" />
-                            <div className="mt-10 h-10 w-full rounded-xl bg-gray-200" />
-                        </div>
+                        <ChallengeCardSkeleton key={`initial-skeleton-${index}`} keyPrefix="initial-skeleton" index={index} />
                     ))}
                 </div>
             </div>
@@ -339,16 +375,7 @@ export function ChallengeGrid({
                 ))}
                 {isLoadingMore &&
                     Array.from({ length: NEXT_PAGE_SIZE }).map((_, index) => (
-                        <div
-                            key={`loading-more-skeleton-${index}`}
-                            className="h-[300px] border-2 border-black bg-white/70 p-5 animate-pulse"
-                        >
-                            <div className="h-6 w-3/4 rounded bg-gray-200" />
-                            <div className="mt-3 h-4 w-1/2 rounded bg-gray-200" />
-                            <div className="mt-8 h-4 w-full rounded bg-gray-200" />
-                            <div className="mt-2 h-4 w-5/6 rounded bg-gray-200" />
-                            <div className="mt-10 h-10 w-full rounded-xl bg-gray-200" />
-                        </div>
+                        <ChallengeCardSkeleton key={`loading-more-skeleton-${index}`} keyPrefix="loading-more-skeleton" index={index} />
                     ))}
             </div>
             {hasMore && (

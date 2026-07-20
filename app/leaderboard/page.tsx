@@ -130,7 +130,7 @@ export default function LeaderboardPage() {
     const router = useRouter();
     const [searchQuery, setSearchQuery] = useState("");
     const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
-    const [sortField, setSortField] = useState<SortField>("createdChallenges");
+    const [sortField, setSortField] = useState<SortField>("profit");
     const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
     const [currentPage, setCurrentPage] = useState(1);
     const [rows, setRows] = useState<LeaderboardRow[]>([]);
@@ -201,6 +201,15 @@ export default function LeaderboardPage() {
         { value: "1d", label: "1D" }, { value: "7d", label: "7D" },
         { value: "30d", label: "30D" }, { value: "all", label: "All Time" },
     ];
+    const sortLabels: Record<SortField, string> = {
+        rank: "rank",
+        createdChallenges: "challenges created",
+        winRate: "win rate",
+        won: "wins",
+        rekt: "rekts",
+        profit: "P&L",
+        volume: "volume",
+    };
 
     return (
         <div className="rekto-page min-h-screen">
@@ -308,7 +317,9 @@ export default function LeaderboardPage() {
                     <div className="flex flex-col gap-1 border-b border-black/10 bg-white/80 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                             <h2 className="text-lg font-black text-gray-900">User Rankings</h2>
-                            <p className="text-sm font-medium text-gray-500">Ranked by challenges created · {periods.find((item) => item.value === period)?.label}</p>
+                            <p className="text-sm font-medium text-gray-500">
+                                Ranked by {sortLabels[sortField]} ({sortOrder === "desc" ? "high to low" : "low to high"}) · {periods.find((item) => item.value === period)?.label}
+                            </p>
                         </div>
                         <div className="text-sm font-semibold text-gray-600">
                             Page {Math.min(currentPage, Math.max(totalPages, 1))} of {Math.max(totalPages, 1)}

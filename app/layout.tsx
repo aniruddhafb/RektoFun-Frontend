@@ -8,6 +8,7 @@ import ReownProvider from "./providers/reown-provider";
 import { ReferralAttributionCapture } from "./components/ReferralAttributionCapture";
 
 import { WelcomeTutorialModal } from "./components/homepage-components";
+import { SiteMaintenanceGate } from "./components/SiteMaintenanceGate";
 
 export const metadata: Metadata = {
   title: {
@@ -87,15 +88,17 @@ export default function RootLayout({
       </head>
       <body className="min-h-full flex flex-col">
         <ReownProvider>
-          <div className="pixel-shell min-h-screen flex flex-col">
-            <Suspense fallback={null}>
-              <ReferralAttributionCapture />
-            </Suspense>
-            <WelcomeTutorialModal />
-            <Navbar />
-            <main className="flex-1 mt-12 md:mt-8">{children}</main>
-            <Footer />
-          </div>
+          <SiteMaintenanceGate>
+            <div className="pixel-shell min-h-screen flex flex-col">
+              <Suspense fallback={null}>
+                <ReferralAttributionCapture />
+              </Suspense>
+              <WelcomeTutorialModal />
+              <Navbar />
+              <main className="flex-1 mt-12 md:mt-8">{children}</main>
+              <Footer />
+            </div>
+          </SiteMaintenanceGate>
         </ReownProvider>
       </body>
     </html>
