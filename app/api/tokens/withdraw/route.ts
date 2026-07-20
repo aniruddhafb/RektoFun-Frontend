@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { PublicKey } from "@solana/web3.js";
 import { buildAdminSignedTokenTransferTx } from "@/app/lib/admin-signer";
 import { getTokenMintAddress, type SupportedToken } from "@/app/lib/solana-config";
+import { checkWithdrawalIpRateLimit } from "@/app/lib/withdraw-rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,6 +16,20 @@ type WithdrawPayload = {
 
 export async function POST(request: NextRequest) {
   try {
+    const rateLimit = await checkWithdrawalIpRateLimit(request);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: "Too many withdrawal requests. Please try again later." },
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(rateLimit.retryAfterSeconds),
+            "Cache-Control": "no-store",
+          },
+        }
+      );
+    }
+
     const body = (await request.json()) as WithdrawPayload;
     if (typeof body.sender !== "string" || typeof body.recipient !== "string") {
       return NextResponse.json({ error: "Missing sender or recipient wallet." }, { status: 400 });
