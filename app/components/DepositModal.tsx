@@ -179,6 +179,11 @@ export function DepositModal({ isOpen, onClose, initialMode = "deposit", usdcBal
       return;
     }
 
+    if (asset === "rekto" && (usdcBalance === null || usdcBalance < 0.5)) {
+      setError("At least 0.5 USDC is required for the REKTO withdrawal fee.");
+      return;
+    }
+
     try {
       setIsSubmitting(true);
       const config = ASSET_CONFIG[asset];
@@ -206,6 +211,11 @@ export function DepositModal({ isOpen, onClose, initialMode = "deposit", usdcBal
         serializedTx?: string;
         blockhash?: string;
         lastValidBlockHeight?: number;
+        withdrawalFee?: {
+          amount: string;
+          decimals: number;
+          symbol: string;
+        };
         error?: string;
       };
       if (!response.ok || !data.serializedTx || !data.blockhash || !data.lastValidBlockHeight) {
@@ -465,6 +475,18 @@ export function DepositModal({ isOpen, onClose, initialMode = "deposit", usdcBal
                 <p className="mt-2 text-xs font-semibold text-[#7c6a60]">
                   Minimum withdrawal: {minimumWithdrawAmount.toLocaleString()} {assetLabel}
                 </p>
+                {asset === "rekto" && (
+                  <p className="mt-1 text-xs font-semibold text-[#7c6a60]">
+                    Fixed withdrawal fee: 0.5 USDC. The recipient receives the
+                    full REKTO amount.
+                  </p>
+                )}
+                {asset === "usdc" && (
+                  <p className="mt-1 text-xs font-semibold text-[#7c6a60]">
+                    Withdrawal fee: 0.5%. If the recipient needs a new USDC
+                    token account, its creation cost is also deducted.
+                  </p>
+                )}
               </div>
 
               {/* Error */}
