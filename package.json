@@ -22,6 +22,7 @@
     "@solana/kit": "^5.5.1",
     "@solana/spl-token": "^0.4.14",
     "@solana/web3.js": "^1.98.4",
+    "@supabase/supabase-js": "^2.110.7",
     "@vercel/analytics": "^2.0.1",
     "bs58": "^6.0.0",
     "dayjs": "^1.11.20",

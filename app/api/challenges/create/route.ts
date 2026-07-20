@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { buildAdminSignedCreateChallengeTx } from "@/app/lib/admin-signer";
+import { readSiteSettings } from "@/app/lib/site-settings-store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,11 +21,33 @@ export interface CreateChallengePayload {
   target: number;
   resolutionMethod: "PRICE_FEED" | "COMMUNITY";
   resolutionDate: string;
+  marketType: "crypto" | "sports";
+  challengeFormat: "price" | "statement";
 }
 
 export async function POST(req: NextRequest) {
   try {
     const body = (await req.json()) as Partial<CreateChallengePayload>;
+    const settings = await readSiteSettings();
+
+    const lockedReason = settings.siteMaintenance
+      ? "Challenge creation is unavailable during maintenance."
+      : body.marketType === "crypto" && settings.cryptoCreationLocked
+        ? "Crypto challenge creation is temporarily locked."
+        : body.marketType === "sports" && settings.sportsCreationLocked
+          ? "Sports challenge creation is temporarily locked."
+          : body.challengeFormat === "price" && settings.priceChallengesLocked
+            ? "Price challenges are temporarily locked."
+            : body.challengeFormat === "statement" && settings.statementChallengesLocked
+              ? "Statement challenges are temporarily locked."
+              : body.challengeType === "pvp" && settings.pvpChallengesLocked
+                ? "PvP challenge creation is temporarily locked."
+                : body.challengeType === "team" && settings.teamChallengesLocked
+                  ? "Team challenge creation is temporarily locked."
+                  : null;
+    if (lockedReason) {
+      return NextResponse.json({ error: lockedReason }, { status: 423 });
+    }
 
     if (!body.userWallet || typeof body.userWallet !== "string") {
       return NextResponse.json({ error: "Missing or invalid userWallet" }, { status: 400 });
@@ -46,6 +69,12 @@ export async function POST(req: NextRequest) {
     }
     if (body.challengeType !== "pvp" && body.challengeType !== "team") {
       return NextResponse.json({ error: "Missing or invalid challengeType (must be 'pvp' or 'team')" }, { status: 400 });
+    }
+    if (body.marketType !== "crypto" && body.marketType !== "sports") {
+      return NextResponse.json({ error: "Missing or invalid marketType" }, { status: 400 });
+    }
+    if (body.challengeFormat !== "price" && body.challengeFormat !== "statement") {
+      return NextResponse.json({ error: "Missing or invalid challengeFormat" }, { status: 400 });
     }
     if (typeof body.maxTeamSize !== "number" || body.maxTeamSize < 0) {
       return NextResponse.json({ error: "Missing or invalid maxTeamSize" }, { status: 400 });

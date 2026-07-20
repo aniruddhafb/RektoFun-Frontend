@@ -51,6 +51,11 @@ import { ChallengeCard } from "./ChallengeCard";
 import type { User } from "@/app/lib/users-service/users";
 import { announceChallengeCreated } from "@/app/lib/realtime-events";
 import { fetchUsdcBalance } from "@/app/lib/token-balances";
+import {
+    DEFAULT_SITE_SETTINGS,
+    getSiteSettings,
+    type SiteSettings,
+} from "@/app/lib/site-settings";
 
 interface CreateChallengeModalProps {
     isOpen: boolean;
@@ -189,6 +194,7 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
     const [formError, setFormError] = useState<string | null>(null);
     const [balanceShortfall, setBalanceShortfall] = useState<number | null>(null);
     const [rememberSettings, setRememberSettings] = useState(false);
+    const [siteSettings, setSiteSettings] = useState<SiteSettings>(DEFAULT_SITE_SETTINGS);
 
     const [txStatus, setTxStatus] = useState<TxStatus>("idle");
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -203,6 +209,35 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
 
     useBodyScrollLock(isOpen);
 
+    useEffect(() => {
+        if (!isOpen) return;
+        let active = true;
+        void getSiteSettings().then((settings) => {
+            if (!active) return;
+            setSiteSettings(settings);
+            setMarketType((current) => {
+                if (current === "crypto" && settings.cryptoCreationLocked && !settings.sportsCreationLocked) return "sports";
+                if (current === "sports" && settings.sportsCreationLocked && !settings.cryptoCreationLocked) return "crypto";
+                return current;
+            });
+            setChallengeFormat((current) => {
+                if (current === "price" && settings.priceChallengesLocked && !settings.statementChallengesLocked) return "statement";
+                if (current === "statement" && settings.statementChallengesLocked && !settings.priceChallengesLocked) return "price";
+                return current;
+            });
+            setChallengeMode((current) => {
+                if (current === "pvp" && settings.pvpChallengesLocked && !settings.teamChallengesLocked) return "team";
+                if (current === "team" && settings.teamChallengesLocked && !settings.pvpChallengesLocked) return "pvp";
+                return current;
+            });
+        }).catch(() => {
+            if (active) setSiteSettings(DEFAULT_SITE_SETTINGS);
+        });
+        return () => {
+            active = false;
+        };
+    }, [isOpen]);
+
     /* eslint-disable react-hooks/set-state-in-effect -- restoring an explicitly saved form snapshot when the modal opens */
     useEffect(() => {
         if (!isOpen) return;
@@ -213,12 +248,21 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
                 return;
             }
             const saved = JSON.parse(rawSettings) as Partial<SavedCreateSettings>;
-            if (saved.marketType === "crypto" || saved.marketType === "sports") {
+            const savedMarketAvailable = (saved.marketType === "crypto" && !siteSettings.cryptoCreationLocked)
+                || (saved.marketType === "sports" && !siteSettings.sportsCreationLocked);
+            if (savedMarketAvailable && (saved.marketType === "crypto" || saved.marketType === "sports")) {
                 setMarketType(saved.marketType);
-                setChallengeFormat(saved.marketType === "sports" ? "statement" : saved.challengeFormat === "statement" ? "statement" : "price");
+                const savedFormat = saved.marketType === "sports" ? "statement" : saved.challengeFormat === "statement" ? "statement" : "price";
+                const savedFormatAvailable = (savedFormat === "price" && !siteSettings.priceChallengesLocked)
+                    || (savedFormat === "statement" && !siteSettings.statementChallengesLocked);
+                if (savedFormatAvailable) setChallengeFormat(savedFormat);
             }
-            // Team mode is not available yet, so stale saved settings must not re-enable it.
-            setChallengeMode("pvp");
+            if (
+                (saved.challengeMode === "pvp" && !siteSettings.pvpChallengesLocked)
+                || (saved.challengeMode === "team" && !siteSettings.teamChallengesLocked)
+            ) {
+                setChallengeMode(saved.challengeMode);
+            }
             if (typeof saved.betAmount === "number" && Number.isFinite(saved.betAmount) && saved.betAmount > 0) setBetAmount(saved.betAmount);
             if (typeof saved.durationMinutes === "number" && saved.durationMinutes >= MIN_DURATION_MINUTES) {
                 setDuration(durationFromMinutes(Math.min(saved.durationMinutes, MAX_JOIN_WINDOW_MINUTES)));
@@ -233,7 +277,7 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
             window.localStorage.removeItem(CREATE_SETTINGS_KEY);
             setRememberSettings(false);
         }
-    }, [isOpen]);
+    }, [isOpen, siteSettings]);
     /* eslint-enable react-hooks/set-state-in-effect */
 
     useEffect(() => {
@@ -310,6 +354,10 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
     }, [isOpen, marketType]);
 
     const switchMarket = (nextMarket: MarketType) => {
+        if (
+            (nextMarket === "crypto" && siteSettings.cryptoCreationLocked)
+            || (nextMarket === "sports" && siteSettings.sportsCreationLocked)
+        ) return;
         if (nextMarket === marketType) return;
         setMarketType(nextMarket);
         setChallengeFormat(nextMarket === "sports" ? "statement" : "price");
@@ -453,6 +501,13 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
     }, [assetPriceRequestKey, chartRange, isOpen, isPriceFeed, selectedAssetSymbol, selectedMarketPair, selectedChildCategory?.category]);
 
     const validateForm = ({ requireProfile = true }: { requireProfile?: boolean } = {}) => {
+        if (siteSettings.siteMaintenance) return "Challenge creation is unavailable during maintenance.";
+        if (marketType === "crypto" && siteSettings.cryptoCreationLocked) return "Crypto challenge creation is temporarily locked.";
+        if (marketType === "sports" && siteSettings.sportsCreationLocked) return "Sports challenge creation is temporarily locked.";
+        if (challengeFormat === "price" && siteSettings.priceChallengesLocked) return "Price challenges are temporarily locked.";
+        if (challengeFormat === "statement" && siteSettings.statementChallengesLocked) return "Statement challenges are temporarily locked.";
+        if (challengeMode === "pvp" && siteSettings.pvpChallengesLocked) return "PvP challenge creation is temporarily locked.";
+        if (challengeMode === "team" && siteSettings.teamChallengesLocked) return "Team challenge creation is temporarily locked.";
         if (marketType === "crypto" && !selectedChildCategory) {
             setActivePanel("topic");
             return "Choose a crypto asset.";
@@ -574,6 +629,8 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
                     target: targetPrice,
                     resolutionMethod: isPriceFeed ? "PRICE_FEED" : "COMMUNITY",
                     resolutionDate: new Date(resolvesAt * 1000).toISOString().split("T")[0],
+                    marketType,
+                    challengeFormat,
                 }),
             });
 
@@ -732,33 +789,25 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
                                 <button
                                     type="button"
                                     onClick={() => switchMarket("crypto")}
-                                    className={`inline-flex h-8 items-center justify-center gap-1.5 px-3 text-xs font-black transition-colors ${marketType === "crypto" ? "bg-black text-white" : "text-[#594b44] hover:bg-white/70"}`}
+                                    disabled={siteSettings.cryptoCreationLocked}
+                                    className={`inline-flex h-8 items-center justify-center gap-1.5 px-3 text-xs font-black transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${marketType === "crypto" ? "bg-black text-white" : "text-[#594b44] hover:bg-white/70"}`}
                                     aria-pressed={marketType === "crypto"}
+                                    title={siteSettings.cryptoCreationLocked ? "Locked by admin" : undefined}
                                 >
+                                    {siteSettings.cryptoCreationLocked && <Lock className="h-3 w-3" />}
                                     <Coins className="h-3.5 w-3.5" /> Crypto
                                 </button>
-                                <span
-                                    className="group relative h-8"
-                                    tabIndex={0}
-                                    aria-label="Sports, coming soon"
+                                <button
+                                    type="button"
+                                    onClick={() => switchMarket("sports")}
+                                    disabled={siteSettings.sportsCreationLocked}
+                                    className={`inline-flex h-8 items-center justify-center gap-1.5 px-3 text-xs font-black transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${marketType === "sports" ? "bg-black text-white" : "text-[#594b44] hover:bg-white/70"}`}
+                                    aria-pressed={marketType === "sports"}
+                                    title={siteSettings.sportsCreationLocked ? "Locked by admin" : undefined}
                                 >
-                                    <button
-                                        type="button"
-                                        disabled
-                                        aria-describedby="sports-coming-soon"
-                                        className="inline-flex h-full w-full cursor-not-allowed items-center justify-center gap-1.5 px-3 text-xs font-black text-[#594b44] opacity-45"
-                                    >
-                                        <Lock className="h-3 w-3" aria-hidden="true" />
-                                        <Trophy className="h-3.5 w-3.5" /> Sports
-                                    </button>
-                                    <span
-                                        id="sports-coming-soon"
-                                        role="tooltip"
-                                        className="pointer-events-none absolute left-1/2 top-full z-20 mt-2 -translate-x-1/2 whitespace-nowrap border border-black bg-black px-2 py-1 text-[9px] font-black uppercase tracking-[0.08em] text-white opacity-0 shadow-[2px_2px_0_#e85a2d] transition-opacity group-hover:opacity-100 group-focus:opacity-100"
-                                    >
-                                        Coming soon
-                                    </span>
-                                </span>
+                                    {siteSettings.sportsCreationLocked && <Lock className="h-3 w-3" />}
+                                    <Trophy className="h-3.5 w-3.5" /> Sports
+                                </button>
                             </div>
 
                             {marketType === "crypto" && (
@@ -766,36 +815,33 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
                                     <button
                                         type="button"
                                         onClick={() => {
+                                            if (siteSettings.priceChallengesLocked) return;
                                             setChallengeFormat("price");
                                             setFormError(null);
                                         }}
-                                        className={`inline-flex h-8 items-center justify-center gap-1.5 px-2.5 text-[11px] font-black transition-colors ${challengeFormat === "price" ? "bg-[#e85a2d] text-white" : "text-[#6d5d55] hover:bg-[#f3e1d7]"}`}
+                                        disabled={siteSettings.priceChallengesLocked}
+                                        title={siteSettings.priceChallengesLocked ? "Locked by admin" : undefined}
+                                        className={`inline-flex h-8 items-center justify-center gap-1.5 px-2.5 text-[11px] font-black transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${challengeFormat === "price" ? "bg-[#e85a2d] text-white" : "text-[#6d5d55] hover:bg-[#f3e1d7]"}`}
                                         aria-pressed={challengeFormat === "price"}
                                     >
+                                        {siteSettings.priceChallengesLocked && <Lock className="h-3 w-3" />}
                                         <Activity className="h-3.5 w-3.5" /> Price
                                     </button>
-                                    <span
-                                        className="group relative h-8"
-                                        tabIndex={0}
-                                        aria-label="Statement, coming soon"
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            if (siteSettings.statementChallengesLocked) return;
+                                            setChallengeFormat("statement");
+                                            setFormError(null);
+                                        }}
+                                        disabled={siteSettings.statementChallengesLocked}
+                                        title={siteSettings.statementChallengesLocked ? "Locked by admin" : undefined}
+                                        className={`inline-flex h-8 items-center justify-center gap-1.5 px-2.5 text-[11px] font-black transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${challengeFormat === "statement" ? "bg-[#e85a2d] text-white" : "text-[#6d5d55] hover:bg-[#f3e1d7]"}`}
+                                        aria-pressed={challengeFormat === "statement"}
                                     >
-                                        <button
-                                            type="button"
-                                            disabled
-                                            aria-describedby="statement-coming-soon"
-                                            className="inline-flex h-full w-full cursor-not-allowed items-center justify-center gap-1.5 px-2.5 text-[11px] font-black text-[#6d5d55] opacity-45"
-                                        >
-                                            <Lock className="h-3 w-3" aria-hidden="true" />
-                                            <MessageSquareText className="h-3.5 w-3.5" /> Statement
-                                        </button>
-                                        <span
-                                            id="statement-coming-soon"
-                                            role="tooltip"
-                                            className="pointer-events-none absolute left-1/2 top-full z-20 mt-2 -translate-x-1/2 whitespace-nowrap border border-black bg-black px-2 py-1 text-[9px] font-black uppercase tracking-[0.08em] text-white opacity-0 shadow-[2px_2px_0_#e85a2d] transition-opacity group-hover:opacity-100 group-focus:opacity-100"
-                                        >
-                                            Coming soon
-                                        </span>
-                                    </span>
+                                        {siteSettings.statementChallengesLocked && <Lock className="h-3 w-3" />}
+                                        <MessageSquareText className="h-3.5 w-3.5" /> Statement
+                                    </button>
                                 </div>
                             )}
 
@@ -1275,30 +1321,41 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
                                         <div className="grid grid-cols-1 gap-2 min-[380px]:grid-cols-2">
                                             <button
                                                 type="button"
+                                                disabled={siteSettings.pvpChallengesLocked}
+                                                title={siteSettings.pvpChallengesLocked ? "Locked by admin" : undefined}
                                                 onClick={() => {
                                                     setChallengeMode("pvp");
                                                     setActivePanel(null);
                                                 }}
-                                                className={`flex items-center gap-3 border-2 p-3 text-left ${challengeMode === "pvp" ? "border-black bg-black text-white shadow-[3px_3px_0_#f5d547]" : "border-black/20 bg-white text-black hover:border-black"}`}
+                                                className={`flex items-center gap-3 border-2 p-3 text-left disabled:cursor-not-allowed disabled:opacity-40 ${challengeMode === "pvp" ? "border-black bg-black text-white shadow-[3px_3px_0_#f5d547]" : "border-black/20 bg-white text-black hover:border-black"}`}
                                             >
                                                 <Swords className="h-5 w-5 shrink-0" />
                                                 <span>
                                                     <span className="block text-xs font-black">1 vs 1</span>
-                                                    <span className={`text-[10px] font-bold ${challengeMode === "pvp" ? "text-white/65" : "text-[#8b7a72]"}`}>PvP Mode</span>
+                                                    <span className={`text-[10px] font-bold ${challengeMode === "pvp" ? "text-white/65" : "text-[#8b7a72]"}`}>
+                                                        {siteSettings.pvpChallengesLocked ? "Locked" : "PvP Mode"}
+                                                    </span>
                                                 </span>
+                                                {siteSettings.pvpChallengesLocked && <Lock className="ml-auto h-4 w-4 shrink-0" />}
                                             </button>
                                             <button
                                                 type="button"
-                                                disabled
-                                                aria-label="Team mode coming soon"
-                                                className="flex cursor-not-allowed items-center gap-3 border-2 border-black/10 bg-black/5 p-3 text-left text-black/40"
+                                                disabled={siteSettings.teamChallengesLocked}
+                                                title={siteSettings.teamChallengesLocked ? "Locked by admin" : undefined}
+                                                onClick={() => {
+                                                    setChallengeMode("team");
+                                                    setActivePanel(null);
+                                                }}
+                                                className={`flex items-center gap-3 border-2 p-3 text-left disabled:cursor-not-allowed disabled:opacity-40 ${challengeMode === "team" ? "border-black bg-black text-white shadow-[3px_3px_0_#f5d547]" : "border-black/20 bg-white text-black hover:border-black"}`}
                                             >
                                                 <Users className="h-5 w-5 shrink-0" />
                                                 <span className="min-w-0 flex-1">
                                                     <span className="block text-xs font-black">Team</span>
-                                                    <span className="text-[10px] font-bold">Coming soon</span>
+                                                    <span className={`text-[10px] font-bold ${challengeMode === "team" ? "text-white/65" : "text-[#8b7a72]"}`}>
+                                                        {siteSettings.teamChallengesLocked ? "Locked" : "Team mode"}
+                                                    </span>
                                                 </span>
-                                                <Lock className="h-4 w-4 shrink-0" aria-hidden="true" />
+                                                {siteSettings.teamChallengesLocked && <Lock className="h-4 w-4 shrink-0" />}
                                             </button>
                                         </div>
                                     </div>

@@ -15,14 +15,17 @@ import {
   ExternalLink,
   FolderPlus,
   ImageUp,
+  Clock3,
   RefreshCw,
   Search,
   Server,
+  Settings2,
   ShieldCheck,
   Swords,
   Trash2,
   Users,
   WalletCards,
+  Wrench,
 } from "lucide-react";
 import { isAdminWallet } from "@/app/lib/admin";
 import { getUsers, type User } from "@/app/lib/users-service/users";
@@ -48,8 +51,13 @@ import {
   type AdminRedemption,
   type AdminReferralUser,
 } from "@/app/lib/admin-service";
+import {
+  DEFAULT_SITE_SETTINGS,
+  type SiteSettingKey,
+  type SiteSettings,
+} from "@/app/lib/site-settings";
 
-type Tab = "stats" | "challenges" | "resolution" | "users" | "categories" | "referrals";
+type Tab = "stats" | "maintenance" | "challenges" | "resolution" | "users" | "categories" | "referrals";
 type ReferralView = "current" | "active";
 type ChallengeAudit = {
   id: number;
@@ -95,6 +103,31 @@ const date = (value: string) =>
   new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(
     new Date(value),
   );
+const challengeResolutionTime = (challenge: Challenge) => {
+  const composerResolvesAt = challenge.metadata?.composer?.resolves_at;
+  const value = composerResolvesAt ?? challenge.resolve_time ?? challenge.resolution_date;
+  const numericValue = typeof value === "number" ? value : Number.NaN;
+  const timestamp = Number.isFinite(numericValue)
+    ? numericValue < 10_000_000_000 ? numericValue * 1000 : numericValue
+    : value ? new Date(String(value)).getTime() : Number.NaN;
+  return Number.isFinite(timestamp) ? timestamp : null;
+};
+const resolutionCountdown = (challenge: Challenge, now: number) => {
+  const dueAt = challengeResolutionTime(challenge);
+  if (dueAt === null) return null;
+
+  const remainingSeconds = Math.max(0, Math.ceil((dueAt - now) / 1000));
+  if (remainingSeconds === 0) return "Due now";
+
+  const days = Math.floor(remainingSeconds / 86_400);
+  const hours = Math.floor((remainingSeconds % 86_400) / 3_600);
+  const minutes = Math.floor((remainingSeconds % 3_600) / 60);
+  const seconds = remainingSeconds % 60;
+
+  return days > 0
+    ? `${days}d ${hours}h ${minutes}m ${seconds}s`
+    : `${hours}h ${minutes}m ${seconds}s`;
+};
 const challengeExpiryTime = (challenge: Challenge) => {
   const value = challenge.expiry || challenge.expire_time;
   const timestamp = value ? new Date(value).getTime() : Number.NaN;
@@ -138,6 +171,7 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [loaded, setLoaded] = useState<Record<Tab, boolean>>({
     stats: false,
+    maintenance: false,
     challenges: false,
     resolution: false,
     users: false,
@@ -160,6 +194,18 @@ export default function AdminPage() {
   const [expandedReferrer, setExpandedReferrer] = useState<number | null>(null);
   const [referralView, setReferralView] = useState<ReferralView>("current");
   const [referralBalancesLoading, setReferralBalancesLoading] = useState(false);
+  const [siteSettings, setSiteSettings] = useState<SiteSettings>(DEFAULT_SITE_SETTINGS);
+  const [savingSetting, setSavingSetting] = useState<SiteSettingKey | null>(null);
+  const [countdownNow, setCountdownNow] = useState(0);
+
+  useEffect(() => {
+    const initialTimer = window.setTimeout(() => setCountdownNow(Date.now()), 0);
+    const timer = window.setInterval(() => setCountdownNow(Date.now()), 1000);
+    return () => {
+      window.clearTimeout(initialTimer);
+      window.clearInterval(timer);
+    };
+  }, []);
 
   useEffect(() => {
     if (!allowed) router.replace("/");
@@ -198,6 +244,11 @@ export default function AdminPage() {
               0,
             ),
           });
+        } else if (section === "maintenance") {
+          const response = await fetch("/api/admin/site-settings", { cache: "no-store" });
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.error || "Could not load site controls.");
+          setSiteSettings(data);
         } else if (section === "challenges") {
           const challengeData = await getChallenges(
             { limit: 1000, offset: 0 },
@@ -355,7 +406,6 @@ export default function AdminPage() {
     (categoryPage - 1) * CATEGORY_PAGE_SIZE,
     categoryPage * CATEGORY_PAGE_SIZE,
   );
-  const today = new Date().toISOString().slice(0, 10);
   const isPriceFeed = (challenge: Challenge) =>
     String(challenge.resolution_method || challenge.resolution_source || "").toUpperCase() === "PRICE_FEED";
   const hasOpponent = (challenge: Challenge) =>
@@ -370,10 +420,9 @@ export default function AdminPage() {
     return hasOpponent(challenge) && ["OPEN", "RESOLVED"].includes(status);
   });
   const actionableResolutionChallenges = resolutionCandidates.filter((challenge) => {
-    const status = String(challenge.status || "").toUpperCase();
     const chainStatus = String(challengeAudits[challenge.id]?.chainStatus || "").toLowerCase();
-    const fullyResolved = status === "RESOLVED" && (chainStatus === "settled" || chainStatus === "closed");
-    return !fullyResolved;
+    const onchainResolved = chainStatus === "settled" || chainStatus === "closed";
+    return !onchainResolved;
   });
   const currentChallenges = [...actionableResolutionChallenges]
     .sort((a, b) => String(a.resolution_date || "").localeCompare(String(b.resolution_date || "")));
@@ -419,6 +468,32 @@ export default function AdminPage() {
       setError(err instanceof Error ? err.message : "Role update failed.");
     } finally {
       setBusyId(null);
+    }
+  };
+
+  const toggleSiteSetting = async (key: SiteSettingKey) => {
+    const nextValue = !siteSettings[key];
+    setSavingSetting(key);
+    setError("");
+    setNotice("");
+    try {
+      const response = await fetch("/api/admin/site-settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [key]: nextValue }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not update site controls.");
+      setSiteSettings(data);
+      setNotice(
+        key === "siteMaintenance"
+          ? nextValue ? "Maintenance mode is now active." : "The website is live again."
+          : "Challenge creation controls updated.",
+      );
+    } catch (settingError) {
+      setError(settingError instanceof Error ? settingError.message : "Could not update site controls.");
+    } finally {
+      setSavingSetting(null);
     }
   };
 
@@ -602,6 +677,7 @@ export default function AdminPage() {
     );
   const tabs: Array<{ id: Tab; label: string }> = [
     { id: "stats", label: "Overview" },
+    { id: "maintenance", label: "Maintenance" },
     { id: "challenges", label: "Challenges" },
     { id: "resolution", label: "Resolution" },
     { id: "users", label: "Users" },
@@ -656,6 +732,82 @@ export default function AdminPage() {
           >
             {notice} <span className="float-right">×</span>
           </button>
+        )}
+
+        {tab === "maintenance" && (
+          <section className="space-y-6">
+            <div className={`border-2 border-black p-6 shadow-[5px_5px_0_#111] ${
+              siteSettings.siteMaintenance ? "bg-[#ff8c79]" : "bg-[#a8d85b]"
+            }`}>
+              <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex items-start gap-4">
+                  <div className="border-2 border-black bg-white p-3 shadow-[3px_3px_0_#111]">
+                    <Wrench className="h-7 w-7" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-[.15em] text-black/55">Global control</p>
+                    <h2 className="mt-1 text-3xl font-black">
+                      {siteSettings.siteMaintenance ? "Website under maintenance" : "Website is live"}
+                    </h2>
+                    <p className="mt-2 max-w-2xl font-semibold text-black/65">
+                      When enabled, every public page is replaced by the maintenance screen.
+                      The admin panel remains available so you can turn the website back on.
+                    </p>
+                  </div>
+                </div>
+                <SettingToggle
+                  label="Website availability"
+                  enabled={!siteSettings.siteMaintenance}
+                  busy={savingSetting === "siteMaintenance"}
+                  onToggle={() => void toggleSiteSetting("siteMaintenance")}
+                />
+              </div>
+            </div>
+
+            <div className="border-2 border-black bg-[#fffaf6] shadow-[5px_5px_0_#111]">
+              <div className="border-b-2 border-black p-5">
+                <h2 className="flex items-center gap-2 text-2xl font-black">
+                  <Settings2 className="h-6 w-6" /> Challenge creation locks
+                </h2>
+                <p className="mt-1 text-sm font-semibold text-black/55">
+                  Lock individual creation paths without taking the rest of RektoFun offline.
+                </p>
+              </div>
+              <div className="grid gap-0 md:grid-cols-2">
+                {([
+                  ["cryptoCreationLocked", "Crypto mode", "Prevent creation of all crypto challenges."],
+                  ["sportsCreationLocked", "Sports mode", "Prevent creation of all sports challenges."],
+                  ["priceChallengesLocked", "Price challenges", "Disable target-price challenge creation."],
+                  ["statementChallengesLocked", "Statement challenges", "Disable statement-based challenge creation."],
+                  ["pvpChallengesLocked", "PvP mode", "Disable one-versus-one challenge creation."],
+                  ["teamChallengesLocked", "Team mode", "Disable team challenge creation."],
+                ] as Array<[SiteSettingKey, string, string]>).map(([key, label, description], index) => (
+                  <div
+                    key={key}
+                    className={`flex items-center justify-between gap-5 p-5 ${
+                      index % 2 === 0 ? "md:border-r-2 md:border-black" : ""
+                    } ${index < 4 ? "border-b-2 border-black" : ""}`}
+                  >
+                    <div>
+                      <h3 className="font-black">{label}</h3>
+                      <p className="mt-1 text-sm font-semibold text-black/50">{description}</p>
+                    </div>
+                    <SettingToggle
+                      label={`${label} availability`}
+                      enabled={!siteSettings[key]}
+                      busy={savingSetting === key}
+                      onToggle={() => void toggleSiteSetting(key)}
+                    />
+                  </div>
+                ))}
+              </div>
+              <div className="border-t-2 border-black bg-[#f3e1d7] px-5 py-3 text-xs font-bold text-black/50">
+                {siteSettings.updatedAt
+                  ? `Last changed ${new Date(siteSettings.updatedAt).toLocaleString()}`
+                  : "Using default controls"}
+              </div>
+            </div>
+          </section>
         )}
 
         {tab === "stats" && (
@@ -1107,7 +1259,7 @@ export default function AdminPage() {
                   <table className="w-full min-w-[1100px] text-left">
                     <thead className={section.headingColor}>
                       <tr>
-                        {["Challenge", "Market", "Mode", "Target", "Due", "Status", "Winner / value", "Action"].map((heading) => (
+                        {["Challenge", "Market", "Mode", "Due", "Status", "Action"].map((heading) => (
                           <th key={heading} className="px-4 py-3 text-xs font-black uppercase">{heading}</th>
                         ))}
                       </tr>
@@ -1117,9 +1269,10 @@ export default function AdminPage() {
                         const opponentJoined = hasOpponent(challenge);
                         const contractAddress = typeof challenge.metadata?.onchain?.challenge_pda === "string"
                           ? challenge.metadata.onchain.challenge_pda : "";
+                        const resolvesAt = challengeResolutionTime(challenge);
                         const canResolve = (challenge.status === "OPEN" || challenge.status === "RESOLVED")
-                          && Boolean(challenge.resolution_date)
-                          && challenge.resolution_date.slice(0, 10) <= today;
+                          && resolvesAt !== null
+                          && resolvesAt <= countdownNow;
                         const databaseResolved = String(challenge.status).toUpperCase() === "RESOLVED";
                         const onchainStatus = String(challengeAudits[challenge.id]?.chainStatus || "").toLowerCase();
                         const onchainResolved = onchainStatus === "settled" || onchainStatus === "closed";
@@ -1146,41 +1299,55 @@ export default function AdminPage() {
                           </td>
                           <td className="px-4 py-3 font-black">{challenge.trading_pair || challenge.ticker || "—"}</td>
                           <td className="px-4 py-3 font-bold">{challenge.mode}</td>
-                          <td className="px-4 py-3 font-bold">{challenge.direction || "—"} {challenge.target ? money(challenge.target) : "—"}</td>
-                          <td className="px-4 py-3 font-bold">{challenge.resolution_date ? date(challenge.resolution_date) : "—"}</td>
-                          <td className="px-4 py-3">
-                            <span className={`border-2 border-black px-2 py-1 text-xs font-black ${challenge.status === "OPEN" ? "bg-[#ff8c79]" : "bg-[#a8d85b]"}`}>{challenge.status}</span>
-                          </td>
-                          <td className="px-4 py-3">
-                            {section.key === "price" ? (
-                              <span className="text-sm font-bold">Calculated automatically</span>
-                            ) : (
-                              <div className="flex min-w-[230px] gap-2">
-                                <select
-                                  value={manualWinners[challenge.id] || ""}
-                                  onChange={(event) => setManualWinners((current) => ({ ...current, [challenge.id]: event.target.value as "creator" | "opponent" }))}
-                                  disabled={!opponentJoined}
-                                  className="border-2 border-black bg-white px-2 py-1.5 text-sm font-black"
+                          <td className="px-4 py-3 font-bold">
+                            {challengeResolutionTime(challenge) === null ? "—" : (
+                              <div>
+                                <p>{date(new Date(challengeResolutionTime(challenge)!).toISOString())}</p>
+                                <p
+                                  className={`mt-1 inline-flex items-center gap-1 text-xs font-black ${
+                                    resolutionCountdown(challenge, countdownNow) === "Due now"
+                                      ? "text-red-700"
+                                      : "text-black/55"
+                                  }`}
+                                  aria-label={`Time until resolution: ${resolutionCountdown(challenge, countdownNow)}`}
                                 >
-                                  <option value="">Select winner</option>
-                                  <option value="creator">Creator / Team A</option>
-                                  <option value="opponent">Opponent / Team B</option>
-                                </select>
-                                <input
-                                  type="number"
-                                  min="0"
-                                  step="any"
-                                  value={manualPrices[challenge.id] || ""}
-                                  onChange={(event) => setManualPrices((current) => ({ ...current, [challenge.id]: event.target.value }))}
-                                  disabled={!opponentJoined}
-                                  placeholder="Final value"
-                                  className="w-28 border-2 border-black bg-white px-2 py-1.5 text-sm font-bold"
-                                />
+                                  <Clock3 className="h-3.5 w-3.5" />
+                                  {resolutionCountdown(challenge, countdownNow)}
+                                </p>
                               </div>
                             )}
                           </td>
                           <td className="px-4 py-3">
+                            <span className={`border-2 border-black px-2 py-1 text-xs font-black ${challenge.status === "OPEN" ? "bg-[#ff8c79]" : "bg-[#a8d85b]"}`}>{challenge.status}</span>
+                          </td>
+                          <td className="px-4 py-3">
                             <div className="flex min-w-[190px] flex-col gap-2">
+                              {section.key === "manual" && !databaseResolved && (
+                                <div className="flex gap-2">
+                                  <select
+                                    value={manualWinners[challenge.id] || ""}
+                                    onChange={(event) => setManualWinners((current) => ({ ...current, [challenge.id]: event.target.value as "creator" | "opponent" }))}
+                                    disabled={!opponentJoined}
+                                    aria-label={`Winner for challenge ${challenge.id}`}
+                                    className="min-w-0 flex-1 border-2 border-black bg-white px-2 py-1.5 text-sm font-black"
+                                  >
+                                    <option value="">Select winner</option>
+                                    <option value="creator">Creator / Team A</option>
+                                    <option value="opponent">Opponent / Team B</option>
+                                  </select>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    step="any"
+                                    value={manualPrices[challenge.id] || ""}
+                                    onChange={(event) => setManualPrices((current) => ({ ...current, [challenge.id]: event.target.value }))}
+                                    disabled={!opponentJoined}
+                                    placeholder="Final value"
+                                    aria-label={`Final value for challenge ${challenge.id}`}
+                                    className="w-24 border-2 border-black bg-white px-2 py-1.5 text-sm font-bold"
+                                  />
+                                </div>
+                              )}
                               {fullyResolved ? (
                                 <div className="flex items-center justify-center gap-2 border-2 border-black bg-[#a8d85b] px-3 py-2 text-sm font-black">
                                   <BadgeCheck className="h-4 w-4" /> Fully resolved
@@ -1217,7 +1384,7 @@ export default function AdminPage() {
                         );
                       })}
                       {!section.rows.length && (
-                        <tr><td colSpan={8} className="p-10 text-center font-bold text-black/45">{section.key === "price" && priceFeedFilter === "resolved" ? "No resolved price-feed challenges." : "No open or ongoing challenges with an opponent in this section."}</td></tr>
+                        <tr><td colSpan={6} className="p-10 text-center font-bold text-black/45">{section.key === "price" && priceFeedFilter === "resolved" ? "No resolved price-feed challenges." : "No open or ongoing challenges with an opponent in this section."}</td></tr>
                       )}
                     </tbody>
                   </table>
@@ -1848,5 +2015,46 @@ export default function AdminPage() {
         )}
       </div>
     </div>
+  );
+}
+
+function SettingToggle({
+  label,
+  enabled,
+  busy,
+  onToggle,
+}: {
+  label: string;
+  enabled: boolean;
+  busy: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={enabled}
+      aria-label={label}
+      disabled={busy}
+      onClick={onToggle}
+      className={`relative h-10 w-[78px] shrink-0 cursor-pointer overflow-hidden border-2 border-black transition-all shadow-[2px_2px_0_#111] disabled:cursor-wait disabled:opacity-60 ${
+        enabled ? "bg-[#45b649]" : "bg-[#ef4444]"
+      }`}
+    >
+      <span
+        aria-hidden="true"
+        className={`absolute top-1/2 -translate-y-1/2 text-[9px] font-black tracking-[0.08em] text-white ${
+          enabled ? "left-2" : "right-1.5"
+        }`}
+      >
+        {busy ? "..." : enabled ? "ON" : "OFF"}
+      </span>
+      <span
+        aria-hidden="true"
+        className={`absolute top-1 h-7 w-7 border-2 border-black bg-white shadow-[1px_1px_0_#111] transition-transform ${
+          enabled ? "translate-x-[45px]" : "translate-x-1"
+        }`}
+      />
+    </button>
   );
 }
