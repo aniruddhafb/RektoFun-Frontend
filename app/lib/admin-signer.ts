@@ -16,7 +16,7 @@
  *  6. Frontend broadcasts the fully-signed transaction.
  */
 
-import { Keypair, PublicKey, Transaction } from "@solana/web3.js";
+import { Keypair, LAMPORTS_PER_SOL, PublicKey, Transaction } from "@solana/web3.js";
 import {
   TOKEN_PROGRAM_ID,
   createAssociatedTokenAccountInstruction,
@@ -38,6 +38,8 @@ import {
   deriveCreatorCounter,
   getReadonlyConnection,
   getRektoProgram,
+  USDC_MINT,
+  USDC_MULTIPLIER,
 } from "./rektofun-program";
 
 export type SponsoredChallengeAction = "accept" | "cancel" | "refund" | "winnings";
@@ -142,10 +144,32 @@ export function getAdminPublicKey(): PublicKey {
   return getAdminKeypair().publicKey;
 }
 
+const NEW_ACCOUNT_ATA_SPACE = 165; // SPL token account size
+const NEW_ACCOUNT_TX_FEE_LAMPORTS = 10_000; // base network fee admin also fronts on this route
+const NEW_ACCOUNT_FEE_MARGIN_BPS = BigInt(50); // 0.5% of the withdrawal amount, margin on top of the actual SOL cost
+
+/** Live SOL/USDC spot price, used to convert the sponsored SOL cost into a USDC-equivalent fee. */
+async function fetchSolUsdcPrice(): Promise<number> {
+  const response = await fetch("https://api.binance.com/api/v3/ticker/price?symbol=SOLUSDC", {
+    next: { revalidate: 30 },
+  });
+  if (!response.ok) throw new Error("Unable to fetch SOL price.");
+  const data = await response.json() as { price?: string };
+  const price = Number(data.price);
+  if (!Number.isFinite(price) || price <= 0) throw new Error("Invalid SOL price received.");
+  return price;
+}
+
 /**
  * Build a gas-sponsored SPL token transfer. The admin pays the transaction
  * fee (and recipient ATA rent when needed), while the token owner must still
- * add their wallet signature before the transaction can be broadcast.
+ * add their wallet signature before the transaction can be broadcast. When
+ * the recipient's ATA doesn't exist yet and the transfer is USDC, the exact
+ * SOL cost admin just fronted (ATA rent + tx fee) is converted to its USDC
+ * value via the live SOL/USDC price, plus a margin of 0.5% of the withdrawal
+ * amount, and deducted from the transferred amount into the admin's own
+ * token account. For other mints (no reliable USDC-denominated price
+ * relationship), a flat 0.5% of the transferred amount is used instead.
  */
 export async function buildAdminSignedTokenTransferTx(args: {
   sender: PublicKey;
@@ -165,7 +189,25 @@ export async function buildAdminSignedTokenTransferTx(args: {
 
   const tx = new Transaction();
   const recipientAccount = await connection.getAccountInfo(recipientTokenAccount);
+  let recipientAmount = args.amount;
+  let newAccountFee = BigInt(0);
   if (!recipientAccount) {
+    if (args.mint.equals(USDC_MINT)) {
+      const [ataRentLamports, solUsdcPrice] = await Promise.all([
+        connection.getMinimumBalanceForRentExemption(NEW_ACCOUNT_ATA_SPACE),
+        fetchSolUsdcPrice(),
+      ]);
+      const sponsoredLamports = ataRentLamports + NEW_ACCOUNT_TX_FEE_LAMPORTS;
+      const baseCostMicroUsdc = (sponsoredLamports / LAMPORTS_PER_SOL) * solUsdcPrice * USDC_MULTIPLIER;
+      const marginMicroUsdc = (args.amount * NEW_ACCOUNT_FEE_MARGIN_BPS) / BigInt(10_000); // 0.5% of the withdrawal amount
+      newAccountFee = BigInt(Math.ceil(baseCostMicroUsdc)) + marginMicroUsdc;
+    } else {
+      // No reliable USDC-denominated price for this mint — fall back to a flat 0.5% of the transferred amount.
+      newAccountFee = (args.amount * NEW_ACCOUNT_FEE_MARGIN_BPS) / BigInt(10_000);
+    }
+    recipientAmount = args.amount - newAccountFee;
+    if (recipientAmount <= BigInt(0)) throw new Error("Transfer amount is too small to cover the new-account fee.");
+
     tx.add(
       createAssociatedTokenAccountInstruction(
         adminKeypair.publicKey,
@@ -181,11 +223,25 @@ export async function buildAdminSignedTokenTransferTx(args: {
       senderTokenAccount,
       recipientTokenAccount,
       args.sender,
-      args.amount,
+      recipientAmount,
       [],
       TOKEN_PROGRAM_ID,
     ),
   );
+
+  if (newAccountFee > BigInt(0)) {
+    const adminTokenAccount = await getAssociatedTokenAddress(args.mint, adminKeypair.publicKey, false);
+    tx.add(
+      createTransferInstruction(
+        senderTokenAccount,
+        adminTokenAccount,
+        args.sender,
+        newAccountFee,
+        [],
+        TOKEN_PROGRAM_ID,
+      ),
+    );
+  }
 
   const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
   tx.feePayer = adminKeypair.publicKey;
@@ -196,6 +252,7 @@ export async function buildAdminSignedTokenTransferTx(args: {
     serializedTx: tx.serialize({ requireAllSignatures: false }).toString("base64"),
     blockhash,
     lastValidBlockHeight,
+    newAccountFeeMicroUnits: newAccountFee.toString(),
   };
 }
 
