@@ -655,6 +655,7 @@ export function useChallengeCard(challenge: Challenge) {
   const isResolveTimeAchieved = Boolean(resolveTimestamp && resolveTimestamp <= currentTime);
   const lifecycle = getChallengeLifecycle({
     status: locallyCancelled ? "CANCELLED" : challenge.status,
+    onchainSettled: Boolean(challenge.metadata?.onchain?.settled_at),
     hasOpponents,
     expiryTimestamp,
     resolveTimestamp,
@@ -674,10 +675,6 @@ export function useChallengeCard(challenge: Challenge) {
       return;
     }
 
-    const isPotentialClaim = challenge.status === "CANCELLED"
-      || (challenge.status === "RESOLVED" && isTeam);
-    if (!isCreator && (!isPotentialClaim || user?.id == null)) return;
-
     const onchain = (challenge.metadata as Record<string, unknown> | undefined)?.onchain as
       | { challenge_pda?: string; creator_wallet?: string }
       | undefined;
@@ -689,10 +686,6 @@ export function useChallengeCard(challenge: Challenge) {
     let cancelled = false;
     const loadAction = async () => {
       try {
-        if (!isCreator && user?.id != null) {
-          const joinedChallengeIds = await loadJoinedChallengeIds(user.id);
-          if (!joinedChallengeIds.has(challenge.id) || cancelled) return;
-        }
         const participant = new PublicKey(address);
         const signer = walletProvider as {
           signTransaction: (transaction: Transaction) => Promise<Transaction>;
@@ -748,7 +741,7 @@ export function useChallengeCard(challenge: Challenge) {
     };
     void loadAction();
     return () => { cancelled = true; };
-  }, [address, challenge.id, challenge.metadata, challenge.status, connection, isConnected, isCreator, isPvpMode, isTeam, user?.id, walletProvider]);
+  }, [address, challenge.metadata, connection, isConnected, isPvpMode, walletProvider]);
 
   const availableChallengeAction = isConnected ? challengeAction : null;
 

@@ -7,7 +7,7 @@ import {
     Challenge,
     getChallengeCategoryImage,
 } from "@/app/lib/challenges-service/challenges";
-import { ChallengeActivity, getActivityLabel, getActivityVerb, getUserChallengeActivities } from "@/app/lib/activity-service/activity";
+import { ChallengeActivity, getActivityChallengeLifecycle, getActivityLabel, getActivityVerb, getUserChallengeActivities } from "@/app/lib/activity-service/activity";
 
 interface ProfileActivityProps {
     userId: string;
@@ -47,17 +47,20 @@ function getModeLabel(mode?: string): string {
 }
 
 function getResolutionStatus(challenge: Challenge): string {
-    const status = (challenge.status || "").toLowerCase();
-    if (status === "resolved" || challenge.resolved_at) return "Resolved";
-    if (status === "cancelled") return "Cancelled";
-    if (status === "locked" || status === "pending_resolution") return "Resolving";
-    return "Pending";
+    const lifecycle = getActivityChallengeLifecycle(challenge);
+    if (lifecycle === "RESOLVED") return "Resolved";
+    if (lifecycle === "CANCELLED") return "Cancelled";
+    if (lifecycle === "RESOLVING") return "Resolving";
+    if (lifecycle === "EXPIRED") return "Expired";
+    if (lifecycle === "LIVE") return "Live";
+    return "Open";
 }
 
 function getResolutionStatusClass(status: string): string {
     if (status === "Resolved") return "border-emerald-200 bg-emerald-50 text-emerald-700";
-    if (status === "Cancelled") return "border-red-200 bg-red-50 text-red-700";
+    if (status === "Cancelled" || status === "Expired") return "border-red-200 bg-red-50 text-red-700";
     if (status === "Resolving") return "border-amber-200 bg-amber-50 text-amber-700";
+    if (status === "Live") return "border-emerald-200 bg-emerald-50 text-emerald-700";
     return "border-sky-200 bg-sky-50 text-sky-700";
 }
 
@@ -104,6 +107,7 @@ export function ProfileActivity({ userId, username, avatar, onActivityClick, sea
     const filteredActivities = useMemo(() => {
         const query = searchQuery.trim().toLowerCase();
         return activities
+            .filter((activity) => activity.type !== "expired" || getActivityChallengeLifecycle(activity.challenge) === "EXPIRED")
             .filter((activity) => !query || [activity.challenge.statement, activity.challenge.title, activity.challenge.ticker, activity.challenge.trading_pair, getActivityVerb(activity.type)]
                 .some((value) => value?.toLowerCase().includes(query)))
             .sort((a, b) => {

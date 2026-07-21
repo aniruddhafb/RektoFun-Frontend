@@ -189,8 +189,15 @@ export default function ProfilePage() {
                     if (alreadyClaimed) return false;
                     const isCreator = createdIds.has(challenge.id);
                     const side = isCreator ? "TEAM_A" : positionsByChallenge.get(challenge.id)?.side;
+                    const resolvesAt = typeof challenge.metadata?.composer?.resolves_at === "string"
+                        ? new Date(challenge.metadata.composer.resolves_at).getTime()
+                        : null;
+                    const settlementIsDue = resolvesAt === null
+                        || Number.isNaN(resolvesAt)
+                        || resolvesAt <= Date.now();
                     const winningTeamClaim = challenge.status === "RESOLVED"
                         && challenge.mode === "TEAM"
+                        && settlementIsDue
                         && side === challenge.result;
                     const participantRefund = challenge.status === "CANCELLED" && !isCreator && Boolean(side);
                     return winningTeamClaim || participantRefund;

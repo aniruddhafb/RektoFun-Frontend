@@ -57,6 +57,23 @@ const formatEndsByCountdown = (timestamp: number | null, nowMs: number): string 
   return `${minutes}m`;
 };
 
+const formatWinConditionCountdown = (timestamp: number | null, nowMs: number): string => {
+  if (!timestamp) return "before resolution";
+
+  const diffMs = timestamp - nowMs;
+  if (diffMs <= 0) return "by the resolution time";
+
+  const totalHours = Math.max(1, Math.ceil(diffMs / 3600000));
+  const days = Math.floor(totalHours / 24);
+  const hours = totalHours % 24;
+  const parts = [
+    days > 0 ? `${days} day${days === 1 ? "" : "s"}` : "",
+    hours > 0 ? `${hours} hour${hours === 1 ? "" : "s"}` : "",
+  ].filter(Boolean);
+
+  return `within the next ${parts.join(" ")}`;
+};
+
 const formatCreatedTimeAgo = (timestamp: number | null, nowMs: number): string => {
   if (!timestamp) return "recently";
   const diff = nowMs - timestamp;
@@ -200,6 +217,7 @@ export function useChallengeDetail(
   const isResolutionPending = challenge?.status === "PENDING_RESOLUTION";
   const lifecycle = getChallengeLifecycle({
     status: challenge?.status,
+    onchainSettled: Boolean(challenge?.metadata?.onchain?.settled_at),
     hasOpponents,
     expiryTimestamp,
     resolveTimestamp,
@@ -277,6 +295,14 @@ export function useChallengeDetail(
     isDescriptionExpanded && isDescriptionTruncatable
       ? challengeDescriptionText
       : challengeDescriptionPreviewText;
+
+  const winConditionDescription = isManualResolution
+    ? `If “${challengeStatement}” is judged true by community resolution, the challenger side wins; otherwise, the opponent side wins.`
+    : `If ${(challenge?.ticker || "the asset").trim().toUpperCase()} ${isDirectionalBelow ? "reaches or falls below" : "reaches or rises above"} ${new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+      maximumFractionDigits: targetPrice < 1 ? 6 : 2,
+    }).format(Number.isFinite(targetPrice) ? targetPrice : 0)} ${formatWinConditionCountdown(resolveTimestamp, currentTime)}, the challenger side wins; otherwise, the opponent side wins.`;
 
   // CTA Button state
   const ctaBaseClassName =
@@ -491,6 +517,7 @@ export function useChallengeDetail(
     primaryTitle: displayedTitle + (!isManualResolution && isResolveTimeAchieved && resolveDateByText ? ` by ${resolveDateByText}` : ""),
     resolutionLabel: isManualResolution ? "Community resolution" : "Price feed resolution",
     descriptionToShow: displayedDescriptionText,
+    winConditionDescription,
 
     // CTA
     ctaState,

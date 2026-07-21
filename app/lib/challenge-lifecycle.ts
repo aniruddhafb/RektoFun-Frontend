@@ -2,6 +2,7 @@ export type ChallengeLifecycle = "OPEN" | "LIVE" | "RESOLVING" | "RESOLVED" | "E
 
 type ChallengeLifecycleInput = {
   status?: string | null;
+  onchainSettled?: boolean;
   hasOpponents: boolean;
   expiryTimestamp: number | null;
   resolveTimestamp: number | null;
@@ -14,6 +15,7 @@ type ChallengeLifecycleInput = {
  */
 export function getChallengeLifecycle({
   status,
+  onchainSettled = false,
   hasOpponents,
   expiryTimestamp,
   resolveTimestamp,
@@ -23,10 +25,19 @@ export function getChallengeLifecycle({
 
   if (normalizedStatus === "CANCELLED") return "CANCELLED";
   if (normalizedStatus === "EXPIRED") return "EXPIRED";
+  // A confirmed direct/admin settlement is terminal even when the challenge's
+  // originally configured resolve time is still in the future.
+  if (normalizedStatus === "RESOLVED" && onchainSettled) return "RESOLVED";
   // A challenge without an opposing side never became a contest. Its join
   // deadline therefore wins over an early price-target resolution.
   if (!hasOpponents && expiryTimestamp !== null && expiryTimestamp <= now) return "EXPIRED";
-  if (normalizedStatus === "RESOLVED") return "RESOLVED";
+  // A price target can resolve the database result before its configured
+  // resolve time. Without a confirmed on-chain marker, keep it resolving.
+  if (normalizedStatus === "RESOLVED") {
+    return resolveTimestamp !== null && resolveTimestamp > now
+      ? "RESOLVING"
+      : "RESOLVED";
+  }
   if (
     normalizedStatus === "PENDING_RESOLUTION" ||
     normalizedStatus === "LOCKED" ||

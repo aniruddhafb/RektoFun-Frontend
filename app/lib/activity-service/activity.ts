@@ -1,6 +1,7 @@
 import { Challenge } from "@/app/lib/challenges-service/challenges";
 import { Position } from "@/app/lib/positions-service/positions";
 import { User } from "@/app/lib/users-service/users";
+import { getChallengeLifecycle, type ChallengeLifecycle } from "@/app/lib/challenge-lifecycle";
 
 export type ChallengeActivityType = "created" | "joined" | "cancelled" | "expired" | "redeemed" | "refunded" | "won";
 
@@ -35,6 +36,41 @@ export function getActivityVerb(type: ChallengeActivityType): string {
 
 export function getActivityLabel(type: ChallengeActivityType): string {
   return type.charAt(0).toUpperCase() + type.slice(1);
+}
+
+export function getActivityChallengeLifecycle(
+  challenge: Challenge,
+  now = Date.now(),
+): ChallengeLifecycle {
+  const composerResolvesAt = challenge.metadata?.composer?.resolves_at;
+  const resolveValue = typeof composerResolvesAt === "string"
+    ? composerResolvesAt
+    : challenge.resolve_time || challenge.resolution_date;
+  const expiryValue = challenge.expire_time || challenge.expiry;
+  const resolveMs = resolveValue ? new Date(resolveValue).getTime() : Number.NaN;
+  const expiryMs = expiryValue ? new Date(expiryValue).getTime() : Number.NaN;
+  const teamB = challenge.bet_info?.team_count?.TEAM_B;
+  const hasOpponents = Boolean(challenge.bet_info?.highest_bet?.TEAM_B)
+    || Number(teamB?.total_bets || 0) > 0
+    || Number(challenge.total_opponents || 0) > 0
+    || Number(challenge.total_challengers || 0) > 0
+    || Number(challenge.participants || 0) > 1
+    || Boolean(challenge.metadata?.onchain?.challenger_wallet);
+  // An opponent means the contest advanced beyond an uncontested expiry.
+  // Some legacy rows were marked EXPIRED when betting closed even though the
+  // battle continued toward resolution, so activity views normalize them.
+  const lifecycleStatus = hasOpponents && String(challenge.status).toUpperCase() === "EXPIRED"
+    ? "OPEN"
+    : challenge.status;
+
+  return getChallengeLifecycle({
+    status: lifecycleStatus,
+    onchainSettled: Boolean(challenge.metadata?.onchain?.settled_at),
+    hasOpponents,
+    resolveTimestamp: Number.isFinite(resolveMs) ? resolveMs : null,
+    expiryTimestamp: Number.isFinite(expiryMs) ? expiryMs : null,
+    now,
+  });
 }
 
 export function buildChallengeActivities(

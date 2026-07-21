@@ -27,10 +27,9 @@ import {
     getChallengeCategoryImage,
     getChallengeById,
 } from "@/app/lib/challenges-service/challenges";
-import { ChallengeActivity, getActivityLabel, getActivityVerb, getChallengeActivityPage } from "@/app/lib/activity-service/activity";
+import { ChallengeActivity, getActivityChallengeLifecycle, getActivityLabel, getActivityVerb, getChallengeActivityPage } from "@/app/lib/activity-service/activity";
 import { useBodyScrollLock } from "@/app/lib/useBodyScrollLock";
 import { stripUsdcQuote } from "@/app/lib/format-market-label";
-import { getChallengeLifecycle, type ChallengeLifecycle } from "@/app/lib/challenge-lifecycle";
 
 type ActivityType = "All Activity" | "Sports" | "Crypto" | "PVP Mode" | "Team Mode";
 type ActivityStatus = "All Status" | "Open" | "Live" | "Resolving" | "Resolved" | "Expired" | "Cancelled";
@@ -81,26 +80,6 @@ function getShortWallet(address: string): string {
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
 }
 
-function getActivityLifecycle(challenge: Challenge, currentTimeMs: number): ChallengeLifecycle {
-    const composerResolvesAt = challenge.metadata?.composer?.resolves_at;
-    const resolveValue = typeof composerResolvesAt === "string"
-        ? composerResolvesAt
-        : challenge.resolve_time || challenge.resolution_date;
-    const expiryValue = challenge.expire_time || challenge.expiry;
-    const resolveMs = resolveValue ? new Date(resolveValue).getTime() : Number.NaN;
-    const expiryMs = expiryValue ? new Date(expiryValue).getTime() : Number.NaN;
-    const hasOpponents = Boolean(challenge.bet_info?.highest_bet?.TEAM_B)
-        || Number(challenge.participants || 0) > 1;
-
-    return getChallengeLifecycle({
-        status: challenge.status,
-        hasOpponents,
-        resolveTimestamp: Number.isFinite(resolveMs) ? resolveMs : null,
-        expiryTimestamp: Number.isFinite(expiryMs) ? expiryMs : null,
-        now: currentTimeMs,
-    });
-}
-
 function getModeLabel(mode?: string): string {
     const normalizedMode = mode?.toLowerCase() || "";
     if (normalizedMode.includes("pvp")) return "PVP";
@@ -110,7 +89,7 @@ function getModeLabel(mode?: string): string {
 
 function getResolutionStatus(challenge: Challenge, currentTimeMs: number): string {
     const resolutionStatus = challenge.resolution_status?.trim().toLowerCase();
-    const lifecycle = getActivityLifecycle(challenge, currentTimeMs);
+    const lifecycle = getActivityChallengeLifecycle(challenge, currentTimeMs);
 
     if (lifecycle === "RESOLVED") return "Resolved";
     if (lifecycle === "CANCELLED") return "Cancelled";
@@ -357,7 +336,8 @@ export default function ActivityPage() {
             const parentId = challenge.market?.parent_id?.toLowerCase() ?? "";
             const resolutionSource = challenge.resolution_source?.toLowerCase() ?? "";
             const normalizedSearch = searchQuery.trim().toLowerCase();
-            const lifecycle = getActivityLifecycle(challenge, currentTimeMs);
+            const lifecycle = getActivityChallengeLifecycle(challenge, currentTimeMs);
+            if (activity.type === "expired" && lifecycle !== "EXPIRED") return false;
             const creator = getActivityCreator(challenge);
 
             const matchesType =

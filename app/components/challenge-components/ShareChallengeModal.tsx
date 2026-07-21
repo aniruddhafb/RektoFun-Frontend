@@ -8,6 +8,7 @@ import { Challenge, getChallengeCategoryImage } from "@/app/lib/challenges-servi
 import { useBodyScrollLock } from "@/app/lib/useBodyScrollLock";
 import { useUserStore } from "@/app/store/useUserStore";
 import { stripUsdcQuote } from "@/app/lib/format-market-label";
+import { getPositionsByChallenge, type ChallengeParticipantPosition } from "@/app/lib/positions-service/positions";
 
 type ShareChallengeModalProps = {
   challenge: Challenge;
@@ -75,7 +76,7 @@ function getWinnerMeta(challenge: Challenge) {
     ? settledPool * (winnerStake / winningStake)
     : settledPool;
 
-  return { winningSide, winnerName, winnerAvatar, payout, isTeam: challenge.mode === "TEAM" };
+  return { winningSide, winnerName, winnerAvatar, payout, teamPayout: settledPool, isTeam: challenge.mode === "TEAM" };
 }
 
 function getPredictionLine(challenge: Challenge) {
@@ -104,6 +105,7 @@ export function ShareChallengeModal({ challenge, isOpen, onClose, variant = "cha
   const [feedback, setFeedback] = useState<"link" | "image" | "share" | null>(null);
   const [side, setSide] = useState<Side>("TEAM_A");
   const [theme] = useState<Theme>("arena");
+  const [teamParticipants, setTeamParticipants] = useState<ChallengeParticipantPosition[]>([]);
   useBodyScrollLock(isOpen);
   const shareUrl = useMemo(() => {
     if (typeof window === "undefined") return "";
@@ -115,15 +117,39 @@ export function ShareChallengeModal({ challenge, isOpen, onClose, variant = "cha
   const winner = useMemo(() => getWinnerMeta(challenge), [challenge]);
   const statement = getPredictionLine(challenge);
 
+  useEffect(() => {
+    if (!isOpen || !winner?.isTeam) return;
+    let cancelled = false;
+    getPositionsByChallenge(challenge.id)
+      .then((positions) => { if (!cancelled) setTeamParticipants(positions); })
+      .catch(() => { if (!cancelled) setTeamParticipants([]); });
+    return () => { cancelled = true; };
+  }, [challenge.id, isOpen, winner?.isTeam]);
+
   const drawCard = useCallback(async () => {
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext("2d");
     if (!canvas || !ctx) return;
     canvas.width = 1200; canvas.height = 1200;
-    const [mascot, logo, winnerAvatar] = await Promise.all([
+    const uniqueTeamParticipants = winner?.isTeam
+      ? [...new Map(teamParticipants.map((position) => [position.creator, position])).values()]
+      : [];
+    if (winner?.isTeam && !uniqueTeamParticipants.some((position) => position.creator === Number(challenge.creator_id ?? challenge.creator))) {
+      uniqueTeamParticipants.unshift({
+        id: -1,
+        challenge_id: challenge.id,
+        creator: Number(challenge.creator_id ?? challenge.creator),
+        bet: Number(challenge.initial_bet || 0),
+        side: "TEAM_A",
+        created_at: challenge.created_at,
+        user: challenge.creator_details || undefined,
+      });
+    }
+    const [mascot, logo, winnerAvatar, participantAvatars] = await Promise.all([
       loadImage("/welcome/rekto-mascot-arena.jpg"),
       loadImage("/rektologo.png"),
       winner ? loadImage(winner.winnerAvatar) : Promise.resolve(null),
+      Promise.all(uniqueTeamParticipants.map((position) => loadImage(position.user?.profile_image || getChallengeCategoryImage(challenge)))),
     ]);
 
     if (isPromotional) {
@@ -173,16 +199,41 @@ export function ShareChallengeModal({ challenge, isOpen, onClose, variant = "cha
       ctx.fillStyle = "#181513"; ctx.font = "900 22px Arial"; ctx.textAlign = "center"; ctx.fillText("✓ RESULT CONFIRMED", 959, 125);
 
       ctx.fillStyle = "#11895a"; ctx.font = "900 25px Arial"; ctx.textAlign = "left";
-      ctx.fillText(winner.isTeam ? `${winner.winningSide.replace("_", " ")}  •  TOP WINNING SHARE` : "PVP WINNER", 106, 245);
-      ctx.fillStyle = "#171412"; ctx.font = "900 70px Arial"; ctx.fillText("THE CALL PAID OFF.", 106, 330);
+      ctx.fillText(winner.isTeam ? "TEAM CHALLENGE RESULT" : "PVP WINNER", 106, 245);
+      ctx.fillStyle = "#171412"; ctx.font = "900 70px Arial";
+      ctx.fillText(winner.isTeam ? `${winner.winningSide.replace("_", " ")} WON.` : "THE CALL PAID OFF.", 106, 330);
 
-      ctx.save(); ctx.beginPath(); ctx.arc(214, 478, 92, 0, Math.PI * 2); ctx.clip();
-      if (winnerAvatar?.naturalWidth) ctx.drawImage(winnerAvatar, 122, 386, 184, 184);
-      else { ctx.fillStyle = "#f5d547"; ctx.fillRect(122, 386, 184, 184); }
-      ctx.restore(); ctx.strokeStyle = "#171412"; ctx.lineWidth = 8; ctx.beginPath(); ctx.arc(214, 478, 96, 0, Math.PI * 2); ctx.stroke();
-      ctx.fillStyle = "#171412"; ctx.font = "900 46px Arial"; ctx.fillText(winner.winnerName, 344, 458);
-      ctx.fillStyle = "#75665e"; ctx.font = "800 24px Arial"; ctx.fillText("WON", 344, 505);
-      ctx.fillStyle = "#11895a"; ctx.font = "900 76px Arial"; ctx.fillText(`${amount} USDC`, 344, 574);
+      if (winner.isTeam) {
+        const teamAmount = winner.teamPayout.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        ctx.fillStyle = "#75665e"; ctx.font = "800 23px Arial"; ctx.fillText("WINNING TEAM RECEIVES", 106, 390);
+        ctx.fillStyle = "#11895a"; ctx.font = "900 66px Arial"; ctx.fillText(`${teamAmount} USDC`, 106, 460);
+        ctx.fillStyle = "#171412"; ctx.font = "900 22px Arial"; ctx.fillText(`ALL PARTICIPANTS  •  ${uniqueTeamParticipants.length}`, 106, 500);
+
+        const avatarSize = uniqueTeamParticipants.length > 24 ? 36 : uniqueTeamParticipants.length > 12 ? 44 : 74;
+        const gap = uniqueTeamParticipants.length > 12 ? 8 : 14;
+        const perRow = Math.max(1, Math.floor(988 / (avatarSize + gap)));
+        uniqueTeamParticipants.forEach((position, index) => {
+          const row = Math.floor(index / perRow);
+          const column = index % perRow;
+          const x = 106 + column * (avatarSize + gap);
+          const y = 520 + row * (avatarSize + gap);
+          const avatar = participantAvatars[index];
+          ctx.save(); ctx.beginPath(); ctx.arc(x + avatarSize / 2, y + avatarSize / 2, avatarSize / 2, 0, Math.PI * 2); ctx.clip();
+          if (avatar?.naturalWidth) ctx.drawImage(avatar, x, y, avatarSize, avatarSize);
+          else { ctx.fillStyle = "#f5d547"; ctx.fillRect(x, y, avatarSize, avatarSize); }
+          ctx.restore();
+          ctx.strokeStyle = position.side === winner.winningSide ? "#11895a" : "#8b5bb5";
+          ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(x + avatarSize / 2, y + avatarSize / 2, avatarSize / 2 + 2, 0, Math.PI * 2); ctx.stroke();
+        });
+      } else {
+        ctx.save(); ctx.beginPath(); ctx.arc(214, 478, 92, 0, Math.PI * 2); ctx.clip();
+        if (winnerAvatar?.naturalWidth) ctx.drawImage(winnerAvatar, 122, 386, 184, 184);
+        else { ctx.fillStyle = "#f5d547"; ctx.fillRect(122, 386, 184, 184); }
+        ctx.restore(); ctx.strokeStyle = "#171412"; ctx.lineWidth = 8; ctx.beginPath(); ctx.arc(214, 478, 96, 0, Math.PI * 2); ctx.stroke();
+        ctx.fillStyle = "#171412"; ctx.font = "900 46px Arial"; ctx.fillText(winner.winnerName, 344, 458);
+        ctx.fillStyle = "#75665e"; ctx.font = "800 24px Arial"; ctx.fillText("WON", 344, 505);
+        ctx.fillStyle = "#11895a"; ctx.font = "900 76px Arial"; ctx.fillText(`${amount} USDC`, 344, 574);
+      }
 
       ctx.fillStyle = "#171412"; ctx.beginPath(); ctx.roundRect(106, 660, 988, 280, 28); ctx.fill();
       ctx.fillStyle = "#f5d547"; ctx.font = "900 22px Arial"; ctx.fillText(`CHALLENGE #${challenge.id}  •  ${challenge.mode}`, 154, 722);
@@ -234,7 +285,7 @@ export function ShareChallengeModal({ challenge, isOpen, onClose, variant = "cha
     ctx.fillStyle = lightText ? "#a895ae" : "#4a354f"; ctx.font = "800 20px Arial";
     ctx.fillText(`${challenge.mode.toUpperCase()}  /  CHALLENGE #${challenge.id}  /  REKTO.FUN`, 66, 1130);
     setPreview(canvas.toDataURL("image/png"));
-  }, [challenge, isPromotional, side, statement, stats.participants, stats.pool, theme, username, winner]);
+  }, [challenge, isPromotional, side, statement, stats.participants, stats.pool, teamParticipants, theme, username, winner]);
 
   useEffect(() => { if (isOpen) requestAnimationFrame(drawCard); }, [drawCard, isOpen]);
   useEffect(() => { if (!isOpen) return; const close = (e: KeyboardEvent) => e.key === "Escape" && onClose(); window.addEventListener("keydown", close); return () => window.removeEventListener("keydown", close); }, [isOpen, onClose]);

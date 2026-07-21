@@ -34,6 +34,17 @@ export async function resolveChallenge(
   return data;
 }
 
+export async function recordChallengeSettlement(challengeId: number, signature: string) {
+  const response = await fetch(`${API_BASE_URL}/challenges/${challengeId}/settlement`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ signature }),
+  });
+  const data = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(data?.detail || "Failed to sync confirmed settlement");
+  return data as { success: true; challenge_id: number };
+}
+
 export async function withdrawChallengeFunds(
   challengeId: number,
   recipientWallet: string,
