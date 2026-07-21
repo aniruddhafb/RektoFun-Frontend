@@ -526,6 +526,25 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
             window.setTimeout(() => priceRef.current?.focus(), 0);
             return "Enter a valid target price.";
         }
+        if (isPriceFeed) {
+            const currentPrice = assetPriceState.key === assetPriceRequestKey
+                && assetPriceState.status === "ready"
+                ? assetPriceState.currentPrice
+                : null;
+            if (!currentPrice) {
+                return "Wait for the current market price before continuing.";
+            }
+
+            const targetPrice = Number(predictionPrice);
+            if (predictionDirection === "Above" && targetPrice <= currentPrice) {
+                window.setTimeout(() => priceRef.current?.focus(), 0);
+                return `An above target must be greater than the current price (${formatPrice(String(currentPrice))}).`;
+            }
+            if (predictionDirection === "Below" && targetPrice >= currentPrice) {
+                window.setTimeout(() => priceRef.current?.focus(), 0);
+                return `A below target must be less than the current price (${formatPrice(String(currentPrice))}).`;
+            }
+        }
         if (!Number.isFinite(betAmount) || betAmount < 1) {
             setActivePanel("stake");
             return "Minimum stake is 1 USDC.";

@@ -83,6 +83,42 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing challenge availability fields" }, { status: 400 });
     }
 
+    if (body.challengeFormat === "price") {
+      if (typeof body.target !== "number" || !Number.isFinite(body.target) || body.target <= 0) {
+        return NextResponse.json({ error: "Missing or invalid target price" }, { status: 400 });
+      }
+
+      const symbol = body.tradingPair.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+      if (!symbol || symbol.length > 20) {
+        return NextResponse.json({ error: "Invalid trading pair" }, { status: 400 });
+      }
+
+      const priceUrl = new URL("https://data-api.binance.vision/api/v3/ticker/price");
+      priceUrl.searchParams.set("symbol", symbol);
+      const priceResponse = await fetch(priceUrl, { cache: "no-store" });
+      if (!priceResponse.ok) {
+        return NextResponse.json({ error: "Could not verify the current market price" }, { status: 502 });
+      }
+
+      const priceData = await priceResponse.json() as { price?: string };
+      const currentPrice = Number(priceData.price);
+      if (!Number.isFinite(currentPrice) || currentPrice <= 0) {
+        return NextResponse.json({ error: "Could not verify the current market price" }, { status: 502 });
+      }
+
+      const invalidDirection = body.directionAbove
+        ? body.target <= currentPrice
+        : body.target >= currentPrice;
+      if (invalidDirection) {
+        const direction = body.directionAbove ? "above" : "below";
+        const comparison = body.directionAbove ? "greater" : "less";
+        return NextResponse.json(
+          { error: `An ${direction} target must be ${comparison} than the current market price ($${currentPrice}).` },
+          { status: 400 },
+        );
+      }
+    }
+
     const trimmedAsset = body.asset.trim();
     if (trimmedAsset.length === 0 || trimmedAsset.length > 10) {
       return NextResponse.json({ error: "Asset must be 1-10 characters" }, { status: 400 });
