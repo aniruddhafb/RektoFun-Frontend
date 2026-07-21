@@ -38,6 +38,7 @@ import {
   deleteCategory,
   getCategories,
   updateCategoryImage,
+  updateCategoryAssetType,
   type Category,
 } from "@/app/lib/category-service/category";
 import {
@@ -183,6 +184,7 @@ export default function AdminPage() {
   const [notice, setNotice] = useState("");
   const [categoryName, setCategoryName] = useState("");
   const [parentCategory, setParentCategory] = useState("");
+  const [assetType, setAssetType] = useState<"crypto" | "stock" | "rwa">("crypto");
   const [categoryImage, setCategoryImage] = useState<File | null>(null);
   const [categoryPage, setCategoryPage] = useState(1);
   const [challengePage, setChallengePage] = useState(1);
@@ -576,12 +578,14 @@ export default function AdminPage() {
       const created = await createCategory({
         category: categoryName.trim(),
         parent_category: parentCategory || null,
+        asset_type: parentCategory.toLowerCase() === "crypto" ? assetType : null,
         metadata: imageUrl ? { image_url: imageUrl } : undefined,
       });
       setCategories((items) => [...items, created]);
       setCategoryPage(Math.ceil((categories.length + 1) / CATEGORY_PAGE_SIZE));
       setCategoryName("");
       setParentCategory("");
+      setAssetType("crypto");
       setCategoryImage(null);
       setNotice(`Category “${created.category}” added.`);
     } catch (err) {
@@ -629,6 +633,25 @@ export default function AdminPage() {
       setError(
         err instanceof Error ? err.message : "Category image update failed.",
       );
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const changeCategoryAssetType = async (
+    category: Category,
+    assetType: "crypto" | "stock" | "rwa",
+  ) => {
+    setBusyId(category.id);
+    setError("");
+    try {
+      const updated = await updateCategoryAssetType(category.id, assetType);
+      setCategories((items) =>
+        items.map((item) => (item.id === updated.id ? updated : item)),
+      );
+      setNotice(`“${updated.category}” moved to ${assetType === "stock" ? "Stocks" : assetType.toUpperCase()}.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Asset type update failed.");
     } finally {
       setBusyId(null);
     }
@@ -1632,6 +1655,20 @@ export default function AdminPage() {
                     ))}
                 </select>
               </label>
+              {parentCategory.toLowerCase() === "crypto" && (
+                <label className="mb-5 block text-xs font-black uppercase tracking-wider">
+                  Asset type
+                  <select
+                    value={assetType}
+                    onChange={(e) => setAssetType(e.target.value as "crypto" | "stock" | "rwa")}
+                    className="mt-2 w-full border-2 border-black bg-white px-3 py-2.5 text-base font-bold"
+                  >
+                    <option value="crypto">Crypto</option>
+                    <option value="stock">Stocks</option>
+                    <option value="rwa">RWA</option>
+                  </select>
+                </label>
+              )}
               <button
                 disabled={busyId === -1}
                 className="w-full cursor-pointer border-2 border-black bg-[#a8d85b] px-4 py-2.5 font-black shadow-[3px_3px_0_#111] disabled:opacity-50"
@@ -1671,12 +1708,30 @@ export default function AdminPage() {
                         <p className="font-black">{item.category}</p>
                         <p className="text-xs font-bold text-black/45">
                           {item.parent_category
-                            ? `Under ${item.parent_category}`
+                            ? `Under ${item.parent_category}${item.asset_type ? ` · ${item.asset_type === "stock" ? "Stock" : item.asset_type.toUpperCase()}` : ""}`
                             : "Top-level category"}
                         </p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
+                      {item.parent_category?.toLowerCase() === "crypto" && (
+                        <select
+                          aria-label={`Asset type for ${item.category}`}
+                          value={item.asset_type ?? "crypto"}
+                          disabled={busyId === item.id}
+                          onChange={(event) =>
+                            void changeCategoryAssetType(
+                              item,
+                              event.target.value as "crypto" | "stock" | "rwa",
+                            )
+                          }
+                          className="border border-black bg-white px-2 py-1 text-xs font-black disabled:opacity-50"
+                        >
+                          <option value="crypto">Crypto</option>
+                          <option value="stock">Stock</option>
+                          <option value="rwa">RWA</option>
+                        </select>
+                      )}
                       <span className="border border-black bg-white px-2 py-1 text-xs font-black">
                         {item.challenges_count || 0} challenges
                       </span>
