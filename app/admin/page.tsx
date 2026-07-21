@@ -4,7 +4,8 @@ import Link from "next/link";
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useAppKitAccount } from "@reown/appkit/react";
+import { useAppKitAccount, useAppKitProvider } from "@reown/appkit/react";
+import { PublicKey, Transaction } from "@solana/web3.js";
 import {
   Activity,
   BadgeCheck,
@@ -44,6 +45,7 @@ import {
 import {
   getAdminReferrals,
   getReferralBalances,
+  recordChallengeSettlement,
   resolveChallenge,
   withdrawChallengeFunds,
   updateRedemptionStatus,
@@ -57,6 +59,11 @@ import {
   type SiteSettingKey,
   type SiteSettings,
 } from "@/app/lib/site-settings";
+import {
+  buildAdminSettleChallengeTx,
+  getReadonlyConnection,
+  getRektoProgram,
+} from "@/app/lib/rektofun-program";
 
 type Tab = "stats" | "maintenance" | "challenges" | "resolution" | "users" | "categories" | "referrals";
 type ReferralView = "current" | "active";
@@ -142,6 +149,7 @@ const isPastChallengeExpiry = (challenge: Challenge, now = Date.now()) => {
 export default function AdminPage() {
   const router = useRouter();
   const { address, isConnected } = useAppKitAccount();
+  const { walletProvider } = useAppKitProvider("solana");
   const allowed = isConnected && isAdminWallet(address);
   const [tab, setTab] = useState<Tab>("stats");
   const [users, setUsers] = useState<User[]>([]);
@@ -522,6 +530,58 @@ export default function AdminPage() {
     setError("");
     setNotice("");
     try {
+      if (operation === "settle_onchain") {
+        if (!address || !walletProvider || !isAdminWallet(address)) {
+          throw new Error("Connect the authorized admin wallet to settle this challenge on-chain.");
+        }
+        const challengePda = challenge.metadata?.onchain?.challenge_pda;
+        if (typeof challengePda !== "string" || !challengePda) {
+          throw new Error("This challenge has no on-chain challenge PDA.");
+        }
+        const storedResult = String(challenge.result || "").toUpperCase();
+        if (storedResult !== "TEAM_A" && storedResult !== "TEAM_B") {
+          throw new Error("The database does not contain a valid winning side for this challenge.");
+        }
+
+        const admin = new PublicKey(address);
+        const signer = walletProvider as {
+          signTransaction: (transaction: Transaction) => Promise<Transaction>;
+        };
+        const walletAdapter = {
+          publicKey: admin,
+          signTransaction: (transaction: Transaction) => signer.signTransaction(transaction),
+          signAllTransactions: (transactions: Transaction[]) =>
+            Promise.all(transactions.map((transaction) => signer.signTransaction(transaction))),
+        };
+        const program = getRektoProgram(walletAdapter);
+        const transaction = await buildAdminSettleChallengeTx(
+          program,
+          admin,
+          new PublicKey(challengePda),
+          storedResult === "TEAM_A",
+        );
+        const connection = getReadonlyConnection();
+        const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
+        transaction.feePayer = admin;
+        transaction.recentBlockhash = blockhash;
+        transaction.lastValidBlockHeight = lastValidBlockHeight;
+        const signedTransaction = await signer.signTransaction(transaction);
+        const signature = await connection.sendRawTransaction(signedTransaction.serialize(), {
+          skipPreflight: false,
+          preflightCommitment: "confirmed",
+        });
+        await connection.confirmTransaction({ signature, blockhash, lastValidBlockHeight }, "confirmed");
+        let syncWarning = "";
+        try {
+          await recordChallengeSettlement(challenge.id, signature);
+        } catch (syncError) {
+          syncWarning = ` On-chain settlement succeeded, but the database marker could not be saved: ${syncError instanceof Error ? syncError.message : "unknown error"}`;
+        }
+        setNotice(`Challenge #${challenge.id} settled on-chain. Transaction: ${signature}.${syncWarning}`);
+        await loadSection("resolution", true);
+        return;
+      }
+
       const manualPrice = Number(manualPrices[challenge.id]);
       const result = await resolveChallenge(challenge.id, priceFeed ? { operation } : {
         ...(winner ? { creator_wins: winner === "creator" } : {}),
@@ -1297,8 +1357,10 @@ export default function AdminPage() {
                           && resolvesAt !== null
                           && resolvesAt <= countdownNow;
                         const databaseResolved = String(challenge.status).toUpperCase() === "RESOLVED";
-                        const onchainStatus = String(challengeAudits[challenge.id]?.chainStatus || "").toLowerCase();
+                        const challengeAudit = challengeAudits[challenge.id];
+                        const onchainStatus = String(challengeAudit?.chainStatus || "").toLowerCase();
                         const onchainResolved = onchainStatus === "settled" || onchainStatus === "closed";
+                        const hasOnchainFunds = Number(challengeAudit?.lockedUsdc || 0) > 0;
                         const fullyResolved = databaseResolved && onchainResolved;
                         return (
                         <tr key={challenge.id} className="hover:bg-white">
@@ -1378,7 +1440,8 @@ export default function AdminPage() {
                               ) : databaseResolved ? (
                                 <button
                                   onClick={() => void resolveOne(challenge, "settle_onchain")}
-                                  disabled={!canResolve || !opponentJoined || busyId === challenge.id}
+                                  disabled={!hasOnchainFunds || onchainResolved || !opponentJoined || busyId === challenge.id}
+                                  title={!hasOnchainFunds ? "No USDC remains in this challenge's on-chain escrow." : undefined}
                                   className="cursor-pointer border-2 border-black bg-[#f5d547] px-3 py-2 text-sm font-black shadow-[2px_2px_0_#111] disabled:cursor-not-allowed disabled:opacity-40"
                                 >
                                   {busyId === challenge.id ? "Working…" : "Settle on-chain"}

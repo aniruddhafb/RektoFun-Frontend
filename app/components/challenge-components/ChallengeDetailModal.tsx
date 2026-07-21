@@ -278,6 +278,7 @@ function ChallengeAcceptAction({ challenge, onOpenChange }: ChallengeAcceptActio
 export default function ChallengeDetailModal({ challenge, creator, isOpen, onClose }: ChallengeDetailModalProps) {
   const currentUser = useUserStore((state) => state.user);
   const currentUserId = currentUser?.id;
+  const [expandedWinConditionId, setExpandedWinConditionId] = React.useState<number | null>(null);
   const [isAcceptModalOpen, setIsAcceptModalOpen] = React.useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = React.useState(false);
   const [participantState, setParticipantState] = React.useState<{
@@ -288,6 +289,7 @@ export default function ChallengeDetailModal({ challenge, creator, isOpen, onClo
   const lastCountedChallengeIdRef = React.useRef<number | null>(null);
   const challengeId = challenge?.id;
   const resolvedCreator = creator ?? challenge?.creator_details ?? null;
+  const isWinConditionExpanded = challengeId !== undefined && expandedWinConditionId === challengeId;
 
   const {
     modalRef,
@@ -316,6 +318,7 @@ export default function ChallengeDetailModal({ challenge, creator, isOpen, onClo
     statusClassName,
     modeLabel,
     primaryTitle,
+    winConditionDescription,
     resolutionLabel,
     openProfile,
     onClose: handleClose,
@@ -656,6 +659,16 @@ export default function ChallengeDetailModal({ challenge, creator, isOpen, onClo
                     </>
                   )}
                 </h2>
+                {(lifecycle === "OPEN" || lifecycle === "LIVE" || lifecycle === "RESOLVING") && (
+                  <button
+                    type="button"
+                    aria-expanded={isWinConditionExpanded}
+                    onClick={() => setExpandedWinConditionId((expandedId) => expandedId === challenge.id ? null : challenge.id)}
+                    className={`mt-1.5 block max-w-3xl cursor-pointer text-left text-xs font-semibold leading-relaxed text-[#6b5b53] sm:cursor-default sm:text-sm ${isWinConditionExpanded ? "line-clamp-none" : "line-clamp-2 sm:line-clamp-none"}`}
+                  >
+                    {winConditionDescription}
+                  </button>
+                )}
               </div>
             </div>
 

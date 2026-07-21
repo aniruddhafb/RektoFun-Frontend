@@ -24,6 +24,7 @@ import {
   TOKEN_PROGRAM_ID,
   getAssociatedTokenAddress,
   createAssociatedTokenAccountInstruction,
+  createAssociatedTokenAccountIdempotentInstruction,
 } from "@solana/spl-token";
 import idl from "./rektofun_program.json";
 import { getSolanaRpcEndpoint, getTokenMintAddress } from "./solana-config";
@@ -47,6 +48,12 @@ export const USDC_MINT = new PublicKey(
 /** USDC has 6 decimal places */
 export const USDC_DECIMALS = 6;
 export const USDC_MULTIPLIER = 10 ** USDC_DECIMALS; // 1_000_000
+
+/** Public platform treasury wallet whose USDC ATA receives settlement fees. */
+export const TREASURY_WALLET = new PublicKey(
+  process.env.NEXT_PUBLIC_TREASURY_WALLET
+    || "AEdGJ1VaYfeLgX7MyCy9ShhaCk7Rd41ztprUCXnY4vaU"
+);
 
 // Seed prefixes — must match the Rust constants
 const CHALLENGE_SEED = Buffer.from("challenge");
@@ -115,6 +122,7 @@ export interface CreateChallengeArgs {
 export interface OnChainChallenge {
   publicKey: PublicKey;
   creator: PublicKey;
+  rentPayer: PublicKey;
   challenger: PublicKey;
   challengeId: number;
   asset: string;
@@ -486,6 +494,70 @@ export async function buildCancelChallengeTx(
   return tx;
 }
 
+/**
+ * Build an admin-signed `settle_challenge` transaction for a challenge whose
+ * winner has already been recorded in the database. This intentionally does
+ * not perform any database mutation or replace the normal backend resolution
+ * flow; it is only the on-chain recovery path used by the admin panel.
+ */
+export async function buildAdminSettleChallengeTx(
+  program: Program,
+  admin: PublicKey,
+  challengePDA: PublicKey,
+  creatorWins: boolean,
+): Promise<Transaction> {
+  const challenge = await fetchChallenge(program, challengePDA);
+  if (!challenge) {
+    throw new Error("On-chain challenge account was not found. It may already be settled or closed.");
+  }
+  const eligible = challenge.challengeType === "Pvp"
+    ? challenge.status === "Active"
+    : challenge.status === "Open" || challenge.status === "Active";
+  if (!eligible) {
+    throw new Error(`On-chain challenge status ${challenge.status} cannot be settled.`);
+  }
+  if (challenge.challengeType === "Pvp" && challenge.challenger.equals(PublicKey.default)) {
+    throw new Error("The on-chain PVP challenge has no challenger.");
+  }
+  if (challenge.challengeType === "Team" && challenge.opponentTeam.length === 0) {
+    throw new Error("The on-chain TEAM challenge has no opponent-side participant.");
+  }
+
+  const [config] = deriveConfigPDA();
+  const [vault] = deriveVaultPDA(challengePDA);
+  const challenger = challenge.challengeType === "Pvp" ? challenge.challenger : challenge.creator;
+  const winner = creatorWins ? challenge.creator : challenger;
+  const winnerUsdcAccount = await getAssociatedTokenAddress(USDC_MINT, winner, false);
+  const creatorUsdcAccount = await getAssociatedTokenAddress(USDC_MINT, challenge.creator, false);
+  const treasuryUsdcAccount = await getAssociatedTokenAddress(USDC_MINT, TREASURY_WALLET, false);
+
+  const setupInstructions = [
+    createAssociatedTokenAccountIdempotentInstruction(admin, winnerUsdcAccount, winner, USDC_MINT),
+    createAssociatedTokenAccountIdempotentInstruction(admin, creatorUsdcAccount, challenge.creator, USDC_MINT),
+    createAssociatedTokenAccountIdempotentInstruction(admin, treasuryUsdcAccount, TREASURY_WALLET, USDC_MINT),
+  ];
+
+  return (program.methods as any)
+    .settleChallenge(creatorWins)
+    .accounts({
+      config,
+      admin,
+      creator: challenge.creator,
+      challenger,
+      challenge: challengePDA,
+      vault,
+      winnerUsdcAccount,
+      treasuryUsdcAccount,
+      creatorUsdcAccount,
+      usdcMint: USDC_MINT,
+      rentPayer: challenge.rentPayer,
+      tokenProgram: TOKEN_PROGRAM_ID,
+      systemProgram: SystemProgram.programId,
+    })
+    .preInstructions(setupInstructions)
+    .transaction();
+}
+
 function enumVariant(value: Record<string, unknown>): string {
   const key = Object.keys(value)[0] ?? "";
   return key ? `${key[0].toUpperCase()}${key.slice(1)}` : "";
@@ -571,6 +643,7 @@ export async function fetchAllChallenges(
       return {
         publicKey: a.publicKey as PublicKey,
         creator: d.creator as PublicKey,
+        rentPayer: d.rentPayer as PublicKey,
         challenger: d.challenger as PublicKey,
         challengeId: Number(d.challengeId),
         asset: d.asset as string,
@@ -612,6 +685,7 @@ export async function fetchChallenge(
     return {
       publicKey: challengePDA,
       creator: d.creator,
+      rentPayer: d.rentPayer,
       challenger: d.challenger,
       challengeId: Number(d.challengeId),
       asset: d.asset,
