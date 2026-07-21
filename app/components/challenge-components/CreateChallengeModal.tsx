@@ -1103,7 +1103,7 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
                                                 <Loader2 className="h-5 w-5 animate-spin" />
                                             </div>
                                         ) : childCategories.length > 0 ? (
-                                            <div className="max-h-52 space-y-3 overflow-y-auto">
+                                            <div className="create-asset-scroll max-h-36 space-y-3 overflow-y-auto overscroll-contain pr-1 sm:max-h-40">
                                                 {(marketType === "crypto" ? ASSET_GROUPS : [{ type: "sports", label: "Sports" }] as const).map((group) => {
                                                     const groupCategories = childCategories.filter((category) =>
                                                         group.type === "sports"
@@ -1530,6 +1530,29 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
 
                 .create-challenge-modal {
                     min-width: 0;
+                }
+
+                .create-challenge-modal .create-asset-scroll {
+                    scrollbar-width: thin;
+                    scrollbar-color: #8b7355 rgba(139, 115, 85, 0.12);
+                }
+
+                .create-challenge-modal .create-asset-scroll::-webkit-scrollbar {
+                    width: 4px;
+                }
+
+                .create-challenge-modal .create-asset-scroll::-webkit-scrollbar-track {
+                    background: rgba(139, 115, 85, 0.12);
+                    border-radius: 999px;
+                }
+
+                .create-challenge-modal .create-asset-scroll::-webkit-scrollbar-thumb {
+                    background: #8b7355;
+                    border-radius: 999px;
+                }
+
+                .create-challenge-modal .create-asset-scroll::-webkit-scrollbar-thumb:hover {
+                    background: #594b44;
                 }
 
                 .create-challenge-date-input::-webkit-date-and-time-value {

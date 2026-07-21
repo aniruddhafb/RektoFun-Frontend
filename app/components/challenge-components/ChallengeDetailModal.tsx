@@ -27,6 +27,7 @@ import {
   CandlestickSeries,
   ColorType,
   createChart,
+  createSeriesMarkers,
   CrosshairMode,
   LineStyle,
   type UTCTimestamp,
@@ -42,6 +43,7 @@ import { ChallengeActionModal } from "./ChallengeActionModal";
 import { ProfileHoverPreview } from "./ProfileHoverPreview";
 import { ShareChallengeModal } from "./ShareChallengeModal";
 import { WinningsShareModal } from "./WinningsShareModal";
+import { useUserStore } from "@/app/store/useUserStore";
 
 interface ChallengeDetailModalProps {
   challenge: Challenge | null;
@@ -90,6 +92,18 @@ type MarketCandle = {
 };
 
 type ChartRange = "24H" | "7D" | "30D" | "3M";
+type BetChartMarker = {
+  key: string;
+  time: string;
+  amount: number;
+  side: "TEAM_A" | "TEAM_B";
+  name: string;
+  avatar: string;
+  isVerified: boolean;
+  isModerator: boolean;
+  isCurrentUser: boolean;
+  isCreator: boolean;
+};
 
 const FALLBACK_AVATAR = "/scribbles/btc.png";
 
@@ -118,6 +132,16 @@ function formatPrice(value: number) {
     currency: "USD",
     maximumFractionDigits: value < 1 ? 6 : 2,
   }).format(Number.isFinite(value) ? value : 0);
+}
+
+function chartMarkerCode(marker: BetChartMarker, markers: BetChartMarker[]) {
+  if (marker.isCurrentUser) return "YOU";
+  return sideMarkerCode(marker, markers);
+}
+
+function sideMarkerCode(marker: BetChartMarker, markers: BetChartMarker[]) {
+  const sideMarkers = markers.filter((candidate) => candidate.side === marker.side);
+  return `${marker.side === "TEAM_A" ? "C" : "O"}${sideMarkers.findIndex((candidate) => candidate.key === marker.key) + 1}`;
 }
 
 function formatBetPlacedAt(value: string) {
@@ -252,6 +276,8 @@ function ChallengeAcceptAction({ challenge, onOpenChange }: ChallengeAcceptActio
 }
 
 export default function ChallengeDetailModal({ challenge, creator, isOpen, onClose }: ChallengeDetailModalProps) {
+  const currentUser = useUserStore((state) => state.user);
+  const currentUserId = currentUser?.id;
   const [isAcceptModalOpen, setIsAcceptModalOpen] = React.useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = React.useState(false);
   const [participantState, setParticipantState] = React.useState<{
@@ -503,6 +529,40 @@ export default function ChallengeDetailModal({ challenge, creator, isOpen, onClo
     return rows.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }, [challenge, creatorAvatar, creatorName, creatorWalletAddress, hasOpponents, isExpireTimeAchieved, participantState, participants, resolvedCreator]);
 
+  const chartBetMarkers = React.useMemo<BetChartMarker[]>(() => {
+    if (!challenge) return [];
+    const currentRows = participantState.key === String(challenge.id) ? participantState.rows : [];
+    const creatorId = Number(challenge.creator_id ?? challenge.creator ?? 0);
+    const allMarkers = currentRows.map(({ position, user }) => {
+      const isCreator = Number(position.creator) === creatorId;
+      const resolvedUser = user ?? (isCreator ? resolvedCreator : null);
+      return {
+        key: String(position.id), time: position.created_at, amount: Number(position.bet || 0),
+        side: position.side === "TEAM_B" ? "TEAM_B" as const : "TEAM_A" as const,
+        name: resolvedUser?.username || (isCreator ? creatorName : `Player ${position.creator}`),
+        avatar: resolvedUser?.profile_image || (isCreator ? creatorAvatar : FALLBACK_AVATAR),
+        isVerified: Boolean(resolvedUser?.twitter_username || resolvedUser?.user_type === "moderator"),
+        isModerator: resolvedUser?.user_type === "moderator",
+        isCurrentUser: currentUserId != null && Number(position.creator) === Number(currentUserId),
+        isCreator,
+      };
+    });
+    if (!allMarkers.some((marker) => marker.isCreator) && Number(challenge.initial_bet || 0) > 0) {
+      allMarkers.push({
+        key: `creator:${challenge.id}`, time: challenge.created_at, amount: Number(challenge.initial_bet), side: "TEAM_A",
+        name: creatorName, isCurrentUser: currentUserId != null && Number(currentUserId) === creatorId,
+        avatar: creatorAvatar || FALLBACK_AVATAR,
+        isVerified: Boolean(resolvedCreator?.twitter_username || resolvedCreator?.user_type === "moderator"),
+        isModerator: resolvedCreator?.user_type === "moderator",
+        isCreator: true,
+      });
+    }
+    allMarkers.sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
+    if (isTeam) return allMarkers;
+    const ownMarkers = allMarkers.filter((marker) => marker.isCurrentUser);
+    return ownMarkers.length ? ownMarkers : allMarkers;
+  }, [challenge, creatorAvatar, creatorName, currentUserId, isTeam, participantState, resolvedCreator]);
+
   if (!isOpen || !challenge) return null;
 
   const teamA = participants.filter((participant) => participant.side === "TEAM_A");
@@ -620,6 +680,8 @@ export default function ChallengeDetailModal({ challenge, creator, isOpen, onClo
                 pair={challenge.trading_pair}
                 target={isManualResolution ? undefined : targetPrice}
                 direction={isDirectionalBelow ? "below" : "above"}
+                betMarkers={chartBetMarkers}
+                isTeam={isTeam}
               />
             ) : (
               <SportsOutcomePanel
@@ -776,11 +838,13 @@ function SummaryStat({ icon: Icon, label, value, accent = false }: {
   );
 }
 
-function LazyCryptoMarketPanel({ asset, pair, target, direction }: {
+function LazyCryptoMarketPanel({ asset, pair, target, direction, betMarkers, isTeam }: {
   asset: string;
   pair?: string;
   target?: number;
   direction: "above" | "below";
+  betMarkers: BetChartMarker[];
+  isTeam: boolean;
 }) {
   const [isExpanded, setIsExpanded] = React.useState(false);
 
@@ -807,18 +871,20 @@ function LazyCryptoMarketPanel({ asset, pair, target, direction }: {
 
       {isExpanded && (
         <div id="challenge-market-analysis" className="border-t-2 border-black">
-          <CryptoMarketPanel asset={asset} pair={pair} target={target} direction={direction} />
+          <CryptoMarketPanel asset={asset} pair={pair} target={target} direction={direction} betMarkers={betMarkers} isTeam={isTeam} />
         </div>
       )}
     </section>
   );
 }
 
-function CryptoMarketPanel({ asset, pair, target, direction }: {
+function CryptoMarketPanel({ asset, pair, target, direction, betMarkers, isTeam }: {
   asset: string;
   pair?: string;
   target?: number;
   direction: "above" | "below";
+  betMarkers: BetChartMarker[];
+  isTeam: boolean;
 }) {
   const [range, setRange] = React.useState<ChartRange>("3M");
   const [state, setState] = React.useState<{
@@ -903,25 +969,59 @@ function CryptoMarketPanel({ asset, pair, target, direction }: {
             <p className="mt-2 text-xs font-bold">Chart unavailable for this asset</p>
           </div>
         ) : (
-          <MarketCandlestickChart key={requestKey} candles={candles} asset={asset} target={target} direction={direction} />
+          <MarketCandlestickChart key={requestKey} candles={candles} asset={asset} target={target} direction={direction} betMarkers={betMarkers} />
         )}
       </div>
+      {betMarkers.length ? (
+        <div className="border-t border-white/15 bg-black/10 px-3 py-2.5 sm:px-4">
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <span className="text-[8px] font-black uppercase tracking-[0.12em] text-white/45">Entry trail</span>
+            <span className="text-[8px] font-bold text-white/40">{isTeam ? `${betMarkers.length} team entries` : betMarkers.some((marker) => marker.isCurrentUser) ? "Focused on you" : "Both sides"}</span>
+          </div>
+          <div className="flex snap-x gap-2 overflow-x-auto pb-1 [scrollbar-width:thin]">
+            {betMarkers.map((marker) => (
+              <div key={marker.key} className={`flex min-w-[180px] snap-start items-center gap-2.5 border px-2.5 py-2 sm:min-w-[205px] ${marker.isCurrentUser ? "border-[#f5d547] bg-[#f5d547]/15" : "border-white/15 bg-white/5"}`}>
+                <span className="relative h-8 w-8 shrink-0">
+                  <span className="block h-8 w-8 overflow-hidden rounded-full border border-white/30 bg-white/10">
+                    <Image src={marker.avatar} alt="" width={32} height={32} unoptimized className="h-full w-full object-cover" />
+                  </span>
+                  {marker.isVerified ? (
+                    <span className="absolute -bottom-1 -right-1"><SmallVerifiedBadge isModerator={marker.isModerator} /></span>
+                  ) : null}
+                </span>
+                <span className="min-w-0">
+                  <span className="flex min-w-0 items-center gap-1 text-[10px] font-black text-white">
+                    <span className={marker.side === "TEAM_A" ? "text-[#f5d547]" : "text-rose-300"}>{sideMarkerCode(marker, betMarkers)}</span>
+                    <span className="text-white/35">|</span>
+                    <span className="truncate">{marker.isCurrentUser ? `${marker.name} (you)` : marker.name}</span>
+                  </span>
+                  <span className="block truncate text-[8px] font-bold text-white/50">
+                    {marker.side === "TEAM_A" ? "Challenger side" : "Opponent side"} · {formatMoney(marker.amount)}
+                  </span>
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
       <div className="flex flex-wrap items-center justify-between gap-1 border-t border-white/15 px-3 py-2 text-[8px] font-bold uppercase tracking-[0.06em] text-white/50 sm:px-4 sm:text-[9px]">
-        <span>Pan, zoom and hover</span><span>{range}</span>
+        <span>{betMarkers.length ? "Entries are pinned to their candle" : "Pan, zoom and hover"}</span><span>{range}</span>
       </div>
     </section>
   );
 }
 
-function MarketCandlestickChart({ candles, asset, target, direction }: {
+function MarketCandlestickChart({ candles, asset, target, direction, betMarkers }: {
   candles: MarketCandle[];
   asset: string;
   target?: number;
   direction: "above" | "below";
+  betMarkers: BetChartMarker[];
 }) {
   const containerRef = React.useRef<HTMLDivElement>(null);
   const chartApiRef = React.useRef<ReturnType<typeof createChart> | null>(null);
   const [inspected, setInspected] = React.useState<MarketCandle>(() => candles.at(-1)!);
+  const [entryPoint, setEntryPoint] = React.useState<{ x: number; y: number; marker: BetChartMarker; price: number } | null>(null);
 
   React.useEffect(() => {
     const container = containerRef.current;
@@ -978,6 +1078,24 @@ function MarketCandlestickChart({ candles, asset, target, direction }: {
       lastValueVisible: true,
     });
     series.setData(validCandles);
+    const chartEntries = betMarkers.map((marker) => {
+      const markerTime = new Date(marker.time).getTime() / 1000;
+      const candle = validCandles.reduce((nearest, candidate) =>
+        Math.abs(Number(candidate.time) - markerTime) < Math.abs(Number(nearest.time) - markerTime) ? candidate : nearest,
+      validCandles[0]);
+      return { marker, candle, markerTime };
+    }).filter(({ candle, markerTime }) => {
+      const interval = Math.max(Number(validCandles[1].time) - Number(validCandles[0].time), 60);
+      return Math.abs(Number(candle.time) - markerTime) <= interval * 2;
+    });
+    createSeriesMarkers(series, chartEntries.map(({ marker, candle }) => ({
+      time: candle.time,
+      position: marker.side === "TEAM_A" ? "belowBar" as const : "aboveBar" as const,
+      shape: marker.side === "TEAM_A" ? "arrowUp" as const : "arrowDown" as const,
+      color: marker.side === "TEAM_A" ? "#f5d547" : "#fb7185",
+      text: chartMarkerCode(marker, betMarkers),
+      size: 1.5,
+    })), { zOrder: "top" });
     series.createPriceLine({
       price: validCandles.at(-1)!.close,
       color: "rgba(255,255,255,.48)",
@@ -1010,11 +1128,21 @@ function MarketCandlestickChart({ candles, asset, target, direction }: {
     });
     chartApi.timeScale().fitContent();
 
+    const latestEntry = [...chartEntries].reverse().find(({ marker }) => marker.isCurrentUser) ?? chartEntries.at(-1);
+    const syncEntryPoint = () => {
+      if (!latestEntry) return setEntryPoint(null);
+      const x = chartApi.timeScale().timeToCoordinate(latestEntry.candle.time);
+      const y = series.priceToCoordinate(latestEntry.candle.close);
+      setEntryPoint(x == null || y == null ? null : { x, y, marker: latestEntry.marker, price: latestEntry.candle.close });
+    };
+    requestAnimationFrame(syncEntryPoint);
+    chartApi.timeScale().subscribeVisibleLogicalRangeChange(syncEntryPoint);
+
     return () => {
       chartApiRef.current = null;
       chartApi.remove();
     };
-  }, [candles, direction, target]);
+  }, [betMarkers, candles, direction, target]);
 
   const zoomChart = (factor: number) => {
     const timeScale = chartApiRef.current?.timeScale();
@@ -1035,6 +1163,15 @@ function MarketCandlestickChart({ candles, asset, target, direction }: {
   return (
     <div className="relative h-full w-full select-none" aria-label={`${asset} interactive candlestick chart`}>
       <div ref={containerRef} className="h-full w-full" />
+      {entryPoint ? (
+        <div className="pointer-events-none absolute z-20 -translate-x-1/2 -translate-y-1/2" style={{ left: entryPoint.x, top: entryPoint.y }} aria-hidden="true">
+          <span className={`absolute left-1/2 top-1/2 h-8 w-8 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 motion-safe:animate-ping ${entryPoint.marker.side === "TEAM_A" ? "border-[#f5d547]/70" : "border-rose-400/70"}`} />
+          <span className={`block h-3.5 w-3.5 rotate-45 border-2 border-[#163f31] shadow-[0_0_0_2px_rgba(255,255,255,.85)] ${entryPoint.marker.side === "TEAM_A" ? "bg-[#f5d547]" : "bg-rose-400"}`} />
+          <span className="absolute left-1/2 top-5 w-max -translate-x-1/2 border border-white/25 bg-[#201a16]/95 px-2 py-1 text-[8px] font-black uppercase tracking-[0.08em] text-white shadow-lg">
+            {entryPoint.marker.isCurrentUser ? "Your entry" : `${entryPoint.marker.name}'s entry`} · {formatPrice(entryPoint.price)}
+          </span>
+        </div>
+      ) : null}
       {target && target > 0 ? (
         <div className="absolute bottom-2 left-2 z-20 inline-flex items-center gap-1 border border-[#f5d547]/50 bg-[#163f31]/90 px-2 py-1 text-[8px] font-black uppercase tracking-[0.08em] text-[#f5d547] shadow-sm sm:text-[9px]">
           <span>Target</span>
