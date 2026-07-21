@@ -5,7 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useAppKit, useAppKitAccount } from "@reown/appkit/react";
 import { BadgeCheck, Check, ChevronLeft, ChevronRight, Copy, Crown, History, Loader2, Medal, Sparkles, Trophy, Users, X } from "lucide-react";
-import { getLeaderboard, getReferralHistory, getUserByWallet, requestReferralRedemption, type LeaderboardUser, type ReferralHistory, type User } from "@/app/lib/users-service/users";
+import { getReferralLeaderboard, getReferralHistory, getUserByWallet, requestReferralRedemption, type ReferralHistory, type User } from "@/app/lib/users-service/users";
 import { useBodyScrollLock } from "@/app/lib/useBodyScrollLock";
 
 type ReferralModalProps = {
@@ -25,7 +25,7 @@ type LeaderboardRow = {
 const LEADERBOARD_PAGE_SIZE = 10;
 const TOP_REFERRERS_FETCH_LIMIT = 100;
 
-function getDisplayName(user: LeaderboardUser) {
+function getDisplayName(user: User) {
   if (user.username) return user.username;
   const wallet = user.wallet_address || user.pubkey || "";
   return wallet ? `${wallet.slice(0, 4)}...${wallet.slice(-4)}` : "Anonymous";
@@ -105,10 +105,10 @@ export function ReferralModal({ isOpen, onClose }: ReferralModalProps) {
 
     try {
       setIsLoadingLeaderboard(true);
-      const response = await getLeaderboard(TOP_REFERRERS_FETCH_LIMIT, 0);
+      const response = await getReferralLeaderboard(TOP_REFERRERS_FETCH_LIMIT, 0);
       const rows = response.users
         .map((leaderboardUser) => ({
-          id: leaderboardUser.id,
+          id: String(leaderboardUser.id),
           name: getDisplayName(leaderboardUser),
           walletAddress: leaderboardUser.wallet_address || leaderboardUser.pubkey,
           referrals: leaderboardUser.referrals?.length ?? 0,

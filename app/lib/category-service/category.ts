@@ -3,10 +3,13 @@ export interface Category {
   category: string;
   challenges_count: number | null;
   parent_category: string | null;
+  asset_type: AssetType | null;
   image_url?: string;
   metadata?: { image_url?: string } | null;
   created_at: string;
 }
+
+export type AssetType = "crypto" | "stock" | "rwa";
 
 const API_BASE_URL = "/api/backend";
 
@@ -67,6 +70,7 @@ export async function getParentCategories(): Promise<Category[]> {
 export async function createCategory(input: {
   category: string;
   parent_category?: string | null;
+  asset_type?: AssetType | null;
   metadata?: { image_url?: string };
 }): Promise<Category> {
   const response = await fetch(`${API_BASE_URL}/categories`, {
@@ -103,6 +107,22 @@ export async function updateCategoryImage(
   if (!response.ok) {
     const data = await response.json().catch(() => null);
     throw new Error(data?.detail || "Failed to update category image");
+  }
+  return response.json();
+}
+
+export async function updateCategoryAssetType(
+  id: number,
+  assetType: AssetType,
+): Promise<Category> {
+  const response = await fetch(`${API_BASE_URL}/categories/${id}`, {
+    method: "PATCH",
+    headers: { accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify({ asset_type: assetType }),
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => null);
+    throw new Error(data?.detail || "Failed to update asset type");
   }
   return response.json();
 }

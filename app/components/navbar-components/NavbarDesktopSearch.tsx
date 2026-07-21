@@ -624,7 +624,7 @@ export function NavbarDesktopSearch({
                 </div>
 
                 <a
-                    href="https://rektofun.gitbook.io/rektofun/introduction/how-it-works"
+                    href="https://rektofun.gitbook.io/rektofun/introduction/what-is-rektofun"
                     target="_blank"
                     rel="noreferrer"
                     className="px-3 py-1.5 text-sm font-black uppercase tracking-[0.06em] text-gray-700 transition-colors hover:text-[#e85a2d] whitespace-nowrap"

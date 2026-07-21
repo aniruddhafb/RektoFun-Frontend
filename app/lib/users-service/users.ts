@@ -354,6 +354,20 @@ export async function requestReferralRedemption(walletAddress: string): Promise<
   return normalizeUser(await response.json());
 }
 
+export async function getReferralLeaderboard(limit = 100, offset = 0): Promise<GetUsersResponse> {
+  const query = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+  const response = await fetch(`${API_BASE_URL}/users/referral-leaderboard?${query}`, {
+    headers: { accept: "application/json" },
+  });
+  if (!response.ok) throw await parseError(response, "Failed to fetch referral leaderboard");
+
+  const data = await response.json();
+  return {
+    users: (data.users || []).map(normalizeUser),
+    total: Number(data.total) || 0,
+  };
+}
+
 export async function getLeaderboard(
   limit = 100,
   offset = 0,

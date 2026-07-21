@@ -477,14 +477,12 @@ export function DepositModal({ isOpen, onClose, initialMode = "deposit", usdcBal
                 </p>
                 {asset === "rekto" && (
                   <p className="mt-1 text-xs font-semibold text-[#7c6a60]">
-                    Fixed withdrawal fee: 0.5 USDC. The recipient receives the
-                    full REKTO amount.
+                    Fixed withdrawal fee: 0.5 USDC
                   </p>
                 )}
                 {asset === "usdc" && (
                   <p className="mt-1 text-xs font-semibold text-[#7c6a60]">
-                    Withdrawal fee: 0.5%. If the recipient needs a new USDC
-                    token account, its creation cost is also deducted.
+                    Withdrawal fee: 0.5%
                   </p>
                 )}
               </div>

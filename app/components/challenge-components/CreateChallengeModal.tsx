@@ -164,6 +164,12 @@ const targetPriceInputValue = (value: number) => {
 const getCategoryImage = (category: Category | null | undefined) =>
     category?.image_url || category?.metadata?.image_url || "";
 
+const ASSET_GROUPS = [
+    { type: "crypto", label: "Crypto" },
+    { type: "stock", label: "Stocks" },
+    { type: "rwa", label: "RWA" },
+] as const;
+
 export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChallengeModalProps) {
     const [marketType, setMarketType] = useState<MarketType>("crypto");
     const [challengeFormat, setChallengeFormat] = useState<ChallengeFormat>("price");
@@ -1097,8 +1103,23 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
                                                 <Loader2 className="h-5 w-5 animate-spin" />
                                             </div>
                                         ) : childCategories.length > 0 ? (
-                                            <div className="flex max-h-36 flex-wrap gap-2 overflow-y-auto">
-                                                {childCategories.map((category) => {
+                                            <div className="create-asset-scroll max-h-36 space-y-3 overflow-y-auto overscroll-contain pr-1 sm:max-h-40">
+                                                {(marketType === "crypto" ? ASSET_GROUPS : [{ type: "sports", label: "Sports" }] as const).map((group) => {
+                                                    const groupCategories = childCategories.filter((category) =>
+                                                        group.type === "sports"
+                                                            ? true
+                                                            : (category.asset_type ?? "crypto") === group.type,
+                                                    );
+                                                    if (groupCategories.length === 0) return null;
+                                                    return (
+                                                        <section key={group.type}>
+                                                            {marketType === "crypto" && (
+                                                                <p className="mb-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-[#7b6a62]">
+                                                                    {group.label}
+                                                                </p>
+                                                            )}
+                                                            <div className="flex flex-wrap gap-2">
+                                                                {groupCategories.map((category) => {
                                                     const isSelected = selectedChildCategory?.id === category.id;
                                                     const categoryImage = getCategoryImage(category);
                                                     return (
@@ -1129,6 +1150,10 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
                                                             )}
                                                             {stripUsdcQuote(category.category)}
                                                         </button>
+                                                    );
+                                                                })}
+                                                            </div>
+                                                        </section>
                                                     );
                                                 })}
                                             </div>
@@ -1505,6 +1530,29 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
 
                 .create-challenge-modal {
                     min-width: 0;
+                }
+
+                .create-challenge-modal .create-asset-scroll {
+                    scrollbar-width: thin;
+                    scrollbar-color: #8b7355 rgba(139, 115, 85, 0.12);
+                }
+
+                .create-challenge-modal .create-asset-scroll::-webkit-scrollbar {
+                    width: 4px;
+                }
+
+                .create-challenge-modal .create-asset-scroll::-webkit-scrollbar-track {
+                    background: rgba(139, 115, 85, 0.12);
+                    border-radius: 999px;
+                }
+
+                .create-challenge-modal .create-asset-scroll::-webkit-scrollbar-thumb {
+                    background: #8b7355;
+                    border-radius: 999px;
+                }
+
+                .create-challenge-modal .create-asset-scroll::-webkit-scrollbar-thumb:hover {
+                    background: #594b44;
                 }
 
                 .create-challenge-date-input::-webkit-date-and-time-value {
