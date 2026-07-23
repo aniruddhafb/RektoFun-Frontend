@@ -17,6 +17,10 @@ import { stripUsdcQuote } from "@/app/lib/format-market-label";
 import { getUserByWallet } from "@/app/lib/users-service/users";
 import { announceChallengeUpdated } from "@/app/lib/realtime-events";
 import { getChallengeLifecycle } from "@/app/lib/challenge-lifecycle";
+import {
+  getChallengeActionError,
+  type ChallengeActionStage,
+} from "@/app/lib/challenge-action-errors";
 
 interface ExactCountdownDetails {
   exactCountdown: string;
@@ -48,8 +52,6 @@ function loadJoinedChallengeIds(userId: number): Promise<Set<number>> {
   joinedChallengeRequests.set(userId, request);
   return request;
 }
-
-const GENERIC_ACCEPT_ERROR = "Something went wrong. Please try again.";
 
 type ProfileVerification = {
   isVerified: boolean;
@@ -296,8 +298,9 @@ export function useChallengeCard(challenge: Challenge) {
     joinCreatorSide?: boolean;
     amountMicroUsdc?: string;
     challengeId?: number;
-  }) => {
+  }, onStage?: (stage: ChallengeActionStage) => void) => {
     if (!walletProvider) throw new Error("Wallet is not ready.");
+    onStage?.("prepare");
     const response = await fetch("/api/challenges/action", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -314,18 +317,24 @@ export function useChallengeCard(challenge: Challenge) {
     }
 
     const transaction = Transaction.from(Buffer.from(data.serializedTx, "base64"));
+    onStage?.("sign");
     const signedTransaction = await (walletProvider as {
       signTransaction: (tx: Transaction) => Promise<Transaction>;
     }).signTransaction(transaction);
+    onStage?.("submit");
     const signature = await connection.sendRawTransaction(signedTransaction.serialize(), {
       skipPreflight: false,
       preflightCommitment: "confirmed",
     });
-    await connection.confirmTransaction({
+    onStage?.("confirm");
+    const confirmation = await connection.confirmTransaction({
       signature,
       blockhash: data.blockhash,
       lastValidBlockHeight: data.lastValidBlockHeight,
     }, "confirmed");
+    if (confirmation.value.err) {
+      throw new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
+    }
     return signature;
   };
 
@@ -429,12 +438,12 @@ export function useChallengeCard(challenge: Challenge) {
     }
 
     if (!isConnected || !address || !walletProvider) {
-      setBetError(GENERIC_ACCEPT_ERROR);
+      setBetError("Your wallet is not connected or ready. Reconnect it, then try again.");
       return;
     }
 
     if (!user?.id) {
-      setBetError(GENERIC_ACCEPT_ERROR);
+      setBetError("Your RektoFun profile is not ready. Finish setting up your profile, then try again.");
       return;
     }
 
@@ -461,6 +470,7 @@ export function useChallengeCard(challenge: Challenge) {
       return;
     }
 
+    let joinStage: ChallengeActionStage = "validation";
     try {
       setBetError("");
       setIsLoading(true);
@@ -526,8 +536,9 @@ export function useChallengeCard(challenge: Challenge) {
         challengePDA: challengePDA.toBase58(),
         joinCreatorSide: joinSide === "TEAM_A",
         amountMicroUsdc: depositMicroUsdc.toString(),
-      });
+      }, (stage) => { joinStage = stage; });
 
+      joinStage = "save";
       await createPosition({
         challenge_id: challenge.id,
         bet: parsedBetAmount,
@@ -542,7 +553,7 @@ export function useChallengeCard(challenge: Challenge) {
       announceChallengeUpdated({ challengeId: challenge.id, action: "joined" });
     } catch (error) {
       console.error("Failed to accept challenge:", error);
-      setBetError(error instanceof Error ? error.message : GENERIC_ACCEPT_ERROR);
+      setBetError(getChallengeActionError(error, "join", joinStage));
     } finally {
       setIsLoading(false);
     }

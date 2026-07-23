@@ -56,6 +56,10 @@ import {
     getSiteSettings,
     type SiteSettings,
 } from "@/app/lib/site-settings";
+import {
+    getChallengeActionError,
+    type ChallengeActionStage,
+} from "@/app/lib/challenge-action-errors";
 
 interface CreateChallengeModalProps {
     isOpen: boolean;
@@ -620,6 +624,7 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated, recipient = n
         setFormError(null);
         setBalanceShortfall(null);
 
+        let createStage: ChallengeActionStage = "validation";
         try {
             const usdcBalance = await fetchUsdcBalance(address);
             if (usdcBalance < betAmount) {
@@ -649,6 +654,7 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated, recipient = n
             const targetPrice = isPriceFeed ? Number(predictionPrice) : 0;
             const challengeStatement = isPriceFeed ? generatedStatement : statement.trim();
 
+            createStage = "prepare";
             const response = await fetch("/api/challenges/create", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -677,18 +683,21 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated, recipient = n
             if (!response.ok) throw new Error(data.error || "Failed to create challenge");
 
             setTxStatus("signing");
+            createStage = "sign";
             const transaction = Transaction.from(Buffer.from(data.serializedTx, "base64"));
             const signedTransaction = await (walletProvider as {
                 signTransaction: (transaction: Transaction) => Promise<Transaction>;
             }).signTransaction(transaction);
 
             setTxStatus("confirming");
+            createStage = "submit";
             const connection = getReadonlyConnection();
             const signature = await connection.sendRawTransaction(signedTransaction.serialize(), {
                 skipPreflight: false,
                 preflightCommitment: "confirmed",
             });
-            await connection.confirmTransaction(
+            createStage = "confirm";
+            const confirmation = await connection.confirmTransaction(
                 {
                     signature,
                     blockhash: data.blockhash,
@@ -696,7 +705,11 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated, recipient = n
                 },
                 "confirmed",
             );
+            if (confirmation.value.err) {
+                throw new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
+            }
 
+            createStage = "save";
             await createChallenge({
                 statement: challengeStatement,
                 ticker,
@@ -757,7 +770,7 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated, recipient = n
         } catch (error) {
             console.error("Error creating challenge:", error);
             setTxStatus("error");
-            setFormError(error instanceof Error ? error.message : "Something went wrong. Try again.");
+            setFormError(getChallengeActionError(error, "create", createStage));
         } finally {
             setIsSubmitting(false);
         }

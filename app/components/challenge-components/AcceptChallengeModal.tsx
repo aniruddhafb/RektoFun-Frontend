@@ -42,8 +42,6 @@ interface AcceptChallengeModalProps {
 }
 
 const PRESET_AMOUNTS = [5, 10, 25, 50, 100];
-const GENERIC_ACCEPT_ERROR = "Something went wrong. Please try again.";
-
 export function AcceptChallengeModal({
     isOpen,
     isLoading,
@@ -180,9 +178,7 @@ export function AcceptChallengeModal({
 
     if (!isOpen) return null;
 
-    // Never expose wallet, RPC, API, or program errors in the UI. Input
-    // validation remains specific because it is safe and actionable.
-    const displayedError = liveValidationError || (betError ? GENERIC_ACCEPT_ERROR : "");
+    const displayedError = liveValidationError || betError;
     const submitLabel = isLoading
         ? "Accepting challenge"
         : liveValidationError
