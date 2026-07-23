@@ -80,7 +80,7 @@ type BetActivityView = {
   bet: number;
   createdAt: string;
   isCreator: boolean;
-  type: "created" | "challenged" | "joined" | "cancelled" | "expired" | "target_reached" | "redeemed" | "refunded" | "won";
+  type: "created" | "challenged" | "accepted" | "joined" | "cancelled" | "expired" | "target_reached" | "redeemed" | "refunded" | "won";
 };
 
 type MarketCandle = {
@@ -467,6 +467,7 @@ export default function ChallengeDetailModal({ challenge, creator, isOpen, onClo
     // The creator's initial position is the creation event, not a join.
     rows.forEach((row) => {
       if (row.isCreator && row.createdAt === challenge.created_at) row.type = "created";
+      else if (challenge.visibility === "DIRECT" && !row.isCreator && row.type === "joined") row.type = "accepted";
     });
 
     const invitedUser = challenge.challenged_user_details;
@@ -1368,6 +1369,7 @@ function BetActivityList({ activity, onOpenProfile, creatorLabel }: {
                 <span className="mt-0.5 block text-[9px] font-bold text-[#8b7355]">
                   {bet.type === "created" ? "Created the challenge"
                     : bet.type === "challenged" ? `${creatorLabel} challenged this user`
+                    : bet.type === "accepted" ? "Accepted the direct challenge"
                     : bet.type === "joined" ? `Joined ${bet.side === "TEAM_A" ? "challenger" : "opponent"} side`
                       : bet.type === "cancelled" ? "Cancelled the challenge"
                         : bet.type === "expired" ? "Challenge expired"

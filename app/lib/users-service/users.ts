@@ -45,7 +45,7 @@ export interface User {
 }
 
 export type LeaderboardPeriod = "1d" | "7d" | "30d" | "all";
-export type LeaderboardSort = "rank" | "created_challenges" | "win_rate" | "won" | "lost" | "pnl" | "volume";
+export type LeaderboardSort = "rank" | "followers" | "created_challenges" | "win_rate" | "won" | "lost" | "pnl" | "volume";
 export type LeaderboardVerification = "all" | "x" | "kol";
 
 export type LeaderboardUser = Omit<User, "id" | "followers" | "following"> & {

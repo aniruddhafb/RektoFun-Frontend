@@ -2,9 +2,11 @@
 
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { useAppKitAccount } from "@reown/appkit/react";
 import { AppNotification, declineChallengeInvitation, getNotifications, markNotificationRead } from "@/app/lib/notifications-service";
+import { useBodyScrollLock } from "@/app/lib/useBodyScrollLock";
 
 export function NotificationBell() {
   const { address } = useAppKitAccount();
@@ -14,8 +16,10 @@ export function NotificationBell() {
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [decliningId, setDecliningId] = useState<number | null>(null);
+  const [declineConfirmation, setDeclineConfirmation] = useState<AppNotification | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  useBodyScrollLock(Boolean(declineConfirmation));
 
   const refresh = async () => {
     if (!address) return;
@@ -49,9 +53,19 @@ export function NotificationBell() {
     return () => document.removeEventListener("mousedown", closeOnOutsideClick);
   }, [isOpen]);
 
+  useEffect(() => {
+    if (!declineConfirmation) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && decliningId === null) setDeclineConfirmation(null);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [declineConfirmation, decliningId]);
+
   const toggleModal = async () => {
     const nextOpen = !isOpen;
     setIsOpen(nextOpen);
+    if (!nextOpen) setDeclineConfirmation(null);
     if (nextOpen && address) {
       setIsLoading(true);
       try { await refresh(); } catch { /* The polling request will retry. */ }
@@ -93,10 +107,16 @@ export function NotificationBell() {
     router.push(`/profile/${encodeURIComponent(notification.actor_wallet_address)}`);
   };
 
-  const declineInvitation = async (event: React.MouseEvent, notification: AppNotification) => {
+  const requestDeclineInvitation = (event: React.MouseEvent, notification: AppNotification) => {
     event.preventDefault();
     event.stopPropagation();
     if (notification.challenge_id === null || !address || decliningId !== null) return;
+    setDeclineConfirmation(notification);
+  };
+
+  const declineInvitation = async () => {
+    const notification = declineConfirmation;
+    if (!notification || notification.challenge_id === null || !address || decliningId !== null) return;
     setActionError(null);
     setDecliningId(notification.id);
     try {
@@ -105,6 +125,7 @@ export function NotificationBell() {
         ? { ...item, event_type: "challenge_declined", message: "You declined this 1 vs 1 challenge.", is_read: true }
         : item));
       if (!notification.is_read) setUnread((count) => Math.max(0, count - 1));
+      setDeclineConfirmation(null);
     } catch (error) {
       setActionError(error instanceof Error ? error.message : "Failed to decline invitation");
     } finally {
@@ -139,12 +160,39 @@ export function NotificationBell() {
                   <Image src={notification.actor_profile_image || "/scribbles/pepe.png"} alt="" width={48} height={48} className="h-12 w-12 rounded-full border-2 border-black/80 bg-white object-cover" />
                   <span className="absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full border-2 border-white bg-[#f5d547] text-[10px]">{notification.event_type === "challenge_won" ? "🏆" : notification.event_type === "challenge_created" ? "+" : notification.event_type === "user_followed" || notification.event_type === "user_followed_back" ? "♥" : "↗"}</span>
                 </button>
-                <div className="min-w-0 flex-1"><div className="flex items-start justify-between gap-3"><p className="text-sm font-extrabold leading-5 text-gray-950">{notification.message}</p><time className="shrink-0 pt-0.5 text-[11px] font-bold text-gray-400">{new Date(notification.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</time></div><p className="mt-1 text-xs font-semibold leading-5 text-gray-500">{notification.event_type === "challenge_won" ? "Your PVP win has been confirmed." : notification.event_type === "challenge_received" ? "Accept the battle or decline the invitation." : notification.event_type === "challenge_created" ? "A new challenge is ready to join." : notification.event_type === "user_followed" || notification.event_type === "user_followed_back" ? "Tap to view their profile." : "View the challenge."}</p>{notification.event_type === "challenge_received" ? <div className="mt-2 flex gap-2"><span className="inline-flex text-[11px] font-black text-[#c74620]">View & accept →</span><button type="button" onClick={(event) => void declineInvitation(event, notification)} className="text-[11px] font-black text-gray-500 hover:text-red-600">Decline</button></div> : <span className="mt-2 inline-flex text-[11px] font-black text-[#c74620] opacity-0 transition-opacity group-hover:opacity-100">{notification.event_type === "user_followed" || notification.event_type === "user_followed_back" ? "View profile →" : "View challenge →"}</span>}</div>
+                <div className="min-w-0 flex-1"><div className="flex items-start justify-between gap-3"><p className="text-sm font-extrabold leading-5 text-gray-950">{notification.message}</p><time className="shrink-0 pt-0.5 text-[11px] font-bold text-gray-400">{new Date(notification.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</time></div><p className="mt-1 text-xs font-semibold leading-5 text-gray-500">{notification.event_type === "challenge_won" ? "Your PVP win has been confirmed." : notification.event_type === "challenge_received" && notification.invitation_status === "PENDING" ? "Accept the battle or decline the invitation." : notification.event_type === "challenge_created" ? "A new challenge is ready to join." : notification.event_type === "user_followed" || notification.event_type === "user_followed_back" ? "Tap to view their profile." : "View the challenge."}</p>{notification.event_type === "challenge_received" && notification.invitation_status === "PENDING" ? <div className="mt-2 flex gap-2"><span className="inline-flex text-[11px] font-black text-[#c74620]">View & accept →</span><button type="button" onClick={(event) => requestDeclineInvitation(event, notification)} className="text-[11px] font-black text-gray-500 hover:text-red-600">Decline</button></div> : <span className="mt-2 inline-flex text-[11px] font-black text-[#c74620] opacity-0 transition-opacity group-hover:opacity-100">{notification.event_type === "user_followed" || notification.event_type === "user_followed_back" ? "View profile →" : "View challenge →"}</span>}</div>
                 {!notification.is_read && <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-[#e85a2d]" />}
               </div>
             ))}
           </div>
         </div>
+      )}
+
+      {declineConfirmation && typeof document !== "undefined" && createPortal(
+        <div className="fixed inset-0 z-[10040] flex items-center justify-center p-4">
+          <button
+            type="button"
+            className="absolute inset-0 cursor-pointer bg-black/60 backdrop-blur-[2px]"
+            onClick={() => setDeclineConfirmation(null)}
+            disabled={decliningId !== null}
+            aria-label="Close decline confirmation"
+          />
+          <div role="alertdialog" aria-modal="true" aria-labelledby="decline-challenge-title" aria-describedby="decline-challenge-description" className="relative z-10 w-full max-w-sm border-2 border-black bg-[#fffaf6] p-5">
+            <h2 id="decline-challenge-title" className="text-xl font-black text-gray-950">Decline this challenge?</h2>
+            <p id="decline-challenge-description" className="mt-2 text-sm font-semibold leading-6 text-gray-600">
+              This will reject the direct challenge invitation. Are you sure you want to continue?
+            </p>
+            <div className="mt-5 flex justify-end gap-3">
+              <button type="button" onClick={() => setDeclineConfirmation(null)} disabled={decliningId !== null} className="rounded-lg border-2 border-black bg-white px-4 py-2 text-sm font-black text-gray-800 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50">
+                Keep challenge
+              </button>
+              <button type="button" onClick={() => void declineInvitation()} disabled={decliningId !== null} className="rounded-lg border-2 border-black bg-[#e85a2d] px-4 py-2 text-sm font-black text-white transition hover:bg-[#cf4720] disabled:cursor-not-allowed disabled:opacity-60">
+                {decliningId !== null ? "Declining…" : "Yes, decline"}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

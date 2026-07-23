@@ -3,7 +3,7 @@ import { Position } from "@/app/lib/positions-service/positions";
 import { User } from "@/app/lib/users-service/users";
 import { getChallengeLifecycle, type ChallengeLifecycle } from "@/app/lib/challenge-lifecycle";
 
-export type ChallengeActivityType = "created" | "joined" | "cancelled" | "expired" | "redeemed" | "refunded" | "won";
+export type ChallengeActivityType = "created" | "accepted" | "joined" | "cancelled" | "expired" | "redeemed" | "refunded" | "won";
 
 export interface ChallengeActivity {
   id: string;
@@ -25,6 +25,7 @@ const activityRequests = new Map<string, Promise<ChallengeActivityPage>>();
 type TimestampedChallenge = Challenge & { updated_at?: string; cancelled_at?: string };
 
 export function getActivityVerb(type: ChallengeActivityType, challenge?: Challenge): string {
+  if (type === "accepted") return "accepted this direct challenge";
   if (type === "joined") return "joined this challenge";
   if (type === "cancelled") return "cancelled this challenge";
   if (type === "expired") return "had this challenge expire";
@@ -105,7 +106,7 @@ export function buildChallengeActivities(
     joinedChallengeIds.add(challenge.id);
     events.push({
       id: `joined-${position.id}`,
-      type: "joined",
+      type: challenge.visibility === "DIRECT" ? "accepted" : "joined",
       occurredAt: position.created_at,
       challenge,
       actor: userById.get(Number(position.creator)) ?? null,

@@ -68,6 +68,7 @@ function getResolutionStatusClass(status: string): string {
 const activityAppearance = {
     won: { Icon: Trophy, card: "bg-gradient-to-r from-amber-50/60 via-white to-white", badge: "bg-amber-100 text-amber-800" },
     redeemed: { Icon: Crown, card: "bg-gradient-to-r from-violet-50/50 via-white to-white", badge: "bg-violet-100 text-violet-700" },
+    accepted: { Icon: LogIn, card: "bg-gradient-to-r from-emerald-50/50 via-white to-white", badge: "bg-emerald-100 text-emerald-700" },
     joined: { Icon: LogIn, card: "bg-gradient-to-r from-emerald-50/50 via-white to-white", badge: "bg-emerald-100 text-emerald-700" },
     created: { Icon: Plus, card: "bg-gradient-to-r from-sky-50/50 via-white to-white", badge: "bg-sky-100 text-sky-700" },
     cancelled: { Icon: Ban, card: "bg-gradient-to-r from-rose-50/50 via-white to-white", badge: "bg-rose-100 text-rose-700" },

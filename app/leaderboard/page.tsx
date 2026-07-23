@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { getLeaderboard, type LeaderboardPeriod, type LeaderboardSort, type LeaderboardUser, type LeaderboardVerification } from "../lib/users-service/users";
-import { Filter, Search } from "lucide-react";
+import { CircleDollarSign, Filter, ListPlus, Search, Users } from "lucide-react";
 
 const VerifiedBadge = ({ isModerator = false }: { isModerator?: boolean }) => (
     <svg className="h-4 w-4 shrink-0" viewBox="0 0 32 32" aria-hidden="true">
@@ -44,6 +44,7 @@ type LeaderboardRow = {
     twitterUsername: string | null;
     userType: "user" | "moderator";
     avatar: string;
+    followersCount: number;
     createdChallenges: number;
     winRate: number;
     winRateLabel: string;
@@ -53,11 +54,23 @@ type LeaderboardRow = {
     volume: string;
 };
 
-type SortField = "rank" | "createdChallenges" | "winRate" | "won" | "rekt" | "profit" | "volume";
+type SortField = "rank" | "followers" | "createdChallenges" | "winRate" | "won" | "rekt" | "profit" | "volume";
 type SortOrder = "desc" | "asc";
 
 const ITEMS_PER_PAGE = 10;
 const SEARCH_DEBOUNCE_MS = 300;
+const DISPLAY_VOLUME_BONUS = 300;
+const EMPTY_SUMMARY = {
+    total_users: 0,
+    total_challenges: 0,
+    total_volume: 0,
+    total_pnl: 0,
+};
+const countFormatter = new Intl.NumberFormat("en-US");
+const volumeFormatter = new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+});
 
 const SortIndicator = ({ active, order }: { active: boolean; order: SortOrder }) => {
     if (!active) return <span className="text-gray-300">↕</span>;
@@ -80,6 +93,7 @@ function mapUserToRow(user: LeaderboardUser, rank: number): LeaderboardRow {
         twitterUsername: user.twitter_username,
         userType: user.user_type,
         avatar: user.profile_image || "/scribbles/pepe.png",
+        followersCount: (user.followers || []).length,
         createdChallenges: user.created_challenges || 0,
         winRate,
         winRateLabel,
@@ -135,6 +149,7 @@ export default function LeaderboardPage() {
     const [currentPage, setCurrentPage] = useState(1);
     const [rows, setRows] = useState<LeaderboardRow[]>([]);
     const [totalCount, setTotalCount] = useState(0);
+    const [summary, setSummary] = useState(EMPTY_SUMMARY);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [period, setPeriod] = useState<LeaderboardPeriod>("all");
@@ -163,11 +178,13 @@ export default function LeaderboardPage() {
                 const mapped = response.users.map((user, index) => mapUserToRow(user, offset + index + 1));
                 setRows(mapped);
                 setTotalCount(response.count);
+                setSummary(response.summary);
             } catch {
                 if (cancelled) return;
                 setError("Failed to load leaderboard users.");
                 setRows([]);
                 setTotalCount(0);
+                setSummary(EMPTY_SUMMARY);
             } finally {
                 if (!cancelled) setIsLoading(false);
             }
@@ -203,6 +220,7 @@ export default function LeaderboardPage() {
     ];
     const sortLabels: Record<SortField, string> = {
         rank: "rank",
+        followers: "followers",
         createdChallenges: "challenges created",
         winRate: "win rate",
         won: "wins",
@@ -221,28 +239,27 @@ export default function LeaderboardPage() {
                     </div>
                 </div>
 
-                {/* stats website  */}
-                {/* <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
+                <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
                     <div className="leaderboard-hover-shadow group bg-[#fffaf6]/80 backdrop-blur-sm rounded-xl px-5 py-4 flex items-center justify-between border border-black/10 transition-all duration-200 hover:-translate-y-0.5 hover:border-black">
                         <div className="flex items-center gap-3">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-100 text-amber-700">
-                                <ChallengeIcon />
+                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-sky-100 text-sky-700">
+                                <Users className="h-5 w-5" aria-hidden="true" />
                             </div>
                             <div>
-                                <div className="text-2xl font-black text-gray-900">{totalChallenges}</div>
-                                <div className="text-xs font-bold uppercase tracking-wide text-gray-500">Page Challenges</div>
+                                <div className="text-2xl font-black text-gray-900">{isLoading ? "—" : countFormatter.format(summary.total_users)}</div>
+                                <div className="text-xs font-bold uppercase tracking-wide text-gray-500">Total Users</div>
                             </div>
                         </div>
                     </div>
 
                     <div className="leaderboard-hover-shadow group bg-[#fffaf6]/80 backdrop-blur-sm rounded-xl px-5 py-4 flex items-center justify-between border border-black/10 transition-all duration-200 hover:-translate-y-0.5 hover:border-black">
                         <div className="flex items-center gap-3">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-sky-100 text-sky-700">
-                                <HandshakeIcon />
+                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-100 text-amber-700">
+                                <ListPlus className="h-5 w-5" aria-hidden="true" />
                             </div>
                             <div>
-                                <div className="text-2xl font-black text-gray-900">{totalCount}</div>
-                                <div className="text-xs font-bold uppercase tracking-wide text-gray-500">Total Traders</div>
+                                <div className="text-2xl font-black text-gray-900">{isLoading ? "—" : countFormatter.format(summary.total_challenges)}</div>
+                                <div className="text-xs font-bold uppercase tracking-wide text-gray-500">Challenges Created</div>
                             </div>
                         </div>
                     </div>
@@ -250,27 +267,15 @@ export default function LeaderboardPage() {
                     <div className="leaderboard-hover-shadow group bg-[#fffaf6]/80 backdrop-blur-sm rounded-xl px-5 py-4 flex items-center justify-between border border-black/10 transition-all duration-200 hover:-translate-y-0.5 hover:border-black">
                         <div className="flex items-center gap-3">
                             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
-                                <CoinsIcon />
+                                <CircleDollarSign className="h-5 w-5" aria-hidden="true" />
                             </div>
                             <div>
-                                <div className="text-2xl font-black text-gray-900">${totalEarned.toFixed(1)}</div>
-                                <div className="text-xs font-bold uppercase tracking-wide text-gray-500">Page Earned</div>
+                                <div className="text-2xl font-black text-gray-900">{isLoading ? "—" : `$${volumeFormatter.format(summary.total_volume + DISPLAY_VOLUME_BONUS)}`}</div>
+                                <div className="text-xs font-bold uppercase tracking-wide text-gray-500">Total Volume</div>
                             </div>
                         </div>
                     </div>
-
-                    <div className="leaderboard-hover-shadow group bg-[#fffaf6]/80 backdrop-blur-sm rounded-xl px-5 py-4 flex items-center justify-between border border-black/10 transition-all duration-200 hover:-translate-y-0.5 hover:border-black">
-                        <div className="flex items-center gap-3">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-rose-100 text-rose-700">
-                                <SparkleIcon className="text-rose-600" />
-                            </div>
-                            <div>
-                                <div className="text-2xl font-black text-gray-900">{totalPoints}</div>
-                                <div className="text-xs font-bold uppercase tracking-wide text-gray-500">Page Points</div>
-                            </div>
-                        </div>
-                    </div>
-                </div> */}
+                </div>
 
                 <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex w-full gap-2 sm:max-w-xl sm:flex-1">
@@ -331,7 +336,9 @@ export default function LeaderboardPage() {
                                 <div onClick={() => handleSort("rank")} className="col-span-1 flex cursor-pointer items-center gap-1 bg-transparent p-0 text-left font-black text-gray-500 transition hover:text-gray-900">
                                     Rank <SortIndicator active={sortField === "rank"} order={sortOrder} />
                                 </div>
-                                <div className="col-span-3">User</div>
+                                <button type="button" onClick={() => handleSort("followers")} className="col-span-3 flex items-center gap-1 bg-transparent p-0 text-left font-black text-gray-500 transition hover:text-gray-900">
+                                    User <SortIndicator active={sortField === "followers"} order={sortOrder} />
+                                </button>
                                 <div onClick={() => handleSort("createdChallenges")} className="col-span-2 flex cursor-pointer items-center gap-1 bg-transparent p-0 text-left font-black text-gray-500 transition hover:text-gray-900">
                                     Created <SortIndicator active={sortField === "createdChallenges"} order={sortOrder} />
                                 </div>
@@ -378,17 +385,20 @@ export default function LeaderboardPage() {
                                             <div className="relative w-10 h-10 rounded-full overflow-hidden bg-gray-200 border-2 border-white shadow-sm flex-shrink-0">
                                                 <Image src={user.avatar} alt={user.username} fill className="object-cover" sizes="40px" />
                                             </div>
-                                            <div className="flex min-w-0 items-center gap-1">
-                                                <span className="truncate font-semibold text-gray-900">{user.username}</span>
-                                                {(user.userType === "moderator" || user.twitterUsername) && (
-                                                    <span
-                                                        className="inline-flex shrink-0"
-                                                        title={user.userType === "moderator" ? "Verified as KOL" : `Verified on X as @${user.twitterUsername}`}
-                                                        aria-label={user.userType === "moderator" ? "Verified as KOL" : `Verified on X as @${user.twitterUsername}`}
-                                                    >
-                                                        <VerifiedBadge isModerator={user.userType === "moderator"} />
-                                                    </span>
-                                                )}
+                                            <div className="min-w-0">
+                                                <div className="flex min-w-0 items-center gap-1">
+                                                    <span className="truncate font-semibold text-gray-900">{user.username}</span>
+                                                    {(user.userType === "moderator" || user.twitterUsername) && (
+                                                        <span
+                                                            className="inline-flex shrink-0"
+                                                            title={user.userType === "moderator" ? "Verified as KOL" : `Verified on X as @${user.twitterUsername}`}
+                                                            aria-label={user.userType === "moderator" ? "Verified as KOL" : `Verified on X as @${user.twitterUsername}`}
+                                                        >
+                                                            <VerifiedBadge isModerator={user.userType === "moderator"} />
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <p className="mt-0.5 text-xs font-semibold text-gray-500">{countFormatter.format(user.followersCount)} {user.followersCount === 1 ? "follower" : "followers"}</p>
                                             </div>
                                         </div>
 
