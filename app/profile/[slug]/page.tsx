@@ -400,6 +400,9 @@ export default function ProfilePage() {
                             followersCount={user.followers?.length ?? 0}
                             followingCount={user.following?.length ?? 0}
                             onToggleFollow={connectedWalletAddress ? handleToggleFollow : undefined}
+                            onChallengeUser={connectedWalletAddress && !isOwnProfile
+                                ? () => setIsCreateModalOpen(true)
+                                : undefined}
                             isFollowActionLoading={isFollowActionLoading}
                             joinedDate={user.created_at}
                             balance={{
@@ -493,8 +496,9 @@ export default function ProfilePage() {
                 onClose={closeModal}
             />
             <CreateChallengeModal
-                isOpen={Boolean(isOwnProfile && isCreateModalOpen)}
+                isOpen={isCreateModalOpen}
                 onClose={() => setIsCreateModalOpen(false)}
+                recipient={!isOwnProfile && user ? user : null}
                 onCreated={() => {
                     setIsCreateModalOpen(false);
                     setChallengeRefreshKey((key) => key + 1);

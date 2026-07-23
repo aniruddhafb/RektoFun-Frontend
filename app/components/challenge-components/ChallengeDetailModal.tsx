@@ -80,7 +80,7 @@ type BetActivityView = {
   bet: number;
   createdAt: string;
   isCreator: boolean;
-  type: "created" | "joined" | "cancelled" | "expired" | "target_reached" | "redeemed" | "refunded" | "won";
+  type: "created" | "challenged" | "joined" | "cancelled" | "expired" | "target_reached" | "redeemed" | "refunded" | "won";
 };
 
 type MarketCandle = {
@@ -468,6 +468,21 @@ export default function ChallengeDetailModal({ challenge, creator, isOpen, onClo
     rows.forEach((row) => {
       if (row.isCreator && row.createdAt === challenge.created_at) row.type = "created";
     });
+
+    const invitedUser = challenge.challenged_user_details;
+    if (challenge.visibility === "DIRECT" && invitedUser) {
+      rows.push({
+        key: `challenged:${challenge.id}:${invitedUser.id}`,
+        name: invitedUser.username || "Invited user",
+        avatar: invitedUser.profile_image || FALLBACK_AVATAR,
+        wallet: invitedUser.pubkey || invitedUser.wallet_address || "",
+        side: "TEAM_B",
+        bet: 0,
+        createdAt: challenge.created_at,
+        isCreator: false,
+        type: "challenged",
+      });
+    }
 
     const historyUsers = new Map(participants.map((participant) => [participant.id, participant]));
     getChallengeHistoryEvents(challenge).forEach((event) => {
@@ -1352,6 +1367,7 @@ function BetActivityList({ activity, onOpenProfile, creatorLabel }: {
                 </span>
                 <span className="mt-0.5 block text-[9px] font-bold text-[#8b7355]">
                   {bet.type === "created" ? "Created the challenge"
+                    : bet.type === "challenged" ? `${creatorLabel} challenged this user`
                     : bet.type === "joined" ? `Joined ${bet.side === "TEAM_A" ? "challenger" : "opponent"} side`
                       : bet.type === "cancelled" ? "Cancelled the challenge"
                         : bet.type === "expired" ? "Challenge expired"
@@ -1362,7 +1378,7 @@ function BetActivityList({ activity, onOpenProfile, creatorLabel }: {
                 </span>
               </span>
               <span className="shrink-0 text-right">
-                {bet.type !== "cancelled" && bet.type !== "expired" && bet.type !== "target_reached" && !(bet.type === "won" && bet.bet <= 0) && (
+                {bet.type !== "challenged" && bet.type !== "cancelled" && bet.type !== "expired" && bet.type !== "target_reached" && !(bet.type === "won" && bet.bet <= 0) && (
                   <span className="block text-[11px] font-black text-emerald-700 sm:text-xs">{formatMoney(bet.bet)}</span>
                 )}
                 <span className="mt-0.5 flex items-center justify-end gap-1 text-[8px] font-bold text-[#8b7a72] sm:text-[9px]">

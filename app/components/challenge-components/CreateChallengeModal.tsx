@@ -61,6 +61,7 @@ interface CreateChallengeModalProps {
     isOpen: boolean;
     onClose: () => void;
     onCreated: () => void;
+    recipient?: Pick<User, "id" | "username" | "wallet_address" | "profile_image"> | null;
 }
 
 type TxStatus = "idle" | "building" | "signing" | "confirming" | "success" | "error";
@@ -170,7 +171,7 @@ const ASSET_GROUPS = [
     { type: "rwa", label: "RWA" },
 ] as const;
 
-export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChallengeModalProps) {
+export function CreateChallengeModal({ isOpen, onClose, onCreated, recipient = null }: CreateChallengeModalProps) {
     const [marketType, setMarketType] = useState<MarketType>("crypto");
     const [challengeFormat, setChallengeFormat] = useState<ChallengeFormat>("price");
     const [challengeMode, setChallengeMode] = useState<ChallengeMode>("pvp");
@@ -207,6 +208,7 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
 
     const statementRef = useRef<HTMLTextAreaElement>(null);
     const priceRef = useRef<HTMLInputElement>(null);
+    const setupPanelRef = useRef<HTMLDivElement>(null);
     const savedAssetCategoryRef = useRef<string | null>(null);
     const { user } = useUserStore();
     const { open } = useAppKit();
@@ -232,6 +234,7 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
                 return current;
             });
             setChallengeMode((current) => {
+                if (recipient) return "pvp";
                 if (current === "pvp" && settings.pvpChallengesLocked && !settings.teamChallengesLocked) return "team";
                 if (current === "team" && settings.teamChallengesLocked && !settings.pvpChallengesLocked) return "pvp";
                 return current;
@@ -242,7 +245,7 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
         return () => {
             active = false;
         };
-    }, [isOpen]);
+    }, [isOpen, recipient]);
 
     /* eslint-disable react-hooks/set-state-in-effect -- restoring an explicitly saved form snapshot when the modal opens */
     useEffect(() => {
@@ -263,10 +266,10 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
                     || (savedFormat === "statement" && !siteSettings.statementChallengesLocked);
                 if (savedFormatAvailable) setChallengeFormat(savedFormat);
             }
-            if (
+            if (!recipient && (
                 (saved.challengeMode === "pvp" && !siteSettings.pvpChallengesLocked)
                 || (saved.challengeMode === "team" && !siteSettings.teamChallengesLocked)
-            ) {
+            )) {
                 setChallengeMode(saved.challengeMode);
             }
             if (typeof saved.betAmount === "number" && Number.isFinite(saved.betAmount) && saved.betAmount > 0) setBetAmount(saved.betAmount);
@@ -283,7 +286,7 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
             window.localStorage.removeItem(CREATE_SETTINGS_KEY);
             setRememberSettings(false);
         }
-    }, [isOpen, siteSettings]);
+    }, [isOpen, recipient, siteSettings]);
     /* eslint-enable react-hooks/set-state-in-effect */
 
     useEffect(() => {
@@ -380,6 +383,17 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
         setActivePanel((current) => current === panel ? null : panel);
         setFormError(null);
     };
+
+    useEffect(() => {
+        if (!isOpen || !activePanel || !window.matchMedia("(max-width: 639px)").matches) return;
+        const frame = window.requestAnimationFrame(() => {
+            setupPanelRef.current?.scrollIntoView({
+                behavior: "smooth",
+                block: "start",
+            });
+        });
+        return () => window.cancelAnimationFrame(frame);
+    }, [activePanel, isOpen]);
 
     const handleDurationChange = (nextDuration: { hours: number; minutes: number }) => {
         const totalMinutes = Math.min(
@@ -716,6 +730,9 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
                 resolution_date: new Date(resolvesAt * 1000).toISOString().split("T")[0],
                 final_price: 0,
                 category: marketType === "crypto" ? "Crypto" : "Sports",
+                visibility: recipient ? "DIRECT" : "PUBLIC",
+                challenged_user_id: recipient?.id,
+                invitation_status: recipient ? "PENDING" : undefined,
             });
 
             setTxStatus("idle");
@@ -785,7 +802,7 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
                         </div>
                         <div>
                             <h2 id="create-challenge-title" className="text-base font-black tracking-tight text-[#17120f] sm:text-lg">
-                                Create challenge
+                                {recipient ? `Challenge @${recipient.username}` : "Create challenge"}
                             </h2>
                             <p className="text-[11px] font-bold text-[#7a6961]">Make your call.</p>
                         </div>
@@ -1113,7 +1130,7 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
                         </div>
 
                         {activePanel && (
-                            <div className="mt-3 border-2 border-black bg-[#f8ede7] p-3 sm:mt-4 sm:p-4">
+                            <div ref={setupPanelRef} className="mt-3 scroll-mt-3 border-2 border-black bg-[#f8ede7] p-3 sm:mt-4 sm:p-4">
                                 {activePanel === "topic" && (
                                     <div>
                                         <PanelHeading>{marketType === "crypto" ? "Asset" : "Sport"}</PanelHeading>
@@ -1384,7 +1401,7 @@ export function CreateChallengeModal({ isOpen, onClose, onCreated }: CreateChall
                                             </button>
                                             <button
                                                 type="button"
-                                                disabled={siteSettings.teamChallengesLocked}
+                                                disabled={Boolean(recipient) || siteSettings.teamChallengesLocked}
                                                 title={siteSettings.teamChallengesLocked ? "Locked by admin" : undefined}
                                                 onClick={() => {
                                                     setChallengeMode("team");

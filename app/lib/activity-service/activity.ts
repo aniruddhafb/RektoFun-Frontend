@@ -24,14 +24,16 @@ const activityRequests = new Map<string, Promise<ChallengeActivityPage>>();
 
 type TimestampedChallenge = Challenge & { updated_at?: string; cancelled_at?: string };
 
-export function getActivityVerb(type: ChallengeActivityType): string {
+export function getActivityVerb(type: ChallengeActivityType, challenge?: Challenge): string {
   if (type === "joined") return "joined this challenge";
   if (type === "cancelled") return "cancelled this challenge";
   if (type === "expired") return "had this challenge expire";
   if (type === "redeemed") return "redeemed winnings";
   if (type === "refunded") return "claimed a refund";
   if (type === "won") return "won this challenge";
-  return "created this challenge";
+  return type === "created" && challenge?.visibility === "DIRECT"
+    ? "challenged"
+    : "created this challenge";
 }
 
 export function getActivityLabel(type: ChallengeActivityType): string {

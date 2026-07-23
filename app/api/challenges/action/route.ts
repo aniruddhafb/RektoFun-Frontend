@@ -19,6 +19,7 @@ export async function POST(req: NextRequest) {
       challengePDA?: string;
       joinCreatorSide?: boolean;
       amountMicroUsdc?: string;
+      challengeId?: number;
     };
 
     if (!body.action || !ACTIONS.has(body.action)) {
@@ -30,6 +31,23 @@ export async function POST(req: NextRequest) {
     const amountMicroUsdc = body.action === "accept" ? BigInt(body.amountMicroUsdc ?? "0") : undefined;
     if (body.action === "accept" && (!amountMicroUsdc || amountMicroUsdc <= BigInt(0))) {
       return NextResponse.json({ error: "Invalid acceptance amount" }, { status: 400 });
+    }
+    if (body.action === "accept") {
+      if (!body.challengeId) {
+        return NextResponse.json({ error: "Missing challenge ID" }, { status: 400 });
+      }
+      const apiBase = process.env.NEXT_PUBLIC_BE_API_URL || "http://localhost:8000/api";
+      const permission = await fetch(
+        `${apiBase.replace(/\/$/, "")}/challenges/${body.challengeId}/can-accept?wallet_address=${encodeURIComponent(body.participant)}`,
+        { headers: { accept: "application/json" }, cache: "no-store" },
+      );
+      if (!permission.ok) {
+        const detail = await permission.json().catch(() => null);
+        return NextResponse.json(
+          { error: detail?.detail || "You are not allowed to accept this challenge" },
+          { status: permission.status },
+        );
+      }
     }
 
     const result = await buildAdminSignedChallengeActionTx({

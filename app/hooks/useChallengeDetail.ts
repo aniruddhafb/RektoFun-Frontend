@@ -180,6 +180,10 @@ export function useChallengeDetail(
 
   // Challenge status
   const isCreator = Boolean(user?.id && challenge?.creator && user.id === challenge.creator);
+  const isDirectJoinRestricted = challenge?.visibility === "DIRECT"
+    && user?.id !== challenge.challenged_user_id;
+  const isDeclinedDirectInvitation = challenge?.visibility === "DIRECT"
+    && challenge.invitation_status === "DECLINED";
   const isExpireTimeAchieved = Boolean(expiryTimestamp && expiryTimestamp <= currentTime);
   const isResolveTimeAchieved = Boolean(resolveTimestamp && resolveTimestamp <= currentTime);
   const challengerConditionMet = isDirectionalBelow ? currentPrice < targetPrice : currentPrice > targetPrice;
@@ -339,6 +343,10 @@ export function useChallengeDetail(
       ctaLabel = "RESOLVING";
       ctaDisabled = true;
       ctaClassName = resolvingCtaClassName;
+    } else if ((isDirectJoinRestricted || isDeclinedDirectInvitation) && lifecycle === "OPEN") {
+      ctaLabel = isDeclinedDirectInvitation ? "INVITATION DECLINED" : "INVITATION ONLY";
+      ctaDisabled = true;
+      ctaClassName = cancelledCtaClassName;
     } else if (lifecycle === "LIVE") {
       if (isTeam && !isExpireTimeAchieved) {
         ctaLabel = "JOIN CHALLENGE";

@@ -164,7 +164,7 @@ export function NavbarProfileDropdown({
 
             {isOpen && (
                 <div className="absolute right-0 top-full z-50 w-[min(18rem,calc(100vw-1rem))] pt-2">
-                    <div className="bg-white border-2 border-black overflow-hidden">
+                    <div className="max-h-[calc(100dvh-5rem)] overflow-y-auto overscroll-contain border-2 border-black bg-white touch-pan-y">
                         <div className="p-4 bg-[#fffaf6] border-b-2 border-black">
                             <Link
                                 href={profileHref}

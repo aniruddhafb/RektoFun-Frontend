@@ -22,6 +22,9 @@ export interface CreateChallengeParams {
   resolution_date: string;
   final_price: number;
   category?: string;
+  visibility?: "PUBLIC" | "DIRECT";
+  challenged_user_id?: number;
+  invitation_status?: "PENDING" | "ACCEPTED" | "DECLINED" | "EXPIRED" | "CANCELLED";
 }
 
 export interface ChallengeAvailability {
@@ -94,6 +97,10 @@ export interface Challenge {
   final_price: number;
   category?: string;
   category_image?: string | null;
+  visibility?: "PUBLIC" | "DIRECT";
+  challenged_user_id?: number;
+  challenged_user_details?: User | null;
+  invitation_status?: "PENDING" | "ACCEPTED" | "DECLINED" | "EXPIRED" | "CANCELLED";
   created_at: string;
   bet_info?: BetInfo | null;
   market: {
@@ -161,6 +168,7 @@ export interface GetChallengesParams {
   expiring_soon?: boolean;
   joinable?: boolean;
   include_total?: boolean;
+  visibility?: "PUBLIC" | "DIRECT";
 }
 
 export interface GetChallengesOptions {
@@ -251,6 +259,10 @@ export async function getChallenges(
 
   if (params?.include_total !== undefined) {
     queryParams.append('include_total', params.include_total.toString());
+  }
+
+  if (params?.visibility) {
+    queryParams.append("visibility", params.visibility);
   }
   
   const queryString = queryParams.toString();

@@ -118,9 +118,9 @@ export function CreateProfileModal({ isOpen, user, onClose, onSaved }: EditProfi
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-[210] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="edit-profile-title">
+    <div className="fixed inset-0 z-[210] flex items-start justify-center overflow-y-auto p-2 sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-labelledby="edit-profile-title">
       <button type="button" className="absolute inset-0 cursor-default bg-black/45 backdrop-blur-sm" onClick={onClose} aria-label="Close edit profile" />
-      <div className="relative z-10 max-h-[90vh] w-full max-w-md overflow-y-auto rounded-lg border-2 border-black bg-[#fff8f4]">
+      <div className="relative z-10 my-1 max-h-[calc(100dvh-0.75rem)] w-full max-w-md touch-pan-y overflow-y-auto overscroll-contain rounded-lg border-2 border-black bg-[#fff8f4] sm:my-0 sm:max-h-[90vh]">
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[#ead7cc] bg-[#fff8f4]/95 px-5 py-4 backdrop-blur">
           <div>
             <h2 id="edit-profile-title" className="text-xl font-black text-gray-950">Edit Profile</h2>

@@ -169,6 +169,12 @@ export function NavbarDesktopSearch({
 
     const hasQuery = query.trim().length > 0;
 
+    useEffect(() => {
+        const preload = () => { void getSearchModalResults().catch(() => undefined); };
+        const id = window.setTimeout(preload, 500);
+        return () => window.clearTimeout(id);
+    }, []);
+
     const closeModal = useCallback(() => onCloseModal(), [onCloseModal]);
 
     const loadInitialResults = useCallback(async () => {
@@ -541,7 +547,7 @@ export function NavbarDesktopSearch({
                             <div className="mb-4 flex items-center justify-between">
                                 <div>
                                     <h3 className="text-lg font-black text-[#1e293b] md:text-xl">Users</h3>
-                                    <p className="text-xs font-semibold text-[#7c6a60]">Most followed users first</p>
+                                    <p className="text-xs font-semibold text-[#7c6a60]">Quick user matches</p>
                                 </div>
                                 <Link href="/leaderboard" onClick={closeModal} className="text-[#f97316] text-xs md:text-sm font-bold">View all →</Link>
                             </div>
@@ -581,11 +587,11 @@ export function NavbarDesktopSearch({
                                                     <p className="mt-0.5 text-[9px] font-black uppercase tracking-[0.07em] text-[#8a7468]">Followers</p>
                                                 </div>
                                                 <div className="min-w-0 px-1">
-                                                    <p className="truncate text-sm font-black text-emerald-700">{formatCompactNumber(user.won)}</p>
+                                                    <p className="truncate text-sm font-black text-emerald-700">{user.won == null ? "—" : formatCompactNumber(user.won)}</p>
                                                     <p className="mt-0.5 text-[9px] font-black uppercase tracking-[0.07em] text-[#8a7468]">Wins</p>
                                                 </div>
                                                 <div className="min-w-0 px-1">
-                                                    <p className={`truncate text-sm font-black ${user.pnl > 0 ? "text-emerald-700" : user.pnl < 0 ? "text-red-600" : "text-[#111827]"}`} title={formatPnl(user.pnl)}>{formatPnl(user.pnl)}</p>
+                                                    <p className={`truncate text-sm font-black ${user.pnl != null && user.pnl > 0 ? "text-emerald-700" : user.pnl != null && user.pnl < 0 ? "text-red-600" : "text-[#111827]"}`} title={user.pnl == null ? "Open leaderboard for performance" : formatPnl(user.pnl)}>{user.pnl == null ? "—" : formatPnl(user.pnl)}</p>
                                                     <p className="mt-0.5 text-[9px] font-black uppercase tracking-[0.07em] text-[#8a7468]">P&amp;L</p>
                                                 </div>
                                             </div>

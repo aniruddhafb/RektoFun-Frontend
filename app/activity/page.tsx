@@ -358,7 +358,7 @@ export default function ActivityPage() {
             const matchesSearch =
                 normalizedSearch.length === 0 ||
                 challenge.title?.toLowerCase().includes(normalizedSearch) ||
-                getActivityVerb(activity.type).includes(normalizedSearch) ||
+                getActivityVerb(activity.type, activity.challenge).includes(normalizedSearch) ||
                 activity.actor?.username?.toLowerCase().includes(normalizedSearch) ||
                 creator.username.toLowerCase().includes(normalizedSearch) ||
                 creator.wallet.toLowerCase().includes(normalizedSearch) ||
@@ -653,7 +653,16 @@ export default function ActivityPage() {
                                                 >
                                                     {actorName}
                                                 </Link>
-                                                <span className="min-w-0 truncate">{getActivityVerb(item.type).toLowerCase()}</span>
+                                                <span className="min-w-0 truncate">{getActivityVerb(item.type, item.challenge).toLowerCase()}</span>
+                                                {item.type === "created" && item.challenge.visibility === "DIRECT" && item.challenge.challenged_user_details ? (
+                                                    <Link
+                                                        href={`/profile/${encodeURIComponent(item.challenge.challenged_user_details.pubkey)}`}
+                                                        onClick={(event) => event.stopPropagation()}
+                                                        className="max-w-36 truncate font-bold text-[#352720] transition-colors hover:text-[#8b5e3c] hover:underline"
+                                                    >
+                                                        {item.challenge.challenged_user_details.username}
+                                                    </Link>
+                                                ) : null}
                                                 {item.amount != null && (
                                                     <span className="shrink-0 font-bold text-[#352720]">
                                                         ${Number(item.amount).toLocaleString()}

@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { Ban, ChevronRight, Crown, LogIn, Plus, RotateCcw, TimerOff, Trophy, UsersRound, Wallet } from "lucide-react";
 import {
     Challenge,
@@ -108,7 +109,7 @@ export function ProfileActivity({ userId, username, avatar, onActivityClick, sea
         const query = searchQuery.trim().toLowerCase();
         return activities
             .filter((activity) => activity.type !== "expired" || getActivityChallengeLifecycle(activity.challenge) === "EXPIRED")
-            .filter((activity) => !query || [activity.challenge.statement, activity.challenge.title, activity.challenge.ticker, activity.challenge.trading_pair, getActivityVerb(activity.type)]
+            .filter((activity) => !query || [activity.challenge.statement, activity.challenge.title, activity.challenge.ticker, activity.challenge.trading_pair, getActivityVerb(activity.type, activity.challenge)]
                 .some((value) => value?.toLowerCase().includes(query)))
             .sort((a, b) => {
                 const difference = new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime();
@@ -215,7 +216,16 @@ export function ProfileActivity({ userId, username, avatar, onActivityClick, sea
                             <div className="min-w-0 flex-1 text-xs text-[#826e62]">
                                 <div className="flex min-w-0 items-center gap-1.5">
                                     <span className="max-w-36 truncate font-bold text-[#352720]">{actorName}</span>
-                                    <span className="min-w-0 truncate">{getActivityVerb(item.type).toLowerCase()}</span>
+                                    <span className="min-w-0 truncate">{getActivityVerb(item.type, item.challenge).toLowerCase()}</span>
+                                    {item.type === "created" && item.challenge.visibility === "DIRECT" && item.challenge.challenged_user_details ? (
+                                        <Link
+                                            href={`/profile/${encodeURIComponent(item.challenge.challenged_user_details.pubkey)}`}
+                                            onClick={(event) => event.stopPropagation()}
+                                            className="max-w-36 truncate font-bold text-[#352720] transition-colors hover:text-[#8b5e3c] hover:underline"
+                                        >
+                                            {item.challenge.challenged_user_details.username}
+                                        </Link>
+                                    ) : null}
                                     {item.amount != null && <span className="shrink-0 font-bold text-[#352720]">${Number(item.amount).toLocaleString()}</span>}
                                 </div>
                                 <span className="mt-0.5 block text-[11px] text-[#a08c80]">{formatTimeAgo(item.occurredAt)}</span>

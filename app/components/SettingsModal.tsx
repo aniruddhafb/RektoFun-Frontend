@@ -44,9 +44,9 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const shortAddress = address ? `${address.slice(0, 6)}...${address.slice(-4)}` : "Not connected";
 
   return createPortal(
-    <div className="fixed inset-0 z-[220] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="settings-modal-title">
+    <div className="fixed inset-0 z-[220] flex items-start justify-center overflow-y-auto p-2 sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-labelledby="settings-modal-title">
       <button type="button" className="absolute inset-0 cursor-default bg-black/55 backdrop-blur-sm" onClick={handleClose} aria-label="Close settings" />
-      <div className="relative z-10 w-full max-w-md overflow-hidden rounded-2xl border border-[#1f2937] bg-[#fff8f4]">
+      <div className="relative z-10 my-1 max-h-[calc(100dvh-0.75rem)] w-full max-w-md touch-pan-y overflow-y-auto overscroll-contain rounded-2xl border border-[#1f2937] bg-[#fff8f4] sm:my-0 sm:max-h-[90vh]">
         <div className="flex items-center justify-between border-b border-[#ead7cc] bg-white/60 px-5 py-4">
           {showExport ? (
             <button type="button" onClick={() => setShowExport(false)} aria-label="Back to wallet settings" className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-md border border-[#d7c5ba] bg-white text-gray-700 transition hover:border-gray-900 hover:bg-[#ffe8db]">

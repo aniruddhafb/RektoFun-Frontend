@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Search, ChevronDown, Clock, TrendingUp, Eye, Bookmark, PinIcon, CircleCheck, CircleX, DoorOpen } from "lucide-react";
+import { Search, ChevronDown, Clock, TrendingUp, Eye, Bookmark, PinIcon, CircleCheck, CircleX, DoorOpen, Swords } from "lucide-react";
 import { useBodyScrollLock } from "@/app/lib/useBodyScrollLock";
 
 interface ChallengeFiltersSectionProps {
@@ -20,6 +20,7 @@ const filterOptions: { label: string; icon: React.ReactNode }[] = [
     { label: "Pinned", icon: <PinIcon className="w-4 h-4 rotate-45" /> },
     { label: "My Bets", icon: <Bookmark className="w-4 h-4" /> },
     { label: "Created By Me", icon: <Eye className="w-4 h-4" /> },
+    { label: "Direct Challenges", icon: <Swords className="w-4 h-4" /> },
 ];
 
 export function ChallengeFiltersSection({

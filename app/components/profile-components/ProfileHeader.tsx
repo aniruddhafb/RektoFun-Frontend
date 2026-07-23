@@ -35,6 +35,7 @@ interface ProfileHeaderProps {
     showSettingsIcon?: boolean;
     isRektoBalanceLoading?: boolean;
     isUsdcBalanceLoading?: boolean;
+    onChallengeUser?: () => void;
 }
 
 function formatTokenBalance(balance: number) {
@@ -72,6 +73,7 @@ export function ProfileHeader({
     showSettingsIcon = false,
     isRektoBalanceLoading = false,
     isUsdcBalanceLoading = false,
+    onChallengeUser,
 }: ProfileHeaderProps) {
     const [walletCopied, setWalletCopied] = React.useState(false);
     const [isShareModalOpen, setIsShareModalOpen] = React.useState(false);
@@ -227,6 +229,15 @@ export function ProfileHeader({
 
                     {/* Action Buttons - Redesigned */}
                     <div className="flex w-full flex-wrap items-stretch justify-center sm:justify-start gap-2 sm:gap-3 mt-1">
+                        {!isOwnProfile && onChallengeUser ? (
+                            <button
+                                type="button"
+                                onClick={onChallengeUser}
+                                className="w-full cursor-pointer rounded-xl border-2 border-black bg-[#f5d547] px-4 py-2 text-sm font-black text-black shadow-[3px_3px_0_#111] transition hover:-translate-y-0.5 sm:w-auto"
+                            >
+                                ⚔️ Challenge
+                            </button>
+                        ) : null}
                         {/* Joined Badge */}
                         <div className="w-full sm:w-auto px-3 sm:px-4 py-2 bg-gradient-to-r from-orange-100 to-amber-100 rounded-xl text-xs sm:text-sm font-medium text-orange-700 border border-orange-200/50 flex items-center justify-center sm:justify-start gap-2">
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

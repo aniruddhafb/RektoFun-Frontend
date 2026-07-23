@@ -295,6 +295,7 @@ export function useChallengeCard(challenge: Challenge) {
     challengePDA: string;
     joinCreatorSide?: boolean;
     amountMicroUsdc?: string;
+    challengeId?: number;
   }) => {
     if (!walletProvider) throw new Error("Wallet is not ready.");
     const response = await fetch("/api/challenges/action", {
@@ -388,6 +389,7 @@ export function useChallengeCard(challenge: Challenge) {
 
   const openBetForm = (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (isDirectJoinRestricted || isDeclinedDirectInvitation) return;
     if (hasJoinedChallenge || isJoinedStatusLoading) return;
     if (!isConnected || !address) {
       open();
@@ -415,6 +417,12 @@ export function useChallengeCard(challenge: Challenge) {
   };
 
   const handleJoinChallenge = async () => {
+    if (isDirectJoinRestricted || isDeclinedDirectInvitation) {
+      setBetError(isDeclinedDirectInvitation
+        ? "This invitation was declined."
+        : "Only the challenged user can join this battle.");
+      return;
+    }
     if (hasJoinedChallenge) {
       setBetError("You have already joined this challenge.");
       return;
@@ -512,6 +520,7 @@ export function useChallengeCard(challenge: Challenge) {
       const depositMicroUsdc = BigInt(Math.round(parsedBetAmount * USDC_MULTIPLIER));
       await signAndSendSponsoredAction({
         action: "accept",
+        challengeId: challenge.id,
         participant: challengerPubkey.toBase58(),
         creator: creatorPubkey.toBase58(),
         challengePDA: challengePDA.toBase58(),
@@ -578,6 +587,10 @@ export function useChallengeCard(challenge: Challenge) {
 
   const creator = challenge.creator;
   const isCreator = user?.id != null && user.id === creator;
+  const isDirectJoinRestricted = challenge.visibility === "DIRECT"
+    && user?.id !== challenge.challenged_user_id;
+  const isDeclinedDirectInvitation = challenge.visibility === "DIRECT"
+    && challenge.invitation_status === "DECLINED";
   const creatorDetails = challenge.creator_details;
   const teamAHighestBet = challenge.bet_info?.highest_bet?.TEAM_A;
   const teamBHighestBet = challenge.bet_info?.highest_bet?.TEAM_B;
@@ -923,6 +936,10 @@ export function useChallengeCard(challenge: Challenge) {
       ctaLabel = "Already joined";
       ctaDisabled = true;
       ctaClassName = ongoingCtaClassName;
+    } else if (isDirectJoinRestricted || isDeclinedDirectInvitation) {
+      ctaLabel = isDeclinedDirectInvitation ? "Invitation declined" : "Invitation only";
+      ctaDisabled = true;
+      ctaClassName = cancelledCtaClassName;
     } else if (lifecycle === "LIVE") {
       if (isTeam && !isExpireTimeAchieved) {
         ctaLabel = "Join challenge";

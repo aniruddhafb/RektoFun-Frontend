@@ -10,8 +10,8 @@ export type SearchModalUser = {
   twitter_username?: string | null;
   user_type?: "user" | "moderator" | null;
   follower_count: number;
-  won: number;
-  pnl: number;
+  won: number | null;
+  pnl: number | null;
 };
 
 export type SearchModalResponse = {
@@ -22,7 +22,7 @@ export type SearchModalResponse = {
 const API_BASE_URL = "/api/backend";
 const requests = new Map<string, Promise<SearchModalResponse>>();
 const cache = new Map<string, { data: SearchModalResponse; expiresAt: number }>();
-const CACHE_TTL_MS = 30_000;
+const CACHE_TTL_MS = 2 * 60_000;
 
 export async function getSearchModalResults(query = ""): Promise<SearchModalResponse> {
   const normalized = query.trim();

@@ -118,7 +118,7 @@ export async function getPositionById(id: number): Promise<Position> {
   return response.json();
 }
 
-const PARTICIPANT_CACHE_TTL_MS = 30_000;
+const PARTICIPANT_CACHE_TTL_MS = 5 * 60_000;
 const participantRequests = new Map<number, {
   promise: Promise<ChallengeParticipantPosition[]>;
   expiresAt: number;

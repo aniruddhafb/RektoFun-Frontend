@@ -122,6 +122,7 @@ export function ChallengeGrid({
             const isCreatedByMeFilter = activeFilter === "Created By Me";
             const isExpiringSoonFilter = activeFilter === "Expiring Soon";
             const isOpenFilter = activeFilter === "Open";
+            const isDirectFilter = activeFilter === "Direct Challenges";
             const statusFilter = activeFilter === "Completed"
                 ? "RESOLVED"
                 : activeFilter === "Cancelled"
@@ -150,6 +151,7 @@ export function ChallengeGrid({
                     expiring_soon: isExpiringSoonFilter || undefined,
                     joinable: isOpenFilter || undefined,
                     include_total: false,
+                    visibility: isDirectFilter ? "DIRECT" : undefined,
                 }),
                 isMyBetsFilter ? getPositions({ limit: 100, offset: 0 }) : Promise.resolve(null),
             ]);

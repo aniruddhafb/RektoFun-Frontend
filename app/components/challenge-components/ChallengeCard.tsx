@@ -9,8 +9,11 @@ import { ShareChallengeModal } from "./ShareChallengeModal";
 import { ProfileHoverPreview } from "./ProfileHoverPreview";
 import { WinningsShareModal } from "./WinningsShareModal";
 import { ChallengeActionModal } from "./ChallengeActionModal";
-import { getPositionsByChallenge, type Position } from "@/app/lib/positions-service/positions";
-import { getUserById, type User as UserType } from "@/app/lib/users-service/users";
+import {
+    getPositionsByChallenge,
+    type ChallengeParticipantPosition,
+    type ParticipantUser,
+} from "@/app/lib/positions-service/positions";
 import { CHALLENGE_UPDATED_EVENT, type ChallengeUpdatedDetail } from "@/app/lib/realtime-events";
 
 type TeamCardParticipant = {
@@ -21,20 +24,17 @@ type TeamCardParticipant = {
     side: "TEAM_A" | "TEAM_B";
 };
 
-const cardParticipantRequests = new Map<number, Promise<Array<{ position: Position; user: UserType | null }>>>();
+const cardParticipantRequests = new Map<number, Promise<Array<{
+    position: ChallengeParticipantPosition;
+    user: ParticipantUser | null;
+}>>>();
 
 function loadCardParticipants(challengeId: number, refresh = false) {
     if (refresh) cardParticipantRequests.delete(challengeId);
     const cached = cardParticipantRequests.get(challengeId);
     if (cached) return cached;
-    const request = getPositionsByChallenge(challengeId, refresh).then(async (positions) => {
-        const userIds = [...new Set(positions.map((position) => position.creator).filter(Boolean))];
-        const users = await Promise.allSettled(userIds.map((id) => getUserById(id)));
-        const usersById = new Map<number, UserType>();
-        users.forEach((result) => {
-            if (result.status === "fulfilled") usersById.set(result.value.id, result.value);
-        });
-        return positions.map((position) => ({ position, user: usersById.get(position.creator) ?? null }));
+    const request = getPositionsByChallenge(challengeId, refresh).then((positions) => {
+        return positions.map((position) => ({ position, user: position.user ?? null }));
     }).catch((error) => {
         cardParticipantRequests.delete(challengeId);
         throw error;
@@ -105,6 +105,7 @@ export function ChallengeCard({
     const [viewOverrides, setViewOverrides] = React.useState<Record<number, number>>({});
     const [teamParticipants, setTeamParticipants] = React.useState<{ challengeId: number; rows: TeamCardParticipant[] } | null>(null);
     const [shouldLoadParticipants, setShouldLoadParticipants] = React.useState(false);
+    const cardRef = React.useRef<HTMLDivElement>(null);
     const viewCount = Math.max(challenge.views ?? 0, viewOverrides[challenge.id] ?? 0);
     const {
         isLoading,
@@ -243,6 +244,22 @@ export function ChallengeCard({
         };
     }, [challenge.creator, challenge.creator_id, challenge.id, creatorDisplayName, creatorProfileImage, creatorWalletAddress, isTeam, shouldLoadParticipants]);
 
+    React.useEffect(() => {
+        if (!isTeam || shouldLoadParticipants) return;
+        const card = cardRef.current;
+        if (!card) return;
+        const observer = new IntersectionObserver(
+            ([entry]) => {
+                if (!entry?.isIntersecting) return;
+                setShouldLoadParticipants(true);
+                observer.disconnect();
+            },
+            { rootMargin: "300px 0px" },
+        );
+        observer.observe(card);
+        return () => observer.disconnect();
+    }, [isTeam, shouldLoadParticipants]);
+
     const currentTeamParticipants = teamParticipants?.challengeId === challenge.id ? teamParticipants.rows : [];
     const usePromotionalShareCard = isCancelledState || (isExpireTimeAchieved && !hasOpponents);
     const challengerProfiles = isTeam
@@ -286,7 +303,7 @@ export function ChallengeCard({
 
     return (
         <>
-            <div onClick={handleClick}
+            <div ref={cardRef} onClick={handleClick}
                 onMouseEnter={() => setShouldLoadParticipants(true)}
                 onFocusCapture={() => setShouldLoadParticipants(true)}
                 onTouchStart={() => setShouldLoadParticipants(true)}
