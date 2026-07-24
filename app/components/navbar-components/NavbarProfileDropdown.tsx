@@ -428,9 +428,9 @@ export function NavbarProfileDropdown({
                                 Docs
                             </a>
 
-                            <div className="my-2 border-t-2 border-black" />
+                            <div className="hidden sm:block my-2 border-t-2 border-black" />
 
-                            <div className="px-4 py-2">
+                            <div className="hidden sm:block px-4 py-2">
                                 <p className="text-xs text-gray-500 mb-2">Our Socials</p>
                                 <div className="flex gap-3">
                                     <a
